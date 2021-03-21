@@ -197,8 +197,7 @@ def _parse_axis_from_substring(smoothie_substring):
 def _parse_position_response(raw_axis_values) -> Dict[str, float]:
     parsed_values = parse_key_values(raw_axis_values)
     if len(parsed_values) < 6:
-        msg = 'Unexpected response in _parse_position_response: {}'.format(
-            raw_axis_values)
+        msg = f'Unexpected response in _parse_position_response: {raw_axis_values}'
         log.error(msg)
         raise ParseError(msg)
 
