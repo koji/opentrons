@@ -34,6 +34,7 @@ migrated_dummy_settings = {
     'acceleration': {'X': 3, 'Y': 2, 'Z': 15, 'A': 15, 'B': 2, 'C': 2},
     'z_retract_distance': 2,
     'left_mount_offset': [-34, 0, 0],
+    'drop_tip_location': [347.84, 351.5, 82],
     'serial_speed': 888,
     'default_current': {
         'default': {'X': 1.25, 'Y': 1.25, 'Z': 0.5, 'A': 0.5, 'B': 0.05, 'C': 0.05},
@@ -61,6 +62,7 @@ new_dummy_settings = {
     'acceleration': {'X': 3, 'Y': 2, 'Z': 15, 'A': 15, 'B': 2, 'C': 2},
     'z_retract_distance': 2,
     'left_mount_offset': [-34, 0, 0],
+    'drop_tip_location': [347.84, 351.5, 82],
     'serial_speed': 888,
     'default_current': {
         'default': {'X': 1.25, 'Y': 1.25, 'Z': 0.8, 'A': 0.8, 'B': 0.05, 'C': 0.05},

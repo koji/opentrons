@@ -588,7 +588,15 @@ class API(HardwareAPILike):
         """
         self._backend.halt()
         self._log.info("Recovering from halt")
-        await self.reset()
+        await self.reset_execution_manager()
+        await self.home_z()
+        for mount, pipette in self._attached_instruments.items():
+            if pipette and pipette.has_tip:
+                loc = top_types.Point(*self._config.drop_tip_location)
+                await self.move_to(mount, loc)
+                self._log.info(f"Dropping tip after halt on {pipette}")
+                await self.drop_tip(mount, home_after=False)
+        self.reset_instrument()
         await self.home()
 
     async def _wait_for_is_running(self):
@@ -601,10 +609,11 @@ class API(HardwareAPILike):
         This will re-scan instruments and models, clearing any cached
         information about their presence or state.
         """
+        await self.reset_execution_manager()
+        self.reset_instrument()
+
+    async def reset_execution_manager(self):
         await self._execution_manager.reset()
-        self._attached_instruments = {
-            k: None for k in self._attached_instruments.keys()}
-        await self.cache_instruments()
 
     # Gantry/frame (i.e. not pipette) action API
     async def home_z(self, mount: top_types.Mount = None):
@@ -772,6 +781,7 @@ class API(HardwareAPILike):
             if refresh:
                 self._current_position = self._deck_from_smoothie(
                     self._backend.update_position())
+                self._log.info("Updating current position in STOP!")
             if mount == top_types.Mount.RIGHT:
                 offset = top_types.Point(0, 0, 0)
             else:
@@ -864,6 +874,7 @@ class API(HardwareAPILike):
                            is still set by ``speed``.
         """
         if not self._current_position:
+            self._log.info("No current position :(")
             await self.home()
 
         mounts = self._mounts(mount)

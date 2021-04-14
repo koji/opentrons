@@ -44,3 +44,4 @@ class RobotConfig:
     log_level: str
     z_retract_distance: float
     left_mount_offset: Tuple[float, float, float]
+    drop_tip_location: Tuple[float, float, float]

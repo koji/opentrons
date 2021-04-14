@@ -7,7 +7,7 @@ from pathlib import Path
 
 from typing import Any, Dict, List, Union, Optional, TypeVar, cast
 
-from opentrons.config import CONFIG
+from opentrons.config import CONFIG, feature_flags as fflags
 from opentrons.hardware_control.types import BoardRevision
 from .types import CurrentDict, RobotConfig, AxisDict
 
@@ -154,6 +154,8 @@ DEFAULT_MOUNT_OFFSET = [-34, 0, 0]
 DEFAULT_PIPETTE_OFFSET = [0.0, 0.0, 0.0]
 SERIAL_SPEED = 115200
 DEFAULT_LOG_LEVEL = 'INFO'
+DROP_TIP_LOCATION =\
+    [347.84, 351.5, 58] if fflags.short_fixed_trash() else [347.84, 351.5, 82]
 
 
 def _build_hw_versioned_current_dict(
@@ -219,6 +221,9 @@ def build_config(robot_settings: Dict[str, Any]) -> RobotConfig:
             'z_retract_distance', Z_RETRACT_DISTANCE),
         left_mount_offset=robot_settings.get(
             'left_mount_offset', DEFAULT_MOUNT_OFFSET),
+        drop_tip_location=robot_settings.get(
+            'drop_tip_location', DROP_TIP_LOCATION
+        )
     )
 
 
