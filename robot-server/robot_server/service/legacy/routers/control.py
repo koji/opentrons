@@ -44,6 +44,7 @@ async def get_robot_positions() -> control.RobotPositionsResponse:
     can easily access the pipette mount screws with a screwdriver. Attach tip
     position places either pipette roughly in the front-center of the deck area
     """
+    # What if we change the motion target to be the pipette and not the mount?
     robot_positions = control.RobotPositions(
         change_pipette=control.ChangePipette(
             target=control.MotionTarget.mount, left=[300, 40, 30], right=[95, 40, 30]
@@ -147,11 +148,11 @@ async def post_robot_light_state(
 
 async def _do_move(hardware: ThreadManager, robot_move_target: control.RobotMoveTarget):
     """Perform the move"""
-    await hardware.cache_instruments()
+    # await hardware.cache_instruments()
 
-    critical_point = None
-    if robot_move_target.target == control.MotionTarget.mount:
-        critical_point = CriticalPoint.MOUNT
+    # critical_point = None
+    # if robot_move_target.target == control.MotionTarget.mount:
+    #     critical_point = CriticalPoint.MOUNT
 
     mount = Mount[robot_move_target.mount.upper()]
     target_pos = Point(*robot_move_target.point)
@@ -159,16 +160,15 @@ async def _do_move(hardware: ThreadManager, robot_move_target: control.RobotMove
     # Reset z position
     await hardware.home_z()
 
-    gantry_position = hardware.gantry_position
-    move_to = hardware.move_to
+    # gantry_position = hardware.gantry_position
+    # move_to = hardware.move_to
 
-    pos = await gantry_position(mount, critical_point=critical_point)
+    pos = await hardware.gantry_position(mount)
     # Move to requested x, y and current z position
-    await move_to(
+    await hardware.move_to(
         mount,
-        Point(x=target_pos.x, y=target_pos.y, z=pos.z),
-        critical_point=critical_point,
+        Point(x=target_pos.x, y=target_pos.y, z=pos.z)
     )
     # Move to requested z position
-    await move_to(mount, target_pos, critical_point=critical_point)
-    return await gantry_position(mount)
+    await hardware.move_to(mount, target_pos)
+    return await hardware.gantry_position(mount)

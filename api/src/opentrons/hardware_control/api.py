@@ -51,6 +51,7 @@ from .types import (
     PairedPipetteConfigValueError,
     MotionChecks,
     PauseType,
+    PipetteGeneration,
 )
 from . import modules, robot_calibration as rb_cal
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 """
 from dataclasses import asdict, replace
 import logging
+import re
 from typing import Any, Dict, Optional, Set, Tuple, Union, TYPE_CHECKING
 
 from opentrons.types import Point
@@ -11,7 +12,7 @@ from opentrons.calibration_storage.types import PipetteOffsetByPipetteMount
 from opentrons.config import pipette_config, robot_configs
 from opentrons.config.types import RobotConfig
 from opentrons.drivers.types import MoveSplit
-from .types import CriticalPoint, BoardRevision
+from .types import CriticalPoint, BoardRevision, PipetteGeneration
 
 
 if TYPE_CHECKING:
@@ -59,6 +60,9 @@ class Pipette:
         self._tip_overlap_map = self._config.tip_overlap
         self._has_tip = False
         self._pipette_id = pipette_id
+        self._generation = (
+            PipetteGeneration.GEN2
+            if self.check_generation(self._model) == 2 else PipetteGeneration.GEN1)
         self._log = mod_log.getChild(
             self._pipette_id if self._pipette_id else "<unknown>"
         )
@@ -126,6 +130,16 @@ class Pipette:
     @property
     def pipette_id(self) -> Optional[str]:
         return self._pipette_id
+
+    @property
+    def generation(self) -> PipetteGeneration:
+        return self._generation
+
+    @staticmethod
+    def check_generation(pipette_model: str) -> int:
+        GEN1_RE = re.compile('v1')
+        matches_gen1 = GEN1_RE.search(pipette_model)
+        return 1 if matches_gen1 else 2
 
     def critical_point(self, cp_override: CriticalPoint = None) -> Point:
         """

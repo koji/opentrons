@@ -145,6 +145,14 @@ class BoardRevision(enum.Enum):
         return self.real_name()
 
 
+class PipetteGeneration(enum.Enum):
+    GEN1 = enum.auto()
+    GEN2 = enum.auto()
+
+    def __str__(self):
+        return self.name
+
+
 class CriticalPoint(enum.Enum):
     """Possibilities for the point to move in a move call.
 
