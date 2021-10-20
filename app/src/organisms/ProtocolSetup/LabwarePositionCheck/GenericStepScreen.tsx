@@ -3,11 +3,14 @@ import {
   ALIGN_CENTER,
   Box,
   DIRECTION_COLUMN,
+  C_BLUE,
   Flex,
   JUSTIFY_CENTER,
   JUSTIFY_SPACE_BETWEEN,
+  PrimaryBtn,
   SPACING_3,
   SPACING_5,
+  SPACING_4,
 } from '@opentrons/components'
 import { LabwarePositionCheckStepDetail } from './LabwarePositionCheckStepDetail'
 import { SectionList } from './SectionList'
@@ -18,6 +21,8 @@ import type { LabwarePositionCheckStep } from './types'
 interface GenericStepScreenProps {
   selectedStep: LabwarePositionCheckStep
   setCurrentLabwareCheckStep: (stepNumber: number) => void
+  ctaText: string
+  proceed: () => void
 }
 export const GenericStepScreen = (
   props: GenericStepScreenProps
@@ -54,6 +59,11 @@ export const GenericStepScreen = (
         <Box width="60%" padding={SPACING_3}>
           <LabwarePositionCheckStepDetail selectedStep={props.selectedStep} />
         </Box>
+      </Flex>
+      <Flex justifyContent={JUSTIFY_CENTER} marginBottom={SPACING_4}>
+        <PrimaryBtn backgroundColor={C_BLUE} onClick={props.proceed}>
+          {props.ctaText}
+        </PrimaryBtn>
       </Flex>
     </Box>
   )
