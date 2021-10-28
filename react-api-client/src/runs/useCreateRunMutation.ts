@@ -9,18 +9,22 @@ import { useHost } from '../api'
 
 export type UseCreateRunMutationResult = UseMutationResult<
   Run,
-  unknown,
+  Error,
   void
 > & {
   createRun: UseMutateFunction<Run, unknown, void>
 }
 
 export function useCreateRunMutation(
-  createRunData: CreateRunData
+  createSessionData: CreateRunData
 ): UseCreateRunMutationResult {
   const host = useHost()
-  const mutation = useMutation<Run, unknown>(['run', host], () =>
-    createRun(host as HostConfig, createRunData).then(response => response.data)
+  const mutation = useMutation<Run, Error>(['run', host], () =>
+    createRun(host as HostConfig, createSessionData)
+      .then(response => response.data)
+      .catch((e: Error) => {
+        throw e
+      })
   )
   return {
     ...mutation,
