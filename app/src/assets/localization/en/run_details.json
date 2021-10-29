@@ -12,5 +12,11 @@
   "status_finished": "Finished",
   "status_loaded": "Not started",
   "status_paused": "Paused",
-  "status_running": "Running"
+  "status_running": "Running",
+  "protocol_setup": "Protocol Setup",
+  "cancel_run": "Cancel Run",
+  "load_pipette_protocol_setup": "Load {{pipette_name}} in {{mount_name}} Mount",
+  "load_modules_protocol_setup": "Load {{module}} in Slot {{slot_name}}",
+  "load_labware_info_protocol_setup": "Load {{labware_namespace}} {{labware_loadname}} {{labware_version}} in {{slot_number}}",
+  "labware_slot_protocol_setup": "in {{slot_number}}"
 }
