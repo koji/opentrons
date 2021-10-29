@@ -12,7 +12,7 @@ export function useRunsByTypeQuery(args: {
     () =>
       getRuns(host as HostConfig)
         .then(response => {
-          return response.data.data.filter(run => run.sessionType === runType)
+          return response.data.data.filter(run => run.runType === runType)
         })
         .catch((e: Error) => {
           throw e
