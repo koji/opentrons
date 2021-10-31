@@ -16,5 +16,5 @@ export function createRun(
   return request<
     Run,
     { data: { runType: RunType; createParams?: unknown } | undefined }
-  >(POST, '/sessions', { data }, config)
+  >(POST, '/runs', { data }, config)
 }
