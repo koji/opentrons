@@ -7,7 +7,9 @@ name = "javascript"
   plugins = ["react"]
   environment = [
     "nodejs",
-    "jest"
+    "browser",
+    "jest",
+    "cypress"
   ]
 
 [[analyzers]]
@@ -15,3 +17,6 @@ name = "test-coverage"
 
 [[transformers]]
 name = "prettier"
+
+[[transformers]]
+name = "standardjs"
