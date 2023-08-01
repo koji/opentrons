@@ -5,7 +5,7 @@ from datetime import datetime
 from math import pi
 from subprocess import run
 from time import time
-from typing import Callable, Coroutine, Dict, List, Optional, Tuple, Union, cast
+from typing import Callable, Coroutine, Dict, List, Optional, Tuple, Union
 
 from opentrons_hardware.drivers.can_bus import DriverSettings, build, CanMessenger
 from opentrons_hardware.drivers.can_bus import settings as can_bus_settings
@@ -18,14 +18,13 @@ from opentrons_shared_data.labware import load_definition as load_labware
 from opentrons.config.robot_configs import build_config_ot3, load_ot3 as load_ot3_config
 from opentrons.config.advanced_settings import set_adv_setting
 from opentrons.hardware_control.backends.ot3utils import sensor_node_for_mount
+from opentrons.hardware_control.types import SubSystem
 
 # TODO (lc 10-27-2022) This should be changed to an ot3 pipette object once we
 # have that well defined.
 from opentrons.hardware_control.instruments.ot2.pipette import Pipette as PipetteOT2
 from opentrons.hardware_control.instruments.ot3.pipette import Pipette as PipetteOT3
-from opentrons.hardware_control.motion_utilities import deck_from_machine
 from opentrons.hardware_control.ot3api import OT3API
-from opentrons_shared_data.robot import RobotType
 
 from .types import (
     GantryLoad,
@@ -39,6 +38,8 @@ from .types import (
 # TODO: use values from shared data, so we don't need to update here again
 TIP_LENGTH_OVERLAP = 10.5
 TIP_LENGTH_LOOKUP = {50: 57.9, 200: 58.35, 1000: 95.6}
+
+RESET_DELAY_SECONDS = 2
 
 
 @dataclass
@@ -123,6 +124,42 @@ def _create_attached_instruments_dict(
     }
 
 
+async def update_firmware(
+    api: OT3API, force: bool = False, subsystems: Optional[List[SubSystem]] = None
+) -> None:
+    """Update firmware of OT3."""
+    if not api.is_simulator:
+        await asyncio.sleep(RESET_DELAY_SECONDS)
+    subsystems_on_boot = api.attached_subsystems
+    progress_tracker: Dict[SubSystem, List[int]] = {}
+
+    def _print_update_progress() -> None:
+        msg = ""
+        for _sub_sys, (_ver, _prog) in progress_tracker.items():
+            if msg:
+                msg += ", "
+            msg += f"{_sub_sys.name}: v{_ver} ({_prog}%)"
+        print(msg)
+
+    if not subsystems:
+        subsystems = []
+    async for update in api.update_firmware(set(subsystems), force=force):
+        fw_version = subsystems_on_boot[update.subsystem].next_fw_version
+        if update.subsystem not in progress_tracker:
+            progress_tracker[update.subsystem] = [fw_version, 0]
+        if update.progress != progress_tracker[update.subsystem][1]:
+            progress_tracker[update.subsystem][1] = update.progress
+            _print_update_progress()
+
+
+async def reset_api(api: OT3API) -> None:
+    """Reset OT3API."""
+    if not api.is_simulator:
+        await asyncio.sleep(RESET_DELAY_SECONDS)
+    await api.cache_instruments()
+    await api.refresh_positions()
+
+
 async def build_async_ot3_hardware_api(
     is_simulating: Optional[bool] = False,
     use_defaults: Optional[bool] = True,
@@ -166,10 +203,9 @@ async def build_async_ot3_hardware_api(
         kwargs["use_usb_bus"] = False  # type: ignore[assignment]
         api = await builder(loop=loop, **kwargs)  # type: ignore[arg-type]
     if not is_simulating:
-        await asyncio.sleep(0.5)
-        await api.cache_instruments()
-        async for update in api.update_firmware():
-            print(f"Update: {update.subsystem.name}: {update.progress}%")
+        await update_firmware(api)
+    print(f"Firmware: v{api.fw_version}")
+    await reset_api(api)
     return api
 
 
@@ -419,6 +455,7 @@ async def move_plunger_absolute_ot3(
     position: float,
     motor_current: Optional[float] = None,
     speed: Optional[float] = None,
+    expect_stalls: bool = False,
 ) -> None:
     """Move OT3 plunger position to an absolute position."""
     if not api.hardware_pipettes[mount.to_mount()]:
@@ -427,6 +464,7 @@ async def move_plunger_absolute_ot3(
     _move_coro = api._move(
         target_position={plunger_axis: position},  # type: ignore[arg-type]
         speed=speed,
+        expect_stalls=expect_stalls,
     )
     if motor_current is None:
         await _move_coro
@@ -493,18 +531,11 @@ async def move_gripper_jaw_relative_ot3(api: OT3API, delta: float) -> None:
 
 def get_endstop_position_ot3(api: OT3API, mount: OT3Mount) -> Dict[Axis, float]:
     """Get the endstop's position per mount."""
-    transforms = api._robot_calibration
-    machine_pos_per_axis = api._backend.home_position()
-    deck_pos_per_axis = deck_from_machine(
-        machine_pos=machine_pos_per_axis,
-        attitude=transforms.deck_calibration.attitude,
-        offset=transforms.carriage_offset,
-        robot_type=cast(RobotType, "OT-3 Standard"),
+    carriage_pos = api._deck_from_machine(api._backend.home_position())
+    pos_at_home = api._effector_pos_from_carriage_pos(
+        OT3Mount.from_mount(mount), carriage_pos, None
     )
-    mount_pos_per_axis = api._effector_pos_from_carriage_pos(
-        mount, deck_pos_per_axis, None
-    )
-    return {ax: val for ax, val in mount_pos_per_axis.items()}
+    return {ax: val for ax, val in pos_at_home.items()}
 
 
 def get_gantry_homed_position_ot3(api: OT3API, mount: OT3Mount) -> Point:
@@ -945,6 +976,16 @@ def get_pipette_serial_ot3(pipette: Union[PipetteOT2, PipetteOT3]) -> str:
     return f"P{volume}{channels}V{version}{id}"
 
 
+def get_robot_serial_ot3(api: OT3API) -> str:
+    """Get robot serial number."""
+    if api.is_simulator:
+        return "FLXA1000000000000"
+    robot_id = api._backend.eeprom_data.serial_number
+    if not robot_id:
+        robot_id = "None"
+    return robot_id
+
+
 def clear_pipette_ul_per_mm(api: OT3API, mount: OT3Mount) -> None:
     """Clear pipette ul-per-mm."""
 
@@ -973,8 +1014,8 @@ def clear_pipette_ul_per_mm(api: OT3API, mount: OT3Mount) -> None:
             pip_nominal_ul_per_mm,
         ),
     ]
-    pip._active_tip_settings.aspirate["default"] = ul_per_mm  # type: ignore[assignment]
-    pip._active_tip_settings.dispense["default"] = ul_per_mm  # type: ignore[assignment]
+    pip._active_tip_settings.aspirate.default["1"] = ul_per_mm  # type: ignore[assignment]
+    pip._active_tip_settings.dispense.default["1"] = ul_per_mm  # type: ignore[assignment]
     pip.ul_per_mm.cache_clear()
     assert pip.ul_per_mm(1, "aspirate") == pip_nominal_ul_per_mm
     assert pip.ul_per_mm(pip.working_volume, "aspirate") == pip_nominal_ul_per_mm

@@ -45,6 +45,7 @@ from opentrons_hardware.hardware_control.motion_planning import (
     Move,
     Coordinates,
 )
+from opentrons.hardware_control.estop_state import EstopStateMachine
 from opentrons_hardware.drivers.eeprom import EEPROMData
 from opentrons.hardware_control.module_control import AttachedModulesControl
 from opentrons.hardware_control import modules
@@ -75,7 +76,7 @@ from opentrons.hardware_control.dev_types import (
     InstrumentHardwareConfigs,
     PipetteSpec,
     GripperSpec,
-    OT3AttachedPipette,
+    AttachedPipette,
     AttachedGripper,
     OT3AttachedInstruments,
 )
@@ -137,6 +138,7 @@ class OT3Simulator:
         self._update_required = False
         self._initialized = False
         self._lights = {"button": False, "rails": False}
+        self._estop_state_machine = EstopStateMachine(detector=None)
 
         def _sanitize_attached_instrument(
             mount: OT3Mount, passed_ai: Optional[Dict[str, Optional[str]]] = None
@@ -292,13 +294,14 @@ class OT3Simulator:
         auto_zero_sensor: bool = True,
         num_baseline_reads: int = 10,
         sensor_id: SensorId = SensorId.S0,
-    ) -> None:
+    ) -> Dict[NodeId, float]:
 
         head_node = axis_to_node(Axis.by_mount(mount))
         pos = self._position
-        pos[head_node] = max_z_distance - 2
+        pos[head_node] += max_z_distance
         self._position.update(pos)
         self._encoder_position.update(pos)
+        return self._position
 
     @ensure_yield
     async def move(
@@ -367,6 +370,10 @@ class OT3Simulator:
         self._encoder_position[NodeId.gripper_g] = encoder_position_um / 1000.0
 
     async def get_tip_present(self, mount: OT3Mount, tip_state: TipStateType) -> None:
+        """Raise an error if the given state doesn't match the physical state."""
+        pass
+
+    async def get_tip_present_state(self, mount: OT3Mount) -> int:
         """Get the state of the tip ejector flag for a given mount."""
         pass
 
@@ -407,7 +414,7 @@ class OT3Simulator:
         mount: OT3Mount,
         init_instr: PipetteSpec,
         expected_instr: Optional[PipetteName],
-    ) -> OT3AttachedPipette:
+    ) -> AttachedPipette:
         found_model = init_instr["model"]
 
         # TODO (lc 12-05-2022) When the time comes, we should think about supporting
@@ -686,3 +693,8 @@ class OT3Simulator:
             )
             for target in self._present_nodes
         }
+
+    @property
+    def estop_state_machine(self) -> EstopStateMachine:
+        """Return an estop state machine locked in the "disengaged" state."""
+        return self._estop_state_machine

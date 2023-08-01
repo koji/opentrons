@@ -23,7 +23,6 @@ from opentrons_shared_data.gripper import (
 
 from opentrons.drivers.types import MoveSplit
 from opentrons.types import Mount
-from opentrons.config.pipette_config import PipetteConfig
 from opentrons.hardware_control.types import GripperJawState
 
 
@@ -40,11 +39,6 @@ class GripperSpec(InstrumentSpec):
 
 
 class AttachedPipette(TypedDict):
-    config: Optional[PipetteConfig]
-    id: Optional[str]
-
-
-class OT3AttachedPipette(TypedDict):
     config: Optional[PipetteConfigurations]
     id: Optional[str]
 
@@ -56,7 +50,7 @@ class AttachedGripper(TypedDict):
 
 AttachedInstruments = Dict[Mount, AttachedPipette]
 
-OT3AttachedInstruments = Union[OT3AttachedPipette, AttachedGripper]
+OT3AttachedInstruments = Union[AttachedPipette, AttachedGripper]
 
 EIGHT_CHANNELS = Literal[8]
 ONE_CHANNEL = Literal[1]
@@ -95,6 +89,10 @@ class PipetteDict(InstrumentDict):
     ready_to_aspirate: bool
     has_tip: bool
     default_blow_out_volume: float
+
+
+class PipetteStateDict(TypedDict):
+    tip_detected: bool
 
 
 class GripperDict(InstrumentDict):
