@@ -58,7 +58,7 @@ export function BaseDeck(props: BaseDeckProps): JSX.Element {
         <DeckFromData def={deckDef} layerBlocklist={[]} />
       ) : (
         deckDef.locations.orderedSlots.map(slotDef => (
-          <>
+          <React.Fragment key={slotDef.id}>
             <DeckSlotLocation
               slotName={slotDef.id}
               deckDefinition={deckDef}
@@ -74,7 +74,7 @@ export function BaseDeck(props: BaseDeckProps): JSX.Element {
                 backgroundColor={darkFill}
               />
             ) : null}
-          </>
+          </React.Fragment>
         ))
       )}
       {moduleLocations.map(
@@ -84,6 +84,7 @@ export function BaseDeck(props: BaseDeckProps): JSX.Element {
           )
           return slotDef != null ? (
             <Module
+              key={moduleModel}
               def={getModuleDef2(moduleModel)}
               x={slotDef.position[0]}
               y={slotDef.position[1]}
@@ -107,7 +108,7 @@ export function BaseDeck(props: BaseDeckProps): JSX.Element {
             s.id === labwareLocation.slotName
         )
         return slotDef != null ? (
-          <g
+          <g key={definition.namespace}
             transform={`translate(${slotDef.position[0]},${slotDef.position[1]})`}
           >
             <LabwareRender definition={definition} />
