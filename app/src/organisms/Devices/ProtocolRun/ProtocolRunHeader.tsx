@@ -138,10 +138,9 @@ export function ProtocolRunHeader({
   const { startedAt, stoppedAt, completedAt } = useRunTimestamps(runId)
   const [showRunFailedModal, setShowRunFailedModal] = React.useState(false)
   const { data: runRecord } = useRunQuery(runId, { staleTime: Infinity })
-  const highestPriorityError =
-    runRecord?.data?.errors != null
-      ? getHighestPriorityError(runRecord?.data?.errors)
-      : undefined
+  const highestPriorityError = runRecord?.data.errors != null && runRecord?.data.errors.length > 0
+    ? getHighestPriorityError(runRecord?.data?.errors)
+    : undefined;
   const { data: estopStatus } = useEstopQuery({
     refetchInterval: ESTOP_POLL_MS,
   })
