@@ -559,6 +559,7 @@ function ActionButton(props: ActionButtonProps): JSX.Element {
         confirmAttachment()
       } else {
         play()
+        history.push(`/devices/${robotName}/protocol-runs/${runId}/run-preview`)
         trackProtocolRunEvent({
           name:
             runStatus === RUN_STATUS_IDLE
