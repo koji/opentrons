@@ -84,3 +84,9 @@ make setup
 ```
 
 Once `make setup` completes, you're ready to start developing!
+
+
+Note
+```zsh
+export NODE_OPTIONS=--openssl-legacy-provider
+```
