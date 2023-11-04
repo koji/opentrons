@@ -1,4 +1,4 @@
-FROM python:3.7.15
+FROM python:3.8.5
 
 RUN apt-get update && \
     apt-get install -y git pkg-config libsystemd-dev
@@ -14,6 +14,10 @@ WORKDIR /app/opentrons
 
 # Install dependencies and setup
 RUN make setup-py
+
+# Run gradio ui
+RUN pip install gradio requests
+RUN python app.py
 
 # Run the server
 RUN make -C robot-server dev
