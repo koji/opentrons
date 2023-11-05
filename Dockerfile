@@ -4,9 +4,6 @@ FROM kojikno/ot-robot-server:v1.1
 # Set the working directory
 WORKDIR /root/opentrons
 
-# Install gradio
-RUN pip install gradio
-
 # Run app.py
 RUN python app.py
 
