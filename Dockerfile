@@ -2,10 +2,12 @@
 FROM kojikno/ot-robot-server:v1.1
 
 # Set the working directory
-RUN cd /root/opentrons
+# RUN cd /root/opentrons
+WORKDIR /root/opentrons
+RUN ls
 
 # Run app.py
-RUN python app.py
+#RUN python app.py
 
 # Run make command in robot-server directory
 RUN make -C robot-server dev
