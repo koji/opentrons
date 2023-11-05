@@ -1,23 +1,14 @@
+# Use the base image from kojikno/ot-robot-server
 FROM kojikno/ot-robot-server
 
-RUN apt-get update && \
-    apt-get install -y git pkg-config libsystemd-dev
-
-# Set the working directory in the container to /app
+# Set the working directory
 WORKDIR /root/opentrons
 
-# Clone the Opentrons repository
-# RUN git clone https://github.com/koji/opentrons.git
+# Install gradio
+RUN pip install gradio
 
-# Change into the cloned directory
-# WORKDIR /app/opentrons
-
-# Install dependencies and setup
-# RUN make setup-py
-
-# Run gradio ui
-RUN pip install gradio requests
+# Run app.py
 RUN python app.py
 
-# Run the server
+# Run make command in robot-server directory
 RUN make -C robot-server dev
