@@ -2,7 +2,7 @@
 FROM kojikno/ot-robot-server:v1.1
 
 # Set the working directory
-WORKDIR /root/opentrons
+RUN cd /root/opentrons
 
 # Run app.py
 RUN python app.py
