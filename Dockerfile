@@ -1,5 +1,5 @@
 # Use the base image from kojikno/ot-robot-server
-FROM kojikno/ot-robot-server
+FROM kojikno/ot-robot-server:v1.0
 
 # Set the working directory
 WORKDIR /root/opentrons
