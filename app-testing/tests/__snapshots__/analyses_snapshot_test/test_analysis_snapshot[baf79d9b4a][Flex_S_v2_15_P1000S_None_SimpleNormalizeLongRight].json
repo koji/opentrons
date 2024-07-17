@@ -10685,8 +10685,10 @@
       "commandType": "loadPipette",
       "notes": [],
       "params": {
+        "liquidPresenceDetection": false,
         "mount": "right",
-        "pipetteName": "p1000_single_flex"
+        "pipetteName": "p1000_single_flex",
+        "tipOverlapNotAfterVersion": "v0"
       },
       "result": {},
       "status": "succeeded"
@@ -99223,6 +99225,7 @@
       "pipetteName": "p1000_single_flex"
     }
   ],
+  "result": "ok",
   "robotType": "OT-3 Standard",
   "runTimeParameters": []
 }
