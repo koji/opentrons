@@ -33,6 +33,9 @@ import { CollapsibleSection } from '/app/molecules/CollapsibleSection'
 
 import { Divider } from '/app/atoms/structure'
 import { NewRobotSetupHelp } from './NewRobotSetupHelp'
+import { useFeatureFlag } from '/app/redux/config'
+import { useSearch } from '/app/resources/devices'
+import { SearchComponent } from '../../../../organisms/Search/SearchComponent'
 
 import type { State } from '/app/redux/types'
 
@@ -52,6 +55,13 @@ export function DevicesLanding(): JSX.Element {
   const unreachableRobots = useSelector((state: State) =>
     getUnreachableRobots(state)
   )
+
+  const enableSearch = useFeatureFlag('enableSearch')
+  const {
+    searchTerm,
+    setSearchTerm,
+    filteredData: targetedHealthyReachableRobots,
+  } = useSearch(healthyReachableRobots)
 
   const [unhealthyReachableRobots, recentlySeenRobots] = partition(
     reachableRobots,
@@ -79,6 +89,13 @@ export function DevicesLanding(): JSX.Element {
         </LegacyStyledText>
         <NewRobotSetupHelp />
       </Flex>
+      {enableSearch ? (
+        <SearchComponent
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          type="device"
+        />
+      ) : null}
       {isScanning && noRobots ? <DevicesLoadingState /> : null}
       {!isScanning && noRobots ? <DevicesEmptyState /> : null}
       {!noRobots ? (
@@ -87,11 +104,13 @@ export function DevicesLanding(): JSX.Element {
             gridGap={SPACING.spacing4}
             marginY={SPACING.spacing8}
             title={t('available', {
-              count: [...healthyReachableRobots, ...unhealthyReachableRobots]
-                .length,
+              count: [
+                ...targetedHealthyReachableRobots,
+                ...unhealthyReachableRobots,
+              ].length,
             })}
           >
-            {healthyReachableRobots.map(robot => (
+            {targetedHealthyReachableRobots.map(robot => (
               <ApiHostProvider
                 key={robot.name}
                 hostname={robot.ip ?? null}
@@ -121,7 +140,7 @@ export function DevicesLanding(): JSX.Element {
             title={t('not_available', {
               count: [...recentlySeenRobots, ...unreachableRobots].length,
             })}
-            isExpandedInitially={healthyReachableRobots.length === 0}
+            isExpandedInitially={targetedHealthyReachableRobots.length === 0}
           >
             {recentlySeenRobots.map(robot => (
               <RobotCard key={robot.name} robot={{ ...robot, local: null }} />
