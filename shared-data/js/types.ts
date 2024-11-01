@@ -86,7 +86,7 @@ export type LabwareDisplayCategory =
   | 'trash'
   | 'other'
   | 'adapter'
-
+  | 'lid'
 export type LabwareVolumeUnits = 'µL' | 'mL' | 'L'
 
 // TODO(mc, 2019-05-29): Remove this enum in favor of string + exported
@@ -231,7 +231,12 @@ export interface LabwareWellGroup {
   brand?: LabwareBrand
 }
 
-export type LabwareRoles = 'labware' | 'adapter' | 'fixture' | 'maintenance'
+export type LabwareRoles =
+  | 'labware'
+  | 'adapter'
+  | 'fixture'
+  | 'maintenance'
+  | 'lid'
 
 // NOTE: must be synced with shared-data/labware/schemas/2.json
 export interface LabwareDefinition2 {

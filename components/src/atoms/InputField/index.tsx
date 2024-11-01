@@ -71,6 +71,7 @@ export interface InputFieldProps {
   leftIcon?: IconName
   showDeleteIcon?: boolean
   onDelete?: () => void
+  hasBackgroundError?: boolean
 }
 
 export const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
@@ -83,6 +84,7 @@ export const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
       tooltipText,
       tabIndex = 0,
       showDeleteIcon = false,
+      hasBackgroundError = false,
       ...inputProps
     } = props
     const hasError = props.error != null
@@ -103,11 +105,13 @@ export const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
 
     const INPUT_FIELD = css`
       display: flex;
-      background-color: ${COLORS.white};
+      background-color: ${hasBackgroundError ? COLORS.red30 : COLORS.white};
       border-radius: ${BORDERS.borderRadius4};
       padding: ${SPACING.spacing8};
-      border: 1px ${BORDERS.styleSolid}
-        ${hasError ? COLORS.red50 : COLORS.grey50};
+      border: ${hasBackgroundError
+        ? 'none'
+        : `1px ${BORDERS.styleSolid}
+        ${hasError ? COLORS.red50 : COLORS.grey50}`};
       font-size: ${TYPOGRAPHY.fontSizeP};
       width: 100%;
       height: ${size === 'small' ? '2rem' : '2.75rem'};
@@ -234,6 +238,7 @@ export const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
 
     return (
       <Flex
+        width="100%"
         alignItems={ALIGN_CENTER}
         lineHeight={1}
         fontSize={TYPOGRAPHY.fontSizeP}
@@ -320,10 +325,7 @@ export const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
             </StyledText>
           ) : null}
           {hasError ? (
-            <StyledText
-              desktopStyle="bodyDefaultRegular"
-              css={ERROR_TEXT_STYLE}
-            >
+            <StyledText desktopStyle="captionRegular" css={ERROR_TEXT_STYLE}>
               {props.error}
             </StyledText>
           ) : null}
@@ -334,6 +336,7 @@ export const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
 )
 
 const StyledInput = styled.input`
+  background-color: transparent;
   &::placeholder {
     color: ${COLORS.grey40};
   }

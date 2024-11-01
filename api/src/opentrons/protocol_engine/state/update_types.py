@@ -4,6 +4,7 @@
 import dataclasses
 import enum
 import typing
+from datetime import datetime
 
 from opentrons.hardware_control.nozzle_manager import NozzleMap
 from opentrons.protocol_engine.resources import pipette_data_provider
@@ -66,9 +67,10 @@ class AddressableArea:
 
 @dataclasses.dataclass
 class PipetteLocationUpdate:
-    """Represents an update to perform on a pipette's location."""
+    """An update to a pipette's location."""
 
     pipette_id: str
+    """The ID of the already-loaded pipette."""
 
     new_location: Well | AddressableArea | None | NoChangeType
     """The pipette's new logical location.
@@ -82,19 +84,30 @@ class PipetteLocationUpdate:
 
 @dataclasses.dataclass
 class LabwareLocationUpdate:
-    """Represents an update to perform on a labware's location."""
+    """An update to a labware's location."""
 
     labware_id: str
+    """The ID of the already-loaded labware."""
 
     new_location: LabwareLocation
-    """The labware's new logical location."""
+    """The labware's new location."""
 
     offset_id: typing.Optional[str]
+    """The ID of the labware's new offset, for its new location."""
 
 
 @dataclasses.dataclass
-class LoadedLabwareUpdate(LabwareLocationUpdate):
-    """Update loaded labware."""
+class LoadedLabwareUpdate:
+    """An update that loads a new labware."""
+
+    labware_id: str
+    """The unique ID of the new labware."""
+
+    new_location: LabwareLocation
+    """The labware's initial location."""
+
+    offset_id: typing.Optional[str]
+    """The ID of the labware's offset."""
 
     display_name: typing.Optional[str]
 
@@ -103,9 +116,15 @@ class LoadedLabwareUpdate(LabwareLocationUpdate):
 
 @dataclasses.dataclass
 class LoadPipetteUpdate:
-    """Update loaded pipette."""
+    """An update that loads a new pipette.
+
+    NOTE: Currently, if this is provided, a PipetteConfigUpdate must always be
+    provided alongside it to fully initialize everything.
+    """
 
     pipette_id: str
+    """The unique ID of the new pipette."""
+
     pipette_name: PipetteNameType
     mount: MountType
     liquid_presence_detection: typing.Optional[bool]
@@ -113,10 +132,14 @@ class LoadPipetteUpdate:
 
 @dataclasses.dataclass
 class PipetteConfigUpdate:
-    """Update pipette config."""
+    """An update to a pipette's config."""
 
     pipette_id: str
+    """The ID of the already-loaded pipette."""
+
+    # todo(mm, 2024-10-14): Does serial_number belong in LoadPipetteUpdate?
     serial_number: str
+
     config: pipette_data_provider.LoadedStaticPipetteData
 
 
@@ -154,6 +177,35 @@ class TipsUsedUpdate:
 
 
 @dataclasses.dataclass
+class LiquidLoadedUpdate:
+    """An update from loading a liquid."""
+
+    labware_id: str
+    volumes: typing.Dict[str, float]
+    last_loaded: datetime
+
+
+@dataclasses.dataclass
+class LiquidProbedUpdate:
+    """An update from probing a liquid."""
+
+    labware_id: str
+    well_name: str
+    last_probed: datetime
+    height: float | ClearType
+    volume: float | ClearType
+
+
+@dataclasses.dataclass
+class LiquidOperatedUpdate:
+    """An update from operating a liquid."""
+
+    labware_id: str
+    well_name: str
+    volume_added: float | ClearType
+
+
+@dataclasses.dataclass
 class StateUpdate:
     """Represents an update to perform on engine state."""
 
@@ -172,6 +224,12 @@ class StateUpdate:
     loaded_labware: LoadedLabwareUpdate | NoChangeType = NO_CHANGE
 
     tips_used: TipsUsedUpdate | NoChangeType = NO_CHANGE
+
+    liquid_loaded: LiquidLoadedUpdate | NoChangeType = NO_CHANGE
+
+    liquid_probed: LiquidProbedUpdate | NoChangeType = NO_CHANGE
+
+    liquid_operated: LiquidOperatedUpdate | NoChangeType = NO_CHANGE
 
     # These convenience functions let the caller avoid the boilerplate of constructing a
     # complicated dataclass tree.
@@ -237,7 +295,7 @@ class StateUpdate:
         new_location: LabwareLocation,
         new_offset_id: str | None,
     ) -> None:
-        """Set labware location."""
+        """Set a labware's location. See `LabwareLocationUpdate`."""
         self.labware_location = LabwareLocationUpdate(
             labware_id=labware_id,
             new_location=new_location,
@@ -252,7 +310,7 @@ class StateUpdate:
         display_name: typing.Optional[str],
         location: LabwareLocation,
     ) -> None:
-        """Add loaded labware to state."""
+        """Add a new labware to state. See `LoadedLabwareUpdate`."""
         self.loaded_labware = LoadedLabwareUpdate(
             definition=definition,
             labware_id=labware_id,
@@ -268,7 +326,7 @@ class StateUpdate:
         mount: MountType,
         liquid_presence_detection: typing.Optional[bool],
     ) -> None:
-        """Add loaded pipette to state."""
+        """Add a new pipette to state. See `LoadPipetteUpdate`."""
         self.loaded_pipette = LoadPipetteUpdate(
             pipette_id=pipette_id,
             pipette_name=pipette_name,
@@ -282,13 +340,13 @@ class StateUpdate:
         config: pipette_data_provider.LoadedStaticPipetteData,
         serial_number: str,
     ) -> None:
-        """Update pipette config."""
+        """Update a pipette's config. See `PipetteConfigUpdate`."""
         self.pipette_config = PipetteConfigUpdate(
             pipette_id=pipette_id, config=config, serial_number=serial_number
         )
 
     def update_pipette_nozzle(self, pipette_id: str, nozzle_map: NozzleMap) -> None:
-        """Update pipette nozzle map."""
+        """Update a pipette's nozzle map. See `PipetteNozzleMapUpdate`."""
         self.pipette_nozzle_map = PipetteNozzleMapUpdate(
             pipette_id=pipette_id, nozzle_map=nozzle_map
         )
@@ -296,7 +354,7 @@ class StateUpdate:
     def update_pipette_tip_state(
         self, pipette_id: str, tip_geometry: typing.Optional[TipGeometry]
     ) -> None:
-        """Update tip state."""
+        """Update a pipette's tip state. See `PipetteTipStateUpdate`."""
         self.pipette_tip_state = PipetteTipStateUpdate(
             pipette_id=pipette_id, tip_geometry=tip_geometry
         )
@@ -304,7 +362,47 @@ class StateUpdate:
     def mark_tips_as_used(
         self, pipette_id: str, labware_id: str, well_name: str
     ) -> None:
-        """Mark tips in a tip rack as used. See `MarkTipsUsedState`."""
+        """Mark tips in a tip rack as used. See `TipsUsedUpdate`."""
         self.tips_used = TipsUsedUpdate(
             pipette_id=pipette_id, labware_id=labware_id, well_name=well_name
+        )
+
+    def set_liquid_loaded(
+        self,
+        labware_id: str,
+        volumes: typing.Dict[str, float],
+        last_loaded: datetime,
+    ) -> None:
+        """Add liquid volumes to well state. See `LoadLiquidUpdate`."""
+        self.liquid_loaded = LiquidLoadedUpdate(
+            labware_id=labware_id,
+            volumes=volumes,
+            last_loaded=last_loaded,
+        )
+
+    def set_liquid_probed(
+        self,
+        labware_id: str,
+        well_name: str,
+        last_probed: datetime,
+        height: float | ClearType,
+        volume: float | ClearType,
+    ) -> None:
+        """Add a liquid height and volume to well state. See `ProbeLiquidUpdate`."""
+        self.liquid_probed = LiquidProbedUpdate(
+            labware_id=labware_id,
+            well_name=well_name,
+            height=height,
+            volume=volume,
+            last_probed=last_probed,
+        )
+
+    def set_liquid_operated(
+        self, labware_id: str, well_name: str, volume_added: float | ClearType
+    ) -> None:
+        """Update liquid volumes in well state. See `OperateLiquidUpdate`."""
+        self.liquid_operated = LiquidOperatedUpdate(
+            labware_id=labware_id,
+            well_name=well_name,
+            volume_added=volume_added,
         )

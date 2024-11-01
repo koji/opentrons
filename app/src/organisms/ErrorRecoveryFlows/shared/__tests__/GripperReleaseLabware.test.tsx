@@ -9,6 +9,10 @@ import { clickButtonLabeled } from '/app/organisms/ErrorRecoveryFlows/__tests__/
 
 import type { Mock } from 'vitest'
 
+vi.mock('/app/assets/videos/error-recovery/Gripper_Release.webm', () => ({
+  default: 'mocked-animation-path.webm',
+}))
+
 const render = (props: React.ComponentProps<typeof GripperReleaseLabware>) => {
   return renderWithProviders(<GripperReleaseLabware {...props} />, {
     i18nInstance: i18n,
@@ -38,7 +42,7 @@ describe('GripperReleaseLabware', () => {
     screen.getByText(
       'Take any necessary precautions before positioning yourself to stabilize or catch the labware. Once confirmed, a countdown will begin before the gripper releases.'
     )
-    screen.getByText('The labware will be released from its current height')
+    screen.getByText('The labware will be released from its current height.')
   })
 
   it('clicking the primary button has correct behavior', () => {
@@ -47,5 +51,15 @@ describe('GripperReleaseLabware', () => {
     clickButtonLabeled('Release')
 
     expect(mockHandleMotionRouting).toHaveBeenCalled()
+  })
+
+  it('renders gripper animation', () => {
+    render(props)
+
+    screen.getByRole('presentation', { hidden: true })
+    expect(screen.getByTestId('gripper-animation')).toHaveAttribute(
+      'src',
+      'mocked-animation-path.webm'
+    )
   })
 })

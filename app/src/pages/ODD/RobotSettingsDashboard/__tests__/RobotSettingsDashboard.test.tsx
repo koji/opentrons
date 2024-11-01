@@ -1,19 +1,26 @@
 import { vi, it, describe, expect, beforeEach, afterEach } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { fireEvent, screen } from '@testing-library/react'
+import { when } from 'vitest-when'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 
 import { i18n } from '/app/i18n'
 import { getRobotSettings } from '/app/redux/robot-settings'
 import { getLocalRobot } from '/app/redux/discovery'
-import { toggleDevtools, toggleHistoricOffsets } from '/app/redux/config'
+import {
+  getAppLanguage,
+  toggleDevtools,
+  toggleHistoricOffsets,
+  useFeatureFlag,
+} from '/app/redux/config'
 import { mockConnectedRobot } from '/app/redux/discovery/__fixtures__'
 import { Navigation } from '/app/organisms/ODD/Navigation'
 import {
   DeviceReset,
   TouchScreenSleep,
   TouchscreenBrightness,
+  LanguageSetting,
   NetworkSettings,
   Privacy,
   RobotSystemVersion,
@@ -22,6 +29,7 @@ import {
 import { getRobotUpdateAvailable } from '/app/redux/robot-update'
 import { useNetworkConnection } from '/app/resources/networking'
 import { useLEDLights } from '/app/resources/robot-settings'
+import { useErrorRecoverySettingsToggle } from '/app/resources/errorRecovery'
 
 import { RobotSettingsDashboard } from '../'
 
@@ -34,6 +42,7 @@ vi.mock('/app/redux/robot-update')
 vi.mock('/app/redux/config')
 vi.mock('/app/redux/robot-settings')
 vi.mock('/app/resources/robot-settings')
+vi.mock('/app/resources/errorRecovery')
 vi.mock('/app/organisms/ODD/Navigation')
 vi.mock('/app/organisms/ODD/RobotSettingsDashboard/TouchScreenSleep')
 vi.mock('/app/organisms/ODD/RobotSettingsDashboard/NetworkSettings')
@@ -42,8 +51,10 @@ vi.mock('/app/organisms/ODD/RobotSettingsDashboard/RobotSystemVersion')
 vi.mock('/app/organisms/ODD/RobotSettingsDashboard/TouchscreenBrightness')
 vi.mock('/app/organisms/ODD/RobotSettingsDashboard/UpdateChannel')
 vi.mock('/app/organisms/ODD/RobotSettingsDashboard/Privacy')
+vi.mock('/app/organisms/ODD/RobotSettingsDashboard/LanguageSetting')
 
 const mockToggleLights = vi.fn()
+const mockToggleER = vi.fn()
 
 const render = () => {
   return renderWithProviders(
@@ -55,6 +66,8 @@ const render = () => {
     }
   )
 }
+
+const MOCK_DEFAULT_LANGUAGE = 'en-US'
 
 // Note kj 01/25/2023 Currently test cases only check text since this PR is bare-bones for RobotSettings Dashboard
 describe('RobotSettingsDashboard', () => {
@@ -74,6 +87,14 @@ describe('RobotSettingsDashboard', () => {
       toggleLights: mockToggleLights,
     })
     vi.mocked(useNetworkConnection).mockReturnValue({} as any)
+    vi.mocked(useErrorRecoverySettingsToggle).mockReturnValue({
+      isEREnabled: true,
+      toggleERSettings: mockToggleER,
+    })
+    vi.mocked(getAppLanguage).mockReturnValue(MOCK_DEFAULT_LANGUAGE)
+    when(vi.mocked(useFeatureFlag))
+      .calledWith('enableLocalization')
+      .thenReturn(true)
   })
 
   afterEach(() => {
@@ -92,6 +113,7 @@ describe('RobotSettingsDashboard', () => {
     screen.getByText('Robot System Version')
     screen.getByText('Network Settings')
     screen.getByText('Status LEDs')
+    screen.getByText('Error Recovery Mode')
     screen.getByText(
       'Control the strip of color lights on the front of the robot.'
     )
@@ -137,6 +159,31 @@ describe('RobotSettingsDashboard', () => {
     expect(
       screen.getByTestId('RobotSettingButton_display_led_lights')
     ).toHaveTextContent('On')
+  })
+
+  it('should render appropriate error recovery mode copy, and calls the toggle', () => {
+    render()
+    const toggle = screen.getByTestId('RobotSettingButton_error_recovery_mode')
+    fireEvent.click(toggle)
+    expect(mockToggleER).toHaveBeenCalled()
+  })
+
+  it('should render the on toggle when ER mode is enabled', () => {
+    render()
+    expect(
+      screen.getByTestId('RobotSettingButton_error_recovery_mode')
+    ).toHaveTextContent('On')
+  })
+
+  it('should render the off toggle when ER mode is disabled', () => {
+    vi.mocked(useErrorRecoverySettingsToggle).mockReturnValue({
+      isEREnabled: false,
+      toggleERSettings: mockToggleER,
+    })
+    render()
+    expect(
+      screen.getByTestId('RobotSettingButton_error_recovery_mode')
+    ).toHaveTextContent('Off')
   })
 
   it('should render component when tapping network settings', () => {
@@ -215,5 +262,14 @@ describe('RobotSettingsDashboard', () => {
     vi.mocked(getRobotUpdateAvailable).mockReturnValue('upgrade')
     render()
     screen.getByText('Update available')
+  })
+
+  it('should render component when tapping Language', () => {
+    render()
+
+    screen.getByText('English (US)')
+    const button = screen.getByText('Language')
+    fireEvent.click(button)
+    expect(vi.mocked(LanguageSetting)).toHaveBeenCalled()
   })
 })

@@ -8,6 +8,7 @@ export const DEV_INTERNAL_FLAGS: DevInternalFlag[] = [
   'enableLabwareCreator',
   'enableLocalization',
   'enableSearch',
+  'reactQueryDevtools',
 ]
 
 // action type constants

@@ -1,22 +1,16 @@
 import { useTranslation } from 'react-i18next'
-import {
-  COLORS,
-  DIRECTION_COLUMN,
-  Flex,
-  Icon,
-  InputField,
-  SPACING,
-  Tooltip,
-  useHoverTooltip,
-} from '@opentrons/components'
+import { Flex, InputField, SPACING } from '@opentrons/components'
+import type { Dispatch, SetStateAction } from 'react'
 import type { FieldProps } from '../../components/StepEditForm/types'
 
 interface InputStepFormFieldProps extends FieldProps {
   title: string
+  setIsPristine?: Dispatch<SetStateAction<boolean>>
   units?: string
   padding?: string
   showTooltip?: boolean
   caption?: string
+  formLevelError?: string | null
 }
 
 export function InputStepFormField(
@@ -35,40 +29,31 @@ export function InputStepFormField(
     padding = SPACING.spacing16,
     tooltipContent,
     caption,
+    formLevelError,
+    setIsPristine,
     ...otherProps
   } = props
   const { t } = useTranslation('tooltip')
-  const [targetProps, tooltipProps] = useHoverTooltip()
 
   return (
-    <Flex flexDirection={DIRECTION_COLUMN} padding={padding}>
-      <Flex gridGap={SPACING.spacing8} paddingBottom={SPACING.spacing8}>
-        {showTooltip ? (
-          <>
-            <Flex {...targetProps}>
-              <Icon
-                name="information"
-                size={SPACING.spacing12}
-                color={COLORS.grey60}
-                data-testid="information_icon"
-              />
-            </Flex>
-            <Tooltip tooltipProps={tooltipProps}>
-              {t(`${tooltipContent}`)}
-            </Tooltip>
-          </>
-        ) : null}
-      </Flex>
+    <Flex padding={padding} width="100%">
       <InputField
         {...otherProps}
+        tooltipText={
+          showTooltip ? t(`${tooltipContent}`) ?? undefined : undefined
+        }
+        type="number"
         title={title}
         caption={caption}
         name={name}
-        error={errorToShow}
+        error={formLevelError ?? errorToShow}
         onBlur={onFieldBlur}
         onFocus={onFieldFocus}
         onChange={e => {
           updateValue(e.currentTarget.value)
+          if (setIsPristine != null) {
+            setIsPristine(false)
+          }
         }}
         value={value ? String(value) : null}
         units={units}

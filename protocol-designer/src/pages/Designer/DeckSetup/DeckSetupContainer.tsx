@@ -30,7 +30,7 @@ import { getDeckSetupForActiveItem } from '../../../top-selectors/labware-locati
 import { getDisableModuleRestrictions } from '../../../feature-flags/selectors'
 import { getRobotType } from '../../../file-data/selectors'
 import { getHasGen1MultiChannelPipette } from '../../../step-forms'
-import { SlotDetailsContainer, TimelineAlerts } from '../../../organisms'
+import { SlotDetailsContainer } from '../../../organisms'
 import { selectZoomedIntoSlot } from '../../../labware-ingred/actions'
 import { selectors } from '../../../labware-ingred/selectors'
 import { DeckSetupDetails } from './DeckSetupDetails'
@@ -171,12 +171,7 @@ export function DeckSetupContainer(props: DeckSetupTabType): JSX.Element {
   )
 
   return (
-    <>
-      {tab === 'protocolSteps' ? (
-        <Flex justifyContent={JUSTIFY_CENTER} width="100%">
-          <TimelineAlerts />
-        </Flex>
-      ) : null}
+    <Flex>
       <Flex
         backgroundColor={COLORS.white}
         borderRadius={BORDERS.borderRadius12}
@@ -192,11 +187,12 @@ export function DeckSetupContainer(props: DeckSetupTabType): JSX.Element {
           justifyContent={JUSTIFY_CENTER}
         >
           <RobotCoordinateSpaceWithRef
-            height={zoomIn.slot != null ? '100%' : '80%'}
+            height={zoomIn.slot != null ? '100%' : '95%'}
             width="100%"
             deckDef={deckDef}
             viewBox={viewBox}
             outline="auto"
+            zoomed={zoomIn.slot != null}
           >
             {() => (
               <>
@@ -345,6 +341,6 @@ export function DeckSetupContainer(props: DeckSetupTabType): JSX.Element {
           setHoveredLabware={setHoveredLabware}
         />
       ) : null}
-    </>
+    </Flex>
   )
 }

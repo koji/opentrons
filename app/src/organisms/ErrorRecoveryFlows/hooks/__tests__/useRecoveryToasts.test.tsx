@@ -14,13 +14,13 @@ import {
 } from '../useRecoveryToasts'
 import { RECOVERY_MAP } from '../../constants'
 import { useToaster } from '../../../ToasterOven'
-import { useCommandTextString } from '/app/molecules/Command'
+import { useCommandTextString } from '/app/local-resources/commands'
 
 import type { Mock } from 'vitest'
 import type { BuildToast } from '../useRecoveryToasts'
 
 vi.mock('../../../ToasterOven')
-vi.mock('/app/molecules/Command')
+vi.mock('/app/local-resources/commands')
 
 const TEST_COMMAND = 'test command'
 const TC_COMMAND =
@@ -34,6 +34,7 @@ const DEFAULT_PROPS: BuildToast = {
   selectedRecoveryOption: RECOVERY_MAP.RETRY_SAME_TIPS.ROUTE,
   commandTextData: { commands: [] } as any,
   robotType: FLEX_ROBOT_TYPE,
+  allRunDefs: [],
 }
 
 // Utility function for rendering with I18nextProvider
@@ -208,6 +209,7 @@ describe('useRecoveryFullCommandText', () => {
         robotType: FLEX_ROBOT_TYPE,
         stepNumber: 0,
         commandTextData: { commands: [TEST_COMMAND] } as any,
+        allRunDefs: [],
       })
     )
 
@@ -225,6 +227,7 @@ describe('useRecoveryFullCommandText', () => {
         robotType: FLEX_ROBOT_TYPE,
         stepNumber: 1,
         commandTextData: { commands: [] } as any,
+        allRunDefs: [],
       })
     )
 
@@ -237,6 +240,7 @@ describe('useRecoveryFullCommandText', () => {
         robotType: FLEX_ROBOT_TYPE,
         stepNumber: '?',
         commandTextData: { commands: [] } as any,
+        allRunDefs: [],
       })
     )
 
@@ -257,6 +261,7 @@ describe('useRecoveryFullCommandText', () => {
         commandTextData: {
           commands: [TC_COMMAND],
         } as any,
+        allRunDefs: [],
       })
     )
     expect(result.current).toBe('tc starting profile of 1231231 element steps')
@@ -276,6 +281,7 @@ describe('useRecoveryFullCommandText', () => {
         commandTextData: {
           commands: [TC_COMMAND],
         } as any,
+        allRunDefs: [],
       })
     )
     expect(result.current).toBe('tc starting profile of 1231231 element steps')

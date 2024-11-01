@@ -11,15 +11,19 @@ import {
   RESPONSIVENESS,
 } from '@opentrons/components'
 
-import { useCommandTextString } from './hooks'
+import { useCommandTextString } from '/app/local-resources/commands'
 
-import type { RobotType, RunTimeCommand } from '@opentrons/shared-data'
+import type {
+  LabwareDefinition2,
+  RobotType,
+  RunTimeCommand,
+} from '@opentrons/shared-data'
 import type { StyleProps } from '@opentrons/components'
-import type { CommandTextData } from './types'
 import type {
   GetTCRunExtendedProfileCommandTextResult,
   GetTCRunProfileCommandTextResult,
-} from './hooks'
+  CommandTextData,
+} from '/app/local-resources/commands'
 
 interface LegacySTProps {
   as?: React.ComponentProps<typeof LegacyStyledText>['as']
@@ -36,6 +40,7 @@ type STProps = LegacySTProps | ModernSTProps
 
 interface BaseProps extends StyleProps {
   command: RunTimeCommand
+  allRunDefs: LabwareDefinition2[]
   commandTextData: CommandTextData
   robotType: RobotType
   isOnDevice?: boolean

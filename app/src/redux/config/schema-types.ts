@@ -1,4 +1,5 @@
 import type { LogLevel } from '../../logger'
+import type { Language } from '/app/i18n'
 import type { ProtocolSort } from '/app/redux/protocol-storage'
 
 export type UrlProtocol = 'file:' | 'http:'
@@ -15,6 +16,7 @@ export type DevInternalFlag =
   | 'enableLabwareCreator'
   | 'enableLocalization'
   | 'enableSearch'
+  | 'reactQueryDevtools'
 
 export type FeatureFlags = Partial<Record<DevInternalFlag, boolean | undefined>>
 
@@ -31,8 +33,6 @@ export type QuickTransfersOnDeviceSortKey =
   | 'reverse'
   | 'recentCreated'
   | 'oldCreated'
-
-export type Language = 'en' | 'zh'
 
 export interface OnDeviceDisplaySettings {
   sleepMs: number
