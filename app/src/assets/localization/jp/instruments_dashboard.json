@@ -1,10 +1,10 @@
 {
-  "calibrate": "calibrate",
-  "detach": "detach",
-  "firmware_version": "firmware version",
-  "last_calibrated": "last calibrated",
-  "no_cal_data": "no calibration data",
-  "pipette_calibrations_differ": "<bold>Pipette recalibration recommended</bold> The attached pipettes have very different calibration values. When properly calibrated, the values should be similar.",
-  "recalibrate": "recalibrate",
-  "serial_number": "serial number"
+  "calibrate": "キャリブレーション",
+  "detach": "取り外す",
+  "firmware_version": "ファームウェアのバージョン",
+  "last_calibrated": "最終キャリブレーション",
+  "no_cal_data": "キャリブレーションデータなし",
+  "pipette_calibrations_differ": "<bold>ピペットの再キャリブレーションを推奨します</bold> 接続されたピペットのキャリブレーション値が非常に異なっています。適切にキャリブレーションされていれば、値は類似しているはずです。",
+  "recalibrate": "再キャリブレーション",
+  "serial_number": "シリアル番号"
 }

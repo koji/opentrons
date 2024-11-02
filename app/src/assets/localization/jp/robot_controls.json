@@ -1,14 +1,14 @@
 {
-  "confirm_location": "confirm location",
-  "drop_tips": "Drop tips",
-  "home_button": "home",
-  "home_description": "Return robot to starting position.",
-  "home_label": "home all axes",
-  "lights_description": "Control lights on deck.",
-  "lights_label": "lights",
-  "recalibrate": "Recalibrate",
-  "restart_button": "restart",
-  "restart_description": "Restart robot.",
-  "restart_label": "Restart robot",
-  "title": "robot controls"
+  "confirm_location": "位置を確認",
+  "drop_tips": "チップを落とす",
+  "home_button": "ホーム",
+  "home_description": "ロボットを初期位置に戻します。",
+  "home_label": "すべての軸をホーム",
+  "lights_description": "デッキのライトを制御します。",
+  "lights_label": "ライト",
+  "recalibrate": "再キャリブレーション",
+  "restart_button": "再起動",
+  "restart_description": "ロボットを再起動します。",
+  "restart_label": "ロボットを再起動",
+  "title": "ロボットコントロール"
 }
