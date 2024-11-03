@@ -1,0 +1,7 @@
+{
+  "incompatible_modules_attached": "互換性のないモジュールが検出されました",
+  "remove_before_running_protocol": "プロトコルを実行する前に、以下のハードウェアを取り外してください：",
+  "needs_your_assistance": "{{robot_name}} の支援が必要です",
+  "remove_before_using": "このロボットを使用する前に、互換性のないモジュールを取り外す必要があります。",
+  "is_not_compatible": "{{module_name}} は {{robot_type}} と互換性がありません"
+}
