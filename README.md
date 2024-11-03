@@ -9,3 +9,7 @@ This repository is not related to the original repository in any way1. Therefore
 ### Japanese UI
 
 ![Japanese UI](./assetsForReadme/japanese_ui.png)
+
+### Contributing
+
+This is a forked repo so there is no issue boards. So contribution is opening a PR only.
