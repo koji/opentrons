@@ -1,0 +1,17 @@
+{
+  "firmware_out_of_date": "<bold>{{mount}} {{instrument}}</bold> のファームウェアが古くなっています。この機器を使用するプロトコルを実行する前に、更新する必要があります。",
+  "gantry_x": "ガントリ X",
+  "gantry_y": "ガントリ Y",
+  "gripper": "グリッパー",
+  "head": "ヘッド",
+  "hepa_uv": "HEPA/UV モジュール",
+  "pipette_left": "ピペット",
+  "pipette_right": "ピペット",
+  "ready_to_use": "あなたの<bold>{{instrument}}</bold>は使用準備が整いました！",
+  "rear_panel": "リアパネル",
+  "successful_update": "更新に成功しました！",
+  "update_failed": "更新に失敗しました",
+  "update_firmware": "ファームウェアを更新",
+  "update_needed": "機器のファームウェア更新が必要です",
+  "updating_firmware": "{{subsystem}} のファームウェアを更新しています..."
+}

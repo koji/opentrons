@@ -1,0 +1,14 @@
+{
+  "confirm_location": "位置を確認",
+  "drop_tips": "チップを落とす",
+  "home_button": "ホーム",
+  "home_description": "ロボットを初期位置に戻します。",
+  "home_label": "すべての軸をホーム",
+  "lights_description": "デッキのライトを制御します。",
+  "lights_label": "ライト",
+  "recalibrate": "再キャリブレーション",
+  "restart_button": "再起動",
+  "restart_description": "ロボットを再起動します。",
+  "restart_label": "ロボットを再起動",
+  "title": "ロボットコントロール"
+}

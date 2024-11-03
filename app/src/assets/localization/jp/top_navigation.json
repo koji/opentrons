@@ -1,0 +1,19 @@
+{
+  "attached_pipettes_do_not_match": "接続されたピペットは、読み込まれたプロトコルで指定されたピペットと一致しません。",
+  "calibrate_deck_to_proceed": "進むにはデッキをキャリブレーションしてください。",
+  "deck_setup": "デッキ設定",
+  "devices": "デバイス",
+  "instruments": "機器",
+  "labware": "ラボウェア",
+  "modules": "モジュール",
+  "pipettes_not_calibrated": "進むには、読み込まれたプロトコルで指定されたすべてのピペットをキャリブレーションしてください。",
+  "pipettes": "ピペット",
+  "please_connect_to_a_robot": "進むにはロボットに接続してください。",
+  "please_load_a_protocol": "進むにはプロトコルを読み込んでください。",
+  "protocol_runs": "プロトコルの実行",
+  "protocols": "プロトコル",
+  "quick_transfer": "クイック転送",
+  "robot_settings": "ロボット設定",
+  "run": "実行",
+  "settings": "設定"
+}
