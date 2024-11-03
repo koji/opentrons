@@ -1,18 +1,26 @@
 import { useState, useMemo } from 'react'
 import { getProtocolDisplayName } from '/app/transformations/protocols'
 
-import type { Robot } from '/app/redux/discovery/types'
+import type {
+  Robot,
+  ReachableRobot,
+  UnreachableRobot,
+} from '/app/redux/discovery/types'
 import type { StoredProtocolData } from '/app/redux/protocol-storage'
 
 export interface UseSearchResult {
   searchTerm: string
   setSearchTerm: React.Dispatch<React.SetStateAction<string>>
-  filteredData: Robot[] | StoredProtocolData[]
+  filteredData: any[] // ToDo specify types
   type?: 'device' | 'protocol'
 }
 
 export const useSearch = (
-  inputData: Robot[] | StoredProtocolData[],
+  inputData:
+    | Robot[]
+    | StoredProtocolData[]
+    | ReachableRobot[]
+    | UnreachableRobot[],
   initialSearchTerm: string = '',
   type = 'device'
 ): UseSearchResult => {
