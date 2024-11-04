@@ -13,7 +13,7 @@ This repository is not related to the original repository in any way1. Therefore
 
 ### dev environment
 #### js
-nodejs v18.19.0 ~ v22
+nodejs v18.19.0 ~ v22  
 yarn v1.22.19
 
 #### python
