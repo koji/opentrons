@@ -26,6 +26,7 @@ import {
 import {
   getProtocolsDesktopSortKey,
   updateConfigValue,
+  useFeatureFlag,
 } from '/app/redux/config'
 import { useSortedProtocols } from './hooks'
 import { Slideout } from '/app/atoms/Slideout'
@@ -34,6 +35,8 @@ import { SendProtocolToFlexSlideout } from '../SendProtocolToFlexSlideout'
 import { ProtocolUploadInput } from './ProtocolUploadInput'
 import { ProtocolCard } from './ProtocolCard'
 import { EmptyStateLinks } from './EmptyStateLinks'
+import { SearchComponent } from '../../Search/SearchComponent'
+import { useSearch } from '/app/resources/devices'
 
 import type {
   StoredProtocolData,
@@ -85,6 +88,13 @@ export function ProtocolList(props: ProtocolListProps): JSX.Element | null {
   const sortedStoredProtocols = useSortedProtocols(sortBy, storedProtocols)
 
   const dispatch = useDispatch<Dispatch>()
+
+  const enableSearch = useFeatureFlag('enableSearch')
+  const {
+    searchTerm,
+    setSearchTerm,
+    filteredData: targetedSortedStoredProtocols,
+  } = useSearch(sortedStoredProtocols, '', 'protocol')
 
   const handleClickOutside: React.MouseEventHandler<HTMLDivElement> = e => {
     e.preventDefault()
@@ -161,114 +171,123 @@ export function ProtocolList(props: ProtocolListProps): JSX.Element | null {
         marginBottom={SPACING.spacing24}
       >
         <LegacyStyledText as="h1">{t('protocols')}</LegacyStyledText>
-        <Flex flexDirection={DIRECTION_ROW}>
-          <Flex
-            flexDirection={DIRECTION_ROW}
-            alignItems={ALIGN_CENTER}
-            marginRight={SPACING.spacing16}
-          >
-            <LegacyStyledText
-              as="p"
-              fontWeight={TYPOGRAPHY.fontWeightSemiBold}
-              color={COLORS.grey60}
-            >
-              {t('shared:sort_by')}
-            </LegacyStyledText>
+        <Flex gridGap={enableSearch ? SPACING.spacing16 : undefined}>
+          {enableSearch ? (
+            <SearchComponent
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
+              type="protocol"
+            />
+          ) : null}
+          <Flex flexDirection={DIRECTION_ROW}>
             <Flex
               flexDirection={DIRECTION_ROW}
               alignItems={ALIGN_CENTER}
-              borderRadius={BORDERS.borderRadius8}
-              marginLeft={SPACING.spacing8}
-              css={SORT_BY_BUTTON_STYLE}
-              onClick={toggleSetShowSortByMenu}
-              data-testid="ProtocolList_SortByMenu"
+              marginRight={SPACING.spacing16}
             >
               <LegacyStyledText
                 as="p"
                 fontWeight={TYPOGRAPHY.fontWeightSemiBold}
-                paddingLeft={SPACING.spacing8}
-                paddingRight={SPACING.spacing4}
-                paddingY={SPACING.spacing4}
-                data-testid="sortBy-label"
+                color={COLORS.grey60}
               >
-                {sortByLabelType[sortBy].label}
+                {t('shared:sort_by')}
               </LegacyStyledText>
-              <Icon
-                paddingRight={SPACING.spacing8}
-                color={COLORS.black90}
-                height={TYPOGRAPHY.lineHeight16}
-                name={showSortByMenu ? 'chevron-up' : 'chevron-down'}
+              <Flex
+                flexDirection={DIRECTION_ROW}
+                alignItems={ALIGN_CENTER}
+                borderRadius={BORDERS.borderRadius8}
+                marginLeft={SPACING.spacing8}
+                css={SORT_BY_BUTTON_STYLE}
+                onClick={toggleSetShowSortByMenu}
+                data-testid="ProtocolList_SortByMenu"
+              >
+                <LegacyStyledText
+                  as="p"
+                  fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+                  paddingLeft={SPACING.spacing8}
+                  paddingRight={SPACING.spacing4}
+                  paddingY={SPACING.spacing4}
+                  data-testid="sortBy-label"
+                >
+                  {sortByLabelType[sortBy].label}
+                </LegacyStyledText>
+                <Icon
+                  paddingRight={SPACING.spacing8}
+                  color={COLORS.black90}
+                  height={TYPOGRAPHY.lineHeight16}
+                  name={showSortByMenu ? 'chevron-up' : 'chevron-down'}
+                />
+              </Flex>
+            </Flex>
+            {showSortByMenu && (
+              <Flex
+                zIndex={2}
+                borderRadius={BORDERS.borderRadius4}
+                boxShadow="0px 1px 3px rgba(0, 0, 0, 0.2)"
+                position={POSITION_ABSOLUTE}
+                backgroundColor={COLORS.white}
+                top="3.25rem"
+                right="7rem"
+                flexDirection={DIRECTION_COLUMN}
+              >
+                <MenuItem
+                  onClick={() => {
+                    handleProtocolsSortKey('alphabetical')
+                  }}
+                >
+                  {t('shared:alphabetical')}
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    handleProtocolsSortKey('reverse')
+                  }}
+                >
+                  {t('shared:reverse')}
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    handleProtocolsSortKey('recent')
+                  }}
+                >
+                  {t('most_recent_updates')}
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    handleProtocolsSortKey('oldest')
+                  }}
+                >
+                  {t('oldest_updates')}
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    handleProtocolsSortKey('flex')
+                  }}
+                >
+                  {t('robot_type_first', { robotType: FLEX })}
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    handleProtocolsSortKey('ot2')
+                  }}
+                >
+                  {t('robot_type_first', { robotType: OT2 })}
+                </MenuItem>
+              </Flex>
+            )}
+            {showSortByMenu ? (
+              <Overlay
+                onClick={handleClickOutside}
+                backgroundColor={COLORS.transparent}
               />
-            </Flex>
-          </Flex>
-          {showSortByMenu && (
-            <Flex
-              zIndex={2}
-              borderRadius={BORDERS.borderRadius4}
-              boxShadow="0px 1px 3px rgba(0, 0, 0, 0.2)"
-              position={POSITION_ABSOLUTE}
-              backgroundColor={COLORS.white}
-              top="3.25rem"
-              right="7rem"
-              flexDirection={DIRECTION_COLUMN}
+            ) : null}
+            <SecondaryButton
+              onClick={() => {
+                setShowImportProtocolSlideout(true)
+              }}
             >
-              <MenuItem
-                onClick={() => {
-                  handleProtocolsSortKey('alphabetical')
-                }}
-              >
-                {t('shared:alphabetical')}
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleProtocolsSortKey('reverse')
-                }}
-              >
-                {t('shared:reverse')}
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleProtocolsSortKey('recent')
-                }}
-              >
-                {t('most_recent_updates')}
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleProtocolsSortKey('oldest')
-                }}
-              >
-                {t('oldest_updates')}
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleProtocolsSortKey('flex')
-                }}
-              >
-                {t('robot_type_first', { robotType: FLEX })}
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleProtocolsSortKey('ot2')
-                }}
-              >
-                {t('robot_type_first', { robotType: OT2 })}
-              </MenuItem>
-            </Flex>
-          )}
-          {showSortByMenu ? (
-            <Overlay
-              onClick={handleClickOutside}
-              backgroundColor={COLORS.transparent}
-            />
-          ) : null}
-          <SecondaryButton
-            onClick={() => {
-              setShowImportProtocolSlideout(true)
-            }}
-          >
-            {t('import')}
-          </SecondaryButton>
+              {t('import')}
+            </SecondaryButton>
+          </Flex>
         </Flex>
       </Flex>
       <Flex
@@ -276,8 +295,9 @@ export function ProtocolList(props: ProtocolListProps): JSX.Element | null {
         gridGap={SPACING.spacing8}
         marginBottom={SPACING.spacing40}
       >
-        {sortedStoredProtocols != null &&
-          sortedStoredProtocols.map(storedProtocol => (
+        {targetedSortedStoredProtocols != null &&
+          targetedSortedStoredProtocols.length > 0 &&
+          targetedSortedStoredProtocols.map(storedProtocol => (
             <ProtocolCard
               key={storedProtocol.protocolKey}
               handleRunProtocol={handleRunProtocol}

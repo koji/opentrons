@@ -5,6 +5,7 @@
   "__dev_internal__forceHttpPolling": "Poll all network requests instead of using MQTT",
   "__dev_internal__protocolStats": "Protocol Stats",
   "__dev_internal__protocolTimeline": "Protocol Timeline",
+  "__dev_internal__enableSearch": "Enable Search in App",
   "__dev_internal__reactQueryDevtools": "Enable React Query Devtools",
   "add_folder_button": "Add labware source folder",
   "add_ip_button": "Add",
