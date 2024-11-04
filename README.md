@@ -10,13 +10,15 @@ This repository is not related to the original repository in any way1. Therefore
 
 ![Japanese UI](./assetsForReadme/japanese_ui.png)
 
-
 ### dev environment
+
 #### js
+
 nodejs v18.19.0 ~ v22  
 yarn v1.22.19
 
 #### python
+
 python version 3.10.x
 
 ### Contributing
