@@ -1,39 +1,47 @@
-import { css } from 'styled-components'
+import { css, ThemeContext } from 'styled-components'
+import * as React from 'react' // Import React for useContext
 
-import { Btn, COLORS, Flex, Icon } from '@opentrons/components'
+import {
+  Btn,
+  // COLORS, // Removed direct import of COLORS
+  Flex,
+  Icon,
+} from '@opentrons/components'
+import type { OpentronsTheme } from '../../../../../components/src/helix-design-system/colors'
 
 import type { MouseEvent } from 'react'
 import type { StyleProps } from '@opentrons/components'
 
-const TOGGLE_DISABLED_STYLES = css`
-  color: ${COLORS.grey50};
+// Updated to be functions that take theme
+const toggleDisabledStyles = (theme: OpentronsTheme) => css`
+  color: ${theme.colors.icon}; // Was COLORS.grey50
 
   &:hover {
-    color: ${COLORS.grey55};
+    color: ${theme.colors.iconHover}; // Was COLORS.grey55
   }
 
   &:focus-visible {
-    box-shadow: 0 0 0 3px ${COLORS.yellow50};
+    box-shadow: 0 0 0 3px ${theme.colors.yellow50}; // Was COLORS.yellow50
   }
 
   &:disabled {
-    color: ${COLORS.grey30};
+    color: ${theme.colors.iconDisabled}; // Was COLORS.grey30
   }
 `
 
-const TOGGLE_ENABLED_STYLES = css`
-  color: ${COLORS.blue50};
+const toggleEnabledStyles = (theme: OpentronsTheme) => css`
+  color: ${theme.colors.primary}; // Was COLORS.blue50
 
   &:hover {
-    color: ${COLORS.blue55};
+    color: ${theme.colors.interactivePrimaryHover}; // Was COLORS.blue55
   }
 
   &:focus-visible {
-    box-shadow: 0 0 0 3px ${COLORS.yellow50};
+    box-shadow: 0 0 0 3px ${theme.colors.yellow50}; // Was COLORS.yellow50
   }
 
   &:disabled {
-    color: ${COLORS.grey30};
+    color: ${theme.colors.iconDisabled}; // Was COLORS.grey30
   }
 `
 
@@ -48,6 +56,11 @@ interface ToggleButtonProps extends StyleProps {
 export function ToggleButton(props: ToggleButtonProps): JSX.Element {
   const { label, toggledOn, disabled, size, ...buttonProps } = props
   const iconName = toggledOn ? 'ot-toggle-input-on' : 'ot-toggle-input-off'
+  const theme = React.useContext(ThemeContext) as OpentronsTheme
+
+  const toggleStyles = toggledOn
+    ? toggleEnabledStyles(theme)
+    : toggleDisabledStyles(theme)
 
   return (
     <Btn
@@ -56,7 +69,7 @@ export function ToggleButton(props: ToggleButtonProps): JSX.Element {
       aria-label={label}
       aria-checked={toggledOn}
       size={size ?? '2rem'}
-      css={props.toggledOn ? TOGGLE_ENABLED_STYLES : TOGGLE_DISABLED_STYLES}
+      css={toggleStyles}
       {...buttonProps}
       data-testid={`ToggleButton_${label ?? 'label'}`}
     >

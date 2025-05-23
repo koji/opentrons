@@ -1,10 +1,12 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDispatch } from 'react-redux'
+import * as React from 'react' // Import React for useContext
+import { ThemeContext } from 'styled-components'
 
 import {
   ALIGN_CENTER,
-  COLORS,
+  // COLORS, // Removed direct import of COLORS
   DeckInfoLabel,
   DIRECTION_COLUMN,
   DropdownMenu,
@@ -14,6 +16,7 @@ import {
   SPACING,
   StyledText,
 } from '@opentrons/components'
+import type { OpentronsTheme } from '../../../../../components/src/helix-design-system/colors'
 
 import { selectDropdownItem } from '../../../ui/steps/actions/actions'
 
@@ -51,7 +54,14 @@ export function DropdownStepFormField(
   } = props
   const { t } = useTranslation(['tooltip', 'application'])
   const dispatch = useDispatch()
+  const theme = React.useContext(ThemeContext) as OpentronsTheme
   const availableOptionId = options.find(opt => opt.value === value)
+
+  // Define themed colors for the 'else' block
+  const titleColor = theme.colors.textSecondary // Was COLORS.grey60
+  const subtextColor = theme.colors.black70 // Was COLORS.black70, using direct mapping as it's a specific dark grey
+  const errorColor = theme.colors.error // Was COLORS.red50
+
   const handleSelection = (value: string): void => {
     let text = t('application:selected')
     if (fieldName === 'newLocation') {
@@ -121,7 +131,7 @@ export function DropdownStepFormField(
           flexDirection={DIRECTION_COLUMN}
           width="100%"
         >
-          <StyledText desktopStyle="bodyDefaultRegular" color={COLORS.grey60}>
+          <StyledText desktopStyle="bodyDefaultRegular" color={titleColor}>
             {title}
           </StyledText>
           <ListItem type="default">
@@ -145,7 +155,7 @@ export function DropdownStepFormField(
                 </StyledText>
                 <StyledText
                   desktopStyle="captionRegular"
-                  color={COLORS.black70}
+                  color={subtextColor}
                 >
                   {options[0].subtext}
                 </StyledText>
@@ -153,7 +163,7 @@ export function DropdownStepFormField(
             </Flex>
           </ListItem>
           {errorToShow != null ? (
-            <StyledText desktopStyle="bodyDefaultRegular" color={COLORS.red50}>
+            <StyledText desktopStyle="bodyDefaultRegular" color={errorColor}>
               {errorToShow}
             </StyledText>
           ) : null}

@@ -1,13 +1,16 @@
 import { useTranslation } from 'react-i18next'
+import * as React from 'react' // Import React for useContext
+import { ThemeContext } from 'styled-components'
 
 import {
-  COLORS,
+  // COLORS, // Removed direct import of COLORS
   DIRECTION_COLUMN,
   Flex,
   RadioButton,
   SPACING,
   StyledText,
 } from '@opentrons/components'
+import type { OpentronsTheme } from '../../../../../components/src/helix-design-system/colors'
 
 interface BasicButtonsProps {
   header: string
@@ -20,6 +23,9 @@ interface BasicButtonsProps {
 export function BasicsButtons(props: BasicButtonsProps): JSX.Element {
   const { header, onChange, selected, type, subHeader } = props
   const { t } = useTranslation('shared')
+  const theme = React.useContext(ThemeContext) as OpentronsTheme
+
+  const subHeaderColor = theme.colors.textSecondary // Was COLORS.grey60
 
   return (
     <Flex flexDirection={DIRECTION_COLUMN}>
@@ -27,7 +33,7 @@ export function BasicsButtons(props: BasicButtonsProps): JSX.Element {
         <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing4}>
           <StyledText desktopStyle="headingSmallBold">{header}</StyledText>
           {subHeader != null ? (
-            <StyledText desktopStyle="bodyLargeRegular" color={COLORS.grey60}>
+            <StyledText desktopStyle="bodyLargeRegular" color={subHeaderColor}>
               {subHeader}
             </StyledText>
           ) : null}

@@ -3,11 +3,13 @@ import { useTranslation } from 'react-i18next'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 
+import * as React from 'react' // Import React for useContext
+import { ThemeContext } from 'styled-components' // To access theme
 import {
   ALIGN_START,
   Box,
   Btn,
-  COLORS,
+  // COLORS, // Remove direct color import
   DIRECTION_COLUMN,
   Flex,
   FLEX_MAX_CONTENT,
@@ -28,6 +30,8 @@ import { LINK_BUTTON_STYLE } from '../../atoms'
 import { LabwareCardOverflowMenu } from '../LabwareCardOverflowMenu'
 import { getLiquidIdsOnLabware } from '../utils'
 
+// Import OpentronsTheme for typing the theme context
+import type { OpentronsTheme } from '../../../../../components/src/helix-design-system/colors'
 import type { LabwareOnDeck } from '../../../step-forms'
 import type { ThunkDispatch } from '../../../types'
 
@@ -43,6 +47,7 @@ export function LabwareCard(props: LabwareCardProps): JSX.Element {
   const navigate = useNavigate()
   const dispatch = useDispatch<ThunkDispatch<any>>()
   const { t } = useTranslation('starting_deck_state')
+  const theme = React.useContext(ThemeContext) as OpentronsTheme // Access theme via context
   const { def } = labware
   const nickNames = useSelector(getLabwareNicknamesById)
   const allWellContentsForActiveItem = useSelector(
@@ -68,7 +73,8 @@ export function LabwareCard(props: LabwareCardProps): JSX.Element {
           labwareId={labware.id}
         />
       ) : null}
-      <ListItem type="default" backgroundColor={COLORS.grey30}>
+      {/* Use theme color for ListItem background */}
+      <ListItem type="default" backgroundColor={theme.colors.surface}>
         <Flex
           gridGap={SPACING.spacing16}
           justifyContent={JUSTIFY_SPACE_BETWEEN}
@@ -86,12 +92,14 @@ export function LabwareCard(props: LabwareCardProps): JSX.Element {
                 {nickName}
               </StyledText>
               {isNicknameDifferent ? (
-                <StyledText desktopStyle="captionRegular" color={COLORS.grey60}>
+                // Use theme color for secondary text
+                <StyledText desktopStyle="captionRegular" color={theme.colors.textSecondary}>
                   {displayName}
                 </StyledText>
               ) : null}
               {lidDisplayName != null ? (
-                <StyledText desktopStyle="captionRegular" color={COLORS.grey60}>
+                // Use theme color for secondary text
+                <StyledText desktopStyle="captionRegular" color={theme.colors.textSecondary}>
                   {lidDisplayName}
                 </StyledText>
               ) : null}
