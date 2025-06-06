@@ -78,6 +78,11 @@ export default defineConfig(
           '/app/': path.resolve('./src/') + '/',
         },
       },
+  test: {
+    // environment is inherited from root vite.config.mts
+    setupFiles: [path.resolve(__dirname, '../setup-vitest.mts')],
+    globals: true,
+  },
     }
   }
 )

@@ -69,4 +69,7 @@ export default defineConfig({
       '/app/': path.resolve('./app/src/') + '/',
     },
   },
+  test: {
+    environment: 'happy-dom',
+  },
 })
