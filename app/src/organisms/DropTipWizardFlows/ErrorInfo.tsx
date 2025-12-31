@@ -2,17 +2,17 @@ import { useTranslation } from 'react-i18next'
 import { css } from 'styled-components'
 
 import {
-  DISPLAY_FLEX,
-  DIRECTION_COLUMN,
-  SPACING,
   ALIGN_CENTER,
   COLORS,
-  Icon,
+  DIRECTION_COLUMN,
+  DISPLAY_FLEX,
   Flex,
-  StyledText,
+  Icon,
   JUSTIFY_CENTER,
   JUSTIFY_FLEX_END,
   RESPONSIVENESS,
+  SPACING,
+  StyledText,
   TEXT_ALIGN_CENTER,
 } from '@opentrons/components'
 
@@ -28,7 +28,7 @@ export function ErrorInfo({
   return (
     <>
       <Flex css={CONTAINER_STYLE}>
-        <Icon name="alert-circle" css={ICON_STYLE} color={COLORS.red50} />
+        <Icon name="ot-alert" css={ICON_STYLE} color={COLORS.red50} />
         <StyledText oddStyle="level3HeaderBold" desktopStyle="headingSmallBold">
           {errorDetails?.header ?? t('error_dropping_tips')}
         </StyledText>

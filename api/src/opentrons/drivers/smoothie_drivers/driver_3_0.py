@@ -12,7 +12,7 @@ import asyncio
 import contextlib
 import logging
 from os import environ
-from time import time
+from time import monotonic
 from typing import Any, Dict, Optional, Union, List, Tuple, cast, AsyncIterator
 
 from math import isclose
@@ -262,9 +262,9 @@ class SmoothieDriver:
 
         Only pipette axes may be specified for splitting
         """
-        assert all(
-            (ax.lower() in "bc" for ax in config.keys())
-        ), "splits may only be configured for plunger axes"
+        assert all((ax.lower() in "bc" for ax in config.keys())), (
+            "splits may only be configured for plunger axes"
+        )
         self._move_split_config.update(config)
         log.info(f"Updated move split config with {config}")
         self._axes_moved_at.reset_moved(config.keys())
@@ -803,6 +803,8 @@ class SmoothieDriver:
         This methods writes a sequence of newline characters, which will
         guarantee Smoothieware responds with 'ok\r\nok\r\n' within 3 seconds
         """
+        if self._connection:
+            await self._connection.flush_input()
         await self._send_command(_command_builder(), timeout=SMOOTHIE_BOOT_TIMEOUT)
 
     async def _reset_from_error(self) -> None:
@@ -1418,7 +1420,6 @@ class SmoothieDriver:
     async def home(
         self, axis: str = AXES, disabled: str = DISABLE_AXES
     ) -> Dict[str, float]:
-
         await self.run_flag.wait()
 
         axis = axis.upper()
@@ -1516,9 +1517,9 @@ class SmoothieDriver:
         postfix = _command_builder()
         if not axes:
             return prefix, postfix
-        assert all(
-            (ax in "BC" for ax in axes)
-        ), "only plunger axes have controllable microstepping"
+        assert all((ax in "BC" for ax in axes)), (
+            "only plunger axes have controllable microstepping"
+        )
         for ax in axes:
             prefix.add_gcode(gcode=MICROSTEPPING_GCODES[ax]["DISABLE"])
         for ax in axes:
@@ -1546,9 +1547,9 @@ class SmoothieDriver:
 
         :param axes: A string that is a sequence of plunger axis names.
         """
-        assert all(
-            ax.lower() in "bc" for ax in axes
-        ), "only plunger axes may be unstuck"
+        assert all(ax.lower() in "bc" for ax in axes), (
+            "only plunger axes may be unstuck"
+        )
         since_moved = self._axes_moved_at.time_since_moved()
         split_currents = _command_builder().add_gcode(gcode=GCODE.SET_CURRENT)
         split_moves = _command_builder().add_gcode(gcode=GCODE.MOVE)
@@ -1721,7 +1722,8 @@ class SmoothieDriver:
                 _command_builder()
                 .add_gcode(gcode=GCODE.PROBE)
                 .add_int(
-                    prefix="F", value=420  # 420 mm/min (7 mm/sec) to avoid resonance
+                    prefix="F",
+                    value=420,  # 420 mm/min (7 mm/sec) to avoid resonance
                 )
                 .add_float(prefix=axis.upper(), value=probing_distance, precision=None)
             )
@@ -1899,17 +1901,15 @@ class SmoothieDriver:
         # if loop:
         #    kwargs["loop"] = loop
         log.info(update_cmd)
-        before = time()
+        before = monotonic()
         proc = await asyncio.create_subprocess_shell(update_cmd, **kwargs)
-        created = time()
-        log.info(f"created lpc21isp subproc in {created-before}")
+        created = monotonic()
+        log.info(f"created lpc21isp subproc in {created - before}")
         out_b, err_b = await proc.communicate()
-        done = time()
-        log.info(f"ran lpc21isp subproc in {done-created}")
+        done = monotonic()
+        log.info(f"ran lpc21isp subproc in {done - created}")
         if proc.returncode != 0:
-            log.error(
-                f"Smoothie update failed: {proc.returncode}" f" {out_b!r} {err_b!r}"
-            )
+            log.error(f"Smoothie update failed: {proc.returncode} {out_b!r} {err_b!r}")
             raise RuntimeError(
                 f"Failed to program smoothie: {proc.returncode}: {err_b!r}"
             )

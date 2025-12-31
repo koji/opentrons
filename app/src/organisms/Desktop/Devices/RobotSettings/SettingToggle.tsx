@@ -1,4 +1,3 @@
-import type * as React from 'react'
 import { useDispatch } from 'react-redux'
 
 import {
@@ -6,15 +5,17 @@ import {
   Box,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
 import { ToggleButton } from '/app/atoms/buttons'
 import { updateSetting } from '/app/redux/robot-settings'
-import type { Dispatch } from '/app/redux/types'
+
+import type { MouseEventHandler } from 'react'
 import type { RobotSettingsField } from '/app/redux/robot-settings/types'
+import type { Dispatch } from '/app/redux/types'
 
 interface SettingToggleProps extends RobotSettingsField {
   robotName: string
@@ -38,7 +39,7 @@ export function SettingToggle({
 
   if (id == null) return null
 
-  const handleClick: React.MouseEventHandler<Element> = () => {
+  const handleClick: MouseEventHandler<Element> = () => {
     dispatch(updateSetting(robotName, id, !value))
   }
 
@@ -55,7 +56,7 @@ export function SettingToggle({
         >
           {title}
         </LegacyStyledText>
-        <LegacyStyledText as="p">{description}</LegacyStyledText>
+        <LegacyStyledText forwardedAs="p">{description}</LegacyStyledText>
       </Box>
       <ToggleButton
         label={title}

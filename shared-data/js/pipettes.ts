@@ -1,13 +1,14 @@
-import pipetteNameSpecs from '../pipette/definitions/1/pipetteNameSpecs.json'
 import pipetteModelSpecs from '../pipette/definitions/1/pipetteModelSpecs.json'
+import pipetteNameSpecs from '../pipette/definitions/1/pipetteNameSpecs.json'
 import { OT3_PIPETTES } from './constants'
+
 import type {
-  PipetteV2Specs,
+  PipetteModelSpecs,
+  PipetteNameSpecs,
   PipetteV2GeneralSpecs,
   PipetteV2GeometrySpecs,
   PipetteV2LiquidSpecs,
-  PipetteNameSpecs,
-  PipetteModelSpecs,
+  PipetteV2Specs,
 } from './types'
 
 type GeneralGeometricModules = PipetteV2GeneralSpecs | PipetteV2GeometrySpecs
@@ -18,10 +19,8 @@ interface LiquidSpecs {
   default: PipetteV2LiquidSpecs
 }
 
-const generalGeometric: Record<
-  string,
-  GeneralGeometricSpecs
-> = import.meta.glob('../pipette/definitions/2/*/*/*/*.json', { eager: true })
+const generalGeometric: Record<string, GeneralGeometricSpecs> =
+  import.meta.glob('../pipette/definitions/2/*/*/*/*.json', { eager: true })
 
 const liquid: Record<string, LiquidSpecs> = import.meta.glob(
   '../pipette/definitions/2/liquid/*/*/*/*.json',
@@ -41,9 +40,9 @@ export type PipetteName = keyof typeof pipetteNameSpecs
 export type PipetteModel = keyof typeof pipetteModelSpecs.config
 
 // models sorted by channels and then volume by default
-const ALL_PIPETTE_NAMES: PipetteName[] = (Object.keys(
-  pipetteNameSpecs
-) as PipetteName[]).sort(comparePipettes(['channels', 'maxVolume']))
+const ALL_PIPETTE_NAMES: PipetteName[] = (
+  Object.keys(pipetteNameSpecs) as PipetteName[]
+).sort(comparePipettes(['channels', 'maxVolume']))
 
 // use a name like 'p10_single' to get specs true for all models under that name
 export function getPipetteNameSpecs(
@@ -77,8 +76,8 @@ export function getAllPipetteNames(...sortBy: SortableProps[]): PipetteName[] {
 function comparePipettes(sortBy: SortableProps[]) {
   return (modelA: PipetteName, modelB: PipetteName) => {
     // any cast is because we know these pipettes exist
-    const a = getPipetteNameSpecs(modelA) as PipetteNameSpecs
-    const b = getPipetteNameSpecs(modelB) as PipetteNameSpecs
+    const a = getPipetteNameSpecs(modelA)!
+    const b = getPipetteNameSpecs(modelB)!
     let i
 
     for (i = 0; i < sortBy.length; i++) {
@@ -161,6 +160,7 @@ const getHighestVersion = (
   path: string,
   pipetteModel: string,
   channels: Channels | null,
+  oemString: string,
   majorVersion: number,
   highestVersion: string
 ): string => {
@@ -174,10 +174,10 @@ const getHighestVersion = (
     //  and make sure the given model, channels, and major/minor versions
     //  are found in the path
     if (
-      minorPathVersion > minorHighestVersion &&
+      minorPathVersion >= minorHighestVersion &&
       path.includes(`${majorPathVersion}_${minorPathVersion}`) &&
       path.includes(pipetteModel) &&
-      path.includes(channels ?? '')
+      path.includes(channels != null ? `${channels}${oemString}` : '')
     ) {
       highestVersion = `${majorPathVersion}_${minorPathVersion}`
     }
@@ -186,9 +186,9 @@ const getHighestVersion = (
 }
 const V2_DEFINITION_TYPES = ['general', 'geometry']
 
-/* takes in pipetteName such as 'p300_single' or 'p300_single_gen1' 
+/* takes in pipetteName such as 'p300_single' or 'p300_single_gen1'
 or PipetteModel such as 'p300_single_v1.3' and converts it to channels,
-model, and version in order to return the correct pipette schema v2 json files. 
+model, and version in order to return the correct pipette schema v2 json files.
 **/
 export const getPipetteSpecsV2 = (
   name?: PipetteName | PipetteModel
@@ -200,7 +200,15 @@ export const getPipetteSpecsV2 = (
   const nameSplit = name.split('_')
   const pipetteModel = nameSplit[0] // ex: p300
   const channels = getChannelsFromString(nameSplit[1] as PipChannelString) //  ex: single -> single_channel
-  const pipetteGen = getVersionFromGen(nameSplit[2] as Gen)
+  let version_index: number
+  let oemString: string = ''
+  if (nameSplit.length === 4) {
+    version_index = 3
+    oemString = `_${nameSplit[2]}`
+  } else {
+    version_index = 2
+  }
+  const pipetteGen = getVersionFromGen(nameSplit[version_index] as Gen)
   let version: string = ''
   let majorVersion: number
   //  the first 2 conditions are to accommodate version from the pipetteName
@@ -215,7 +223,7 @@ export const getPipetteSpecsV2 = (
     majorVersion = pipetteGen //  ex: gen1 -> 1
     //  the 'else' is to accommodate the exact version if PipetteModel was added
   } else {
-    const versionNumber = nameSplit[2].split('v')[1]
+    const versionNumber = nameSplit[version_index].split('v')[1]
     if (versionNumber.includes('.')) {
       version = versionNumber.replace('.', '_') // ex: 1.0 -> 1_0
     } else {
@@ -231,12 +239,13 @@ export const getPipetteSpecsV2 = (
         path,
         pipetteModel,
         channels,
+        oemString,
         majorVersion,
         highestVersion
       )
       V2_DEFINITION_TYPES.forEach(type => {
         if (
-          `../pipette/definitions/2/${type}/${channels}/${pipetteModel}/${
+          `../pipette/definitions/2/${type}/${channels}${oemString}/${pipetteModel}/${
             version === '' ? highestVersion : version
           }.json` === path
         ) {
@@ -277,4 +286,14 @@ export const getPipetteSpecsV2 = (
   }
 
   return pipetteV2Specs
+}
+
+const DEFAULT_LIQUID_TYPE = 'default'
+//  Flex pipette api names are different from pipetteName
+//  p1000_multi_flex -> flex_8channel_1000
+//  we do not need to worry about -_em pipette in PD
+export const getFlexNameConversion = (pipetteSpec: PipetteV2Specs): string => {
+  const channels = pipetteSpec.channels
+  const maxVolume = pipetteSpec.liquids[DEFAULT_LIQUID_TYPE].maxVolume
+  return `flex_${channels}channel_${maxVolume}`
 }

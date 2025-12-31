@@ -53,7 +53,7 @@ To simulate your code, you’ll need [Python 3\.10](https://www.python.org/downl
 
 Before running a protocol, you’ll want to have the right kind of hardware and labware ready for your Flex or OT\-2\.
 
-- **Flex users** should review Chapter 2: Installation and Relocation in the [instruction manual](https://insights.opentrons.com/hubfs/Products/Flex/Opentrons%20Flex%20Manual.pdf). Specifically, see the pipette information in the “Instrument Installation and Calibration” section. You can use either a 1\-channel or 8\-channel pipette for this tutorial. Most Flex code examples will use a [Flex 1\-Channel 1000 μL pipette](https://shop.opentrons.com/opentrons-flex-1-channel-pipette/).
+- **Flex users** should review Chapter 2: Installation and Relocation in the [instruction manual](https://insights.opentrons.com/hubfs/Products/Flex/Opentrons%20Flex%20Manual.pdf). Specifically, see the pipette information in the “Instrument Installation and Calibration” section. You can use either a 1\-channel or 8\-channel pipette for this tutorial. Most Flex code examples will use a [Flex 1\-Channel 1000 µL pipette](https://shop.opentrons.com/opentrons-flex-1-channel-pipette/).
 - **OT\-2 users** should review the robot setup and pipette information on the [Get Started page](https://support.opentrons.com/s/ot2-get-started). Specifically, see [attaching pipettes](https://support.opentrons.com/s/article/Get-started-Attach-pipettes) and [initial calibration](https://support.opentrons.com/s/article/Get-started-Calibrate-the-deck). You can use either a single\-channel or 8\-channel pipette for this tutorial. Most OT\-2 code examples will use a [P300 Single\-Channel GEN2](https://shop.opentrons.com/single-channel-electronic-pipette-p20/) pipette.
 
 The Flex and OT\-2 use similar labware for serial dilution. The tutorial code will use the labware listed in the table below, but as long as you have labware of each type you can modify the code to run with your labware.
@@ -446,7 +446,6 @@ Opentrons recommends updating protocols from `apiLevel` 2\.18 to 2\.19 to take a
 This version introduces new features for Flex and adds and improves methods for aspirating and dispensing. Note that when updating Flex protocols to version 2\.16, you _must_ load a trash container before dropping tips.
 
 - New features
-
   - Use [`configure_nozzle_layout()`](index.html#opentrons.protocol_api.InstrumentContext.configure_nozzle_layout 'opentrons.protocol_api.InstrumentContext.configure_nozzle_layout') to pick up a single column of tips with the 96\-channel pipette. See [Partial Tip Pickup](index.html#partial-tip-pickup).
   - Specify the trash containers attached to your Flex with [`load_waste_chute()`](index.html#opentrons.protocol_api.ProtocolContext.load_waste_chute 'opentrons.protocol_api.ProtocolContext.load_waste_chute') and [`load_trash_bin()`](index.html#opentrons.protocol_api.ProtocolContext.load_trash_bin 'opentrons.protocol_api.ProtocolContext.load_trash_bin').
   - Dispense, blow out, drop tips, and dispose labware in the waste chute. Disposing labware requires the gripper and calling [`move_labware()`](index.html#opentrons.protocol_api.ProtocolContext.move_labware 'opentrons.protocol_api.ProtocolContext.move_labware') with `use_gripper=True`.
@@ -454,11 +453,9 @@ This version introduces new features for Flex and adds and improves methods for 
   - Explicitly command a pipette to [`prepare_to_aspirate()`](index.html#opentrons.protocol_api.InstrumentContext.prepare_to_aspirate 'opentrons.protocol_api.InstrumentContext.prepare_to_aspirate'). The API usually prepares pipettes to aspirate automatically, but this is useful for certain applications, like pre\-wetting routines.
 
 - Improved features
-
   - [`aspirate()`](index.html#opentrons.protocol_api.InstrumentContext.aspirate 'opentrons.protocol_api.InstrumentContext.aspirate'), [`dispense()`](index.html#opentrons.protocol_api.InstrumentContext.dispense 'opentrons.protocol_api.InstrumentContext.dispense'), and [`mix()`](index.html#opentrons.protocol_api.InstrumentContext.mix 'opentrons.protocol_api.InstrumentContext.mix') will not move any liquid when called with `volume=0`.
 
 - Other changes
-
   - [`ProtocolContext.fixed_trash`](index.html#opentrons.protocol_api.ProtocolContext.fixed_trash 'opentrons.protocol_api.ProtocolContext.fixed_trash') and [`InstrumentContext.trash_container`](index.html#opentrons.protocol_api.InstrumentContext.trash_container 'opentrons.protocol_api.InstrumentContext.trash_container') now return [`TrashBin`](index.html#opentrons.protocol_api.TrashBin 'opentrons.protocol_api.TrashBin') objects instead of [`Labware`](index.html#opentrons.protocol_api.Labware 'opentrons.protocol_api.Labware') objects.
   - Flex will no longer automatically drop tips in the trash at the end of a protocol. You can add a [`drop_tip()`](index.html#opentrons.protocol_api.InstrumentContext.drop_tip 'opentrons.protocol_api.InstrumentContext.drop_tip') command to your protocol or use the Opentrons App to drop the tips.
 
@@ -467,7 +464,6 @@ This version introduces new features for Flex and adds and improves methods for 
 This version introduces support for the Opentrons Flex robot, instruments, modules, and labware.
 
 - Flex features
-
   - Write protocols for Opentrons Flex by declaring `"robotType": "Flex"` in the new `requirements` dictionary. See the [examples in the Tutorial](index.html#tutorial-requirements).
   - [`load_instrument()`](index.html#opentrons.protocol_api.ProtocolContext.load_instrument 'opentrons.protocol_api.ProtocolContext.load_instrument') supports loading Flex 1\-, 8\-, and 96\-channel pipettes. See [Loading Pipettes](index.html#new-create-pipette).
   - The new [`move_labware()`](index.html#opentrons.protocol_api.ProtocolContext.move_labware 'opentrons.protocol_api.ProtocolContext.move_labware') method can move labware automatically using the Flex Gripper. You can also move labware manually on Flex.
@@ -476,7 +472,6 @@ This version introduces support for the Opentrons Flex robot, instruments, modul
   - The new [`configure_for_volume()`](index.html#opentrons.protocol_api.InstrumentContext.configure_for_volume 'opentrons.protocol_api.InstrumentContext.configure_for_volume') method can place Flex 50 µL pipettes in a low\-volume mode for dispensing very small volumes of liquid. See [Volume Modes](index.html#pipette-volume-modes).
 
 - Flex and OT\-2 features
-
   - Optionally specify `apiLevel` in the new `requirements` dictionary (otherwise, specify it in `metadata`).
   - Optionally specify `"robotType": "OT-2"` in `requirements`.
   - Use coordinates or numbers to specify [deck slots](index.html#deck-slots). These formats match physical labels on Flex and OT\-2, but you can use either system, regardless of `robotType`.
@@ -488,7 +483,6 @@ This version introduces support for the Opentrons Flex robot, instruments, modul
   - By default, repeated calls to [`drop_tip()`](index.html#opentrons.protocol_api.InstrumentContext.drop_tip 'opentrons.protocol_api.InstrumentContext.drop_tip') cycle through multiple locations above the trash bin to prevent tips from stacking up.
 
 - Bug fixes
-
   - [`InstrumentContext.starting_tip`](index.html#opentrons.protocol_api.InstrumentContext.starting_tip 'opentrons.protocol_api.InstrumentContext.starting_tip') is now respected on the second and subsequent calls to [`InstrumentContext.pick_up_tip()`](index.html#opentrons.protocol_api.InstrumentContext.pick_up_tip 'opentrons.protocol_api.InstrumentContext.pick_up_tip') with no argument.
 
 #### Version 2\.14
@@ -500,12 +494,10 @@ Several older parts of the Protocol API were deprecated as part of this switchov
 If you specify an API version of `2.13` or lower, your protocols will continue to execute on the old runtime.
 
 - Feature additions
-
   - [`ProtocolContext.define_liquid()`](index.html#opentrons.protocol_api.ProtocolContext.define_liquid 'opentrons.protocol_api.ProtocolContext.define_liquid') and [`Well.load_liquid()`](index.html#opentrons.protocol_api.Well.load_liquid 'opentrons.protocol_api.Well.load_liquid') added
     to define different liquid types and add them to wells, respectively.
 
 - Bug fixes
-
   - [`Labware`](index.html#opentrons.protocol_api.Labware 'opentrons.protocol_api.Labware') and [`Well`](index.html#opentrons.protocol_api.Well 'opentrons.protocol_api.Well') now adhere to the protocol’s API level setting.
     Prior to this version, they incorrectly ignored the setting.
   - [`InstrumentContext.touch_tip()`](index.html#opentrons.protocol_api.InstrumentContext.touch_tip 'opentrons.protocol_api.InstrumentContext.touch_tip') will end with the pipette tip in the center of the well
@@ -519,7 +511,6 @@ If you specify an API version of `2.13` or lower, your protocols will continue t
   - [`Labware.reset()`](index.html#opentrons.protocol_api.Labware.reset 'opentrons.protocol_api.Labware.reset') and [`Labware.tip_length`](index.html#opentrons.protocol_api.Labware.tip_length 'opentrons.protocol_api.Labware.tip_length') will raise useful errors if called on labware that is not a tip rack.
 
 - Removals
-
   - The `presses` and `increment` arguments of [`InstrumentContext.pick_up_tip()`](index.html#opentrons.protocol_api.InstrumentContext.pick_up_tip 'opentrons.protocol_api.InstrumentContext.pick_up_tip') were deprecated.
     Configure your pipette pick\-up settings with the Opentrons App, instead.
   - `InstrumentContext.speed` property was removed.
@@ -545,13 +536,11 @@ If you specify an API version of `2.13` or lower, your protocols will continue t
   > - The [`Well.has_tip`](index.html#opentrons.protocol_api.Well.has_tip 'opentrons.protocol_api.Well.has_tip') **setter** was removed. **The getter is still supported.**
   >   - Internal methods `Labware.use_tips`, `Labware.previous_tip`, and `Labware.return_tips`
   >     were removed.
-
   - The `configuration` argument of [`ProtocolContext.load_module()`](index.html#opentrons.protocol_api.ProtocolContext.load_module 'opentrons.protocol_api.ProtocolContext.load_module') was removed
     because it made unsafe modifications to the protocol’s geometry system,
     and the Thermocycler’s “semi” configuration is not officially supported.
 
 - Known limitations
-
   - [`Labware.set_offset()`](index.html#opentrons.protocol_api.Labware.set_offset 'opentrons.protocol_api.Labware.set_offset') is not yet supported on this API version.
     Run protocols via the Opentrons App, instead.
   - [`ProtocolContext.max_speeds`](index.html#opentrons.protocol_api.ProtocolContext.max_speeds 'opentrons.protocol_api.ProtocolContext.max_speeds') is not yet supported on the API version.
@@ -585,11 +574,9 @@ If you specify an API version of `2.13` or lower, your protocols will continue t
 #### Version 2\.8
 
 - You can now pass in a list of volumes to distribute and consolidate. See [List of Volumes](index.html#distribute-consolidate-volume-list) for more information.
-
   - Passing in a zero volume to any [complex command](index.html#v2-complex-commands) will result in no actions taken for aspirate or dispense
 
 - [`Well.from_center_cartesian()`](index.html#opentrons.protocol_api.Well.from_center_cartesian 'opentrons.protocol_api.Well.from_center_cartesian') can be used to find a point within a well using normalized distance from the center in each axis.
-
   - Note that you will need to create a location object to use this function in a protocol. See [Labware](index.html#protocol-api-labware) for more information.
 
 - You can now pass in a blowout location to transfer, distribute, and consolidate
@@ -617,7 +604,6 @@ This feature has been removed from the Python Protocol API.
 #### Version 2\.5
 
 - New [utility commands](index.html#new-utility-commands) were added:
-
   - [`ProtocolContext.set_rail_lights()`](index.html#opentrons.protocol_api.ProtocolContext.set_rail_lights 'opentrons.protocol_api.ProtocolContext.set_rail_lights'): turns robot rail lights on or off
   - [`ProtocolContext.rail_lights_on`](index.html#opentrons.protocol_api.ProtocolContext.rail_lights_on 'opentrons.protocol_api.ProtocolContext.rail_lights_on'): describes whether or not the rail lights are on
   - [`ProtocolContext.door_closed`](index.html#opentrons.protocol_api.ProtocolContext.door_closed 'opentrons.protocol_api.ProtocolContext.door_closed'): describes whether the robot door is closed
@@ -625,7 +611,6 @@ This feature has been removed from the Python Protocol API.
 #### Version 2\.4
 
 - The following improvements were made to the `touch_tip` command:
-
   - The speed for `touch_tip` can now be lowered down to 1 mm/s
   - `touch_tip` no longer moves diagonally from the X direction \-\> Y direction
   - Takes into account geometry of the deck and modules
@@ -1643,9 +1628,9 @@ The Temperature Module supports these 96\-well block and labware combinations fo
 
 | 96\-well block contents    | API Load Name                                        |
 | -------------------------- | ---------------------------------------------------- |
-| Bio\-Rad well plate 200 μL | `opentrons_96_aluminumblock_biorad_wellplate_200uL`  |
-| Generic PCR strip 200 μL   | `opentrons_96_aluminumblock_generic_pcr_strip_200uL` |
-| NEST well plate 100 μL     | `opentrons_96_aluminumblock_nest_wellplate_100uL`    |
+| Bio\-Rad well plate 200 µL | `opentrons_96_aluminumblock_biorad_wellplate_200uL`  |
+| Generic PCR strip 200 µL   | `opentrons_96_aluminumblock_generic_pcr_strip_200uL` |
+| NEST well plate 100 µL     | `opentrons_96_aluminumblock_nest_wellplate_100uL`    |
 
 This command loads the same physical adapter and labware as the example in the Standalone Adapters section above, but it is also compatible with earlier API versions:
 
@@ -3756,7 +3741,7 @@ One reason to set `new_tip="always"` is to avoid cross\-contamination between we
 
 [`transfer()`](index.html#opentrons.protocol_api.InstrumentContext.transfer 'opentrons.protocol_api.InstrumentContext.transfer') will pick up a new tip before _every_ aspirate when `new_tip="always"`. This includes when [tip refilling](index.html#complex-tip-refilling) requires multiple aspirations from a single source well.
 
-[`distribute()`](index.html#opentrons.protocol_api.InstrumentContext.distribute 'opentrons.protocol_api.InstrumentContext.distribute') and [`consolidate()`](index.html#opentrons.protocol_api.InstrumentContext.consolidate 'opentrons.protocol_api.InstrumentContext.consolidate') only pick up one tip, even when `new_tip="always"`. For example, this distribute command returns to the source well a second time, because the amount to be distributed (400 µL total plus disposal volume) exceeds the pipette capacity (300 μL):
+[`distribute()`](index.html#opentrons.protocol_api.InstrumentContext.distribute 'opentrons.protocol_api.InstrumentContext.distribute') and [`consolidate()`](index.html#opentrons.protocol_api.InstrumentContext.consolidate 'opentrons.protocol_api.InstrumentContext.consolidate') only pick up one tip, even when `new_tip="always"`. For example, this distribute command returns to the source well a second time, because the amount to be distributed (400 µL total plus disposal volume) exceeds the pipette capacity (300 µL):
 
 ```
 pipette.distribute(

@@ -1,9 +1,5 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { when } from 'vitest-when'
-import { vi, it, describe, expect, beforeEach, afterEach } from 'vitest'
-
-import { getDeckDefinitions } from '@opentrons/shared-data'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
@@ -11,17 +7,12 @@ import * as Sessions from '/app/redux/sessions'
 import { mockCalibrationCheckSessionAttributes } from '/app/redux/sessions/__fixtures__'
 
 import { CheckCalibration } from '../index'
+
+import type { ComponentProps, ComponentType } from 'react'
 import type { RobotCalibrationCheckStep } from '/app/redux/sessions/types'
 
 vi.mock('/app/redux/calibration/selectors')
 vi.mock('/app/redux/config')
-vi.mock('@opentrons/shared-data', async importOriginal => {
-  const actual = await importOriginal<typeof getDeckDefinitions>()
-  return {
-    ...actual,
-    getDeckDefinitions: vi.fn(),
-  }
-})
 
 interface CheckCalibrationSpec {
   heading: string
@@ -36,14 +27,14 @@ describe('CheckCalibration', () => {
   }
 
   const render = (
-    props: Partial<React.ComponentProps<typeof CheckCalibration>> = {}
+    props: Partial<ComponentProps<typeof CheckCalibration>> = {}
   ) => {
     const {
       showSpinner = false,
       isJogging = false,
       session = mockCalibrationCheckSession,
     } = props
-    return renderWithProviders<React.ComponentType<typeof CheckCalibration>>(
+    return renderWithProviders<ComponentType<typeof CheckCalibration>>(
       <CheckCalibration
         robotName="robot-name"
         session={session}
@@ -86,10 +77,6 @@ describe('CheckCalibration', () => {
       currentStep: 'resultsSummary',
     },
   ]
-
-  beforeEach(() => {
-    when(vi.mocked(getDeckDefinitions)).calledWith().thenReturn({})
-  })
 
   afterEach(() => {
     vi.clearAllMocks()

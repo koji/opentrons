@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next'
+
 import {
+  ALIGN_CENTER,
   Btn,
   COLORS,
   DIRECTION_COLUMN,
@@ -12,20 +14,19 @@ import {
   TYPOGRAPHY,
 } from '@opentrons/components'
 
-import { BUTTON_LINK_STYLE } from '../../atoms'
+import {
+  LINE_CLAMP_TEXT_STYLE,
+  LINK_BUTTON_STYLE,
+} from '../../components/atoms'
 
-const REQUIRED_APP_VERSION = '8.0.0'
-
-type MetadataInfo = Array<{
-  author?: string
-  description?: string | null
-  created?: string
-  modified?: string
-}>
+interface MetadataItem {
+  title: string
+  value: string | null
+}
 
 interface ProtocolMetadataProps {
   setShowEditMetadataModal: (showEditMetadataModal: boolean) => void
-  metaDataInfo: MetadataInfo
+  metaDataInfo: MetadataItem[]
 }
 
 export function ProtocolMetadata({
@@ -36,7 +37,7 @@ export function ProtocolMetadata({
 
   return (
     <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing12}>
-      <Flex justifyContent={JUSTIFY_SPACE_BETWEEN}>
+      <Flex justifyContent={JUSTIFY_SPACE_BETWEEN} alignItems={ALIGN_CENTER}>
         <StyledText desktopStyle="headingSmallBold">
           {t('protocol_metadata')}
         </StyledText>
@@ -46,7 +47,7 @@ export function ProtocolMetadata({
             onClick={() => {
               setShowEditMetadataModal(true)
             }}
-            css={BUTTON_LINK_STYLE}
+            css={LINK_BUTTON_STYLE}
             data-testid="ProtocolOverview_MetadataEditButton"
           >
             <StyledText desktopStyle="bodyDefaultRegular">
@@ -56,33 +57,32 @@ export function ProtocolMetadata({
         </Flex>
       </Flex>
       <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing4}>
-        {metaDataInfo.map(info => {
-          const [title, value] = Object.entries(info)[0]
-
-          return (
-            <ListItem type="noActive" key={`ProtocolOverview_${title}`}>
-              <ListItemDescriptor
-                type="large"
-                description={
-                  <Flex minWidth="13.75rem">
-                    <StyledText
-                      desktopStyle="bodyDefaultRegular"
-                      color={COLORS.grey60}
-                    >
-                      {t(`${title}`)}
-                    </StyledText>
-                  </Flex>
-                }
-                content={
-                  <StyledText desktopStyle="bodyDefaultRegular">
-                    {value ?? t('na')}
+        {metaDataInfo.map(({ title, value }) => (
+          <ListItem type="default" key={`ProtocolOverview_${title}`}>
+            <ListItemDescriptor
+              type="large"
+              description={
+                <Flex minWidth="13.75rem">
+                  <StyledText
+                    desktopStyle="bodyDefaultRegular"
+                    color={COLORS.grey60}
+                  >
+                    {t(`${title}`)}
                   </StyledText>
-                }
-              />
-            </ListItem>
-          )
-        })}
-        <ListItem type="noActive" key="ProtocolOverview_robotVersion">
+                </Flex>
+              }
+              content={
+                <StyledText
+                  desktopStyle="bodyDefaultRegular"
+                  css={LINE_CLAMP_TEXT_STYLE(2)}
+                >
+                  {value ?? t('na')}
+                </StyledText>
+              }
+            />
+          </ListItem>
+        ))}
+        <ListItem type="default" key="ProtocolOverview_robotVersion">
           <ListItemDescriptor
             type="large"
             description={
@@ -98,7 +98,7 @@ export function ProtocolMetadata({
             content={
               <StyledText desktopStyle="bodyDefaultRegular">
                 {t('app_version', {
-                  version: REQUIRED_APP_VERSION,
+                  version: _OT_PD_REQUIRED_APP_VERSION_,
                 })}
               </StyledText>
             }

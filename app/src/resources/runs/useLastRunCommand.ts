@@ -1,6 +1,10 @@
 import { RUN_STATUSES_TERMINAL } from '@opentrons/api-client'
 
-import { useNotifyAllCommandsQuery, useRunStatus } from '/app/resources/runs'
+import {
+  DEFAULT_STATUS_REFETCH_INTERVAL,
+  useNotifyAllCommandsQuery,
+  useNotifyRunQuery,
+} from '/app/resources/runs'
 
 import type { UseQueryOptions } from 'react-query'
 import type {
@@ -15,21 +19,24 @@ export function useLastRunCommand(
   runId: string,
   options: UseQueryOptions<CommandsData, Error> = {}
 ): RunCommandSummary | null {
-  const runStatus = useRunStatus(runId)
+  const { data: runRecord } = useNotifyRunQuery(runId, {
+    refetchInterval: DEFAULT_STATUS_REFETCH_INTERVAL,
+  })
+  const runStatus = runRecord?.data.status ?? null
   const { data: commandsData } = useNotifyAllCommandsQuery(
     runId,
-    { cursor: null, pageLength: 1 },
+    { pageLength: 1 },
     {
       ...options,
       refetchInterval:
         runStatus != null && runIsLive(runStatus)
-          ? options.refetchInterval ?? LIVE_RUN_COMMANDS_POLL_MS
+          ? (options.refetchInterval ?? LIVE_RUN_COMMANDS_POLL_MS)
           : Infinity,
     }
   )
 
   return commandsData?.data?.[0]?.intent !== 'setup'
-    ? commandsData?.data?.[0] ?? null
+    ? (commandsData?.data?.[0] ?? null)
     : null
 }
 

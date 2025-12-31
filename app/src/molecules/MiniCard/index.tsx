@@ -1,5 +1,5 @@
-import type * as React from 'react'
 import { css } from 'styled-components'
+
 import {
   BORDERS,
   COLORS,
@@ -8,12 +8,13 @@ import {
   SPACING,
 } from '@opentrons/components'
 
+import type { ReactNode } from 'react'
 import type { StyleProps } from '@opentrons/components'
 
 interface MiniCardProps extends StyleProps {
   onClick: () => void
   isSelected: boolean
-  children: React.ReactNode
+  children: ReactNode
   isError?: boolean
   isWarning?: boolean
 }

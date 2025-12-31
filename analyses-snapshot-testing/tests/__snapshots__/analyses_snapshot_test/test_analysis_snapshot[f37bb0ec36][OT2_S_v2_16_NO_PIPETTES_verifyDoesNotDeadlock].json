@@ -1,4 +1,8 @@
 {
+  "commandAnnotations": [],
+  "commandPreconditions": {
+    "isCameraUsed": false
+  },
   "commands": [
     {
       "commandType": "home",
@@ -22,13 +26,9 @@
   },
   "createdAt": "TIMESTAMP",
   "errors": [],
-  "files": [
-    {
-      "name": "OT2_S_v2_16_NO_PIPETTES_verifyDoesNotDeadlock.py",
-      "role": "main"
-    }
-  ],
+  "files": [],
   "labware": [],
+  "liquidClasses": [],
   "liquids": [],
   "metadata": {},
   "modules": [],

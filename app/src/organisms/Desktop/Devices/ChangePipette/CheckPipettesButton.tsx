@@ -1,22 +1,26 @@
-import * as React from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { usePipettesQuery } from '@opentrons/react-api-client'
+
 import {
   ALIGN_CENTER,
   COLORS,
   DIRECTION_ROW,
   Flex,
   Icon,
+  LegacyStyledText,
   PrimaryButton,
   SIZE_1,
   SPACING,
-  LegacyStyledText,
 } from '@opentrons/components'
+import { usePipettesQuery } from '@opentrons/react-api-client'
+
 import { DETACH } from './constants'
+
+import type { ReactNode } from 'react'
 
 export interface CheckPipetteButtonProps {
   robotName: string
-  children?: React.ReactNode
+  children?: ReactNode
   direction?: 'detach' | 'attach'
   onDone?: () => void
 }
@@ -26,7 +30,7 @@ export function CheckPipettesButton(
 ): JSX.Element | null {
   const { onDone, children, direction } = props
   const { t } = useTranslation('change_pipette')
-  const [isPending, setIsPending] = React.useState(false)
+  const [isPending, setIsPending] = useState(false)
   const { refetch: refetchPipettes } = usePipettesQuery(
     { refresh: true },
     {

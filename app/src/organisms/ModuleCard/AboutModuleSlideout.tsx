@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { css } from 'styled-components'
-import { RUN_STATUS_RUNNING, RUN_STATUS_FINISHING } from '@opentrons/api-client'
+
+import { RUN_STATUS_FINISHING, RUN_STATUS_RUNNING } from '@opentrons/api-client'
 import {
   ALIGN_START,
   Banner,
@@ -10,14 +11,16 @@ import {
   DIRECTION_COLUMN,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   PrimaryButton,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
 import { getModuleDisplayName } from '@opentrons/shared-data'
-import { Slideout } from '../../atoms/Slideout'
+
 import { useCurrentRunStatus } from '/app/organisms/RunTimeControl'
+
+import { Slideout } from '../../atoms/Slideout'
 
 import type { AttachedModule } from '/app/redux/modules/types'
 
@@ -81,7 +84,7 @@ export const AboutModuleSlideout = (
               setShowBanner(false)
             }}
           >
-            {t('firmware_update_available')}
+            {t('firmware_update_available_period')}
             <Btn
               textAlign={ALIGN_START}
               paddingLeft={SPACING.spacing4}
@@ -101,14 +104,14 @@ export const AboutModuleSlideout = (
             data-testid={`alert_item_version_${String(module.moduleModel)}`}
           >
             <LegacyStyledText
-              as="h6"
+              forwardedAs="h6"
               fontWeight={TYPOGRAPHY.fontWeightSemiBold}
               color={COLORS.grey60}
             >
               {i18n.format(t('current_version'), 'upperCase')}
             </LegacyStyledText>
             <LegacyStyledText
-              as="p"
+              forwardedAs="p"
               paddingTop={SPACING.spacing4}
               paddingBottom={SPACING.spacing16}
             >
@@ -117,7 +120,7 @@ export const AboutModuleSlideout = (
           </Flex>
         </Flex>
         <LegacyStyledText
-          as="h6"
+          forwardedAs="h6"
           fontWeight={TYPOGRAPHY.fontWeightSemiBold}
           color={COLORS.grey60}
           data-testid={`alert_item_serial_number_text_${String(
@@ -127,7 +130,7 @@ export const AboutModuleSlideout = (
           {i18n.format(t('serial_number'), 'upperCase')}
         </LegacyStyledText>
         <LegacyStyledText
-          as="p"
+          forwardedAs="p"
           paddingTop={SPACING.spacing4}
           data-testid={`alert_item_serial_${String(module.moduleModel)}`}
         >

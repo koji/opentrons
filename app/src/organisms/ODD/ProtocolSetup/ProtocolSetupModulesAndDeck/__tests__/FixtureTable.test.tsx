@@ -1,6 +1,5 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, beforeEach, afterEach, vi, expect } from 'vitest'
+import { afterEach, beforeEach, describe, it, vi } from 'vitest'
 
 import {
   FLEX_ROBOT_TYPE,
@@ -13,50 +12,48 @@ import {
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 import { LocationConflictModal } from '/app/organisms/LocationConflictModal'
-import { useDeckConfigurationCompatibility } from '/app/resources/deck_configuration/hooks'
-import { FixtureTable } from '../FixtureTable'
+import { NotConfiguredModal } from '/app/organisms/LocationConflictModal/NotConfiguredModal'
 import { getLocalRobot } from '/app/redux/discovery'
 import { mockConnectedRobot } from '/app/redux/discovery/__fixtures__'
 
+import { FixtureTable } from '../FixtureTable'
+
+import type { ComponentProps } from 'react'
+
 vi.mock('/app/redux/discovery')
-vi.mock('/app/resources/deck_configuration/hooks')
 vi.mock('/app/organisms/LocationConflictModal')
+vi.mock('/app/organisms/LocationConflictModal/NotConfiguredModal')
 
-const mockSetSetupScreen = vi.fn()
-const mockSetCutoutId = vi.fn()
-const mockSetProvidedFixtureOptions = vi.fn()
-
-const render = (props: React.ComponentProps<typeof FixtureTable>) => {
+const render = (props: ComponentProps<typeof FixtureTable>) => {
   return renderWithProviders(<FixtureTable {...props} />, {
     i18nInstance: i18n,
   })
 }
 
 describe('FixtureTable', () => {
-  let props: React.ComponentProps<typeof FixtureTable>
+  let props: ComponentProps<typeof FixtureTable>
   beforeEach(() => {
     props = {
-      mostRecentAnalysis: { commands: [], labware: [] } as any,
+      deckConfigCompatibility: [
+        {
+          cutoutId: 'cutoutD3',
+          cutoutFixtureId:
+            STAGING_AREA_SLOT_WITH_WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE,
+          requiredAddressableAreas: ['D4'],
+          compatibleCutoutFixtureIds: [
+            STAGING_AREA_SLOT_WITH_WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE,
+          ],
+        },
+      ],
       robotType: FLEX_ROBOT_TYPE,
-      setSetupScreen: mockSetSetupScreen,
-      setCutoutId: mockSetCutoutId,
-      setProvidedFixtureOptions: mockSetProvidedFixtureOptions,
     }
     vi.mocked(getLocalRobot).mockReturnValue(mockConnectedRobot)
     vi.mocked(LocationConflictModal).mockReturnValue(
       <div>mock location conflict modal</div>
     )
-    vi.mocked(useDeckConfigurationCompatibility).mockReturnValue([
-      {
-        cutoutId: 'cutoutD3',
-        cutoutFixtureId: STAGING_AREA_SLOT_WITH_WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE,
-        requiredAddressableAreas: ['D4'],
-        compatibleCutoutFixtureIds: [
-          STAGING_AREA_SLOT_WITH_WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE,
-        ],
-        missingLabwareDisplayName: null,
-      },
-    ])
+    vi.mocked(NotConfiguredModal).mockReturnValue(
+      <div>mock not configured modal</div>
+    )
   })
   afterEach(() => {
     vi.clearAllMocks()
@@ -68,37 +65,36 @@ describe('FixtureTable', () => {
   })
 
   it('should render the current status - not configured', () => {
-    vi.mocked(useDeckConfigurationCompatibility).mockReturnValue([
-      {
-        cutoutId: 'cutoutD3',
-        cutoutFixtureId: SINGLE_RIGHT_SLOT_FIXTURE,
-        requiredAddressableAreas: [MOVABLE_TRASH_D3_ADDRESSABLE_AREA],
-        compatibleCutoutFixtureIds: [TRASH_BIN_ADAPTER_FIXTURE],
-        missingLabwareDisplayName: null,
-      },
-    ])
-
-    render(props)
+    render({
+      ...props,
+      deckConfigCompatibility: [
+        {
+          cutoutId: 'cutoutD3',
+          cutoutFixtureId: SINGLE_RIGHT_SLOT_FIXTURE,
+          requiredAddressableAreas: [MOVABLE_TRASH_D3_ADDRESSABLE_AREA],
+          compatibleCutoutFixtureIds: [TRASH_BIN_ADAPTER_FIXTURE],
+        },
+      ],
+    })
 
     screen.getByText('Not configured')
     fireEvent.click(screen.getByText('Configure'))
-    expect(mockSetCutoutId).toHaveBeenCalledWith('cutoutD3')
-    expect(mockSetSetupScreen).toHaveBeenCalledWith('deck configuration')
-    expect(mockSetProvidedFixtureOptions).toHaveBeenCalledWith([
-      TRASH_BIN_ADAPTER_FIXTURE,
-    ])
+    screen.getByText('mock not configured modal')
   })
 
   it('should render the current status - conflicting', () => {
-    vi.mocked(useDeckConfigurationCompatibility).mockReturnValue([
-      {
-        cutoutId: 'cutoutD3',
-        cutoutFixtureId: STAGING_AREA_SLOT_WITH_WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE,
-        requiredAddressableAreas: [MOVABLE_TRASH_D3_ADDRESSABLE_AREA],
-        compatibleCutoutFixtureIds: [TRASH_BIN_ADAPTER_FIXTURE],
-        missingLabwareDisplayName: null,
-      },
-    ])
+    render({
+      ...props,
+      deckConfigCompatibility: [
+        {
+          cutoutId: 'cutoutD3',
+          cutoutFixtureId:
+            STAGING_AREA_SLOT_WITH_WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE,
+          requiredAddressableAreas: [MOVABLE_TRASH_D3_ADDRESSABLE_AREA],
+          compatibleCutoutFixtureIds: [TRASH_BIN_ADAPTER_FIXTURE],
+        },
+      ],
+    })
 
     render(props)
 

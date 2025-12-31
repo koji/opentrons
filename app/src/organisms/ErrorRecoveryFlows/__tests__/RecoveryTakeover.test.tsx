@@ -1,6 +1,5 @@
-import type * as React from 'react'
-import { describe, it, vi, expect, beforeEach } from 'vitest'
 import { screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   RUN_STATUS_AWAITING_RECOVERY,
@@ -10,22 +9,24 @@ import {
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { RecoveryTakeover, RecoveryTakeoverDesktop } from '../RecoveryTakeover'
 import { useUpdateClientDataRecovery } from '/app/resources/client_data'
+
+import { RecoveryTakeover, RecoveryTakeoverDesktop } from '../RecoveryTakeover'
 import { clickButtonLabeled } from './util'
 
 import type { Mock } from 'vitest'
+import type { ComponentProps } from 'react'
 
 vi.mock('/app/resources/client_data')
 
-const render = (props: React.ComponentProps<typeof RecoveryTakeover>) => {
+const render = (props: ComponentProps<typeof RecoveryTakeover>) => {
   return renderWithProviders(<RecoveryTakeover {...props} />, {
     i18nInstance: i18n,
   })[0]
 }
 
 describe('RecoveryTakeover', () => {
-  let props: React.ComponentProps<typeof RecoveryTakeover>
+  let props: ComponentProps<typeof RecoveryTakeover>
   let mockClearClientData: Mock
 
   beforeEach(() => {
@@ -91,7 +92,7 @@ describe('RecoveryTakeover', () => {
 })
 
 describe('RecoveryTakeoverDesktop', () => {
-  let props: React.ComponentProps<typeof RecoveryTakeoverDesktop>
+  let props: ComponentProps<typeof RecoveryTakeoverDesktop>
 
   beforeEach(() => {
     props = {

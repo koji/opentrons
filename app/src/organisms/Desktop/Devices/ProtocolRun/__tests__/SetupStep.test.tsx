@@ -1,28 +1,31 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, beforeEach, vi, afterEach, expect } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
+
 import { SetupStep } from '../SetupStep'
 
 import type { Mock } from 'vitest'
+import type { ComponentProps } from 'react'
 
 describe('SetupStep', () => {
   const render = ({
     expanded = true,
     title = 'stub title',
     description = 'stub description',
+    descriptionElement = <div>description element</div>,
     toggleExpanded = toggleExpandedMock,
     children = <button>stub children</button>,
     rightElement = <div>right element</div>,
-  }: Partial<React.ComponentProps<typeof SetupStep>> = {}) => {
+  }: Partial<ComponentProps<typeof SetupStep>> = {}) => {
     return renderWithProviders(
       <SetupStep
         {...{
           expanded,
           title,
           description,
+          descriptionElement,
           toggleExpanded,
           children,
           rightElement,
@@ -53,6 +56,7 @@ describe('SetupStep', () => {
   it('renders text nodes with prop contents', () => {
     render({ expanded: false })
     screen.getByText('stub title')
+    screen.getByText('description element')
     screen.queryAllByText('stub description')
     screen.queryAllByText('right element')
   })

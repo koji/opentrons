@@ -1,7 +1,8 @@
 import * as React from 'react'
 
 import { LabwareRender, RobotWorkSpace } from '@opentrons/components'
-import { labwareImages } from './labware-images'
+import { getLabwareViewBox, labwareImages } from '@opentrons/shared-data'
+
 import styles from './styles.module.css'
 
 import type { LabwareDefinition } from '../../types'
@@ -13,26 +14,25 @@ export interface GalleryProps {
 
 export function Gallery(props: GalleryProps): JSX.Element {
   const { definition, className } = props
-  const {
-    parameters: params,
-    dimensions: dims,
-    cornerOffsetFromSlot,
-  } = definition
+  const { parameters: params } = definition
+  const { minX, minY, xDimension, yDimension } = getLabwareViewBox(definition)
   const [currentImage, setCurrentImage] = React.useState(0)
   const render = (
     <RobotWorkSpace
       key="center"
-      viewBox={`${cornerOffsetFromSlot.x} ${cornerOffsetFromSlot.y} ${dims.xDimension} ${dims.yDimension}`}
+      viewBox={`${minX} ${minY} ${xDimension} ${yDimension}`}
       width="100%"
       height="100%"
     >
-      {() => <LabwareRender definition={definition} />}
+      {() => (
+        <LabwareRender definition={definition} positioningMode="passThrough" />
+      )}
     </RobotWorkSpace>
   )
 
-  const staticImages = (
-    labwareImages[params.loadName] || []
-  ).map((src, key) => <img key={key} src={src} />)
+  const staticImages = (labwareImages[params.loadName] || []).map(
+    (src, key) => <img key={key} src={src} />
+  )
 
   const images = [...staticImages, render]
 

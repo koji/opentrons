@@ -1,31 +1,36 @@
+import { useEffect, useMemo } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { useTranslation } from 'react-i18next'
+import debounce from 'lodash/debounce'
+
 import { useConditionalConfirm } from '@opentrons/components'
-import * as timelineWarningSelectors from '../../../../top-selectors/timelineWarnings'
-import { selectors as dismissSelectors } from '../../../../dismiss'
-import { selectors as stepFormSelectors } from '../../../../step-forms'
-import {
-  actions as stepsActions,
-  getHoveredStepId,
-  getHoveredSubstep,
-  getMultiSelectItemIds,
-  getSelectedStepId,
-  getMultiSelectLastSelected,
-  getIsMultiSelectMode,
-} from '../../../../ui/steps'
-import { selectors as fileDataSelectors } from '../../../../file-data'
+
 import {
   CLOSE_STEP_FORM_WITH_CHANGES,
   CLOSE_UNSAVED_STEP_FORM,
   ConfirmDeleteModal,
-} from '../../../../components/modals/ConfirmDeleteModal'
-import { stepIconsByType } from '../../../../form-types'
+} from '/protocol-designer/components/organisms'
+import { selectors as dismissSelectors } from '/protocol-designer/dismiss'
+import { selectors as fileDataSelectors } from '/protocol-designer/file-data'
+import { stepIconsByType } from '/protocol-designer/form-types'
+import { selectors as stepFormSelectors } from '/protocol-designer/step-forms'
+import { getOrderedStepIds } from '/protocol-designer/step-forms/selectors'
+import * as timelineWarningSelectors from '/protocol-designer/top-selectors/timelineWarnings'
+import {
+  getHoveredStepId,
+  getHoveredSubstep,
+  getIsMultiSelectMode,
+  getMultiSelectItemIds,
+  getMultiSelectLastSelected,
+  getSelectedStepId,
+  actions as stepsActions,
+} from '/protocol-designer/ui/steps'
 import {
   hoverOnStep,
   toggleViewSubstep,
-} from '../../../../ui/steps/actions/actions'
-import { getOrderedStepIds } from '../../../../step-forms/selectors'
-import { StepContainer } from './StepContainer'
+} from '/protocol-designer/ui/steps/actions/actions'
+
+import { ConnectedStepContainer } from './ConnectedStepContainer'
+import { useStepText } from './useStepText'
 import {
   getMetaSelectedSteps,
   getMouseClickKeyInfo,
@@ -33,28 +38,40 @@ import {
   nonePressed,
 } from './utils'
 
-import type * as React from 'react'
 import type { ThunkDispatch } from 'redux-thunk'
-import type {
-  HoverOnStepAction,
-  SelectMultipleStepsAction,
-} from '../../../../ui/steps'
-import type { StepIdType } from '../../../../form-types'
-import type { BaseState, ThunkAction } from '../../../../types'
-import type { DeleteModalType } from '../../../../components/modals/ConfirmDeleteModal'
+import type { Dispatch, MouseEvent, SetStateAction } from 'react'
+import type { DeleteModalType } from '/protocol-designer/components/organisms'
+import type { StepIdType } from '/protocol-designer/form-types'
+import type { BaseState, ThunkAction } from '/protocol-designer/types'
+import type { SelectMultipleStepsAction } from '/protocol-designer/ui/steps'
 
 export interface ConnectedStepInfoProps {
   stepId: StepIdType
-  stepNumber: number
-  dragHovered?: boolean
+  openedOverflowMenuId?: string | null
+  setOpenedOverflowMenuId?: Dispatch<SetStateAction<string | null>>
+  sidebarWidth: number
 }
 
+// This debounce reduces flickering when the cursor moves across steps in the timeline.
+// Although there's no hover gap between adjacent `StepContainer`s (they have a visual
+// gap but it's made out of internal padding), there are hover gaps in `ConcurrentStepGroup`s.
+const DEBOUNCE_DURATION_MS = 500
+
+// todo(mm, 2025-11-14): I've made a mess of ConnectedStepInfo and ConnectedStepContainer.
+// We should try to either merge them, or clarify each one's responsibilities.
 export function ConnectedStepInfo(props: ConnectedStepInfoProps): JSX.Element {
-  const { stepId, stepNumber, dragHovered = false } = props
-  const { t } = useTranslation('application')
+  const {
+    stepId,
+    openedOverflowMenuId,
+    setOpenedOverflowMenuId,
+    sidebarWidth,
+  } = props
   const dispatch = useDispatch<ThunkDispatch<BaseState, any, any>>()
   const stepIds = useSelector(getOrderedStepIds)
   const step = useSelector(stepFormSelectors.getSavedStepForms)[stepId]
+  const stepNumber = useSelector(stepFormSelectors.getUserVisibleStepNumbers)[
+    stepId
+  ]
   const argsAndErrors = useSelector(stepFormSelectors.getArgsAndErrorsByStepId)[
     stepId
   ]
@@ -71,6 +88,7 @@ export function ConnectedStepInfo(props: ConnectedStepInfoProps): JSX.Element {
     errorStepId != null ? stepIds.slice(stepIds.indexOf(errorStepId) + 1) : []
   const stepAfterError =
     stepId != null ? stepListAfterErrors.includes(stepId) : false
+  const { text, subtext } = useStepText(step)
 
   const hasWarnings =
     hasTimelineWarningsPerStep[stepId] || hasFormLevelWarningsPerStep[stepId]
@@ -78,12 +96,13 @@ export function ConnectedStepInfo(props: ConnectedStepInfoProps): JSX.Element {
   const hoveredStep = useSelector(getHoveredStepId)
   const selectedStepId = useSelector(getSelectedStepId)
   const multiSelectItemIds = useSelector(getMultiSelectItemIds)
-  const orderedStepIds = useSelector(stepFormSelectors.getOrderedStepIds)
+  const stepHierarchy = useSelector(stepFormSelectors.getSavedStepHierarchy)
   const lastMultiSelectedStepId = useSelector(getMultiSelectLastSelected)
   const isMultiSelectMode = useSelector(getIsMultiSelectMode)
-  const selected: boolean = multiSelectItemIds?.length
-    ? multiSelectItemIds.includes(stepId)
-    : selectedStepId === stepId
+  const selected: boolean =
+    multiSelectItemIds != null && multiSelectItemIds.length > 0
+      ? multiSelectItemIds.includes(stepId)
+      : selectedStepId === stepId
   const currentFormIsPresaved = useSelector(
     stepFormSelectors.getCurrentFormIsPresaved
   )
@@ -99,15 +118,19 @@ export function ConnectedStepInfo(props: ConnectedStepInfoProps): JSX.Element {
   ): ThunkAction<SelectMultipleStepsAction> =>
     dispatch(stepsActions.selectMultipleSteps(steps, lastSelected))
 
+  const debouncedUnhighlightStep = useMemo(
+    () =>
+      debounce(() => {
+        dispatch(stepsActions.hoverOnStep(null))
+      }, DEBOUNCE_DURATION_MS),
+    [dispatch]
+  )
+
   const selectStep = (): ThunkAction<any> =>
     dispatch(stepsActions.resetSelectStep(stepId))
   const selectStepOnDoubleClick = (): ThunkAction<any> =>
     dispatch(stepsActions.selectStep(stepId))
-  const highlightStep = (): HoverOnStepAction =>
-    dispatch(stepsActions.hoverOnStep(stepId))
-  const unhighlightStep = (): HoverOnStepAction =>
-    dispatch(stepsActions.hoverOnStep(null))
-  const handleSelectStep = (event: React.MouseEvent): void => {
+  const handleSelectStep = (event: MouseEvent): void => {
     if (selectedStep !== stepId) {
       dispatch(toggleViewSubstep(null))
       dispatch(hoverOnStep(null))
@@ -132,7 +155,7 @@ export function ConnectedStepInfo(props: ConnectedStepInfoProps): JSX.Element {
       if (isShiftKeyPressed) {
         stepsToSelect = getShiftSelectedSteps(
           selectedStepId,
-          orderedStepIds,
+          stepHierarchy,
           stepId,
           multiSelectItemIds,
           lastMultiSelectedStepId
@@ -184,9 +207,23 @@ export function ConnectedStepInfo(props: ConnectedStepInfoProps): JSX.Element {
 
   const iconName = stepIconsByType[step.stepType]
 
+  const handleMouseEnter = (): void => {
+    debouncedUnhighlightStep.cancel()
+    dispatch(stepsActions.hoverOnStep(stepId))
+  }
+
+  const handleMouseLeave = (): void => {
+    debouncedUnhighlightStep()
+  }
+
+  useEffect(() => {
+    return () => {
+      debouncedUnhighlightStep.cancel()
+    }
+  }, [debouncedUnhighlightStep, hoveredStep, stepId])
+
   return (
     <>
-      {/* TODO: update this modal */}
       {showConfirmationDoubleClick && (
         <ConfirmDeleteModal
           modalType={getModalType()}
@@ -194,7 +231,6 @@ export function ConnectedStepInfo(props: ConnectedStepInfoProps): JSX.Element {
           onCancelClick={cancelDoubleClick}
         />
       )}
-      {/* TODO: update this modal */}
       {showConfirmation && (
         <ConfirmDeleteModal
           modalType={getModalType()}
@@ -202,21 +238,23 @@ export function ConnectedStepInfo(props: ConnectedStepInfoProps): JSX.Element {
           onCancelClick={cancel}
         />
       )}
-      <StepContainer
+      <ConnectedStepContainer
+        openedOverflowMenuId={openedOverflowMenuId}
+        setOpenedOverflowMenuId={setOpenedOverflowMenuId}
         hasError={hasError}
         isStepAfterError={stepAfterError}
         stepId={stepId}
-        onMouseLeave={unhighlightStep}
+        onMouseLeave={handleMouseLeave}
         selected={selected}
         onDoubleClick={confirmDoubleClick}
         onClick={confirm}
         hovered={hoveredStep === stepId && !hoveredSubstep}
-        onMouseEnter={highlightStep}
-        iconName={hasError || hasWarnings ? 'alert-circle' : iconName}
-        title={`${stepNumber}. ${
-          step.stepName || t(`stepType.${step.stepType}`)
-        }`}
-        dragHovered={dragHovered}
+        onMouseEnter={handleMouseEnter}
+        iconName={hasError || hasWarnings ? 'ot-alert' : iconName}
+        stepNumber={stepNumber}
+        text={text}
+        subtext={subtext}
+        sidebarWidth={sidebarWidth}
       />
     </>
   )

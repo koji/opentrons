@@ -1,8 +1,10 @@
 import { useTranslation } from 'react-i18next'
+
 import { Box } from '@opentrons/components'
 
-import { ConfigForm } from './ConfigForm'
 import { ConfigErrorBanner } from './ConfigErrorBanner'
+import { ConfigForm } from './ConfigForm'
+
 import type {
   PipetteSettingsFieldsMap,
   UpdatePipetteSettingsData,
@@ -19,13 +21,8 @@ interface Props {
 }
 
 export function ConfigurePipette(props: Props): JSX.Element {
-  const {
-    updateSettings,
-    updateError,
-    isUpdateLoading,
-    formId,
-    settings,
-  } = props
+  const { updateSettings, updateError, isUpdateLoading, formId, settings } =
+    props
   const { t } = useTranslation('device_details')
 
   const groupLabels = [

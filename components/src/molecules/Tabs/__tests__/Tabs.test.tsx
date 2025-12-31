@@ -1,18 +1,20 @@
-import type * as React from 'react'
-import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { fireEvent, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { BORDERS, COLORS } from '../../../helix-design-system'
-import { SPACING } from '../../../ui-style-constants'
 import { POSITION_RELATIVE } from '../../../styles'
 import { renderWithProviders } from '../../../testing/utils'
+import { SPACING } from '../../../ui-style-constants'
 import { Tabs } from '../index'
 
-const render = (props: React.ComponentProps<typeof Tabs>) => {
+import type { ComponentProps } from 'react'
+
+const render = (props: ComponentProps<typeof Tabs>) => {
   return renderWithProviders(<Tabs {...props} />)
 }
 
 describe('Tabs', () => {
-  let props: React.ComponentProps<typeof Tabs>
+  let props: ComponentProps<typeof Tabs>
 
   beforeEach(() => {
     props = {

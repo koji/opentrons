@@ -1,23 +1,26 @@
-import { useTranslation, Trans } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 import { useDispatch } from 'react-redux'
+
 import {
   ALIGN_CENTER,
   COLORS,
   DIRECTION_COLUMN,
   ERROR_TOAST,
   Flex,
+  LegacyStyledText,
   Link,
   SPACING,
-  LegacyStyledText,
 } from '@opentrons/components'
-import { UploadInput } from '/app/molecules/UploadInput'
-import { addProtocol } from '/app/redux/protocol-storage'
-import {
-  useTrackEvent,
-  ANALYTICS_IMPORT_PROTOCOL_TO_APP,
-} from '/app/redux/analytics'
+
 import { useLogger } from '/app/logger'
+import { UploadInput } from '/app/molecules/UploadInput'
 import { useToaster } from '/app/organisms/ToasterOven'
+import {
+  ANALYTICS_IMPORT_PROTOCOL_TO_APP,
+  useTrackEvent,
+} from '/app/redux/analytics'
+import { addProtocol } from '/app/redux/protocol-storage'
+import { remote } from '/app/redux/shell/remote'
 
 import type { Dispatch } from '/app/redux/types'
 
@@ -38,21 +41,23 @@ export function ProtocolUploadInput(
   const trackEvent = useTrackEvent()
   const { makeToast } = useToaster()
 
-  const handleUpload = (file: File): void => {
-    if (file.path === null) {
-      logger.warn('Failed to upload file, path not found')
-    }
-    if (isValidProtocolFileName(file.name)) {
-      dispatch(addProtocol(file.path))
-    } else {
-      makeToast(t('incompatible_file_type') as string, ERROR_TOAST, {
-        closeButton: true,
+  const handleUpload = (file: File): Promise<void> => {
+    return remote.getFilePathFrom(file).then(filePath => {
+      if (filePath == null) {
+        logger.warn('Failed to upload file, path not found')
+      }
+      if (isValidProtocolFileName(file.name)) {
+        dispatch(addProtocol(filePath))
+      } else {
+        makeToast(t('incompatible_file_type') as string, ERROR_TOAST, {
+          closeButton: true,
+        })
+      }
+      props.onUpload?.()
+      trackEvent({
+        name: ANALYTICS_IMPORT_PROTOCOL_TO_APP,
+        properties: { protocolFileName: file.name },
       })
-    }
-    props.onUpload?.()
-    trackEvent({
-      name: ANALYTICS_IMPORT_PROTOCOL_TO_APP,
-      properties: { protocolFileName: file.name },
     })
   }
 
@@ -64,11 +69,11 @@ export function ProtocolUploadInput(
     >
       <UploadInput
         onUpload={(file: File) => {
-          handleUpload(file)
+          void handleUpload(file)
         }}
         uploadText={t('valid_file_types')}
         dragAndDropText={
-          <LegacyStyledText as="p">
+          <LegacyStyledText forwardedAs="p">
             <Trans
               t={t}
               i18nKey="shared:drag_and_drop"

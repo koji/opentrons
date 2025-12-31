@@ -1,10 +1,11 @@
 from datetime import datetime
-from enum import Enum
 
 import typing
 
 from pydantic import BaseModel, Field
 from typing_extensions import Literal
+
+from opentrons_shared_data.util import StrEnum
 
 from robot_server.robot.calibration.check.models import (
     CalibrationCheckSessionStatus,
@@ -24,7 +25,7 @@ from robot_server.service.json_api import (
 )
 
 
-class SessionType(str, Enum):
+class SessionType(StrEnum):
     """The available session types"""
 
     calibration_check = "calibrationCheck"
@@ -43,46 +44,38 @@ SessionCreateParamType = typing.Union[
 ]
 
 
-class SessionCreateAttributes(BaseModel):
-    """Attributes required for creating a session"""
-
-    sessionType: SessionType = Field(..., description="The type of the session")
-
-
-class SessionCreateAttributesNoParams(SessionCreateAttributes):
-    """The base model of request that has no createParams."""
-
-    createParams: typing.Optional[BaseModel]
-
-
-class CalibrationCheckCreateAttributes(SessionCreateAttributesNoParams):
+class CalibrationCheckCreateAttributes(BaseModel):
     """The calibration check create request."""
 
     sessionType: Literal[SessionType.calibration_check] = SessionType.calibration_check
     createParams: CalCheckCreateParams
 
 
-class TipLengthCalibrationCreateAttributes(SessionCreateAttributes):
+class TipLengthCalibrationCreateAttributes(BaseModel):
     """The tip length calibration create request."""
 
-    sessionType: Literal[
+    sessionType: Literal[SessionType.tip_length_calibration] = (
         SessionType.tip_length_calibration
-    ] = SessionType.tip_length_calibration
+    )
     createParams: SessionCreateParams
 
 
-class DeckCalibrationCreateAttributes(SessionCreateAttributesNoParams):
+class _NoParams(BaseModel): ...
+
+
+class DeckCalibrationCreateAttributes(BaseModel):
     """The deck calibration create request."""
 
     sessionType: Literal[SessionType.deck_calibration] = SessionType.deck_calibration
+    createParams: None | _NoParams = None
 
 
-class PipetteOffsetCalibrationCreateAttributes(SessionCreateAttributes):
+class PipetteOffsetCalibrationCreateAttributes(BaseModel):
     """Pipette offset calibration create request."""
 
-    sessionType: Literal[
+    sessionType: Literal[SessionType.pipette_offset_calibration] = (
         SessionType.pipette_offset_calibration
-    ] = SessionType.pipette_offset_calibration
+    )
     createParams: SessionCreateParams
 
 
@@ -92,7 +85,6 @@ class SessionResponseAttributes(DeprecatedResponseDataModel):
     createdAt: datetime = Field(
         ..., description="Date and time that this session was created"
     )
-    details: BaseModel = Field(..., description="Detailed session specific status")
 
 
 class CalibrationCheckResponseAttributes(

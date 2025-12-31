@@ -8,8 +8,8 @@ import {
   DIRECTION_ROW,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
@@ -81,10 +81,16 @@ function ListItem({ itemName, itemValue }: ListItemProps): JSX.Element {
       justifyContent={JUSTIFY_SPACE_BETWEEN}
       borderRadius={BORDERS.borderRadius8}
     >
-      <LegacyStyledText as="p" fontWeight={TYPOGRAPHY.fontWeightSemiBold}>
+      <LegacyStyledText
+        forwardedAs="p"
+        fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+      >
         {itemName}
       </LegacyStyledText>
-      <LegacyStyledText as="p" fontWeight={TYPOGRAPHY.fontWeightRegular}>
+      <LegacyStyledText
+        forwardedAs="p"
+        fontWeight={TYPOGRAPHY.fontWeightRegular}
+      >
         {itemValue}
       </LegacyStyledText>
     </Flex>

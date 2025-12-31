@@ -1,44 +1,48 @@
-import * as React from 'react'
+import { useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 
-import { getPipetteModelSpecs } from '@opentrons/shared-data'
-import { useConditionalConfirm, ModalShell } from '@opentrons/components'
-
-import * as Sessions from '/app/redux/sessions'
 import {
-  Introduction,
+  ModalShell,
+  useConditionalConfirm,
+  WizardHeader,
+} from '@opentrons/components'
+import { getPipetteModelSpecs } from '@opentrons/shared-data'
+
+import { getTopPortalEl } from '/app/App/portal'
+import {
+  ConfirmExit,
   DeckSetup,
-  TipPickUp,
-  TipConfirmation,
-  SaveZPoint,
-  SaveXYPoint,
+  Introduction,
+  LoadingState,
   MeasureNozzle,
   MeasureTip,
-  LoadingState,
-  ConfirmExit,
+  SaveXYPoint,
+  SaveZPoint,
+  TipConfirmation,
+  TipPickUp,
 } from '/app/organisms/Desktop/CalibrationPanels'
-import { WizardHeader } from '/app/molecules/WizardHeader'
-import { getTopPortalEl } from '/app/App/portal'
-import { ReturnTip } from './ReturnTip'
-import { ResultsSummary } from './ResultsSummary'
+import * as Sessions from '/app/redux/sessions'
+import { CHECK_PIPETTE_RANK_FIRST } from '/app/redux/sessions'
 
+import { ResultsSummary } from './ResultsSummary'
+import { ReturnTip } from './ReturnTip'
+
+import type { ComponentType } from 'react'
 import type { Mount } from '@opentrons/components'
+import type { CalibrationPanelProps } from '/app/organisms/Desktop/CalibrationPanels/types'
 import type {
   CalibrationLabware,
   RobotCalibrationCheckPipetteRank,
   RobotCalibrationCheckStep,
   SessionCommandParams,
 } from '/app/redux/sessions/types'
-
-import type { CalibrationPanelProps } from '/app/organisms/Desktop/CalibrationPanels/types'
 import type { CalibrationCheckParentProps } from './types'
-import { CHECK_PIPETTE_RANK_FIRST } from '/app/redux/sessions'
 
 const ROBOT_CALIBRATION_CHECK_SUBTITLE = 'Calibration health check'
 
 const PANEL_BY_STEP: {
-  [step in RobotCalibrationCheckStep]?: React.ComponentType<CalibrationPanelProps>
+  [step in RobotCalibrationCheckStep]?: ComponentType<CalibrationPanelProps>
 } = {
   [Sessions.CHECK_STEP_SESSION_STARTED]: Introduction,
   [Sessions.CHECK_STEP_LABWARE_LOADED]: DeckSetup,
@@ -124,13 +128,13 @@ export function CheckCalibration(
     cleanUpAndExit()
   }, true)
 
-  const isMulti = React.useMemo(() => {
+  const isMulti = useMemo(() => {
     const spec = activePipette && getPipetteModelSpecs(activePipette.model)
     return spec ? spec.channels > 1 : false
   }, [activePipette])
 
   const calBlock: CalibrationLabware | null = labware
-    ? labware.find(l => !l.isTiprack) ?? null
+    ? (labware.find(l => !l.isTiprack) ?? null)
     : null
 
   function sendCommands(...commands: SessionCommandParams[]): void {
@@ -163,7 +167,7 @@ export function CheckCalibration(
         currentStep ?? null,
         activePipette?.rank ?? null
       )
-    : STEPS_IN_ORDER_ONE_PIPETTE.findIndex(step => step === currentStep) ?? 0
+    : (STEPS_IN_ORDER_ONE_PIPETTE.findIndex(step => step === currentStep) ?? 0)
 
   if (!session || !activeTipRack) {
     return null

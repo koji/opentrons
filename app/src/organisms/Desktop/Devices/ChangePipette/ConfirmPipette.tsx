@@ -1,22 +1,25 @@
-import type * as React from 'react'
 import { useTranslation } from 'react-i18next'
-import { OT2_ROBOT_TYPE } from '@opentrons/shared-data'
+
 import {
   COLORS,
+  PrimaryButton,
+  SecondaryButton,
   SPACING,
   TEXT_TRANSFORM_CAPITALIZE,
   TYPOGRAPHY,
-  PrimaryButton,
-  SecondaryButton,
 } from '@opentrons/components'
-import { CheckPipettesButton } from './CheckPipettesButton'
+import { OT2_ROBOT_TYPE } from '@opentrons/shared-data'
+
 import { SimpleWizardBody } from '/app/molecules/SimpleWizardBody'
+
+import { CheckPipettesButton } from './CheckPipettesButton'
 import { LevelPipette } from './LevelPipette'
 
+import type { Dispatch, SetStateAction } from 'react'
 import type {
-  PipetteNameSpecs,
-  PipetteModelSpecs,
   PipetteDisplayCategory,
+  PipetteModelSpecs,
+  PipetteNameSpecs,
 } from '@opentrons/shared-data'
 import type { PipetteOffsetCalibration } from '/app/redux/calibration/types'
 import type { Mount } from '/app/redux/pipettes/types'
@@ -36,11 +39,9 @@ export interface ConfirmPipetteProps {
   //  wrongWantedPipette is referring to if the user attaches a pipette that is different
   //  from wantedPipette and they want to use it anyway
   wrongWantedPipette: PipetteNameSpecs | null
-  setWrongWantedPipette: React.Dispatch<
-    React.SetStateAction<PipetteNameSpecs | null>
-  >
+  setWrongWantedPipette: Dispatch<SetStateAction<PipetteNameSpecs | null>>
   confirmPipetteLevel: boolean
-  setConfirmPipetteLevel: React.Dispatch<React.SetStateAction<boolean>>
+  setConfirmPipetteLevel: Dispatch<SetStateAction<boolean>>
   tryAgain: () => void
   exit: () => void
   nextStep: () => void

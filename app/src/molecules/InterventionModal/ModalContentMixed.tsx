@@ -1,13 +1,13 @@
 import {
-  Icon,
-  Flex,
-  Box,
-  LegacyStyledText,
-  DIRECTION_COLUMN,
-  SPACING,
-  COLORS,
   ALIGN_CENTER,
+  Box,
+  COLORS,
+  DIRECTION_COLUMN,
+  Flex,
+  Icon,
   RESPONSIVENESS,
+  SPACING,
+  StyledText,
 } from '@opentrons/components'
 
 export type ModalContentMixedType =
@@ -19,14 +19,12 @@ export type ModalContentMixedType =
 
 export type ModalContentMixedIcons = 'error' | 'caution' | 'neutral'
 
-export const MODAL_CONTENT_MIXED_ICONS: Record<
-  ModalContentMixedIcons,
-  string
-> = {
-  neutral: COLORS.grey50,
-  caution: COLORS.yellow50,
-  error: COLORS.red50,
-}
+export const MODAL_CONTENT_MIXED_ICONS: Record<ModalContentMixedIcons, string> =
+  {
+    neutral: COLORS.grey50,
+    caution: COLORS.yellow50,
+    error: COLORS.red50,
+  }
 
 interface ModalContentMixedIconProps {
   type: 'icon'
@@ -85,21 +83,21 @@ export function ModalContentMixed(props: ModalContentMixedProps): JSX.Element {
         `}
       >
         {props.headline != null ? (
-          <LegacyStyledText
+          <StyledText
             oddStyle="level3HeaderBold"
             desktopStyle="headingSmallBold"
           >
             {props.headline}
-          </LegacyStyledText>
+          </StyledText>
         ) : null}
         {props.subText != null ? (
-          <LegacyStyledText
+          <StyledText
             oddStyle="level4HeaderRegular"
             desktopStyle="bodyDefaultRegular"
             color={COLORS.grey60}
           >
             {props.subText}
-          </LegacyStyledText>
+          </StyledText>
         ) : null}
       </Flex>
     </Flex>
@@ -152,7 +150,7 @@ function ModalContentMixedSpinner(
   return (
     <Box
       marginBottom={SPACING.spacing16}
-      width={'80px'}
+      width="80px"
       css={`
         @media ${RESPONSIVENESS.touchscreenMediaQuerySpecs} {
           width: 100px;

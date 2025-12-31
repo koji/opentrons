@@ -1,6 +1,6 @@
 {
   "$otSharedSchema": "#/pipette/schemas/2/pipettePropertiesSchema.json",
-  "displayName": "Flex 1-Channel 50 μL",
+  "displayName": "Flex 1-Channel 50 µL",
   "model": "p50",
   "displayCategory": "FLEX",
   "validNozzleMaps": {
@@ -21,6 +21,8 @@
             "tipOverlaps": {
               "v0": {
                 "default": 10.5,
+                "opentrons/opentrons_flex_96_tiprack_20ul/1": 10.5,
+                "opentrons/opentrons_flex_96_filtertiprack_20ul/1": 10.5,
                 "opentrons/opentrons_flex_96_tiprack_50ul/1": 10.5,
                 "opentrons/opentrons_flex_96_filtertiprack_50ul/1": 10.5
               }

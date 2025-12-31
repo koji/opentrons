@@ -1,11 +1,8 @@
-import * as React from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useDispatch } from 'react-redux'
 import { useTranslation } from 'react-i18next'
-import {
-  useTrackEvent,
-  ANALYTICS_OPEN_LABWARE_CREATOR_FROM_OVERFLOW_MENU,
-} from '/app/redux/analytics'
+import { useDispatch } from 'react-redux'
+
 import {
   AlertPrimaryButton,
   ALIGN_CENTER,
@@ -29,13 +26,18 @@ import {
   useOnClickOutside,
 } from '@opentrons/components'
 
-import { Divider } from '/app/atoms/structure'
 import { getTopPortalEl } from '/app/App/portal'
+import { Divider } from '/app/atoms/structure'
+import {
+  ANALYTICS_OPEN_LABWARE_CREATOR_FROM_OVERFLOW_MENU,
+  useTrackEvent,
+} from '/app/redux/analytics'
 import {
   deleteCustomLabwareFile,
   openCustomLabwareDirectory,
 } from '/app/redux/custom-labware'
 
+import type { MouseEventHandler } from 'react'
 import type { Dispatch } from '/app/redux/types'
 
 const LABWARE_CREATOR_HREF = 'https://labware.opentrons.com/create/'
@@ -51,7 +53,7 @@ export function CustomLabwareOverflowMenu(
   const { filename, onDelete } = props
   const { t } = useTranslation(['labware_landing', 'shared'])
   const dispatch = useDispatch<Dispatch>()
-  const [showOverflowMenu, setShowOverflowMenu] = React.useState<boolean>(false)
+  const [showOverflowMenu, setShowOverflowMenu] = useState<boolean>(false)
   const overflowMenuRef = useOnClickOutside<HTMLDivElement>({
     onClickOutside: () => {
       setShowOverflowMenu(false)
@@ -67,24 +69,24 @@ export function CustomLabwareOverflowMenu(
     dispatch(deleteCustomLabwareFile(filename))
     onDelete?.()
   }, true)
-  const handleOpenInFolder: React.MouseEventHandler<HTMLButtonElement> = e => {
+  const handleOpenInFolder: MouseEventHandler<HTMLButtonElement> = e => {
     e.preventDefault()
     e.stopPropagation()
     setShowOverflowMenu(false)
     dispatch(openCustomLabwareDirectory())
   }
-  const handleClickDelete: React.MouseEventHandler<HTMLButtonElement> = e => {
+  const handleClickDelete: MouseEventHandler<HTMLButtonElement> = e => {
     e.preventDefault()
     e.stopPropagation()
     setShowOverflowMenu(false)
     confirmDeleteLabware()
   }
-  const handleOverflowClick: React.MouseEventHandler<HTMLButtonElement> = e => {
+  const handleOverflowClick: MouseEventHandler<HTMLButtonElement> = e => {
     e.preventDefault()
     e.stopPropagation()
     setShowOverflowMenu(currentShowOverflowMenu => !currentShowOverflowMenu)
   }
-  const handleClickLabwareCreator: React.MouseEventHandler<HTMLButtonElement> = e => {
+  const handleClickLabwareCreator: MouseEventHandler<HTMLButtonElement> = e => {
     e.preventDefault()
     e.stopPropagation()
     trackEvent({
@@ -95,7 +97,7 @@ export function CustomLabwareOverflowMenu(
     window.open(LABWARE_CREATOR_HREF, '_blank')
   }
 
-  const handleCancelModal: React.MouseEventHandler<HTMLButtonElement> = e => {
+  const handleCancelModal: MouseEventHandler<HTMLButtonElement> = e => {
     e.preventDefault()
     e.stopPropagation()
     cancelDeleteLabware()
@@ -146,10 +148,10 @@ export function CustomLabwareOverflowMenu(
             onClose={handleCancelModal}
           >
             <Flex flexDirection={DIRECTION_COLUMN}>
-              <LegacyStyledText as="p">
+              <LegacyStyledText forwardedAs="p">
                 {t('def_moved_to_trash')}
               </LegacyStyledText>
-              <LegacyStyledText as="p" paddingTop={SPACING.spacing8}>
+              <LegacyStyledText forwardedAs="p" paddingTop={SPACING.spacing8}>
                 {t('cannot-run-python-missing-labware')}
               </LegacyStyledText>
               <Flex

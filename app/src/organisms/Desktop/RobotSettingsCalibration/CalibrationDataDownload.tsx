@@ -1,6 +1,5 @@
-import type * as React from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { saveAs } from 'file-saver'
-import { useTranslation, Trans } from 'react-i18next'
 
 import {
   ALIGN_CENTER,
@@ -8,27 +7,31 @@ import {
   Flex,
   Icon,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   Link,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
 import {
   useInstrumentsQuery,
   useModulesQuery,
 } from '@opentrons/react-api-client'
+import { FLEX_ROBOT_TYPE, OT2_ROBOT_TYPE } from '@opentrons/shared-data'
+
 import { TertiaryButton } from '/app/atoms/buttons'
 import {
   useDeckCalibrationData,
   usePipetteOffsetCalibrations,
   useTipLengthCalibrations,
 } from '/app/organisms/Desktop/Devices/hooks'
+import { useIsFlex, useRobot } from '/app/redux-resources/robots'
 import {
-  useTrackEvent,
   ANALYTICS_CALIBRATION_DATA_DOWNLOADED,
+  useTrackEvent,
 } from '/app/redux/analytics'
-import { useRobot, useIsFlex } from '/app/redux-resources/robots'
 import { useIsEstopNotDisengaged } from '/app/resources/devices/hooks/useIsEstopNotDisengaged'
+
+import type { MouseEventHandler } from 'react'
 
 // TODO(bc, 2022-02-08): replace with support article when available
 const FLEX_CALIBRATION_SUPPORT_URL = 'https://support.opentrons.com'
@@ -68,11 +71,13 @@ export function CalibrationDataDownload({
     tipLengthCalibrations != null &&
     tipLengthCalibrations.length > 0
 
-  const onClickSaveAs: React.MouseEventHandler = e => {
+  const onClickSaveAs: MouseEventHandler = e => {
     e.preventDefault()
     doTrackEvent({
       name: ANALYTICS_CALIBRATION_DATA_DOWNLOADED,
-      properties: {},
+      properties: {
+        robotType: isFlex ? FLEX_ROBOT_TYPE : OT2_ROBOT_TYPE,
+      },
     })
     saveAs(
       new Blob([
@@ -98,7 +103,10 @@ export function CalibrationDataDownload({
       gridGap={SPACING.spacing40}
     >
       <Flex gridGap={SPACING.spacing8} flexDirection={DIRECTION_COLUMN}>
-        <LegacyStyledText as="h3" fontWeight={TYPOGRAPHY.fontWeightSemiBold}>
+        <LegacyStyledText
+          forwardedAs="h3"
+          fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+        >
           {isFlex
             ? t('about_calibration_title')
             : t('robot_calibration:download_calibration_title')}
@@ -109,7 +117,7 @@ export function CalibrationDataDownload({
               t={t}
               i18nKey="about_calibration_description_ot3"
               components={{
-                block: <LegacyStyledText as="p" />,
+                block: <LegacyStyledText forwardedAs="p" />,
               }}
             />
             <Link
@@ -121,7 +129,7 @@ export function CalibrationDataDownload({
             </Link>
           </>
         ) : (
-          <LegacyStyledText as="p">
+          <LegacyStyledText forwardedAs="p">
             {t(
               ot2DownloadIsPossible
                 ? 'robot_calibration:download_calibration_data_available'

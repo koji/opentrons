@@ -1,14 +1,14 @@
-import type * as React from 'react'
 import { Provider } from 'react-redux'
-import { createStore } from 'redux'
 import { renderHook } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { legacy_createStore } from 'redux'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { FLEX_ROBOT_TYPE, OT2_ROBOT_TYPE } from '@opentrons/shared-data'
 
 import { useSortedProtocols } from '../hooks'
 
 import type { Store } from 'redux'
+import type { FunctionComponent, ReactNode } from 'react'
 import type { ProtocolAnalysisOutput } from '@opentrons/shared-data'
 import type { StoredProtocolData } from '/app/redux/protocol-storage'
 import type { State } from '/app/redux/types'
@@ -285,7 +285,7 @@ const mockStoredProtocolData = [
 ] as StoredProtocolData[]
 
 describe('useSortedProtocols', () => {
-  const store: Store<State> = createStore(vi.fn(), {})
+  const store: Store<State> = legacy_createStore(vi.fn(), {})
   beforeEach(() => {
     store.dispatch = vi.fn()
   })
@@ -294,7 +294,7 @@ describe('useSortedProtocols', () => {
   })
 
   it('should return an object with protocols sorted alphabetically', () => {
-    const wrapper: React.FunctionComponent<{ children: React.ReactNode }> = ({
+    const wrapper: FunctionComponent<{ children: ReactNode }> = ({
       children,
     }) => <Provider store={store}>{children}</Provider>
 
@@ -318,7 +318,7 @@ describe('useSortedProtocols', () => {
   })
 
   it('should return an object with protocols sorted reverse alphabetically', () => {
-    const wrapper: React.FunctionComponent<{ children: React.ReactNode }> = ({
+    const wrapper: FunctionComponent<{ children: ReactNode }> = ({
       children,
     }) => <Provider store={store}>{children}</Provider>
 
@@ -342,7 +342,7 @@ describe('useSortedProtocols', () => {
   })
 
   it('should return an object with protocols sorted by most recent modified data', () => {
-    const wrapper: React.FunctionComponent<{ children: React.ReactNode }> = ({
+    const wrapper: FunctionComponent<{ children: ReactNode }> = ({
       children,
     }) => <Provider store={store}>{children}</Provider>
 
@@ -366,7 +366,7 @@ describe('useSortedProtocols', () => {
   })
 
   it('should return an object with protocols sorted by oldest modified data', () => {
-    const wrapper: React.FunctionComponent<{ children: React.ReactNode }> = ({
+    const wrapper: FunctionComponent<{ children: ReactNode }> = ({
       children,
     }) => <Provider store={store}>{children}</Provider>
 
@@ -390,7 +390,7 @@ describe('useSortedProtocols', () => {
   })
 
   it('should return an object with protocols sorted by flex then ot-2', () => {
-    const wrapper: React.FunctionComponent<{ children: React.ReactNode }> = ({
+    const wrapper: FunctionComponent<{ children: ReactNode }> = ({
       children,
     }) => <Provider store={store}>{children}</Provider>
 
@@ -413,7 +413,7 @@ describe('useSortedProtocols', () => {
     )
   })
   it('should return an object with protocols sorted by ot-2 then flex', () => {
-    const wrapper: React.FunctionComponent<{ children: React.ReactNode }> = ({
+    const wrapper: FunctionComponent<{ children: ReactNode }> = ({
       children,
     }) => <Provider store={store}>{children}</Provider>
 

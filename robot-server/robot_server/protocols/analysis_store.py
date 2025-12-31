@@ -1,4 +1,5 @@
 """Protocol analysis storage."""
+
 from __future__ import annotations
 
 import sqlalchemy
@@ -11,6 +12,8 @@ from opentrons_shared_data.errors import ErrorCodes
 from opentrons.protocol_engine.types import (
     RunTimeParameter,
     CSVParameter,
+    CommandAnnotation,
+    CommandPreconditions,
 )
 from opentrons.protocol_engine import (
     Command,
@@ -19,6 +22,7 @@ from opentrons.protocol_engine import (
     LoadedLabware,
     LoadedModule,
     Liquid,
+    LiquidClassRecordWithId,
 )
 from opentrons.protocol_engine.protocol_engine import code_in_error_tree
 
@@ -61,7 +65,8 @@ _log = getLogger(__name__)
 #
 # Version History
 #     * Changed to "2" for version 7.0 from "initial"
-_CURRENT_ANALYZER_VERSION: Final = "2"
+#     * Changed to "3" for the implementation of Command Preconditions
+_CURRENT_ANALYZER_VERSION: Final = "3"
 # We have a reasonable limit for a memory cache of analyses.
 _CACHE_MAX_SIZE: Final = 32
 
@@ -131,6 +136,7 @@ class AnalysisStore:
                 a pending analysis.
             analysis_id: The ID of the new analysis.
                 Must be unique across *all* protocols, not just this one.
+            run_time_parameters: Run time parameters to analyze with.
 
         Returns:
             A summary of the just-added analysis.
@@ -152,6 +158,9 @@ class AnalysisStore:
         pipettes: List[LoadedPipette],
         errors: List[ErrorOccurrence],
         liquids: List[Liquid],
+        liquidClasses: List[LiquidClassRecordWithId],
+        command_annotations: List[CommandAnnotation],
+        command_preconditions: Optional[CommandPreconditions] = None,
     ) -> None:
         """Promote a pending analysis to completed, adding details of its results.
 
@@ -167,14 +176,17 @@ class AnalysisStore:
             errors: See `CompletedAnalysis.errors`. Also used to infer whether
                 the completed analysis result is `OK` or `NOT_OK`.
             liquids: See `CompletedAnalysis.liquids`.
+            liquidClasses: See `CompletedAnalysis.liquidClasses`.
             robot_type: See `CompletedAnalysis.robotType`.
+            command_annotations: See `CompletedAnalysis.command_annotations`.
+            command_preconditions: See `CompletedAnalysis.command_preconditions`.
         """
         protocol_id = self._pending_store.get_protocol_id(analysis_id=analysis_id)
 
         # No protocol ID means there was no pending analysis with the given analysis ID.
-        assert (
-            protocol_id is not None
-        ), "Analysis ID to update must be for a valid pending analysis."
+        assert protocol_id is not None, (
+            "Analysis ID to update must be for a valid pending analysis."
+        )
 
         if len(errors) > 0:
             if any(
@@ -189,7 +201,7 @@ class AnalysisStore:
         else:
             result = AnalysisResult.OK
 
-        completed_analysis = CompletedAnalysis.construct(
+        completed_analysis = CompletedAnalysis.model_construct(
             id=analysis_id,
             result=result,
             robotType=robot_type,
@@ -201,6 +213,9 @@ class AnalysisStore:
             pipettes=pipettes,
             errors=errors,
             liquids=liquids,
+            liquidClasses=liquidClasses,
+            commandAnnotations=command_annotations,
+            commandPreconditions=command_preconditions,
         )
         completed_analysis_resource = CompletedAnalysisResource(
             id=completed_analysis.id,
@@ -229,7 +244,7 @@ class AnalysisStore:
         errors: List[ErrorOccurrence],
     ) -> None:
         """Commit the failed analysis to store."""
-        completed_analysis = CompletedAnalysis.construct(
+        completed_analysis = CompletedAnalysis.model_construct(
             id=analysis_id,
             result=AnalysisResult.NOT_OK,
             robotType=robot_type,
@@ -241,6 +256,7 @@ class AnalysisStore:
             pipettes=[],
             errors=errors,
             liquids=[],
+            liquidClasses=[],
         )
         completed_analysis_resource = CompletedAnalysisResource(
             id=completed_analysis.id,
@@ -296,7 +312,9 @@ class AnalysisStore:
             protocol_id=protocol_id
         )
         completed_analysis_summaries = [
-            AnalysisSummary.construct(id=analysis_id, status=AnalysisStatus.COMPLETED)
+            AnalysisSummary.model_construct(
+                id=analysis_id, status=AnalysisStatus.COMPLETED
+            )
             for analysis_id in completed_analysis_ids
         ]
 
@@ -409,7 +427,9 @@ class AnalysisStore:
         ) + list(csv_rtps_in_last_analysis.keys())
         assert set(param.variableName for param in new_parameters) == set(
             total_params_in_last_analysis
-        ), "Mismatch in parameters found in the current request vs. last saved parameters."  # Indicates internal bug
+        ), (
+            "Mismatch in parameters found in the current request vs. last saved parameters."
+        )  # Indicates internal bug
         for param in new_parameters:
             if isinstance(param, CSVParameter):
                 new_file_id = param.file.id if param.file else None
@@ -442,11 +462,11 @@ class _PendingAnalysisStore:
         run_time_parameters: List[RunTimeParameter],
     ) -> None:
         """Add a new pending analysis and associate it with the given protocol."""
-        assert (
-            protocol_id not in self._analysis_ids_by_protocol_id
-        ), "Protocol must not already have a pending analysis."
+        assert protocol_id not in self._analysis_ids_by_protocol_id, (
+            "Protocol must not already have a pending analysis."
+        )
 
-        new_pending_analysis = PendingAnalysis.construct(
+        new_pending_analysis = PendingAnalysis.model_construct(
             id=analysis_id,
             runTimeParameters=run_time_parameters,
         )

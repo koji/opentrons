@@ -1,13 +1,17 @@
 import {
   getLabwareDisplayName,
   getLabwareStackCountAndLocation,
+  locationIsOffDeck,
+  locationIsOnAddressableArea,
+  locationIsOnModule,
+  locationIsOnSlot,
 } from '@opentrons/shared-data'
 
 import type {
   LoadLabwareRunTimeCommand,
-  RunTimeCommand,
   LoadModuleRunTimeCommand,
   ModuleModel,
+  RunTimeCommand,
 } from '@opentrons/shared-data'
 
 export interface LocationInfoNames {
@@ -52,8 +56,7 @@ export function getLocationInfoNames(
     labwareId,
     loadLabwareCommands
   )
-
-  if (labwareLocation === 'offDeck') {
+  if (locationIsOffDeck(labwareLocation)) {
     return { slotName: 'Off deck', labwareName, labwareQuantity }
   } else if ('slotName' in labwareLocation) {
     return { slotName: labwareLocation.slotName, labwareName, labwareQuantity }
@@ -86,13 +89,11 @@ export function getLocationInfoNames(
     )
     if (loadedAdapterCommand?.params == null) {
       console.warn(
-        `expected to find an adapter under the labware but could not with labwareId ${labwareLocation.labwareId}`
+        'getLocationInfoNames: expected to find an adapter under the labware but could not with labwareId',
+        labwareLocation.labwareId
       )
       return { slotName: '', labwareName: labwareName, labwareQuantity }
-    } else if (
-      loadedAdapterCommand?.params.location !== 'offDeck' &&
-      'slotName' in loadedAdapterCommand?.params.location
-    ) {
+    } else if (locationIsOnSlot(loadedAdapterCommand?.params.location)) {
       return {
         slotName: loadedAdapterCommand?.params.location.slotName,
         labwareName,
@@ -103,8 +104,7 @@ export function getLocationInfoNames(
         labwareQuantity,
       }
     } else if (
-      loadedAdapterCommand?.params.location !== 'offDeck' &&
-      'addressableAreaName' in loadedAdapterCommand?.params.location
+      locationIsOnAddressableArea(loadedAdapterCommand?.params.location)
     ) {
       return {
         slotName: loadedAdapterCommand?.params.location.addressableAreaName,
@@ -115,10 +115,7 @@ export function getLocationInfoNames(
         adapterId: loadedAdapterCommand?.result?.labwareId,
         labwareQuantity,
       }
-    } else if (
-      loadedAdapterCommand?.params.location !== 'offDeck' &&
-      'moduleId' in loadedAdapterCommand?.params.location
-    ) {
+    } else if (locationIsOnModule(loadedAdapterCommand?.params.location)) {
       const moduleId = loadedAdapterCommand?.params.location.moduleId
       const loadModuleCommandUnderAdapter = loadModuleCommands?.find(
         command => command.result?.moduleId === moduleId
@@ -138,6 +135,10 @@ export function getLocationInfoNames(
           }
         : { slotName: '', labwareName, labwareQuantity }
     } else {
+      console.warn(
+        'getLocationInfoNames: unhandled adapter location',
+        loadedAdapterCommand?.params.location
+      )
       //  shouldn't hit this
       return { slotName: '', labwareName, labwareQuantity }
     }

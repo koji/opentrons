@@ -1,4 +1,7 @@
-import { useState, useRef } from 'react'
+import { useRef, useState } from 'react'
+import { Provider } from 'react-redux'
+import { legacy_createStore } from 'redux'
+
 import {
   DIRECTION_COLUMN,
   Flex,
@@ -7,14 +10,39 @@ import {
   SPACING,
   VIEWPORT,
 } from '@opentrons/components'
+
+import { configReducer } from '/app/redux/config/reducer'
+
 import { FullKeyboard } from '.'
 
 import type { Meta, StoryObj } from '@storybook/react'
+import type { Store, StoreEnhancer } from 'redux'
+
+const dummyConfig = {
+  config: {
+    isOnDevice: false,
+    language: {
+      appLanguage: 'en',
+      systemLanguage: null,
+    },
+  },
+} as any
+const store: Store<any> = legacy_createStore(
+  configReducer,
+  dummyConfig as StoreEnhancer
+)
 
 const meta: Meta<typeof FullKeyboard> = {
   title: 'ODD/Atoms/SoftwareKeyboard/FullKeyboard',
   component: FullKeyboard,
   parameters: VIEWPORT.touchScreenViewport,
+  decorators: [
+    Story => (
+      <Provider store={store}>
+        <Story />
+      </Provider>
+    ),
+  ],
 }
 export default meta
 

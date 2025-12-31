@@ -1,14 +1,16 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { InputField } from '@opentrons/components'
 
 import { renderWithProviders } from '/app/__testing-utils__'
-import { i18n } from '/app/i18n'
 import { NumericalKeyboard } from '/app/atoms/SoftwareKeyboard'
+import { i18n } from '/app/i18n'
+
 import { getVolumeRange } from '../utils'
 import { VolumeEntry } from '../VolumeEntry'
+
+import type { ComponentProps } from 'react'
 
 vi.mock('/app/atoms/SoftwareKeyboard')
 vi.mock('../utils')
@@ -21,14 +23,14 @@ vi.mock('@opentrons/components', async importOriginal => {
   }
 })
 
-const render = (props: React.ComponentProps<typeof VolumeEntry>) => {
+const render = (props: ComponentProps<typeof VolumeEntry>) => {
   return renderWithProviders(<VolumeEntry {...props} />, {
     i18nInstance: i18n,
   })
 }
 
 describe('VolumeEntry', () => {
-  let props: React.ComponentProps<typeof VolumeEntry>
+  let props: ComponentProps<typeof VolumeEntry>
 
   beforeEach(() => {
     props = {
@@ -160,7 +162,7 @@ describe('VolumeEntry', () => {
     expect(vi.mocked(InputField)).toHaveBeenCalledWith(
       {
         title: 'Aspirate volume per well (µL)',
-        error: 'Value must be between 5-50',
+        error: 'Value must be between 5 to 50',
         readOnly: true,
         type: 'text',
         value: '90',

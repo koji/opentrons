@@ -1,4 +1,5 @@
 """Command models to stop heating a Thermocycler's lid."""
+
 from __future__ import annotations
 from typing import Optional, TYPE_CHECKING
 from typing_extensions import Literal, Type
@@ -66,7 +67,7 @@ class DeactivateLid(
 
     commandType: DeactivateLidCommandType = "thermocycler/deactivateLid"
     params: DeactivateLidParams
-    result: Optional[DeactivateLidResult]
+    result: Optional[DeactivateLidResult] = None
 
     _ImplementationCls: Type[DeactivateLidImpl] = DeactivateLidImpl
 

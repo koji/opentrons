@@ -1,7 +1,6 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, beforeEach, vi } from 'vitest'
-import { renderWithProviders } from '/app/__testing-utils__'
+import { beforeEach, describe, it, vi } from 'vitest'
+
 import {
   MAGNETIC_BLOCK_D3_ADDRESSABLE_AREA,
   MAGNETIC_BLOCK_V1_FIXTURE,
@@ -10,17 +9,21 @@ import {
   STAGING_AREA_SLOT_WITH_WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE,
   TRASH_BIN_ADAPTER_FIXTURE,
 } from '@opentrons/shared-data'
-import { i18n } from '/app/i18n'
-import { SetupFixtureList } from '../SetupFixtureList'
-import { NotConfiguredModal } from '../NotConfiguredModal'
-import { LocationConflictModal } from '/app/organisms/LocationConflictModal'
-import { DeckFixtureSetupInstructionsModal } from '/app/organisms/DeviceDetailsDeckConfiguration/DeckFixtureSetupInstructionsModal'
 
-import type { CutoutConfigAndCompatibility } from '/app/resources/deck_configuration/hooks'
+import { renderWithProviders } from '/app/__testing-utils__'
+import { i18n } from '/app/i18n'
+import { DeckFixtureSetupInstructionsModal } from '/app/organisms/DeviceDetailsDeckConfiguration/DeckFixtureSetupInstructionsModal'
+import { LocationConflictModal } from '/app/organisms/LocationConflictModal'
+import { NotConfiguredModal } from '/app/organisms/LocationConflictModal/NotConfiguredModal'
+
+import { SetupFixtureList } from '../SetupFixtureList'
+
+import type { ComponentProps } from 'react'
+import type { CutoutConfigAndCompatibility } from '@opentrons/shared-data'
 
 vi.mock('/app/resources/deck_configuration/hooks')
 vi.mock('/app/organisms/LocationConflictModal')
-vi.mock('../NotConfiguredModal')
+vi.mock('/app/organisms/LocationConflictModal/NotConfiguredModal')
 vi.mock(
   '/app/organisms/DeviceDetailsDeckConfiguration/DeckFixtureSetupInstructionsModal'
 )
@@ -28,26 +31,26 @@ vi.mock(
 const mockDeckConfigCompatibility: CutoutConfigAndCompatibility[] = [
   {
     cutoutId: 'cutoutD3',
-    cutoutFixtureId: STAGING_AREA_SLOT_WITH_WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE,
+    cutoutFixtureId:
+      STAGING_AREA_SLOT_WITH_WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE,
     requiredAddressableAreas: ['D4'],
     compatibleCutoutFixtureIds: [
       STAGING_AREA_SLOT_WITH_WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE,
     ],
-    missingLabwareDisplayName: null,
   },
 ]
 
-const mockNotConfiguredDeckConfigCompatibility: CutoutConfigAndCompatibility[] = [
-  {
-    cutoutId: 'cutoutD3',
-    cutoutFixtureId: SINGLE_RIGHT_SLOT_FIXTURE,
-    requiredAddressableAreas: ['D4'],
-    compatibleCutoutFixtureIds: [
-      STAGING_AREA_SLOT_WITH_WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE,
-    ],
-    missingLabwareDisplayName: null,
-  },
-]
+const mockNotConfiguredDeckConfigCompatibility: CutoutConfigAndCompatibility[] =
+  [
+    {
+      cutoutId: 'cutoutD3',
+      cutoutFixtureId: SINGLE_RIGHT_SLOT_FIXTURE,
+      requiredAddressableAreas: ['D4'],
+      compatibleCutoutFixtureIds: [
+        STAGING_AREA_SLOT_WITH_WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE,
+      ],
+    },
+  ]
 
 const mockConflictDeckConfigCompatibility: CutoutConfigAndCompatibility[] = [
   {
@@ -57,18 +60,17 @@ const mockConflictDeckConfigCompatibility: CutoutConfigAndCompatibility[] = [
     compatibleCutoutFixtureIds: [
       STAGING_AREA_SLOT_WITH_WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE,
     ],
-    missingLabwareDisplayName: null,
   },
 ]
 
-const render = (props: React.ComponentProps<typeof SetupFixtureList>) => {
+const render = (props: ComponentProps<typeof SetupFixtureList>) => {
   return renderWithProviders(<SetupFixtureList {...props} />, {
     i18nInstance: i18n,
   })
 }
 
 describe('SetupFixtureList', () => {
-  let props: React.ComponentProps<typeof SetupFixtureList>
+  let props: ComponentProps<typeof SetupFixtureList>
   beforeEach(() => {
     props = {
       deckConfigCompatibility: mockDeckConfigCompatibility,
@@ -87,7 +89,7 @@ describe('SetupFixtureList', () => {
 
   it('should a fixture with configured status', () => {
     render(props)
-    screen.getByText('Waste chute with staging area slot')
+    screen.getByText('Waste Chute with Staging Area Slot')
     screen.getByRole('button', { name: 'View setup instructions' })
     screen.getByText('D3')
     screen.getByText('Configured')
@@ -122,7 +124,7 @@ describe('SetupFixtureList', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Resolve' }))
     screen.getByText('mock not configured modal')
   })
-  it('should render a magnetic block with a conflicted fixture', () => {
+  it('should split up magnetic block and staging area combo fixtures', () => {
     props = {
       deckConfigCompatibility: [
         {
@@ -132,15 +134,16 @@ describe('SetupFixtureList', () => {
           compatibleCutoutFixtureIds: [
             STAGING_AREA_SLOT_WITH_MAGNETIC_BLOCK_V1_FIXTURE,
           ],
-          missingLabwareDisplayName: null,
         },
       ],
       robotName: 'otie',
     }
     render(props)
-    screen.getByText('Location conflict')
-    screen.getByText('Magnetic Block GEN1 with staging area slot')
+    screen.getByText('Magnetic Block GEN1')
+    screen.getByText('Configured')
+    screen.getByText('Staging Area Slot')
+    screen.getByText('Not configured')
     fireEvent.click(screen.getByRole('button', { name: 'Resolve' }))
-    screen.getByText('mock location conflict modal')
+    screen.getByText('mock not configured modal')
   })
 })

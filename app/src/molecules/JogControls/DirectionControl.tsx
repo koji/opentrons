@@ -1,6 +1,7 @@
 // jog controls component
-import * as React from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSelector } from 'react-redux'
 import styled, { css } from 'styled-components'
 
 import {
@@ -27,13 +28,17 @@ import {
   TEXT_ALIGN_LEFT,
   TYPOGRAPHY,
 } from '@opentrons/components'
-import { ControlContainer } from './ControlContainer'
-import { HORIZONTAL_PLANE, VERTICAL_PLANE } from './constants'
-import { TouchControlButton } from './TouchControlButton'
 
-import type { IconName } from '@opentrons/components'
+import { TouchControlButton } from '/app/atoms/buttons/TouchControlButton'
+import { getIsOnDevice } from '/app/redux/config'
+
+import { HORIZONTAL_PLANE, VERTICAL_PLANE } from './constants'
+import { ControlContainer } from './ControlContainer'
+
 import type { CSSProperties } from 'styled-components'
-import type { Jog, Plane, Sign, Bearing, Axis, StepSize } from './types'
+import type { MouseEvent } from 'react'
+import type { IconName } from '@opentrons/components'
+import type { Axis, Bearing, Jog, Plane, Sign, StepSize } from './types'
 
 interface Control {
   bearing: Bearing
@@ -223,12 +228,12 @@ interface DirectionControlProps {
 
 export function DirectionControl(props: DirectionControlProps): JSX.Element {
   const { planes, jog, stepSize, initialPlane } = props
-  const [currentPlane, setCurrentPlane] = React.useState<Plane>(
+  const [currentPlane, setCurrentPlane] = useState<Plane>(
     initialPlane ?? planes[0]
   )
   const { t } = useTranslation(['robot_calibration'])
 
-  const handlePlane = (event: React.MouseEvent<HTMLButtonElement>): void => {
+  const handlePlane = (event: MouseEvent<HTMLButtonElement>): void => {
     setCurrentPlane(event.currentTarget.value as Plane)
     event.currentTarget.blur()
   }
@@ -396,7 +401,8 @@ const ARROW_BUTTON_STYLES = css`
     }
   }
 `
-const ARROW_ICON_STYLES = css`
+
+const StyledIcon = styled(Icon)`
   height: 1.125rem;
   width: 1.125rem;
 
@@ -426,21 +432,19 @@ export const ArrowKeys = (props: ArrowKeysProps): JSX.Element => {
 
   return (
     <Box css={ARROW_GRID_STYLES}>
-      {controls.map(
-        ({ bearing, iconName, axis, sign, gridColumn, keyName, disabled }) => (
-          <PrimaryButton
-            key={bearing}
-            onClick={() => jog(axis, sign, stepSize)}
-            css={ARROW_BUTTON_STYLES}
-            title={bearing}
-            gridArea={keyName}
-            alignSelf={BUTTON_ALIGN_BY_KEY_NAME[keyName] ?? 'center'}
-            disabled={disabled}
-          >
-            <Icon css={ARROW_ICON_STYLES} name={iconName} />
-          </PrimaryButton>
-        )
-      )}
+      {controls.map(({ bearing, iconName, axis, sign, keyName, disabled }) => (
+        <PrimaryButton
+          key={bearing}
+          onClick={() => jog(axis, sign, stepSize)}
+          css={ARROW_BUTTON_STYLES}
+          title={bearing}
+          gridArea={keyName}
+          alignSelf={BUTTON_ALIGN_BY_KEY_NAME[keyName] ?? 'center'}
+          disabled={disabled}
+        >
+          <StyledIcon name={iconName} />
+        </PrimaryButton>
+      ))}
     </Box>
   )
 }
@@ -449,11 +453,11 @@ export function TouchDirectionControl(
   props: DirectionControlProps
 ): JSX.Element {
   const { planes, jog, stepSize, initialPlane } = props
-  const [currentPlane, setCurrentPlane] = React.useState<Plane>(
+  const [currentPlane, setCurrentPlane] = useState<Plane>(
     initialPlane ?? planes[0]
   )
   const { i18n, t } = useTranslation(['robot_calibration'])
-
+  const isOnDevice = useSelector(getIsOnDevice)
   return (
     <Flex
       flex="1"
@@ -473,26 +477,13 @@ export function TouchDirectionControl(
             return (
               <TouchControlButton
                 key={plane}
-                selected={selected}
+                isActive={selected}
                 onClick={() => {
                   setCurrentPlane(plane)
                 }}
-              >
-                <Flex
-                  flexDirection={DIRECTION_COLUMN}
-                  alignItems={ALIGN_FLEX_START}
-                  justifyContent={JUSTIFY_CENTER}
-                  height="74px"
-                >
-                  <LegacyStyledText
-                    as="p"
-                    fontWeight={TYPOGRAPHY.fontWeightSemiBold}
-                    color={selected ? COLORS.white : COLORS.black90}
-                  >
-                    {CONTROLS_CONTENTS_BY_PLANE[plane].title}
-                  </LegacyStyledText>
-                </Flex>
-              </TouchControlButton>
+                isOnDevice={isOnDevice}
+                title={CONTROLS_CONTENTS_BY_PLANE[plane].title}
+              />
             )
           })}
         </Flex>

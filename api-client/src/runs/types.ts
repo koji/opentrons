@@ -1,16 +1,23 @@
 import type {
+  LabwareDefinition,
   Liquid,
   LoadedLabware,
   LoadedModule,
   LoadedPipette,
   ModuleModel,
+  NozzleLayoutConfig,
+  OnDeckLabwareLocation,
   RunCommandError,
   RunTimeCommand,
   RunTimeParameter,
-  NozzleLayoutConfig,
-  OnDeckLabwareLocation,
 } from '@opentrons/shared-data'
-import type { ResourceLink, ErrorDetails } from '../types'
+import type { CameraData } from '../camera'
+import type {
+  ErrorDetails,
+  LabwareOffsetLocationSequence,
+  ResourceLink,
+} from '../types'
+
 export * from './commands/types'
 
 export const RUN_STATUS_IDLE = 'idle' as const
@@ -23,8 +30,10 @@ export const RUN_STATUS_FINISHING = 'finishing' as const
 export const RUN_STATUS_SUCCEEDED = 'succeeded' as const
 export const RUN_STATUS_BLOCKED_BY_OPEN_DOOR = 'blocked-by-open-door' as const
 export const RUN_STATUS_AWAITING_RECOVERY = 'awaiting-recovery' as const
-export const RUN_STATUS_AWAITING_RECOVERY_BLOCKED_BY_OPEN_DOOR = 'awaiting-recovery-blocked-by-open-door' as const
-export const RUN_STATUS_AWAITING_RECOVERY_PAUSED = 'awaiting-recovery-paused' as const
+export const RUN_STATUS_AWAITING_RECOVERY_BLOCKED_BY_OPEN_DOOR =
+  'awaiting-recovery-blocked-by-open-door' as const
+export const RUN_STATUS_AWAITING_RECOVERY_PAUSED =
+  'awaiting-recovery-paused' as const
 
 export type RunStatus =
   | typeof RUN_STATUS_IDLE
@@ -56,11 +65,13 @@ export interface LegacyGoodRunData {
   modules: LoadedModule[]
   protocolId?: string
   labwareOffsets?: LabwareOffset[]
+  cameraSettings?: CameraData
 }
 
 export interface KnownGoodRunData extends LegacyGoodRunData {
   ok: true
   runTimeParameters: RunTimeParameter[]
+  /** @deprecated Prefer using bindings for /dataFiles/:runId/all */
   outputFileIds: string[]
 }
 
@@ -82,8 +93,13 @@ export interface LabwareOffset {
   id: string
   createdAt: string
   definitionUri: string
-  location: LabwareOffsetLocation
+  location: LegacyLabwareOffsetLocation
+  locationSequence?: LabwareOffsetLocationSequence
   vector: VectorOffset
+}
+
+export interface RunLoadedLabwareDefinitions {
+  data: LabwareDefinition[]
 }
 
 export interface Run {
@@ -120,7 +136,9 @@ export interface Runs {
 export interface RunCurrentStateData {
   estopEngaged: boolean
   activeNozzleLayouts: Record<string, NozzleLayoutValues> // keyed by pipetteId
+  tipStates: Record<string, TipStates> // keyed by pipetteId
   placeLabwareState?: PlaceLabwareState
+  flexStackerStates?: Record<string, FlexStackerState> // keyed by moduleId
 }
 
 export const RUN_ACTION_TYPE_PLAY: 'play' = 'play'
@@ -148,14 +166,20 @@ export interface CreateRunActionData {
   actionType: RunActionType
 }
 
-export interface LabwareOffsetLocation {
+export interface LegacyLabwareOffsetLocation {
   slotName: string
   moduleModel?: ModuleModel
   definitionUri?: string
 }
+export interface LegacyLabwareOffsetCreateData {
+  definitionUri: string
+  location: LegacyLabwareOffsetLocation
+  vector: VectorOffset
+}
+
 export interface LabwareOffsetCreateData {
   definitionUri: string
-  location: LabwareOffsetLocation
+  locationSequence: LabwareOffsetLocationSequence
   vector: VectorOffset
 }
 
@@ -203,6 +227,7 @@ export interface UpdateErrorRecoveryPolicyRequest {
 }
 
 export type UpdateErrorRecoveryPolicyResponse = Record<string, never>
+export type ErrorRecoveryPolicyResponse = UpdateErrorRecoveryPolicyRequest
 
 /**
  * Current Run State Data
@@ -214,7 +239,19 @@ export interface NozzleLayoutValues {
 }
 
 export interface PlaceLabwareState {
-  labwareId: string
+  labwareURI: string
   location: OnDeckLabwareLocation
   shouldPlaceDown: boolean
+}
+
+export interface TipStates {
+  hasTip: boolean
+}
+
+export interface FlexStackerState {
+  primaryLabwareURI: string
+  adapterLabwareURI?: string
+  lidLabwareURI?: string
+  count: number
+  maxCount: number
 }

@@ -1,3 +1,4 @@
+/* ToDo this file will be removed once the labware library, designer, and creator are updated */
 :root {
   /* ot brand */
   --c-mustard: #ffd252;
@@ -46,12 +47,6 @@
   --c-green: #7ed321;
   --c-red: #f00000;
   --c-orange: #f5a623;
-
-  --transition-color: {
-    transition: color 0.15s ease-in-out;
-  }
-
-  --transition-background-color: {
-    transition: background-color 0.15s ease-in-out;
-  }
+  --transition-color: color 0.15s ease-in-out;
+  --transition-background-color: background-color 0.15s ease-in-out;
 }

@@ -8,24 +8,30 @@ import {
   DIRECTION_COLUMN,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   PrimaryButton,
   RobotWorkSpace,
   SPACING,
-  LegacyStyledText,
 } from '@opentrons/components'
 import {
+  coordinateTupleToVector3D,
   getDeckDefinitions,
+  getDeckSlotOriginToLabwareOrigin,
   getLabwareDisplayName,
   getPositionFromSlotId,
+  getVectorSum,
 } from '@opentrons/shared-data'
-import * as Sessions from '/app/redux/sessions'
+
 import { NeedHelpLink } from '/app/molecules/OT2CalibrationNeedHelpLink'
+import * as Sessions from '/app/redux/sessions'
+
 import { CalibrationLabwareRender } from './CalibrationLabwareRender'
 
-import type { AddressableArea } from '@opentrons/shared-data'
+import type { LabwareDefinition } from '@opentrons/shared-data'
 import type { CalibrationPanelProps } from './types'
 
 const TIPRACK = 'tip rack'
+const DECK_VIEW_BOX = '-46 -10 488 390'
 
 export function DeckSetup(props: CalibrationPanelProps): JSX.Element {
   const deckDef = useMemo(() => getDeckDefinitions().ot2_standard, [])
@@ -57,18 +63,18 @@ export function DeckSetup(props: CalibrationPanelProps): JSX.Element {
     >
       <Flex>
         <Flex flex="1" flexDirection={DIRECTION_COLUMN}>
-          <LegacyStyledText as="h1" marginBottom={SPACING.spacing16}>
+          <LegacyStyledText forwardedAs="h1" marginBottom={SPACING.spacing16}>
             {t('prepare_the_space')}
           </LegacyStyledText>
           {isHealthCheck ? (
-            <LegacyStyledText as="p">
+            <LegacyStyledText forwardedAs="p">
               {t('to_check', { mount: activePipette?.mount })}
             </LegacyStyledText>
           ) : null}
           <Flex marginLeft={SPACING.spacing32}>
             <ul>
               <li>
-                <LegacyStyledText as="p">
+                <LegacyStyledText forwardedAs="p">
                   {t('place_full_tip_rack', {
                     tip_rack: isHealthCheck
                       ? activePipette?.tipRackDisplay
@@ -78,14 +84,14 @@ export function DeckSetup(props: CalibrationPanelProps): JSX.Element {
               </li>
               {calBlock != null ? (
                 <li>
-                  <LegacyStyledText as="p">
+                  <LegacyStyledText forwardedAs="p">
                     {t('place_cal_block')}
                   </LegacyStyledText>
                 </li>
               ) : null}
               {isHealthCheck ? (
                 <li>
-                  <LegacyStyledText as="p">
+                  <LegacyStyledText forwardedAs="p">
                     {t('clear_other_slots')}
                   </LegacyStyledText>
                 </li>
@@ -107,31 +113,65 @@ export function DeckSetup(props: CalibrationPanelProps): JSX.Element {
             ]}
             deckDef={deckDef}
             showDeckLayers
-            viewBox={`-46 -10 ${488} ${390}`} // TODO: put these in variables
+            viewBox={DECK_VIEW_BOX}
           >
-            {({ deckSlotsById }) =>
-              map(deckSlotsById, (slot: AddressableArea, slotId) => {
-                if (!slot.matingSurfaceUnitVector) return null // if slot has no mating surface, don't render anything in it
-                let labwareDef = null
-                if (String(tipRack?.slot) === slotId) {
-                  labwareDef = tipRack?.definition
-                } else if (
-                  calBlock != null &&
-                  String(calBlock?.slot) === slotId
-                ) {
-                  labwareDef = calBlock?.definition
+            {({ addressableAreasById }) =>
+              map(
+                addressableAreasById,
+                (addressableArea, addressableAreaName) => {
+                  if (!addressableArea.matingSurfaceUnitVector) {
+                    // if slot has no mating surface, don't render anything in it
+                    return null
+                  }
+
+                  const labwareDef = ((): LabwareDefinition | null => {
+                    if (
+                      tipRack?.slot != null &&
+                      Sessions.slotNameFromCalibrationSlot(tipRack?.slot) ===
+                        addressableAreaName
+                    ) {
+                      return tipRack.definition
+                    } else if (
+                      calBlock?.slot != null &&
+                      Sessions.slotNameFromCalibrationSlot(calBlock?.slot) ===
+                        addressableAreaName
+                    ) {
+                      return calBlock.definition
+                    } else {
+                      return null
+                    }
+                  })()
+                  if (labwareDef == null) {
+                    return null
+                  }
+
+                  const slotOrigin = getPositionFromSlotId(
+                    addressableArea.id,
+                    deckDef
+                  )
+                  if (slotOrigin == null) {
+                    return null // Shouldn't happen.
+                  }
+
+                  const slotOriginToLabwareOrigin =
+                    getDeckSlotOriginToLabwareOrigin(
+                      addressableArea,
+                      labwareDef
+                    )
+                  const labwarePosition = getVectorSum(
+                    coordinateTupleToVector3D(slotOrigin),
+                    slotOriginToLabwareOrigin
+                  )
+
+                  return labwareDef != null ? (
+                    <CalibrationLabwareRender
+                      key={addressableAreaName}
+                      labwarePosition={labwarePosition}
+                      labwareDef={labwareDef}
+                    />
+                  ) : null
                 }
-
-                const slotDefPosition = getPositionFromSlotId(slot.id, deckDef)
-
-                return labwareDef != null ? (
-                  <CalibrationLabwareRender
-                    key={slotId}
-                    slotDefPosition={slotDefPosition}
-                    labwareDef={labwareDef}
-                  />
-                ) : null
-              })
+              )
             }
           </RobotWorkSpace>
         </Flex>

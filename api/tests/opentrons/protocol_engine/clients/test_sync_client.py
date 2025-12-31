@@ -12,8 +12,9 @@ the subject's methods in a synchronous context in a child thread to ensure:
 import pytest
 from decoy import Decoy
 
+
 from opentrons_shared_data.labware.types import LabwareUri
-from opentrons_shared_data.labware.labware_definition import LabwareDefinition
+from opentrons_shared_data.labware.labware_definition import LabwareDefinition2
 
 from opentrons.protocol_engine import commands
 from opentrons.protocol_engine.clients import SyncClient, ChildThreadTransport
@@ -61,7 +62,7 @@ def test_execute_command_without_recovery(
         result_from_transport
     )
     result_from_subject = subject.execute_command_without_recovery(params)
-    assert result_from_subject == result_from_transport
+    assert result_from_subject == result_from_transport  # type: ignore[comparison-overlap]
 
 
 def test_add_labware_definition(
@@ -70,7 +71,7 @@ def test_add_labware_definition(
     subject: SyncClient,
 ) -> None:
     """It should add a labware definition."""
-    labware_definition = LabwareDefinition.construct(namespace="hello")  # type: ignore[call-arg]
+    labware_definition = LabwareDefinition2.model_construct(namespace="hello")  # type: ignore[call-arg]
     expected_labware_uri = LabwareUri("hello/world/123")
 
     decoy.when(
@@ -108,7 +109,7 @@ def test_add_liquid(
     subject: SyncClient,
 ) -> None:
     """It should add a liquid to engine state."""
-    liquid = Liquid.construct(displayName="water")  # type: ignore[call-arg]
+    liquid = Liquid.model_construct(displayName="water")  # type: ignore[call-arg]
 
     decoy.when(
         transport.call_method(
@@ -122,18 +123,3 @@ def test_add_liquid(
     result = subject.add_liquid(name="water", description="water desc", color="#fff")
 
     assert result == liquid
-
-
-def test_reset_tips(
-    decoy: Decoy, transport: ChildThreadTransport, subject: SyncClient
-) -> None:
-    """It should reset the tip tracking state of a labware."""
-    subject.reset_tips(labware_id="cool-labware")
-
-    decoy.verify(
-        transport.call_method(
-            "reset_tips",
-            labware_id="cool-labware",
-        ),
-        times=1,
-    )

@@ -1,33 +1,43 @@
-import * as React from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import styled from 'styled-components'
 import { useDispatch, useSelector } from 'react-redux'
-import { useNavigate } from 'react-router-dom'
+
 import {
   BORDERS,
   COLORS,
-  CURSOR_AUTO,
-  CURSOR_POINTER,
   DIRECTION_COLUMN,
+  Divider,
   Flex,
+  MenuItem,
   NO_WRAP,
   POSITION_ABSOLUTE,
   RobotCoordsForeignDiv,
-  SPACING,
   StyledText,
   useOnClickOutside,
 } from '@opentrons/components'
-import { getDeckSetupForActiveItem } from '../../../top-selectors/labware-locations'
+import {
+  getFullStackFromLabwares,
+  getIsSlotAHopper,
+  getTopLocationInStack,
+} from '@opentrons/step-generation'
 
-import { deleteModule } from '../../../step-forms/actions'
-import { EditNickNameModal } from '../../../organisms'
-import { deleteDeckFixture } from '../../../step-forms/actions/additionalItems'
+import {
+  ConfirmDeleteEntityInUseModal,
+  ConfirmDeleteStagingAreaModal,
+  EditNickNameModal,
+} from '../../../components/organisms'
+import { useKitchen } from '../../../components/organisms/Kitchen/useKitchen'
+import { getRobotType } from '../../../file-data/selectors'
 import {
   deleteContainer,
   duplicateLabware,
-  openIngredientSelector,
 } from '../../../labware-ingred/actions'
-import { selectors as labwareIngredSelectors } from '../../../labware-ingred/selectors'
+import { getNextAvailableDeckSlot } from '../../../labware-ingred/utils'
+import { getSavedStepForms } from '../../../step-forms/selectors'
+import { getDeckSetupForActiveItem } from '../../../top-selectors/labware-locations'
+import { getIsLabwareOnSlotInUse } from './utils'
+
+import type { MouseEvent, SetStateAction } from 'react'
 import type { CoordinateTuple, DeckSlotId } from '@opentrons/shared-data'
 import type { ThunkDispatch } from '../../../types'
 
@@ -51,13 +61,15 @@ const BOTTOM_SLOT_Y_POSITION = -70
 const TOP_SLOT_Y_POSITION = 50
 const TOP_SLOT_Y_POSITION_ALL_BUTTONS = 110
 const TOP_SLOT_Y_POSITION_2_BUTTONS = 35
+const STAGING_AREA_SLOTS = ['A4', 'B4', 'C4', 'D4']
 
 interface SlotOverflowMenuProps {
-  //   can be off-deck id or deck slot
+  //   can be off-deck id or deck slot or flexStackerAddressableArea or hopper fake slot
   location: DeckSlotId | string
-  setShowMenuList: (value: React.SetStateAction<boolean>) => void
+  setShowMenuList: (value: SetStateAction<boolean>) => void
   addEquipment: (slotId: string) => void
   menuListSlotPosition?: CoordinateTuple
+  invertY?: true
 }
 export function SlotOverflowMenu(
   props: SlotOverflowMenuProps
@@ -67,114 +79,149 @@ export function SlotOverflowMenu(
     setShowMenuList,
     addEquipment,
     menuListSlotPosition,
+    invertY = false,
   } = props
   const { t } = useTranslation('starting_deck_state')
-  const navigate = useNavigate()
+  const savedSteps = useSelector(getSavedStepForms)
   const dispatch = useDispatch<ThunkDispatch<any>>()
-  const [showNickNameModal, setShowNickNameModal] = React.useState<boolean>(
-    false
-  )
+  const [showDeleteLabwareModal, setShowDeleteLabwareModal] =
+    useState<boolean>(false)
+  const [showDeleteEntityInUseModal, setShowDeleteEntityInUseModal] =
+    useState<boolean>(false)
+  const [showNickNameModal, setShowNickNameModal] = useState<boolean>(false)
   const overflowWrapperRef = useOnClickOutside<HTMLDivElement>({
     onClickOutside: () => {
-      if (!showNickNameModal) {
+      if (
+        !showNickNameModal &&
+        !showDeleteLabwareModal &&
+        !showDeleteEntityInUseModal
+      ) {
         setShowMenuList(false)
       }
     },
   })
   const deckSetup = useSelector(getDeckSetupForActiveItem)
+  const robotType = useSelector(getRobotType)
 
-  const liquidLocations = useSelector(
-    labwareIngredSelectors.getLiquidsByLabwareId
-  )
+  const { makeSnackbar } = useKitchen()
 
-  const {
-    labware: deckSetupLabware,
-    modules: deckSetupModules,
-    additionalEquipmentOnDeck,
-  } = deckSetup
+  const { labware: deckSetupLabware } = deckSetup
+
   const isOffDeckLocation = deckSetupLabware[location] != null
 
-  const moduleOnSlot = Object.values(deckSetupModules).find(
-    module => module.slot === location
-  )
-  const labwareOnSlot = Object.values(deckSetupLabware).find(lw =>
-    isOffDeckLocation
-      ? lw.id === location
-      : lw.slot === location || lw.slot === moduleOnSlot?.id
-  )
-  const isLabwareTiprack = labwareOnSlot?.def.parameters.isTiprack ?? false
+  const fullStackOnSlot = getFullStackFromLabwares(deckSetupLabware, location)
+  const labwareStackOnSlot =
+    fullStackOnSlot?.filter(id => deckSetupLabware[id] != null) ?? []
+  const topLabwareOnStackId =
+    fullStackOnSlot != null ? getTopLocationInStack(fullStackOnSlot) : null
+  const topLabwareOnSlot =
+    topLabwareOnStackId != null ? deckSetupLabware[topLabwareOnStackId] : null
+
+  const isSpace =
+    getNextAvailableDeckSlot(deckSetup, robotType, topLabwareOnSlot?.def) !=
+    null
+
+  const isLabwareTiprack = topLabwareOnSlot?.def.parameters.isTiprack ?? false
   const isLabwareAnAdapter =
-    labwareOnSlot?.def.allowedRoles?.includes('adapter') ?? false
-  const nestedLabwareOnSlot = Object.values(deckSetupLabware).find(
-    lw => lw.slot === labwareOnSlot?.id
-  )
-  const fixturesOnSlot = Object.values(additionalEquipmentOnDeck).filter(
-    ae => ae.location?.split('cutout')[1] === location
+    topLabwareOnSlot?.def.allowedRoles?.includes('adapter') ?? false
+
+  const isTiprackAdapter =
+    topLabwareOnSlot?.def.parameters.quirks?.includes(
+      'tiprackAdapterFor96Channel'
+    ) ?? false
+
+  const adapterOnSlot = Object.values(deckSetupLabware).find(
+    lw => lw.id === labwareStackOnSlot[1]
   )
 
-  const hasNoItems =
-    moduleOnSlot == null && labwareOnSlot == null && fixturesOnSlot.length === 0
+  const handleDuplicate = (): void => {
+    if (!isSpace) {
+      makeSnackbar(t('deck_slots_full') as string)
+      return
+    }
+    dispatch(duplicateLabware(labwareStackOnSlot))
+    setShowMenuList(false)
+  }
+  const isLabwareOnSlotInUse =
+    topLabwareOnSlot != null
+      ? getIsLabwareOnSlotInUse(savedSteps, topLabwareOnSlot, adapterOnSlot)
+      : false
 
   const handleClear = (): void => {
-    //  clear module from slot
-    if (moduleOnSlot != null) {
-      dispatch(deleteModule(moduleOnSlot.id))
-    }
-    //  clear fixture(s) from slot
-    if (fixturesOnSlot.length > 0) {
-      fixturesOnSlot.forEach(fixture => dispatch(deleteDeckFixture(fixture.id)))
-    }
-    //  clear labware from slot
-    if (labwareOnSlot != null) {
-      dispatch(deleteContainer({ labwareId: labwareOnSlot.id }))
-    }
-    //  clear nested labware from slot
-    if (nestedLabwareOnSlot != null) {
-      dispatch(deleteContainer({ labwareId: nestedLabwareOnSlot.id }))
-    }
+    labwareStackOnSlot.forEach(labware => {
+      dispatch(deleteContainer({ labwareId: deckSetupLabware[labware].id }))
+    })
   }
+  const isOnHopper = getIsSlotAHopper(location)
   const showDuplicateBtn =
-    (labwareOnSlot != null &&
-      !isLabwareAnAdapter &&
-      nestedLabwareOnSlot == null) ||
-    nestedLabwareOnSlot != null
+    !isLabwareAnAdapter && labwareStackOnSlot.length > 0 && !isOnHopper
 
-  const showEditAndLiquidsBtns =
-    (labwareOnSlot != null &&
-      !isLabwareAnAdapter &&
-      !isLabwareTiprack &&
-      nestedLabwareOnSlot == null) ||
-    nestedLabwareOnSlot != null
+  const canRenameLabwareAndEditLiquids =
+    !isLabwareAnAdapter &&
+    !isLabwareTiprack &&
+    !isTiprackAdapter &&
+    labwareStackOnSlot.length > 0
 
   let position = ROBOT_BOTTOM_HALF_SLOTS.includes(location)
     ? BOTTOM_SLOT_Y_POSITION
     : TOP_SLOT_Y_POSITION
 
   if (showDuplicateBtn && !ROBOT_BOTTOM_HALF_SLOTS.includes(location)) {
-    position += showEditAndLiquidsBtns
+    position += canRenameLabwareAndEditLiquids
       ? TOP_SLOT_Y_POSITION_ALL_BUTTONS
       : TOP_SLOT_Y_POSITION_2_BUTTONS
   }
 
-  let nickNameId = labwareOnSlot?.id
-  if (nestedLabwareOnSlot != null) {
-    nickNameId = nestedLabwareOnSlot.id
-  } else if (isOffDeckLocation) {
+  let nickNameId = topLabwareOnSlot?.id
+  if (isOffDeckLocation) {
     nickNameId = location
   }
 
-  const selectionHasLiquids =
-    nickNameId != null &&
-    liquidLocations[nickNameId] != null &&
-    Object.keys(liquidLocations[nickNameId]).length > 0
+  const handleConfirmDeleteEntityInUseModal = (): void => {
+    handleClear()
+    setShowMenuList(false)
+    setShowDeleteEntityInUseModal(false)
+  }
+
+  const handleClearLabware = (e: MouseEvent): void => {
+    if (isLabwareOnSlotInUse) {
+      setShowDeleteEntityInUseModal(true)
+      e.preventDefault()
+      e.stopPropagation()
+    } else {
+      handleClear()
+      setShowMenuList(false)
+    }
+  }
 
   const slotOverflowBody = (
     <>
+      {isLabwareOnSlotInUse && showDeleteEntityInUseModal ? (
+        <ConfirmDeleteEntityInUseModal
+          onConfirm={handleConfirmDeleteEntityInUseModal}
+          onClose={() => {
+            setShowDeleteEntityInUseModal(false)
+          }}
+        />
+      ) : null}
       {showNickNameModal && nickNameId != null ? (
         <EditNickNameModal
           labwareId={nickNameId}
           onClose={() => {
             setShowNickNameModal(false)
+            setShowMenuList(false)
+          }}
+        />
+      ) : null}
+      {showDeleteLabwareModal ? (
+        <ConfirmDeleteStagingAreaModal
+          onClose={() => {
+            setShowDeleteLabwareModal(false)
+            setShowMenuList(false)
+          }}
+          onConfirm={() => {
+            handleClear()
+            setShowDeleteLabwareModal(false)
             setShowMenuList(false)
           }}
         />
@@ -186,98 +233,55 @@ export function SlotOverflowMenu(
         boxShadow="0px 1px 3px rgba(0, 0, 0, 0.2)"
         backgroundColor={COLORS.white}
         flexDirection={DIRECTION_COLUMN}
-        onClick={(e: React.MouseEvent) => {
+        onClick={(e: MouseEvent) => {
           e.preventDefault()
           e.stopPropagation()
         }}
       >
-        <MenuButton
+        <MenuItem
+          data-testid="SlotOverflowMenu_openTools"
           onClick={() => {
             addEquipment(location)
             setShowMenuList(false)
           }}
         >
           <StyledText desktopStyle="bodyDefaultRegular">
-            {hasNoItems
-              ? t(isOffDeckLocation ? 'add_labware' : 'add_hw_lw')
-              : t(isOffDeckLocation ? 'edit_labware' : 'edit_hw_lw')}
+            {t('edit_labware')}
           </StyledText>
-        </MenuButton>
-        {showEditAndLiquidsBtns ? (
-          <>
-            <MenuButton
-              onClick={(e: React.MouseEvent) => {
-                setShowNickNameModal(true)
-                e.preventDefault()
-                e.stopPropagation()
-              }}
-            >
-              <StyledText desktopStyle="bodyDefaultRegular">
-                {t('rename_lab')}
-              </StyledText>
-            </MenuButton>
-            <MenuButton
-              onClick={() => {
-                if (nestedLabwareOnSlot != null) {
-                  dispatch(openIngredientSelector(nestedLabwareOnSlot.id))
-                } else if (labwareOnSlot != null) {
-                  dispatch(openIngredientSelector(labwareOnSlot.id))
-                }
-                navigate('/liquids')
-              }}
-            >
-              <StyledText desktopStyle="bodyDefaultRegular">
-                {selectionHasLiquids ? t('edit_liquid') : t('add_liquid')}
-              </StyledText>
-            </MenuButton>
-          </>
-        ) : null}
+        </MenuItem>
         {showDuplicateBtn ? (
-          <MenuButton
-            onClick={() => {
-              if (
-                labwareOnSlot != null &&
-                !isLabwareAnAdapter &&
-                nestedLabwareOnSlot == null
-              ) {
-                dispatch(duplicateLabware(labwareOnSlot.id))
-              } else if (nestedLabwareOnSlot != null) {
-                dispatch(duplicateLabware(nestedLabwareOnSlot.id))
-              }
-              setShowMenuList(false)
-            }}
-          >
+          <MenuItem onClick={handleDuplicate}>
             <StyledText desktopStyle="bodyDefaultRegular">
               {t('duplicate')}
             </StyledText>
-          </MenuButton>
+          </MenuItem>
         ) : null}
-        <MenuButton
-          disabled={hasNoItems}
-          onClick={() => {
-            handleClear()
-            setShowMenuList(false)
+        <Divider marginY="0" />
+        <MenuItem
+          onClick={(e: MouseEvent) => {
+            handleClearLabware(e)
           }}
         >
           <StyledText desktopStyle="bodyDefaultRegular">
-            {t(isOffDeckLocation ? 'clear_labware' : 'clear_slot')}
+            {t('clear_labware')}
           </StyledText>
-        </MenuButton>
+        </MenuItem>
       </Flex>
     </>
   )
 
   return menuListSlotPosition != null ? (
     <RobotCoordsForeignDiv
-      x={menuListSlotPosition[0] + 50}
+      x={
+        menuListSlotPosition[0] +
+        (STAGING_AREA_SLOTS.includes(location) ? -100 : 50)
+      }
       y={menuListSlotPosition[1] - position}
       width="10.75rem"
       height="11.25rem"
       innerDivProps={{
-        style: {
-          position: POSITION_ABSOLUTE,
-          transform: 'rotate(180deg) scaleX(-1)',
-        },
+        position: POSITION_ABSOLUTE,
+        transform: `rotate(180deg) scaleX(-1) ${invertY ? 'scaleY(-1)' : ''}`,
       }}
     >
       {slotOverflowBody}
@@ -286,19 +290,3 @@ export function SlotOverflowMenu(
     slotOverflowBody
   )
 }
-
-const MenuButton = styled.button`
-  background-color: ${COLORS.transparent};
-  border-radius: inherit;
-  cursor: ${CURSOR_POINTER};
-  padding: ${SPACING.spacing8} ${SPACING.spacing12};
-  border: none;
-  border-radius: inherit;
-  &:hover {
-    background-color: ${COLORS.blue10};
-  }
-  &:disabled {
-    color: ${COLORS.grey40};
-    cursor: ${CURSOR_AUTO};
-  }
-`

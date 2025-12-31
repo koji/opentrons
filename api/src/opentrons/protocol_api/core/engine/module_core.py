@@ -1,7 +1,10 @@
 """Protocol API module implementation logic."""
-from __future__ import annotations
 
-from typing import Optional, List, Dict, Union
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import Optional, List, Dict, Union, Sequence, TYPE_CHECKING, overload
+
+from opentrons_shared_data.errors.exceptions import CommandPreconditionViolated
 
 from opentrons.hardware_control import SynchronousAdapter, modules as hw_modules
 from opentrons.hardware_control.modules.types import (
@@ -17,13 +20,19 @@ from opentrons.drivers.types import (
 )
 
 from opentrons.protocol_engine import commands as cmd
-from opentrons.protocol_engine.types import ABSMeasureMode
+from opentrons.protocol_engine.types import (
+    ABSMeasureMode,
+    StackerFillEmptyStrategy,
+    StackerStoredLabwareGroup,
+    StackerLabwareMovementStrategy,
+)
 from opentrons.types import DeckSlotName
 from opentrons.protocol_engine.clients import SyncClient as ProtocolEngineClient
 from opentrons.protocol_engine.errors.exceptions import (
     LabwareNotLoadedOnModuleError,
     NoMagnetEngageHeightError,
     CannotPerformModuleAction,
+    FlexStackerLabwarePoolNotYetDefinedError,
 )
 
 from opentrons.protocols.api_support.types import APIVersion, ThermocyclerStep
@@ -37,11 +46,23 @@ from ..module import (
     AbstractHeaterShakerCore,
     AbstractMagneticBlockCore,
     AbstractAbsorbanceReaderCore,
+    AbstractFlexStackerCore,
 )
 from .exceptions import InvalidMagnetEngageHeightError
 
+from .labware import LabwareCore
+from .tasks import EngineTaskCore
+from . import load_labware_params
 
-class ModuleCore(AbstractModuleCore):
+if TYPE_CHECKING:
+    from .protocol import ProtocolCore
+
+# Valid wavelength range for absorbance reader
+ABS_WAVELENGTH_MIN = 350
+ABS_WAVELENGTH_MAX = 1000
+
+
+class ModuleCore(AbstractModuleCore[LabwareCore]):
     """Module core logic implementation for Python protocols.
     Args:
         module_id: ProtocolEngine ID of the loaded modules.
@@ -53,11 +74,13 @@ class ModuleCore(AbstractModuleCore):
         engine_client: ProtocolEngineClient,
         api_version: APIVersion,
         sync_module_hardware: SynchronousAdapter[hw_modules.AbstractModule],
+        protocol_core: ProtocolCore,
     ) -> None:
         self._module_id = module_id
         self._engine_client = engine_client
         self._api_version = api_version
         self._sync_module_hardware = sync_module_hardware
+        self._protocol_core = protocol_core
 
     @property
     def api_version(self) -> APIVersion:
@@ -96,7 +119,7 @@ class ModuleCore(AbstractModuleCore):
         ).displayName
 
 
-class NonConnectedModuleCore(AbstractModuleCore):
+class NonConnectedModuleCore(AbstractModuleCore[LabwareCore]):
     """Not connected module core logic implementation for Python protocols.
 
     Args:
@@ -108,10 +131,12 @@ class NonConnectedModuleCore(AbstractModuleCore):
         module_id: str,
         engine_client: ProtocolEngineClient,
         api_version: APIVersion,
+        protocol_core: ProtocolCore,
     ) -> None:
         self._module_id = module_id
         self._engine_client = engine_client
         self._api_version = api_version
+        self._protocol_core = protocol_core
 
     @property
     def api_version(self) -> APIVersion:
@@ -146,18 +171,22 @@ class NonConnectedModuleCore(AbstractModuleCore):
         )
 
 
-class TemperatureModuleCore(ModuleCore, AbstractTemperatureModuleCore):
+class TemperatureModuleCore(ModuleCore, AbstractTemperatureModuleCore[LabwareCore]):
     """Temperature Module core logic implementation for Python protocols."""
 
     _sync_module_hardware: SynchronousAdapter[hw_modules.TempDeck]
 
-    def set_target_temperature(self, celsius: float) -> None:
+    def set_target_temperature(self, celsius: float) -> EngineTaskCore:
         """Set the Temperature Module's target temperature in °C."""
-        self._engine_client.execute_command(
+        result = self._engine_client.execute_command_without_recovery(
             cmd.temperature_module.SetTargetTemperatureParams(
                 moduleId=self.module_id, celsius=celsius
             )
         )
+        temperature_task = EngineTaskCore(
+            engine_client=self._engine_client, task_id=result.taskId
+        )
+        return temperature_task
 
     def wait_for_target_temperature(self, celsius: Optional[float] = None) -> None:
         """Wait until the module's target temperature is reached.
@@ -189,7 +218,7 @@ class TemperatureModuleCore(ModuleCore, AbstractTemperatureModuleCore):
         return self._sync_module_hardware.status  # type: ignore[no-any-return]
 
 
-class MagneticModuleCore(ModuleCore, AbstractMagneticModuleCore):
+class MagneticModuleCore(ModuleCore, AbstractMagneticModuleCore[LabwareCore]):
     """Magnetic Module control interface via a ProtocolEngine."""
 
     _sync_module_hardware: SynchronousAdapter[hw_modules.MagDeck]
@@ -209,12 +238,12 @@ class MagneticModuleCore(ModuleCore, AbstractMagneticModuleCore):
         # This core will only be used in apiLevels >=2.14, where
         # MagneticModuleContext.engage(height=...) is no longer available.
         # So these asserts should always pass.
-        assert (
-            height_from_home is None
-        ), "Expected engage height to be specified from base."
-        assert (
-            height_from_base is not None
-        ), "Expected engage height to be specified from base."
+        assert height_from_home is None, (
+            "Expected engage height to be specified from base."
+        )
+        assert height_from_base is not None, (
+            "Expected engage height to be specified from base."
+        )
 
         self._engine_client.execute_command(
             cmd.magnetic_module.EngageParams(
@@ -269,7 +298,7 @@ class MagneticModuleCore(ModuleCore, AbstractMagneticModuleCore):
         return self._sync_module_hardware.status  # type: ignore[no-any-return]
 
 
-class ThermocyclerModuleCore(ModuleCore, AbstractThermocyclerCore):
+class ThermocyclerModuleCore(ModuleCore, AbstractThermocyclerCore[LabwareCore]):
     """Core control interface for an attached Thermocycler Module."""
 
     _sync_module_hardware: SynchronousAdapter[hw_modules.Thermocycler]
@@ -293,6 +322,7 @@ class ThermocyclerModuleCore(ModuleCore, AbstractThermocyclerCore):
     def set_target_block_temperature(
         self,
         celsius: float,
+        ramp_rate: Optional[float],
         hold_time_seconds: Optional[float] = None,
         block_max_volume: Optional[float] = None,
     ) -> None:
@@ -303,8 +333,29 @@ class ThermocyclerModuleCore(ModuleCore, AbstractThermocyclerCore):
                 celsius=celsius,
                 blockMaxVolumeUl=block_max_volume,
                 holdTimeSeconds=hold_time_seconds,
+                ramp_rate=ramp_rate,
             )
         )
+
+    def start_set_target_block_temperature(
+        self,
+        celsius: float,
+        ramp_rate: Optional[float],
+        block_max_volume: Optional[float] = None,
+    ) -> EngineTaskCore:
+        """Start setting the target temperature for the well block, in °C."""
+        result = self._engine_client.execute_command_without_recovery(
+            cmd.thermocycler.SetTargetBlockTemperatureParams(
+                moduleId=self.module_id,
+                celsius=celsius,
+                blockMaxVolumeUl=block_max_volume,
+                ramp_rate=ramp_rate,
+            )
+        )
+        block_temperature_task = EngineTaskCore(
+            engine_client=self._engine_client, task_id=result.taskId
+        )
+        return block_temperature_task
 
     def wait_for_block_temperature(self) -> None:
         """Wait for target block temperature to be reached."""
@@ -319,6 +370,18 @@ class ThermocyclerModuleCore(ModuleCore, AbstractThermocyclerCore):
                 moduleId=self.module_id, celsius=celsius
             )
         )
+
+    def start_set_target_lid_temperature(self, celsius: float) -> EngineTaskCore:
+        """Start setting the target temperature for the heated lid, in °C."""
+        result = self._engine_client.execute_command_without_recovery(
+            cmd.thermocycler.SetTargetLidTemperatureParams(
+                moduleId=self.module_id, celsius=celsius
+            )
+        )
+        lid_temperature_task = EngineTaskCore(
+            engine_client=self._engine_client, task_id=result.taskId
+        )
+        return lid_temperature_task
 
     def wait_for_lid_temperature(self) -> None:
         """Wait for target lid temperature to be reached."""
@@ -337,6 +400,7 @@ class ThermocyclerModuleCore(ModuleCore, AbstractThermocyclerCore):
             cmd.thermocycler.RunProfileStepParams(
                 celsius=step["temperature"],
                 holdSeconds=step["hold_time_seconds"],
+                rampRate=step["ramp_rate"],
             )
             for step in steps
         ]
@@ -365,6 +429,7 @@ class ThermocyclerModuleCore(ModuleCore, AbstractThermocyclerCore):
                     cmd.thermocycler.ProfileStep(
                         celsius=step["temperature"],
                         holdSeconds=step["hold_time_seconds"],
+                        rampRate=step["ramp_rate"],
                     )
                     for step in steps
                 ],
@@ -391,6 +456,42 @@ class ThermocyclerModuleCore(ModuleCore, AbstractThermocyclerCore):
             return self._execute_profile_post_221(steps, repetitions, block_max_volume)
         else:
             return self._execute_profile_pre_221(steps, repetitions, block_max_volume)
+
+    def start_execute_profile(
+        self,
+        steps: List[ThermocyclerStep],
+        repetitions: int,
+        block_max_volume: Optional[float] = None,
+    ) -> EngineTaskCore:
+        """Start the execution of a hermocycler profile and return a task."""
+        self._repetitions = repetitions
+        self._step_count = len(steps)
+        engine_steps: List[
+            Union[cmd.thermocycler.ProfileStep, cmd.thermocycler.ProfileCycle]
+        ] = [
+            cmd.thermocycler.ProfileCycle(
+                repetitions=repetitions,
+                steps=[
+                    cmd.thermocycler.ProfileStep(
+                        celsius=step["temperature"],
+                        holdSeconds=step["hold_time_seconds"],
+                        rampRate=step["ramp_rate"],
+                    )
+                    for step in steps
+                ],
+            )
+        ]
+        result = self._engine_client.execute_command_without_recovery(
+            cmd.thermocycler.StartRunExtendedProfileParams(
+                moduleId=self.module_id,
+                profileElements=engine_steps,
+                blockMaxVolumeUl=block_max_volume,
+            )
+        )
+        start_execute_profile_result = EngineTaskCore(
+            engine_client=self._engine_client, task_id=result.taskId
+        )
+        return start_execute_profile_result
 
     def deactivate_lid(self) -> None:
         """Turn off the heated lid."""
@@ -478,18 +579,22 @@ class ThermocyclerModuleCore(ModuleCore, AbstractThermocyclerCore):
         self._step_count = None
 
 
-class HeaterShakerModuleCore(ModuleCore, AbstractHeaterShakerCore):
+class HeaterShakerModuleCore(ModuleCore, AbstractHeaterShakerCore[LabwareCore]):
     """Core control interface for an attached Heater-Shaker Module."""
 
     _sync_module_hardware: SynchronousAdapter[hw_modules.HeaterShaker]
 
-    def set_target_temperature(self, celsius: float) -> None:
+    def set_target_temperature(self, celsius: float) -> EngineTaskCore:
         """Set the labware plate's target temperature in °C."""
-        self._engine_client.execute_command(
+        result = self._engine_client.execute_command_without_recovery(
             cmd.heater_shaker.SetTargetTemperatureParams(
                 moduleId=self.module_id, celsius=celsius
             )
         )
+        temperature_task = EngineTaskCore(
+            engine_client=self._engine_client, task_id=result.taskId
+        )
+        return temperature_task
 
     def wait_for_target_temperature(self) -> None:
         """Wait for the labware plate's target temperature to be reached."""
@@ -504,6 +609,16 @@ class HeaterShakerModuleCore(ModuleCore, AbstractHeaterShakerCore):
                 moduleId=self.module_id, rpm=rpm
             )
         )
+
+    def set_shake_speed(self, rpm: int) -> EngineTaskCore:
+        """Set the shaker's target shake speed and wait for it to spin up."""
+        result = self._engine_client.execute_command_without_recovery(
+            cmd.heater_shaker.SetShakeSpeedParams(moduleId=self.module_id, rpm=rpm)
+        )
+        shake_task = EngineTaskCore(
+            engine_client=self._engine_client, task_id=result.taskId
+        )
+        return shake_task
 
     def open_labware_latch(self) -> None:
         """Open the labware latch."""
@@ -558,11 +673,11 @@ class HeaterShakerModuleCore(ModuleCore, AbstractHeaterShakerCore):
         return self._sync_module_hardware.labware_latch_status  # type: ignore[no-any-return]
 
 
-class MagneticBlockCore(NonConnectedModuleCore, AbstractMagneticBlockCore):
+class MagneticBlockCore(NonConnectedModuleCore, AbstractMagneticBlockCore[LabwareCore]):
     """Magnetic Block control interface via a ProtocolEngine."""
 
 
-class AbsorbanceReaderCore(ModuleCore, AbstractAbsorbanceReaderCore):
+class AbsorbanceReaderCore(ModuleCore, AbstractAbsorbanceReaderCore[LabwareCore]):
     """Absorbance Reader core logic implementation for Python protocols."""
 
     _sync_module_hardware: SynchronousAdapter[hw_modules.AbsorbanceReader]
@@ -581,7 +696,39 @@ class AbsorbanceReaderCore(ModuleCore, AbstractAbsorbanceReaderCore):
                 "Cannot perform Initialize action on Absorbance Reader without calling `.close_lid()` first."
             )
 
-        # TODO: check that the wavelengths are within the supported wavelengths
+        wavelength_len = len(wavelengths)
+        if mode == "single" and wavelength_len != 1:
+            raise ValueError(
+                f"Single mode can only be initialized with 1 wavelength"
+                f" {wavelength_len} wavelengths provided instead."
+            )
+
+        if mode == "multi" and (wavelength_len < 1 or wavelength_len > 6):
+            raise ValueError(
+                f"Multi mode can only be initialized with 1 - 6 wavelengths."
+                f" {wavelength_len} wavelengths provided instead."
+            )
+
+        if reference_wavelength is not None and (
+            reference_wavelength < ABS_WAVELENGTH_MIN
+            or reference_wavelength > ABS_WAVELENGTH_MAX
+        ):
+            raise ValueError(
+                f"Unsupported reference wavelength: ({reference_wavelength}) needs"
+                f" to between {ABS_WAVELENGTH_MIN} and {ABS_WAVELENGTH_MAX} nm."
+            )
+
+        for wavelength in wavelengths:
+            if (
+                not isinstance(wavelength, int)
+                or wavelength < ABS_WAVELENGTH_MIN
+                or wavelength > ABS_WAVELENGTH_MAX
+            ):
+                raise ValueError(
+                    f"Unsupported sample wavelength: ({wavelength}) needs"
+                    f" to between {ABS_WAVELENGTH_MIN} and {ABS_WAVELENGTH_MAX} nm."
+                )
+
         self._engine_client.execute_command(
             cmd.absorbance_reader.InitializeParams(
                 moduleId=self.module_id,
@@ -655,3 +802,315 @@ class AbsorbanceReaderCore(ModuleCore, AbstractAbsorbanceReaderCore):
             self.module_id
         )
         return abs_state.is_lid_on
+
+
+@dataclass
+class _CoreTrio:
+    primary: LabwareCore
+    adapter: LabwareCore | None
+    lid: LabwareCore | None
+
+
+class FlexStackerCore(ModuleCore, AbstractFlexStackerCore[LabwareCore]):
+    """Flex Stacker core logic implementation for Python protocols."""
+
+    _sync_module_hardware: SynchronousAdapter[hw_modules.FlexStacker]
+
+    def retrieve(self) -> LabwareCore:
+        """Retrieve a labware from the Flex Stacker's hopper.
+
+        Returns the primary labware.
+        """
+        self._engine_client.execute_command(
+            cmd.flex_stacker.RetrieveParams(
+                moduleId=self.module_id,
+            )
+        )
+        base = self._protocol_core.get_labware_on_module(self)
+        assert base, "Retrieve failed to provide a labware"
+        if base.is_adapter():
+            primary = self._protocol_core.get_labware_on_labware(base)
+            if primary:
+                return primary
+        return base
+
+    def store(self) -> None:
+        """Store a labware into Flex Stacker's hopper."""
+        self._engine_client.execute_command(
+            cmd.flex_stacker.StoreParams(
+                moduleId=self.module_id,
+                strategy=StackerLabwareMovementStrategy.AUTOMATIC,
+            )
+        )
+
+    def fill(self, count: int | None, message: str | None) -> None:
+        """Pause the protocol to add more labware to the Flex Stacker's hopper."""
+        self._engine_client.execute_command(
+            cmd.flex_stacker.FillParams(
+                moduleId=self.module_id,
+                strategy=StackerFillEmptyStrategy.MANUAL_WITH_PAUSE,
+                message=message,
+                count=count,
+            )
+        )
+
+    def _core_groups_from_primary_core(self, labware: LabwareCore) -> _CoreTrio:
+        possible_adapter = self._protocol_core.get_labware_location(labware)
+        return _CoreTrio(
+            primary=labware,
+            adapter=(
+                possible_adapter if isinstance(possible_adapter, LabwareCore) else None
+            ),
+            lid=self._protocol_core.get_labware_on_labware(labware),
+        )
+
+    def _group_from_core_group(
+        self, core_group: _CoreTrio
+    ) -> StackerStoredLabwareGroup:
+        return StackerStoredLabwareGroup(
+            primaryLabwareId=core_group.primary.labware_id,
+            adapterLabwareId=(
+                core_group.adapter.labware_id if core_group.adapter else None
+            ),
+            lidLabwareId=core_group.lid.labware_id if core_group.lid else None,
+        )
+
+    def _group_from_core(self, labware: LabwareCore) -> StackerStoredLabwareGroup:
+        return self._group_from_core_group(self._core_groups_from_primary_core(labware))
+
+    def fill_items(self, labware: Sequence[LabwareCore], message: str | None) -> None:
+        """Pause the protocol to fill with a specific set of labware."""
+        groups = [self._group_from_core(core) for core in labware]
+        self._engine_client.execute_command(
+            cmd.flex_stacker.FillParams(
+                moduleId=self._module_id,
+                strategy=StackerFillEmptyStrategy.MANUAL_WITH_PAUSE,
+                message=message,
+                labwareToStore=groups,
+                count=None,
+            )
+        )
+
+    def empty(self, message: str | None) -> None:
+        """Pause the protocol to remove labware from the Flex Stacker's hopper."""
+        self._engine_client.execute_command(
+            cmd.flex_stacker.EmptyParams(
+                moduleId=self.module_id,
+                strategy=StackerFillEmptyStrategy.MANUAL_WITH_PAUSE,
+                message=message,
+                count=0,
+            )
+        )
+
+    def get_max_storable_labware(self) -> int:
+        """Get the total number of configured labware the stacker can store."""
+        max_lw = self._engine_client.state.modules.stacker_max_pool_count(
+            self._module_id
+        )
+        if max_lw is None:
+            location = self._engine_client.state.modules.get_location(self._module_id)
+            raise FlexStackerLabwarePoolNotYetDefinedError(
+                message=f"The Flex Stacker in {location} has not been configured yet and cannot be filled."
+            )
+        return max_lw
+
+    def get_current_storable_labware(self) -> int:
+        """Get the amount of space currently available for labware."""
+        max_lw = self.get_max_storable_labware()
+        if max_lw is None:
+            location = self._engine_client.state.modules.get_location(self._module_id)
+            raise FlexStackerLabwarePoolNotYetDefinedError(
+                message=f"The Flex Stacker in {location} has not been configured yet and cannot be filled."
+            )
+        current = len(
+            self._engine_client.state.modules.stacker_contained_labware(self._module_id)
+        )
+        return max_lw - current
+
+    def _predict_storable_count(
+        self,
+        labwares: _CoreTrio,
+        overlap_offset: float | None = None,
+    ) -> int:
+        definitions = (
+            self._engine_client.state.labware.stacker_labware_pool_to_ordered_list(
+                labwares.primary.get_engine_definition(),
+                labwares.lid.get_engine_definition() if labwares.lid else None,
+                labwares.adapter.get_engine_definition() if labwares.adapter else None,
+            )
+        )
+        pool_height = self._engine_client.state.geometry.get_height_of_labware_stack(
+            definitions
+        )
+        pool_overlap = (
+            overlap_offset
+            if overlap_offset is not None
+            else self._engine_client.state.labware.get_stacker_labware_overlap_offset(
+                definitions
+            ).z
+        )
+        return self._engine_client.state.modules.stacker_max_pool_count_by_height(
+            self._module_id, pool_height, pool_overlap
+        )
+
+    def get_max_storable_labware_from_list(
+        self,
+        labware: Sequence[LabwareCore],
+        overlap_offset: float | None = None,
+    ) -> Sequence[LabwareCore]:
+        """Limit the passed list to how many labware can fit in a stacker."""
+        if not labware:
+            return labware
+        max_count: int
+        try:
+            # if the stacker has been configured, make sure the provided overlap
+            # offset, if any, matches the configured one
+            max_count = self.get_max_storable_labware()
+            if overlap_offset is not None:
+                self._engine_client.state.modules.validate_stacker_overlap_offset(
+                    self._module_id, overlap_offset
+                )
+        except FlexStackerLabwarePoolNotYetDefinedError:
+            max_count = self._predict_storable_count(
+                self._core_groups_from_primary_core(labware[0]), overlap_offset
+            )
+        return labware[:max_count]
+
+    def get_current_storable_labware_from_list(
+        self,
+        labware: Sequence[LabwareCore],
+    ) -> Sequence[LabwareCore]:
+        """Limit the passed list to how many labware can fit in the stacker right now."""
+        if not labware:
+            return labware
+        storable = self.get_current_storable_labware()
+        return labware[:storable]
+
+    def get_stored_labware(self) -> Sequence[LabwareCore]:
+        """Get the currently-stored primary labware from the stacker."""
+        stored_groups = self._engine_client.state.modules.stacker_contained_labware(
+            self._module_id
+        )
+        return [
+            self._protocol_core.add_or_get_labware_core(group.primaryLabwareId)
+            for group in stored_groups
+        ]
+
+    @overload
+    def _ssld_from_core(
+        self, core: LabwareCore
+    ) -> cmd.flex_stacker.StackerStoredLabwareDetails: ...
+
+    @overload
+    def _ssld_from_core(self, core: None) -> None: ...
+
+    def _ssld_from_core(
+        self, core: LabwareCore | None
+    ) -> cmd.flex_stacker.StackerStoredLabwareDetails | None:
+        if not core:
+            return None
+        definition = core.get_engine_definition()
+        return cmd.flex_stacker.StackerStoredLabwareDetails(
+            loadName=definition.parameters.loadName,
+            namespace=definition.namespace,
+            version=definition.version,
+        )
+
+    def set_stored_labware_items(
+        self,
+        labware: Sequence[LabwareCore],
+        stacking_offset_z: float | None,
+    ) -> None:
+        """Configure the stacker to contain a set of labware."""
+        core_groups = [self._core_groups_from_primary_core(core) for core in labware]
+        if len(core_groups) < 1:
+            raise CommandPreconditionViolated(
+                "At least one labware must be passed to set_stored_labware_items"
+            )
+        stacker_groups = [
+            self._group_from_core_group(core_group) for core_group in core_groups
+        ]
+
+        self._engine_client.execute_command(
+            cmd.flex_stacker.SetStoredLabwareParams(
+                moduleId=self.module_id,
+                initialCount=None,
+                initialStoredLabware=stacker_groups,
+                primaryLabware=self._ssld_from_core(core_groups[0].primary),
+                lidLabware=self._ssld_from_core(core_groups[0].lid),
+                adapterLabware=self._ssld_from_core(core_groups[0].adapter),
+                poolOverlapOverride=stacking_offset_z,
+            )
+        )
+
+    def set_stored_labware(
+        self,
+        main_load_name: str,
+        main_namespace: str | None,
+        main_version: int | None,
+        lid_load_name: str | None,
+        lid_namespace: str | None,
+        lid_version: int | None,
+        adapter_load_name: str | None,
+        adapter_namespace: str | None,
+        adapter_version: int | None,
+        count: int | None,
+        stacking_offset_z: float | None = None,
+    ) -> None:
+        """Configure the kind of labware that the stacker stores."""
+
+        custom_labware_params = (
+            self._engine_client.state.labware.find_custom_labware_load_params()
+        )
+
+        main_namespace, main_version = load_labware_params.resolve(
+            main_load_name,
+            main_namespace,
+            main_version,
+            custom_labware_params,
+            self._api_version,
+        )
+        main_labware = cmd.flex_stacker.StackerStoredLabwareDetails(
+            loadName=main_load_name, namespace=main_namespace, version=main_version
+        )
+
+        lid_labware: cmd.flex_stacker.StackerStoredLabwareDetails | None = None
+
+        if lid_load_name:
+            lid_namespace, lid_version = load_labware_params.resolve(
+                lid_load_name,
+                lid_namespace,
+                lid_version,
+                custom_labware_params,
+                self._api_version,
+            )
+            lid_labware = cmd.flex_stacker.StackerStoredLabwareDetails(
+                loadName=lid_load_name, namespace=lid_namespace, version=lid_version
+            )
+
+        adapter_labware: cmd.flex_stacker.StackerStoredLabwareDetails | None = None
+
+        if adapter_load_name:
+            adapter_namespace, adapter_version = load_labware_params.resolve(
+                adapter_load_name,
+                adapter_namespace,
+                adapter_version,
+                custom_labware_params,
+                self._api_version,
+            )
+            adapter_labware = cmd.flex_stacker.StackerStoredLabwareDetails(
+                loadName=adapter_load_name,
+                namespace=adapter_namespace,
+                version=adapter_version,
+            )
+
+        self._engine_client.execute_command(
+            cmd.flex_stacker.SetStoredLabwareParams(
+                moduleId=self.module_id,
+                initialCount=count,
+                primaryLabware=main_labware,
+                lidLabware=lid_labware,
+                adapterLabware=adapter_labware,
+                poolOverlapOverride=stacking_offset_z,
+            )
+        )

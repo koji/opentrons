@@ -1,6 +1,6 @@
 // config migration tests
-import { describe, it, expect, beforeEach, vi } from 'vitest'
 import uuid from 'uuid/v4'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   MOCK_CONFIG_V12,
@@ -17,13 +17,16 @@ import {
   MOCK_CONFIG_V23,
   MOCK_CONFIG_V24,
   MOCK_CONFIG_V25,
+  MOCK_CONFIG_V26,
+  MOCK_CONFIG_V27,
+  MOCK_CONFIG_V28,
 } from '../__fixtures__'
 import { migrate } from '../migrate'
 
 vi.mock('uuid/v4')
 
-const NEWEST_VERSION = 25
-const NEWEST_MOCK_CONFIG = MOCK_CONFIG_V25
+const NEWEST_VERSION = 28
+const NEWEST_MOCK_CONFIG = MOCK_CONFIG_V28
 
 describe('config migration', () => {
   beforeEach(() => {
@@ -129,9 +132,30 @@ describe('config migration', () => {
     expect(result.version).toBe(NEWEST_VERSION)
     expect(result).toEqual(NEWEST_MOCK_CONFIG)
   })
-  it('should keep version 25', () => {
+  it('should migrate version 25 to latest', () => {
     const v25Config = MOCK_CONFIG_V25
     const result = migrate(v25Config)
+
+    expect(result.version).toBe(NEWEST_VERSION)
+    expect(result).toEqual(NEWEST_MOCK_CONFIG)
+  })
+  it('should keep version 26', () => {
+    const v26Config = MOCK_CONFIG_V26
+    const result = migrate(v26Config)
+
+    expect(result.version).toBe(NEWEST_VERSION)
+    expect(result).toEqual(NEWEST_MOCK_CONFIG)
+  })
+  it('should keep version 27', () => {
+    const v27Config = MOCK_CONFIG_V27
+    const result = migrate(v27Config)
+
+    expect(result.version).toBe(NEWEST_VERSION)
+    expect(result).toEqual(NEWEST_MOCK_CONFIG)
+  })
+  it('should keep version 28', () => {
+    const v28Config = MOCK_CONFIG_V28
+    const result = migrate(v28Config)
 
     expect(result.version).toBe(NEWEST_VERSION)
     expect(result).toEqual(NEWEST_MOCK_CONFIG)

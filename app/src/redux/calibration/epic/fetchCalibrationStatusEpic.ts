@@ -9,19 +9,20 @@ import type {
   ActionToRequestMapper,
   ResponseToActionMapper,
 } from '../../robot-api/operators'
+import type { RobotApiErrorResponse } from '../../robot-api/types'
 import type { Action, Epic } from '../../types'
 import type { CalibrationStatus, FetchCalibrationStatusAction } from '../types'
-import type { RobotApiErrorResponse } from '../../robot-api/types'
 
-const mapActionToRequest: ActionToRequestMapper<FetchCalibrationStatusAction> = action => ({
+const mapActionToRequest: ActionToRequestMapper<
+  FetchCalibrationStatusAction
+> = action => ({
   method: GET,
   path: Constants.CALIBRATION_STATUS_PATH,
 })
 
-const mapResponseToAction: ResponseToActionMapper<FetchCalibrationStatusAction> = (
-  response,
-  originalAction
-) => {
+const mapResponseToAction: ResponseToActionMapper<
+  FetchCalibrationStatusAction
+> = (response, originalAction) => {
   const { host, body, ...responseMeta } = response
   const meta = { ...originalAction.meta, response: responseMeta }
 

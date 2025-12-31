@@ -1,16 +1,18 @@
-import { describe, it, vi, expect, beforeEach } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { RetryStepInfo } from '../RetryStepInfo'
-import { ERROR_KINDS, RECOVERY_MAP } from '../../constants'
 import { clickButtonLabeled } from '/app/organisms/ErrorRecoveryFlows/__tests__/util'
 
+import { ERROR_KINDS, RECOVERY_MAP } from '../../constants'
+import { RetryStepInfo } from '../RetryStepInfo'
+
 import type { Mock } from 'vitest'
+import type { ComponentProps } from 'react'
 
 describe('RetryStepInfo', () => {
-  let props: React.ComponentProps<typeof RetryStepInfo>
+  let props: ComponentProps<typeof RetryStepInfo>
   let mockHandleMotionRouting: Mock
   let mockRetryFailedCommand: Mock
   let mockResumeRun: Mock
@@ -29,10 +31,11 @@ describe('RetryStepInfo', () => {
         resumeRun: mockResumeRun,
       } as any,
       errorKind: ERROR_KINDS.GENERAL_ERROR,
+      stepCounts: { hasRunDiverged: false },
     } as any
   })
 
-  const render = (props: React.ComponentProps<typeof RetryStepInfo>) => {
+  const render = (props: ComponentProps<typeof RetryStepInfo>) => {
     return renderWithProviders(<RetryStepInfo {...props} />, {
       i18nInstance: i18n,
     })[0]
@@ -106,8 +109,8 @@ describe('RetryStepInfo', () => {
     render(props)
 
     screen.getByText(
-      'First, take any necessary actions to prepare the robot to retry the failed step.'
+      'Take any necessary additional actions to prepare the robot to retry the failed step.'
     )
-    screen.getByText('Then, close the robot door before proceeding.')
+    screen.getByText('Close the robot door before proceeding.')
   })
 })

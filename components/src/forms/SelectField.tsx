@@ -1,13 +1,13 @@
-import type * as React from 'react'
 import cx from 'classnames'
 import find from 'lodash/find'
 
 import { Select } from './Select'
 import styles from './SelectField.module.css'
 
-import type { SelectProps } from './Select'
+import type { ReactNode } from 'react'
 import type { ActionMeta, MultiValue, SingleValue } from 'react-select'
 import type { SelectOption } from '.'
+import type { SelectProps } from './Select'
 
 export interface SelectFieldProps {
   /** optional HTML id for container */
@@ -29,7 +29,7 @@ export interface SelectFieldProps {
   /** optional className */
   className?: string
   /** optional caption. hidden when `error` is given */
-  caption?: React.ReactNode
+  caption?: ReactNode
   /** if included, use error style and display error instead of caption */
   error?: string | null
   /** change handler called with (name, value) */

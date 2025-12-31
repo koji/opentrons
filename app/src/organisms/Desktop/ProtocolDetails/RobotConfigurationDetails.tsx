@@ -1,4 +1,4 @@
-import * as React from 'react'
+import { Fragment } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -14,29 +14,43 @@ import {
   TYPOGRAPHY,
 } from '@opentrons/components'
 import {
+  FLEX_STACKER_MODULE_TYPE,
+  FLEX_STACKER_WITH_MAG_BLOCK_FIXTURE,
+  FLEX_STAGING_AREA_SLOT_ADDRESSABLE_AREAS,
+  FLEX_USB_MODULE_FIXTURES,
+  getAASlotDisplayName,
+  getAAWithFakesFromVSId,
   getCutoutDisplayName,
   getFixtureDisplayName,
+  getModuleDeckLabel,
   getModuleDisplayName,
   getModuleType,
   getPipetteNameSpecs,
-  MAGNETIC_BLOCK_TYPE,
+  getVisualSlotIdForAA,
+  MAGNETIC_BLOCK_ADDRESSABLE_AREAS,
   MAGNETIC_BLOCK_FIXTURES,
+  MAGNETIC_BLOCK_TYPE,
+  MAGNETIC_BLOCK_V1_FIXTURE,
   SINGLE_SLOT_FIXTURES,
-  THERMOCYCLER_MODULE_TYPE,
-  FLEX_USB_MODULE_FIXTURES,
+  STAGING_AREA_RIGHT_SLOT_FIXTURE,
+  STAGING_AREA_SLOT_WITH_MAGNETIC_BLOCK_V1_FIXTURE,
+  WASTE_CHUTE_FLEX_STACKER_FIXTURES,
 } from '@opentrons/shared-data'
 
 import { InstrumentContainer } from '/app/atoms/InstrumentContainer'
 import { Divider } from '/app/atoms/structure'
-import { getRobotTypeDisplayName } from '../ProtocolsLanding/utils'
-import { getSlotsForThermocycler } from './utils'
 
+import { getRobotTypeDisplayName } from '../ProtocolsLanding/utils'
+
+import type { TFunction } from 'i18next'
+import type { ReactNode } from 'react'
 import type {
   CutoutConfigProtocolSpec,
   LoadModuleRunTimeCommand,
   PipetteName,
   RobotType,
   SingleSlotCutoutFixtureId,
+  VISUAL_SLOTS,
 } from '@opentrons/shared-data'
 
 interface RobotConfigurationDetailsProps {
@@ -61,7 +75,11 @@ export const RobotConfigurationDetails = (
     isLoading,
     robotType,
   } = props
-  const { t } = useTranslation(['protocol_details', 'shared'])
+  const { t } = useTranslation([
+    'protocol_details',
+    'shared',
+    'deck_configuration',
+  ])
 
   const loadingText = (
     <StyledText desktopStyle="bodyDefaultRegular">
@@ -79,8 +97,7 @@ export const RobotConfigurationDetails = (
 
   const is96PipetteUsed = leftMountPipetteName === 'p1000_96'
   const leftMountPipetteDisplayName =
-    getPipetteNameSpecs(leftMountPipetteName as PipetteName)?.displayName ??
-    null
+    getPipetteNameSpecs(leftMountPipetteName!)?.displayName ?? null
   const leftMountItem =
     leftMountPipetteDisplayName != null ? (
       <InstrumentContainer displayName={leftMountPipetteDisplayName} />
@@ -89,8 +106,7 @@ export const RobotConfigurationDetails = (
     )
 
   const rightMountPipetteDisplayName =
-    getPipetteNameSpecs(rightMountPipetteName as PipetteName)?.displayName ??
-    null
+    getPipetteNameSpecs(rightMountPipetteName!)?.displayName ?? null
   const rightMountItem =
     rightMountPipetteDisplayName != null ? (
       <InstrumentContainer displayName={rightMountPipetteDisplayName} />
@@ -107,12 +123,52 @@ export const RobotConfigurationDetails = (
 
   // filter out single slot fixtures as they're implicit
   // also filter out usb module fixtures as they're handled by required modules
-  const nonStandardRequiredFixtureDetails = requiredFixtureDetails.filter(
-    fixture =>
-      ![...SINGLE_SLOT_FIXTURES, ...FLEX_USB_MODULE_FIXTURES].includes(
-        fixture.cutoutFixtureId as SingleSlotCutoutFixtureId
+  const nonStandardRequiredFixtureDetails = requiredFixtureDetails.reduce<
+    CutoutConfigProtocolSpec[]
+  >((acc, fixture) => {
+    if (
+      [
+        ...SINGLE_SLOT_FIXTURES,
+        ...FLEX_USB_MODULE_FIXTURES,
+        ...WASTE_CHUTE_FLEX_STACKER_FIXTURES,
+      ].includes(fixture.cutoutFixtureId as SingleSlotCutoutFixtureId)
+    ) {
+      return acc
+    } else if (
+      FLEX_STACKER_WITH_MAG_BLOCK_FIXTURE === fixture.cutoutFixtureId ||
+      fixture.cutoutFixtureId ===
+        STAGING_AREA_SLOT_WITH_MAGNETIC_BLOCK_V1_FIXTURE
+    ) {
+      const magBlockAA = fixture.requiredAddressableAreas.find(aa =>
+        MAGNETIC_BLOCK_ADDRESSABLE_AREAS.includes(aa)
       )
-  )
+      acc.push({
+        ...fixture,
+        cutoutFixtureId: MAGNETIC_BLOCK_V1_FIXTURE,
+        requiredAddressableAreas: [
+          magBlockAA ?? fixture.requiredAddressableAreas[0],
+        ],
+      })
+      if (
+        fixture.cutoutFixtureId ===
+        STAGING_AREA_SLOT_WITH_MAGNETIC_BLOCK_V1_FIXTURE
+      ) {
+        const stagingAreaAA = fixture.requiredAddressableAreas.find(aa =>
+          FLEX_STAGING_AREA_SLOT_ADDRESSABLE_AREAS.includes(aa)
+        )
+        acc.push({
+          ...fixture,
+          cutoutFixtureId: STAGING_AREA_RIGHT_SLOT_FIXTURE,
+          requiredAddressableAreas: [
+            stagingAreaAA ?? fixture.requiredAddressableAreas[0],
+          ],
+        })
+      }
+    } else {
+      acc.push(fixture)
+    }
+    return acc
+  }, [])
 
   return (
     <Flex flexDirection={DIRECTION_COLUMN}>
@@ -151,43 +207,68 @@ export const RobotConfigurationDetails = (
           />
         </>
       ) : null}
-      {requiredModuleDetails.map((module, index) => {
+      {requiredModuleDetails
+        .sort((a, b) =>
+          a.params.location.slotName.localeCompare(b.params.location.slotName)
+        )
+        .map((module, index) => {
+          const moduleType = getModuleType(module.params.model)
+
+          const fixtureD3 = requiredFixtureDetails.find(
+            fixture => fixture.cutoutId === 'cutoutD3'
+          )
+          const moduleDisplayName =
+            moduleType === FLEX_STACKER_MODULE_TYPE &&
+            module.params.location.slotName === 'D3' &&
+            fixtureD3 != null
+              ? getFixtureDisplayName(t as TFunction, fixtureD3.cutoutFixtureId)
+              : getModuleDisplayName(module.params.model)
+
+          return (
+            <Fragment key={`module_${index}`}>
+              <Divider marginY={SPACING.spacing12} width="100%" />
+              <RobotConfigurationDetailsItem
+                label={`${t('slot')} ${getModuleDeckLabel(
+                  getModuleType(module.params.model),
+                  module.params.location.slotName
+                )}`}
+                item={
+                  <>
+                    <ModuleIcon
+                      key={index}
+                      moduleType={getModuleType(module.params.model)}
+                      marginRight={SPACING.spacing4}
+                      alignSelf={ALIGN_CENTER}
+                      color={COLORS.grey50}
+                      height={SIZE_1}
+                      minWidth={SIZE_1}
+                      minHeight={SIZE_1}
+                    />
+                    <StyledText desktopStyle="bodyDefaultRegular">
+                      {moduleDisplayName}
+                    </StyledText>
+                  </>
+                }
+              />
+            </Fragment>
+          )
+        })}
+      {nonStandardRequiredFixtureDetails.map((fixture, index) => {
+        const visualSlotId = getVisualSlotIdForAA(
+          fixture.cutoutId,
+          fixture.cutoutFixtureId,
+          fixture.requiredAddressableAreas[0]
+        )
+        const AAName = getAAWithFakesFromVSId(visualSlotId as VISUAL_SLOTS)
         return (
-          <React.Fragment key={`module_${index}`}>
+          <Fragment key={`fixture_${index}`}>
             <Divider marginY={SPACING.spacing12} width="100%" />
             <RobotConfigurationDetailsItem
               label={`${t('slot')} ${
-                getModuleType(module.params.model) === THERMOCYCLER_MODULE_TYPE
-                  ? getSlotsForThermocycler(robotType)
-                  : module.params.location.slotName
+                AAName != null
+                  ? getAASlotDisplayName(AAName)
+                  : getCutoutDisplayName(fixture.cutoutId)
               }`}
-              item={
-                <>
-                  <ModuleIcon
-                    key={index}
-                    moduleType={getModuleType(module.params.model)}
-                    marginRight={SPACING.spacing4}
-                    alignSelf={ALIGN_CENTER}
-                    color={COLORS.grey50}
-                    height={SIZE_1}
-                    minWidth={SIZE_1}
-                    minHeight={SIZE_1}
-                  />
-                  <StyledText desktopStyle="bodyDefaultRegular">
-                    {getModuleDisplayName(module.params.model)}
-                  </StyledText>
-                </>
-              }
-            />
-          </React.Fragment>
-        )
-      })}
-      {nonStandardRequiredFixtureDetails.map((fixture, index) => {
-        return (
-          <React.Fragment key={`fixture_${index}`}>
-            <Divider marginY={SPACING.spacing12} width="100%" />
-            <RobotConfigurationDetailsItem
-              label={`${t('slot')} ${getCutoutDisplayName(fixture.cutoutId)}`}
               item={
                 <>
                   {MAGNETIC_BLOCK_FIXTURES.includes(fixture.cutoutFixtureId) ? (
@@ -203,12 +284,15 @@ export const RobotConfigurationDetails = (
                     />
                   ) : null}
                   <StyledText desktopStyle="bodyDefaultRegular">
-                    {getFixtureDisplayName(fixture.cutoutFixtureId)}
+                    {getFixtureDisplayName(
+                      t as TFunction,
+                      fixture.cutoutFixtureId
+                    )}
                   </StyledText>
                 </>
               }
             />
-          </React.Fragment>
+          </Fragment>
         )
       })}
     </Flex>
@@ -217,7 +301,7 @@ export const RobotConfigurationDetails = (
 
 interface RobotConfigurationDetailsItemProps {
   label: string
-  item: React.ReactNode
+  item: ReactNode
 }
 
 export const RobotConfigurationDetailsItem = (

@@ -1,4 +1,5 @@
 """Message types."""
+
 from functools import lru_cache
 from typing import Union, Optional, Type
 
@@ -114,10 +115,11 @@ MessageDefinition = Union[
     defs.GetHepaUVStateResponse,
     defs.SendAccumulatedSensorDataRequest,
     defs.AddSensorLinearMoveRequest,
+    defs.IncreaseEvoTipDispenseCountRequestRequest,
 ]
 
 
-@lru_cache(maxsize=None)
+@lru_cache(maxsize=100)
 def get_definition(message_id: MessageId) -> Optional[Type[MessageDefinition]]:
     """Get the message type for a message id.
 

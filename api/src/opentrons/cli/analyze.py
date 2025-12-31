@@ -1,11 +1,11 @@
 """Opentrons analyze CLI."""
+
 import click
 
 from anyio import run
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from enum import Enum
 from pathlib import Path
 from pydantic import BaseModel
 from typing import (
@@ -24,7 +24,9 @@ from typing import (
 import logging
 import sys
 import json
+import gc
 
+from opentrons.protocol_engine import ProtocolEngine
 from opentrons.protocol_engine.types import (
     RunTimeParameter,
     CSVRuntimeParamPaths,
@@ -53,9 +55,13 @@ from opentrons.protocol_engine import (
     LoadedPipette,
     LoadedModule,
     Liquid,
+    LiquidClassRecordWithId,
     StateSummary,
 )
 from opentrons.protocol_engine.protocol_engine import code_in_error_tree
+from opentrons.protocol_engine.types import CommandAnnotation, CommandPreconditions
+
+from opentrons_shared_data.util import StrEnum
 
 from opentrons_shared_data.robot.types import RobotType
 
@@ -91,6 +97,18 @@ class _Output:
     "--human-json-output",
     help="Return analysis results as JSON, formatted for human eyes. Specify --human-json-output=- to use stdout, but be aware that Python protocols may contain print() which will make the output JSON invalid.",
     type=click.File(mode="wb"),
+)
+@click.option(
+    "--leaks",
+    help="Fail (via exit code) if the analysis engine has not been garbage collected after analysis is complete.",
+    is_flag=True,
+    default=False,
+)
+@click.option(
+    "--leaks-debug",
+    help="Drop into a PDB shell if a leak is detected",
+    is_flag=True,
+    default=False,
 )
 @click.option(
     "--check",
@@ -131,6 +149,8 @@ def analyze(
     log_output: str,
     log_level: str,
     check: bool,
+    leaks: bool,
+    leaks_debug: bool,
 ) -> int:
     """Analyze a protocol.
 
@@ -145,7 +165,18 @@ def analyze(
 
     try:
         with _capture_logs(log_output, log_level):
-            sys.exit(run(_analyze, files, rtp_values, rtp_files, outputs, check))
+            sys.exit(
+                run(
+                    _analyze,
+                    files,
+                    rtp_values,
+                    rtp_files,
+                    outputs,
+                    check,
+                    leaks or leaks_debug,
+                    leaks_debug,
+                )
+            )
     except click.ClickException:
         raise
     except Exception as e:
@@ -294,7 +325,6 @@ async def _do_analyze(
     rtp_values: PrimitiveRunTimeParamValuesType,
     rtp_paths: CSVRuntimeParamPaths,
 ) -> RunResult:
-
     orchestrator = await create_simulating_orchestrator(
         robot_type=protocol_source.robot_type, protocol_config=protocol_source.config
     )
@@ -333,19 +363,24 @@ async def _do_analyze(
                 wells=[],
                 hasEverEnteredErrorRecovery=False,
                 files=[],
+                liquidClasses=[],
             ),
             parameters=[],
+            command_annotations=[],
+            command_preconditions=None,
         )
         return analysis
     return await orchestrator.run(deck_configuration=[])
 
 
-async def _analyze(
+async def _analyze(  # noqa: C901
     files_and_dirs: Sequence[Path],
     rtp_values: str,
     rtp_files: str,
     outputs: Sequence[_Output],
     check: bool,
+    fail_on_leak: bool,
+    debug_on_leak: bool,
 ) -> int:
     input_files = _get_input_files(files_and_dirs)
     parsed_rtp_values = _get_runtime_parameter_values(rtp_values)
@@ -361,6 +396,32 @@ async def _analyze(
 
     analysis = await _do_analyze(protocol_source, parsed_rtp_values, rtp_paths)
     return_code = _get_return_code(analysis)
+
+    # This ugly code checks to see if an engine remains past garbage collection
+    # after analysis is complete.
+    # It should be here and open coded to make it a little easier to present
+    # the debug option.
+    if fail_on_leak or debug_on_leak:
+        gc.collect()
+        leaked_engine = next(
+            (obj for obj in gc.get_objects() if isinstance(obj, ProtocolEngine)), None
+        )
+        if leaked_engine:
+            if fail_on_leak:
+                print(
+                    "A ProtocolEngine instance exists even after garbage collection; "
+                    "some thing (likely in the protocol) has caused it to be leaked, "
+                    "likely by reference to the engine or something that refers to the "
+                    "engine after the run function ends.",
+                    file=sys.stderr,
+                )
+                return_code = -2
+            if debug_on_leak:
+                print(
+                    "You are now in an interactive PDB (https://docs.python.org/3.10/library/pdb.html) "
+                    "session; the leaked engine is bound to the variable leaked_engine."
+                )
+                breakpoint()
 
     if not outputs:
         return return_code
@@ -378,16 +439,20 @@ async def _analyze(
     else:
         result = AnalysisResult.OK
 
-    results = AnalyzeResults.construct(
+    results = AnalyzeResults.model_construct(
         createdAt=datetime.now(tz=timezone.utc),
         files=[
-            ProtocolFile.construct(name=f.path.name, role=f.role)
+            ProtocolFile.model_construct(name=f.path.name, role=f.role)
             for f in protocol_source.files
         ],
         config=(
-            JsonConfig.construct(schemaVersion=protocol_source.config.schema_version)
+            JsonConfig.model_construct(
+                schemaVersion=protocol_source.config.schema_version
+            )
             if isinstance(protocol_source.config, JsonProtocolConfig)
-            else PythonConfig.construct(apiVersion=protocol_source.config.api_version)
+            else PythonConfig.model_construct(
+                apiVersion=protocol_source.config.api_version
+            )
         ),
         result=result,
         metadata=protocol_source.metadata,
@@ -399,20 +464,23 @@ async def _analyze(
         pipettes=analysis.state_summary.pipettes,
         modules=analysis.state_summary.modules,
         liquids=analysis.state_summary.liquids,
+        commandAnnotations=analysis.command_annotations,
+        liquidClasses=analysis.state_summary.liquidClasses,
+        commandPreconditions=analysis.command_preconditions,
     )
 
     _call_for_output_of_kind(
         "json",
         outputs,
         lambda to_file: to_file.write(
-            results.json(exclude_none=True).encode("utf-8"),
+            results.model_dump_json(exclude_none=True).encode("utf-8"),
         ),
     )
     _call_for_output_of_kind(
         "human-json",
         outputs,
         lambda to_file: to_file.write(
-            results.json(exclude_none=True, indent=2).encode("utf-8")
+            results.model_dump_json(exclude_none=True, indent=2).encode("utf-8")
         ),
     )
     if check:
@@ -442,7 +510,7 @@ class PythonConfig(BaseModel):
     apiVersion: APIVersion
 
 
-class AnalysisResult(str, Enum):
+class AnalysisResult(StrEnum):
     """Result of a completed protocol analysis.
 
     The result indicates whether the protocol is expected to run successfully.
@@ -486,4 +554,7 @@ class AnalyzeResults(BaseModel):
     pipettes: List[LoadedPipette]
     modules: List[LoadedModule]
     liquids: List[Liquid]
+    liquidClasses: List[LiquidClassRecordWithId]
     errors: List[ErrorOccurrence]
+    commandAnnotations: List[CommandAnnotation]
+    commandPreconditions: Optional[CommandPreconditions]

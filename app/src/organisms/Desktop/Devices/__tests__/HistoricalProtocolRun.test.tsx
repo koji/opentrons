@@ -1,16 +1,27 @@
-import type * as React from 'react'
 import { screen } from '@testing-library/react'
-import { describe, it, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, it, vi } from 'vitest'
+import { when } from 'vitest-when'
+
 import '@testing-library/jest-dom/vitest'
+
+import { RUN_STATUS_SUCCEEDED } from '@opentrons/api-client'
+
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 import { getStoredProtocols } from '/app/redux/protocol-storage'
 import { storedProtocolData as storedProtocolDataFixture } from '/app/redux/protocol-storage/__fixtures__'
-import { useRunStatus, useRunTimestamps } from '/app/resources/runs'
+import {
+  DEFAULT_STATUS_REFETCH_INTERVAL,
+  useNotifyRunQuery,
+  useRunTimestamps,
+} from '/app/resources/runs'
+
 import { HistoricalProtocolRun } from '../HistoricalProtocolRun'
 import { HistoricalProtocolRunOverflowMenu } from '../HistoricalProtocolRunOverflowMenu'
 
-import type { RunStatus, RunData } from '@opentrons/api-client'
+import type { ComponentProps } from 'react'
+import type { UseQueryResult } from 'react-query'
+import type { Run, RunData } from '@opentrons/api-client'
 import type { RunTimeParameter } from '@opentrons/shared-data'
 
 vi.mock('/app/redux/protocol-storage')
@@ -21,18 +32,18 @@ const run = {
   current: false,
   id: 'test_id',
   protocolId: 'test_protocol_id',
-  status: 'succeeded' as RunStatus,
+  status: RUN_STATUS_SUCCEEDED,
   runTimeParameters: [] as RunTimeParameter[],
 } as RunData
 
-const render = (props: React.ComponentProps<typeof HistoricalProtocolRun>) => {
+const render = (props: ComponentProps<typeof HistoricalProtocolRun>) => {
   return renderWithProviders(<HistoricalProtocolRun {...props} />, {
     i18nInstance: i18n,
   })[0]
 }
 
 describe('RecentProtocolRuns', () => {
-  let props: React.ComponentProps<typeof HistoricalProtocolRun>
+  let props: ComponentProps<typeof HistoricalProtocolRun>
 
   beforeEach(() => {
     props = {
@@ -45,7 +56,12 @@ describe('RecentProtocolRuns', () => {
     vi.mocked(HistoricalProtocolRunOverflowMenu).mockReturnValue(
       <div>mock HistoricalProtocolRunOverflowMenu</div>
     )
-    vi.mocked(useRunStatus).mockReturnValue('succeeded')
+    when(vi.mocked(useNotifyRunQuery))
+      .calledWith('fakeRunId', {
+        staleTime: Infinity,
+        refetchInterval: DEFAULT_STATUS_REFETCH_INTERVAL,
+      })
+      .thenReturn({ data: { data: run } } as UseQueryResult<Run, unknown>)
     vi.mocked(useRunTimestamps).mockReturnValue({
       startedAt: '2022-05-04T18:24:40.833862+00:00',
       pausedAt: '',
@@ -57,7 +73,6 @@ describe('RecentProtocolRuns', () => {
 
   it('renders the correct information derived from run and protocol', () => {
     render(props)
-    screen.debug()
     screen.getByText('Completed')
     screen.getByText('mock HistoricalProtocolRunOverflowMenu')
   })

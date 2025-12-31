@@ -1,28 +1,31 @@
-import type * as React from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { fireEvent, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { when } from 'vitest-when'
-import { describe, it, vi, beforeEach, expect } from 'vitest'
-import '@testing-library/jest-dom/vitest'
-import { renderWithProviders } from '/app/__testing-utils__'
 
+import '@testing-library/jest-dom/vitest'
+
+import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { home } from '/app/redux/robot-controls'
-import { useIsRobotOnWrongVersionOfSoftware } from '/app/redux/robot-update'
-import { restartRobot } from '/app/redux/robot-admin'
+import { ChooseProtocolSlideout } from '/app/organisms/Desktop/ChooseProtocolSlideout'
+import { useIsRobotBusy } from '/app/redux-resources/robots'
 import {
   mockConnectableRobot,
   mockReachableRobot,
   mockUnreachableRobot,
 } from '/app/redux/discovery/__fixtures__'
-import { useCanDisconnect } from '/app/resources/networking/hooks'
-import { DisconnectModal } from '../RobotSettings/ConnectNetwork/DisconnectModal'
-import { ChooseProtocolSlideout } from '/app/organisms/Desktop/ChooseProtocolSlideout'
-import { useCurrentRunId } from '/app/resources/runs'
-import { useIsRobotBusy } from '/app/redux-resources/robots'
-import { handleUpdateBuildroot } from '../RobotSettings/UpdateBuildroot'
+import { restartRobot } from '/app/redux/robot-admin'
+import { home } from '/app/redux/robot-controls'
+import { useIsRobotOnWrongVersionOfSoftware } from '/app/redux/robot-update'
 import { useIsEstopNotDisengaged } from '/app/resources/devices/hooks/useIsEstopNotDisengaged'
+import { useCanDisconnect } from '/app/resources/networking/hooks'
+import { useCurrentRunId } from '/app/resources/runs'
+
 import { RobotOverviewOverflowMenu } from '../RobotOverviewOverflowMenu'
+import { DisconnectModal } from '../RobotSettings/ConnectNetwork/DisconnectModal'
+import { handleUpdateBuildroot } from '../RobotSettings/UpdateBuildroot'
+
+import type { ComponentProps } from 'react'
 
 vi.mock('/app/redux/robot-controls')
 vi.mock('/app/redux/robot-admin')
@@ -36,9 +39,7 @@ vi.mock('../RobotSettings/UpdateBuildroot')
 vi.mock('/app/resources/devices/hooks/useIsEstopNotDisengaged')
 vi.mock('/app/redux-resources/robots')
 
-const render = (
-  props: React.ComponentProps<typeof RobotOverviewOverflowMenu>
-) => {
+const render = (props: ComponentProps<typeof RobotOverviewOverflowMenu>) => {
   return renderWithProviders(
     <MemoryRouter>
       <RobotOverviewOverflowMenu {...props} />
@@ -50,7 +51,7 @@ const render = (
 }
 
 describe('RobotOverviewOverflowMenu', () => {
-  let props: React.ComponentProps<typeof RobotOverviewOverflowMenu>
+  let props: ComponentProps<typeof RobotOverviewOverflowMenu>
   vi.useFakeTimers()
 
   beforeEach(() => {

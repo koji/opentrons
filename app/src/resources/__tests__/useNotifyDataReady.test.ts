@@ -1,15 +1,16 @@
 import { useDispatch } from 'react-redux'
 import { renderHook } from '@testing-library/react'
-import { describe, it, vi, expect, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { when } from 'vitest-when'
 
 import { useHost } from '@opentrons/react-api-client'
 
-import { useNotifyDataReady } from '../useNotifyDataReady'
-import { appShellListener } from '/app/redux/shell/remote'
 import { useTrackEvent } from '/app/redux/analytics'
-import { notifySubscribeAction } from '/app/redux/shell'
 import { useFeatureFlag } from '/app/redux/config'
+import { notifySubscribeAction } from '/app/redux/shell'
+import { appShellListener } from '/app/redux/shell/remote'
+
+import { useNotifyDataReady } from '../useNotifyDataReady'
 
 import type { Mock } from 'vitest'
 import type { HostConfig } from '@opentrons/api-client'
@@ -139,7 +140,6 @@ describe('useNotifyDataReady', () => {
     vi.mocked(appShellListener).mockImplementation(function ({
       callback,
     }): any {
-      // eslint-disable-next-line n/no-callback-literal
       callback({ refetch: true })
     })
     const { rerender, result } = renderHook(() =>
@@ -156,7 +156,6 @@ describe('useNotifyDataReady', () => {
     vi.mocked(appShellListener).mockImplementation(function ({
       callback,
     }): any {
-      // eslint-disable-next-line n/no-callback-literal
       callback({ unsubscribe: true })
     })
     const { rerender, result } = renderHook(() =>
@@ -167,6 +166,105 @@ describe('useNotifyDataReady', () => {
     )
     rerender()
     expect(result.current.shouldRefetch).toEqual(true)
+  })
+
+  it('should handle multiple refetch requests during an active refetch', () => {
+    let capturedCallback: any
+    vi.mocked(appShellListener).mockImplementation(function ({
+      callback,
+    }): any {
+      capturedCallback = callback
+    })
+
+    const mockOnSettled = vi.fn()
+    const { result, rerender } = renderHook(() =>
+      useNotifyDataReady({
+        topic: MOCK_TOPIC,
+        options: { ...MOCK_OPTIONS, onSettled: mockOnSettled },
+      } as any)
+    )
+
+    expect(result.current.shouldRefetch).toEqual(true)
+
+    capturedCallback({ refetch: true })
+    rerender()
+    expect(result.current.shouldRefetch).toEqual(true)
+
+    result.current.queryOptionsNotify.onSettled?.(undefined, null)
+    rerender()
+    expect(result.current.shouldRefetch).toEqual(true)
+
+    result.current.queryOptionsNotify.onSettled?.(undefined, null)
+    rerender()
+    expect(result.current.shouldRefetch).toEqual(false)
+
+    expect(mockOnSettled).toHaveBeenCalledTimes(2)
+  })
+
+  it('should not trigger additional refetch if notification arrives after refetch completes', () => {
+    let capturedCallback: any
+    vi.mocked(appShellListener).mockImplementation(function ({
+      callback,
+    }): any {
+      capturedCallback = callback
+    })
+
+    const mockOnSettled = vi.fn()
+    const { result, rerender } = renderHook(() =>
+      useNotifyDataReady({
+        topic: MOCK_TOPIC,
+        options: { ...MOCK_OPTIONS, onSettled: mockOnSettled },
+      } as any)
+    )
+
+    expect(result.current.shouldRefetch).toEqual(true)
+
+    result.current.queryOptionsNotify.onSettled?.(undefined, null)
+    rerender()
+    expect(result.current.shouldRefetch).toEqual(false)
+
+    capturedCallback({ refetch: true })
+    rerender()
+    expect(result.current.shouldRefetch).toEqual(true)
+
+    result.current.queryOptionsNotify.onSettled?.(undefined, null)
+    rerender()
+    expect(result.current.shouldRefetch).toEqual(false)
+  })
+
+  it('should only queue one additional refetch even with multiple notifications during active refetch', () => {
+    let capturedCallback: any
+    vi.mocked(appShellListener).mockImplementation(function ({
+      callback,
+    }): any {
+      capturedCallback = callback
+    })
+
+    const mockOnSettled = vi.fn()
+    const { result, rerender } = renderHook(() =>
+      useNotifyDataReady({
+        topic: MOCK_TOPIC,
+        options: { ...MOCK_OPTIONS, onSettled: mockOnSettled },
+      } as any)
+    )
+
+    expect(result.current.shouldRefetch).toEqual(true)
+
+    capturedCallback({ refetch: true })
+    capturedCallback({ refetch: true })
+    capturedCallback({ unsubscribe: true })
+    rerender()
+    expect(result.current.shouldRefetch).toEqual(true)
+
+    result.current.queryOptionsNotify.onSettled?.(undefined, null)
+    rerender()
+    expect(result.current.shouldRefetch).toEqual(true)
+
+    result.current.queryOptionsNotify.onSettled?.(undefined, null)
+    rerender()
+    expect(result.current.shouldRefetch).toEqual(false)
+
+    expect(mockOnSettled).toHaveBeenCalledTimes(2)
   })
 
   it('should clean up the listener on dismount', () => {
@@ -240,5 +338,21 @@ describe('useNotifyDataReady', () => {
     )
     result.current.queryOptionsNotify.onSettled?.(undefined, null)
     expect(mockOnSettled).toHaveBeenCalled()
+  })
+
+  it('should enable notifications if `enabled` is initially false and then becomes true', () => {
+    const { rerender, result } = renderHook(
+      props =>
+        useNotifyDataReady({
+          topic: MOCK_TOPIC,
+          options: props,
+        }),
+      { initialProps: { enabled: false, refetchInterval: 5000 } }
+    )
+    expect(result.current.shouldRefetch).toEqual(false)
+
+    rerender({ enabled: true, refetchInterval: 5000 })
+
+    expect(result.current.shouldRefetch).toEqual(true)
   })
 })

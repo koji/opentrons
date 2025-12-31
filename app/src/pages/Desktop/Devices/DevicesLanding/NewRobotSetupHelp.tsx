@@ -1,17 +1,18 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
+
 import {
   ALIGN_FLEX_END,
   DIRECTION_COLUMN,
   Flex,
   FLEX_MAX_CONTENT,
+  LegacyStyledText,
   Link,
+  Modal,
   PrimaryButton,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
-  Modal,
 } from '@opentrons/components'
 
 import { getTopPortalEl } from '/app/App/portal'
@@ -46,7 +47,10 @@ export function NewRobotSetupHelp(): JSX.Element {
               }}
             >
               <Flex flexDirection={DIRECTION_COLUMN}>
-                <LegacyStyledText as="p" marginBottom={SPACING.spacing16}>
+                <LegacyStyledText
+                  forwardedAs="p"
+                  marginBottom={SPACING.spacing16}
+                >
                   {t('branded:new_robot_instructions')}
                 </LegacyStyledText>
                 <ExternalLink

@@ -1,6 +1,6 @@
-import { useState, useReducer, useEffect, Fragment } from 'react'
-import { useTranslation, Trans } from 'react-i18next'
-import { useSelector, useDispatch } from 'react-redux'
+import { Fragment, useEffect, useReducer, useRef, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
+import { useDispatch, useSelector } from 'react-redux'
 import { NavLink } from 'react-router-dom'
 import { css } from 'styled-components'
 
@@ -33,34 +33,35 @@ import {
   TYPOGRAPHY,
   useTooltip,
 } from '@opentrons/components'
-
 import {
   FLEX_ROBOT_TYPE,
   OT2_ROBOT_TYPE,
   sortRuntimeParameters,
 } from '@opentrons/shared-data'
+
+import { ToggleButton } from '/app/atoms/buttons'
+import { Slideout } from '/app/atoms/Slideout'
+import { MultiSlideout } from '/app/atoms/Slideout/MultiSlideout'
+import { UploadInput } from '/app/molecules/UploadInput'
 import {
   getConnectableRobots,
   getReachableRobots,
-  getUnreachableRobots,
   getScanning,
-  startDiscovery,
+  getUnreachableRobots,
   RE_ROBOT_MODEL_OT2,
   RE_ROBOT_MODEL_OT3,
+  startDiscovery,
 } from '/app/redux/discovery'
-import { Slideout } from '/app/atoms/Slideout'
-import { MultiSlideout } from '/app/atoms/Slideout/MultiSlideout'
-import { ToggleButton } from '/app/atoms/buttons'
+
 import { AvailableRobotOption } from './AvailableRobotOption'
-import { UploadInput } from '/app/molecules/UploadInput'
 import { FileCard } from './FileCard'
 
-import type { RobotType, RunTimeParameter } from '@opentrons/shared-data'
 import type { DropdownOption } from '@opentrons/components'
+import type { RobotType, RunTimeParameter } from '@opentrons/shared-data'
 import type { SlideoutProps } from '/app/atoms/Slideout'
 import type { UseCreateRun } from '/app/organisms/Desktop/ChooseRobotToRunProtocolSlideout/useCreateRunFromProtocol'
-import type { State, Dispatch } from '/app/redux/types'
 import type { Robot } from '/app/redux/discovery/types'
+import type { Dispatch, State } from '/app/redux/types'
 
 export const CARD_OUTLINE_BORDER_STYLE = css`
   border-style: ${BORDERS.styleSolid};
@@ -111,8 +112,7 @@ function robotBusyStatusByNameReducer(
 }
 
 interface ChooseRobotSlideoutProps
-  extends Omit<SlideoutProps, 'children'>,
-    Partial<UseCreateRun> {
+  extends Omit<SlideoutProps, 'children'>, Partial<UseCreateRun> {
   isSelectedRobotOnDifferentSoftwareVersion: boolean
   robotType: RobotType | null
   selectedRobot: Robot | null
@@ -159,11 +159,10 @@ export function ChooseRobotSlideout(
   const dispatch = useDispatch<Dispatch>()
   const isScanning = useSelector((state: State) => getScanning(state))
   const [targetProps, tooltipProps] = useTooltip()
-  const [
-    showRestoreValuesTooltip,
-    setShowRestoreValuesTooltip,
-  ] = useState<boolean>(false)
+  const [showRestoreValuesTooltip, setShowRestoreValuesTooltip] =
+    useState<boolean>(false)
   const [isInputFocused, setIsInputFocused] = useState<boolean>(false)
+  const multiSlideoutRef = useRef<HTMLDivElement>(null)
 
   const unhealthyReachableRobots = useSelector((state: State) =>
     getReachableRobots(state)
@@ -226,6 +225,14 @@ export function ChooseRobotSlideout(
     }
   }, [reducerAvailableRobots, selectedRobot, setSelectedRobot])
 
+  useEffect(() => {
+    if (multiSlideout?.currentPage === 2 && multiSlideoutRef.current != null) {
+      multiSlideoutRef.current.scrollIntoView({
+        behavior: 'smooth',
+      })
+    }
+  }, [multiSlideout?.currentPage])
+
   const unavailableCount =
     unhealthyReachableRobots.length + unreachableRobots.length
 
@@ -241,7 +248,7 @@ export function ChooseRobotSlideout(
         {isScanning ? (
           <Flex flexDirection={DIRECTION_ROW} alignItems={ALIGN_CENTER}>
             <LegacyStyledText
-              as="p"
+              forwardedAs="p"
               color={COLORS.grey60}
               marginRight={SPACING.spacing12}
             >
@@ -274,8 +281,11 @@ export function ChooseRobotSlideout(
           height={SIZE_4}
           gridGap={SPACING.spacing8}
         >
-          <Icon name="alert-circle" size={SIZE_1} />
-          <LegacyStyledText as="p" fontWeight={TYPOGRAPHY.fontWeightSemiBold}>
+          <Icon name="ot-alert" size={SIZE_1} />
+          <LegacyStyledText
+            forwardedAs="p"
+            fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+          >
             {t('no_available_robots_found')}
           </LegacyStyledText>
         </Flex>
@@ -303,7 +313,7 @@ export function ChooseRobotSlideout(
               />
               {runCreationError != null && isSelected && (
                 <LegacyStyledText
-                  as="label"
+                  forwardedAs="label"
                   color={COLORS.red60}
                   overflowWrap={OVERFLOW_WRAP_ANYWHERE}
                   display={DISPLAY_INLINE_BLOCK}
@@ -342,7 +352,7 @@ export function ChooseRobotSlideout(
           textAlign={TYPOGRAPHY.textAlignCenter}
           marginTop={SPACING.spacing24}
         >
-          <LegacyStyledText as="p" color={COLORS.grey50}>
+          <LegacyStyledText forwardedAs="p" color={COLORS.grey50}>
             {showIdleOnly
               ? t('unavailable_or_busy_robot_not_listed', {
                   count: unavailableCount + reducerBusyCount,
@@ -476,7 +486,7 @@ export function ChooseRobotSlideout(
                   key={runtimeParam.variableName}
                 >
                   <LegacyStyledText
-                    as="label"
+                    forwardedAs="label"
                     fontWeight={TYPOGRAPHY.fontWeightSemiBold}
                     paddingBottom={SPACING.spacing8}
                   >
@@ -511,11 +521,14 @@ export function ChooseRobotSlideout(
                       label={Boolean(runtimeParam.value) ? t('on') : t('off')}
                       paddingTop={SPACING.spacing2} // manual alignment of SVG with value label
                     />
-                    <LegacyStyledText as="p">
+                    <LegacyStyledText forwardedAs="p">
                       {Boolean(runtimeParam.value) ? t('on') : t('off')}
                     </LegacyStyledText>
                   </Flex>
-                  <LegacyStyledText as="label" paddingTop={SPACING.spacing8}>
+                  <LegacyStyledText
+                    forwardedAs="label"
+                    paddingTop={SPACING.spacing8}
+                  >
                     {runtimeParam.description}
                   </LegacyStyledText>
                 </Flex>
@@ -536,7 +549,7 @@ export function ChooseRobotSlideout(
                   key={runtimeParam.variableName}
                   flexDirection={DIRECTION_COLUMN}
                   alignItems={ALIGN_CENTER}
-                  gridgap={SPACING.spacing8}
+                  gridGap={SPACING.spacing8}
                 >
                   <Flex
                     flexDirection={DIRECTION_COLUMN}
@@ -545,7 +558,7 @@ export function ChooseRobotSlideout(
                     marginBottom={SPACING.spacing16}
                   >
                     <LegacyStyledText
-                      as="h3"
+                      forwardedAs="h3"
                       fontWeight={TYPOGRAPHY.fontWeightSemiBold}
                     >
                       {t('csv_file')}
@@ -572,7 +585,7 @@ export function ChooseRobotSlideout(
                         setRunTimeParametersOverrides?.(clone)
                       }}
                       dragAndDropText={
-                        <LegacyStyledText as="p">
+                        <LegacyStyledText forwardedAs="p">
                           <Trans
                             t={t}
                             i18nKey="shared:drag_and_drop"
@@ -616,7 +629,11 @@ export function ChooseRobotSlideout(
 
   const pageTwoBody =
     runTimeParametersOverrides != null ? (
-      <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing10}>
+      <Flex
+        ref={multiSlideoutRef}
+        flexDirection={DIRECTION_COLUMN}
+        gridGap={SPACING.spacing10}
+      >
         <Flex justifyContent={JUSTIFY_END}>
           <Link
             textAlign={TYPOGRAPHY.textAlignRight}

@@ -1,22 +1,22 @@
-import type * as React from 'react'
 import { screen } from '@testing-library/react'
-import { describe, it, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, it, vi } from 'vitest'
 
+import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import * as RobotApi from '/app/redux/robot-api'
+import { useDeckCalibrationData } from '/app/organisms/Desktop/Devices/hooks'
+import { useRobot } from '/app/redux-resources/robots'
 import {
   mockDeckCalData,
   mockWarningDeckCalData,
 } from '/app/redux/calibration/__fixtures__'
 import { mockConnectableRobot } from '/app/redux/discovery/__fixtures__'
 import { mockAttachedPipette } from '/app/redux/pipettes/__fixtures__'
-import { useDeckCalibrationData } from '/app/organisms/Desktop/Devices/hooks'
+import * as RobotApi from '/app/redux/robot-api'
 import { useAttachedPipettes } from '/app/resources/instruments'
-import { useRobot } from '/app/redux-resources/robots'
-import { renderWithProviders } from '/app/__testing-utils__'
 
 import { RobotSettingsDeckCalibration } from '../RobotSettingsDeckCalibration'
 
+import type { ComponentProps } from 'react'
 import type { AttachedPipettesByMount } from '/app/redux/pipettes/types'
 
 vi.mock('../..//CalibrationStatusCard')
@@ -31,7 +31,7 @@ const mockAttachedPipettes: AttachedPipettesByMount = {
 } as any
 
 const render = (
-  props?: Partial<React.ComponentProps<typeof RobotSettingsDeckCalibration>>
+  props?: Partial<ComponentProps<typeof RobotSettingsDeckCalibration>>
 ) => {
   return renderWithProviders(
     <RobotSettingsDeckCalibration robotName="otie" {...props} />,

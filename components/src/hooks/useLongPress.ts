@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import interact from 'interactjs'
+
 import type PointerEvent from 'interactjs'
 import type { CSSProperties, MutableRefObject } from 'react'
 
@@ -35,7 +36,7 @@ export const useLongPress = (): UseLongPressResult => {
 
   const enable = (): void => {
     if (interactiveRef?.current != null) {
-      interact((interactiveRef.current as unknown) as HTMLElement)
+      interact(interactiveRef.current as unknown as HTMLElement)
         .pointerEvents({
           holdDuration: HOLD_DURATION_MS,
         })
@@ -49,7 +50,7 @@ export const useLongPress = (): UseLongPressResult => {
   }
   const disable = (): void => {
     if (interactiveRef?.current != null) {
-      interact((interactiveRef.current as unknown) as HTMLElement).unset()
+      interact(interactiveRef.current as unknown as HTMLElement).unset()
     }
   }
 

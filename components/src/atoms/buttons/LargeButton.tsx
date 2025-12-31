@@ -1,10 +1,5 @@
-import type * as React from 'react'
 import { css } from 'styled-components'
 
-import { Btn } from '../../primitives'
-import { BORDERS, COLORS } from '../../helix-design-system'
-import { RESPONSIVENESS, SPACING, TYPOGRAPHY } from '../../ui-style-constants'
-import { StyledText } from '../StyledText'
 import {
   ALIGN_CENTER,
   ALIGN_FLEX_START,
@@ -14,10 +9,15 @@ import {
   DISPLAY_FLEX,
   JUSTIFY_SPACE_BETWEEN,
 } from '../..'
+import { BORDERS, COLORS } from '../../helix-design-system'
 import { Icon } from '../../icons'
+import { Btn } from '../../primitives'
+import { RESPONSIVENESS, SPACING, TYPOGRAPHY } from '../../ui-style-constants'
+import { StyledText } from '../StyledText'
 
-import type { StyleProps } from '../../primitives'
+import type { ReactNode } from 'react'
 import type { IconName } from '../../icons'
+import type { StyleProps } from '../../primitives'
 
 type LargeButtonTypes =
   | 'primary'
@@ -126,7 +126,7 @@ interface LargeButtonProps extends StyleProps {
   type?: 'submit'
   onClick?: () => void
   buttonType?: LargeButtonTypes
-  buttonText: React.ReactNode
+  buttonText: ReactNode
   iconName?: IconName
   disabled?: boolean
   /** aria-disabled for displaying snack bar. */
@@ -206,7 +206,9 @@ export function LargeButton(props: LargeButtonProps): JSX.Element {
 
       border: ${buttonType === 'stroke'
         ? `2px solid ${COLORS.blue55}`
-        : `${computedBorderStyle()}`};
+        : buttonType === 'primary'
+          ? `4px solid ${COLORS.blue55}`
+          : computedBorderStyle()};
     }
 
     &:focus-visible {
@@ -217,13 +219,14 @@ export function LargeButton(props: LargeButtonProps): JSX.Element {
       color: ${LARGE_BUTTON_PROPS_BY_TYPE[buttonType].disabledColor};
       background-color: ${LARGE_BUTTON_PROPS_BY_TYPE[buttonType]
         .disabledBackgroundColor};
+      border: 4px solid ${COLORS.grey35};
     }
 
     &[aria-disabled='true'] {
       color: ${LARGE_BUTTON_PROPS_BY_TYPE[buttonType].disabledColor};
       background-color: ${LARGE_BUTTON_PROPS_BY_TYPE[buttonType]
         .disabledBackgroundColor};
-      border: none;
+      border: 4px solid ${COLORS.grey35};
     }
 
     @media ${RESPONSIVENESS.touchscreenMediaQuerySpecs} {
@@ -310,8 +313,8 @@ export function LargeButton(props: LargeButtonProps): JSX.Element {
 }
 
 const ICON_STYLE = css`
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.25rem;
+  height: 1.25rem;
   @media ${RESPONSIVENESS.touchscreenMediaQuerySpecs} {
     width: 5rem;
     height: 5rem;

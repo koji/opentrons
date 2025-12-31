@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+
 import {
   useAllPipetteOffsetCalibrationsQuery,
   useAllTipLengthCalibrationsQuery,
@@ -7,10 +8,11 @@ import {
 } from '@opentrons/react-api-client'
 import { getLabwareDefURI } from '@opentrons/shared-data'
 
-import { useAttachedPipettes } from '/app/resources/instruments'
-import { getDefaultTiprackDefForPipetteName } from '../constants'
 import { DECK_CAL_STATUS_OK } from '/app/redux/calibration/constants'
+import { useAttachedPipettes } from '/app/resources/instruments'
 import { formatTimestamp } from '/app/transformations/runs'
+
+import { getDefaultTiprackDefForPipetteName } from '../constants'
 
 import type { PipetteName } from '@opentrons/shared-data'
 import type {
@@ -71,22 +73,16 @@ export function useCalibrationTaskList(
   }
   const attachedPipettes = useAttachedPipettes()
 
-  const {
-    data: calStatusData,
-    isLoading: calStatusIsLoading,
-  } = useCalibrationStatusQuery({ refetchInterval: CALIBRATION_DATA_POLL_MS })
-  const {
-    data: pipOffsetData,
-    isLoading: pipOffsetIsLoading,
-  } = useAllPipetteOffsetCalibrationsQuery({
-    refetchInterval: CALIBRATION_DATA_POLL_MS,
-  })
-  const {
-    data: tipLengthData,
-    isLoading: tipLengthIsLoading,
-  } = useAllTipLengthCalibrationsQuery({
-    refetchInterval: CALIBRATION_DATA_POLL_MS,
-  })
+  const { data: calStatusData, isLoading: calStatusIsLoading } =
+    useCalibrationStatusQuery({ refetchInterval: CALIBRATION_DATA_POLL_MS })
+  const { data: pipOffsetData, isLoading: pipOffsetIsLoading } =
+    useAllPipetteOffsetCalibrationsQuery({
+      refetchInterval: CALIBRATION_DATA_POLL_MS,
+    })
+  const { data: tipLengthData, isLoading: tipLengthIsLoading } =
+    useAllTipLengthCalibrationsQuery({
+      refetchInterval: CALIBRATION_DATA_POLL_MS,
+    })
 
   taskList.isLoading =
     calStatusIsLoading || pipOffsetIsLoading || tipLengthIsLoading

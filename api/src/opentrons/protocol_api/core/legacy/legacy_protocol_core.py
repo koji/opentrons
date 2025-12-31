@@ -1,12 +1,18 @@
 import logging
-from typing import Dict, List, Optional, Set, Union, cast, Tuple
+from typing import Dict, List, Optional, Set, Union, cast, Tuple, Sequence
 
 from opentrons_shared_data.deck.types import DeckDefinitionV5, SlotDefV3
 from opentrons_shared_data.labware.types import LabwareDefinition
 from opentrons_shared_data.pipette.types import PipetteNameType
 from opentrons_shared_data.robot.types import RobotType
 
-from opentrons.types import DeckSlotName, StagingSlotName, Location, Mount, Point
+from opentrons.types import (
+    DeckSlotName,
+    StagingSlotName,
+    Location,
+    Mount,
+    Point,
+)
 from opentrons.util.broker import Broker
 from opentrons.hardware_control import SyncHardwareAPI
 from opentrons.hardware_control.modules import AbstractModule, ModuleModel, ModuleType
@@ -28,6 +34,7 @@ from .legacy_instrument_core import LegacyInstrumentCore
 from .labware_offset_provider import AbstractLabwareOffsetProvider
 from .legacy_labware_core import LegacyLabwareCore
 from .load_info import LoadInfo, InstrumentLoadInfo, LabwareLoadInfo, ModuleLoadInfo
+from .tasks import LegacyTaskCore
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +44,7 @@ class LegacyProtocolCore(
         LegacyInstrumentCore,
         LegacyLabwareCore,
         legacy_module_core.LegacyModuleCore,
+        LegacyTaskCore,
     ]
 ):
     def __init__(
@@ -77,7 +85,8 @@ class LegacyProtocolCore(
         self._equipment_broker = equipment_broker or Broker()
 
         self._instruments: Dict[Mount, Optional[LegacyInstrumentCore]] = {
-            mount: None for mount in Mount.ot2_mounts()  # Legacy core works only on OT2
+            mount: None
+            for mount in Mount.ot2_mounts()  # Legacy core works only on OT2
         }
         self._bundled_labware = bundled_labware
         self._extra_labware = extra_labware or {}
@@ -203,6 +212,10 @@ class LegacyProtocolCore(
             bundled_defs=self._bundled_labware,
             extra_defs=self._extra_labware,
         )
+        # For type checking. This should always pass because
+        # opentrons.protocol_api.core.legacy should only load labware with schema 2.
+        assert labware_def["schemaVersion"] == 2
+
         labware_core = LegacyLabwareCore(
             definition=labware_def,
             parent=parent,
@@ -267,6 +280,20 @@ class LegacyProtocolCore(
         """Load an adapter using its identifying parameters"""
         raise APIVersionError(api_element="Loading adapter")
 
+    def load_lid(
+        self,
+        load_name: str,
+        location: LegacyLabwareCore,
+        namespace: Optional[str],
+        version: Optional[int],
+    ) -> LegacyLabwareCore:
+        """Load an individual lid labware using its identifying parameters. Must be loaded on a labware."""
+        raise APIVersionError(api_element="Loading lid")
+
+    def load_robot(self) -> None:  # type: ignore
+        """Load an adapter using its identifying parameters"""
+        raise APIVersionError(api_element="Loading robot")
+
     def move_labware(
         self,
         labware_core: LegacyLabwareCore,
@@ -277,6 +304,7 @@ class LegacyProtocolCore(
             legacy_module_core.LegacyModuleCore,
             OffDeckType,
             WasteChute,
+            TrashBin,
         ],
         use_gripper: bool,
         pause_for_manual_move: bool,
@@ -285,6 +313,25 @@ class LegacyProtocolCore(
     ) -> None:
         """Move labware to new location."""
         raise APIVersionError(api_element="Labware movement")
+
+    def move_lid(
+        self,
+        source_location: Union[DeckSlotName, StagingSlotName, LegacyLabwareCore],
+        new_location: Union[
+            DeckSlotName,
+            StagingSlotName,
+            LegacyLabwareCore,
+            OffDeckType,
+            WasteChute,
+            TrashBin,
+        ],
+        use_gripper: bool,
+        pause_for_manual_move: bool,
+        pick_up_offset: Optional[Tuple[float, float, float]],
+        drop_offset: Optional[Tuple[float, float, float]],
+    ) -> LegacyLabwareCore | None:
+        """Move lid to new location."""
+        raise APIVersionError(api_element="Lid movement")
 
     def load_module(
         self,
@@ -473,6 +520,30 @@ class LegacyProtocolCore(
         self._last_location = location
         self._last_mount = mount
 
+    def load_lid_stack(
+        self,
+        load_name: str,
+        location: Union[DeckSlotName, StagingSlotName, LegacyLabwareCore],
+        quantity: int,
+        namespace: Optional[str],
+        version: Optional[int],
+    ) -> LegacyLabwareCore:
+        """Load a Stack of Lids to a given location, creating a Lid Stack."""
+        raise APIVersionError(api_element="Lid stack")
+
+    def load_labware_to_flex_stacker_hopper(
+        self,
+        module_core: legacy_module_core.LegacyModuleCore,
+        load_name: str,
+        quantity: int,
+        label: Optional[str],
+        namespace: Optional[str],
+        version: Optional[int],
+        lid: Optional[str],
+    ) -> None:
+        """Load labware to a Flex stacker hopper."""
+        raise APIVersionError(api_element="Flex stacker")
+
     def get_module_cores(self) -> List[legacy_module_core.LegacyModuleCore]:
         """Get loaded module cores."""
         return self._module_cores
@@ -531,8 +602,8 @@ class LegacyProtocolCore(
         """Define a liquid to load into a well."""
         assert False, "define_liquid only supported on engine core"
 
-    def define_liquid_class(self, name: str) -> LiquidClass:
-        """Define a liquid class."""
+    def get_liquid_class(self, name: str, version: Optional[int]) -> LiquidClass:
+        """Get an instance of a built-in liquid class."""
         assert False, "define_liquid_class is only supported on engine core"
 
     def get_labware_location(
@@ -542,3 +613,23 @@ class LegacyProtocolCore(
     ]:
         """Get labware parent location."""
         assert False, "get_labware_location only supported on engine core"
+
+    def capture_image(
+        self,
+        filename: Optional[str] = None,
+        resolution: Optional[Tuple[int, int]] = None,
+        zoom: Optional[float] = None,
+        contrast: Optional[float] = None,
+        brightness: Optional[float] = None,
+        saturation: Optional[float] = None,
+    ) -> None:
+        "Capture an image using a camera."
+        assert False, "capture_image only supported on engine core"
+
+    def wait_for_tasks(self, task: Sequence[LegacyTaskCore]) -> None:
+        """Wait for list of tasks to complete before executing subsequent commands."""
+        assert False, "wait_for_tasks only supported on engine core"
+
+    def create_timer(self, seconds: float) -> LegacyTaskCore:
+        """Create a timer task that runs in the background."""
+        assert False, "create_timer only supported on engine core"

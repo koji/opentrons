@@ -3,15 +3,14 @@ import { useRunCurrentState } from '@opentrons/react-api-client'
 import { isPartialTipConfig } from '/app/local-resources/instruments'
 
 import type {
-  NozzleLayoutValues,
   Instruments,
-  Run,
+  NozzleLayoutValues,
   PipetteData,
+  Run,
 } from '@opentrons/api-client'
-import type { ErrorRecoveryFlowsProps } from '/app/organisms/ErrorRecoveryFlows'
+import type { FailedCommandBySource } from './useRetainedFailedCommandBySource'
 
-export interface UseFailedPipetteUtilsParams
-  extends UseFailedCommandPipetteInfoProps {
+export interface UseFailedPipetteUtilsParams extends UseFailedCommandPipetteInfoProps {
   runId: string
 }
 
@@ -61,7 +60,7 @@ export function useFailedPipetteUtils(
 interface UseFailedCommandPipetteInfoProps {
   runRecord: Run | undefined
   attachedInstruments: Instruments | undefined
-  failedCommandByRunRecord: ErrorRecoveryFlowsProps['failedCommandByRunRecord']
+  failedCommandByRunRecord: FailedCommandBySource['byRunRecord'] | null
 }
 
 // /instruments data for the pipette used in the failedCommand, if any.

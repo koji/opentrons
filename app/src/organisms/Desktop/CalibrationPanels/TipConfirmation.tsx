@@ -1,23 +1,24 @@
+import { useTranslation } from 'react-i18next'
 import { css } from 'styled-components'
+
 import {
   DIRECTION_COLUMN,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   PrimaryButton,
   SecondaryButton,
   SPACING,
-  LegacyStyledText,
 } from '@opentrons/components'
-import { useTranslation } from 'react-i18next'
 
-import * as Sessions from '/app/redux/sessions'
 import { NeedHelpLink } from '/app/molecules/OT2CalibrationNeedHelpLink'
+import * as Sessions from '/app/redux/sessions'
 
-import type { CalibrationPanelProps } from './types'
 import type {
-  SessionType,
   SessionCommandString,
+  SessionType,
 } from '/app/redux/sessions/types'
+import type { CalibrationPanelProps } from './types'
 
 const CAPITALIZE_FIRST_LETTER_STYLE = css`
   &:first-letter {
@@ -56,7 +57,7 @@ export function TipConfirmation(props: CalibrationPanelProps): JSX.Element {
       padding={SPACING.spacing32}
       minHeight="25rem"
     >
-      <LegacyStyledText as="h1" marginBottom={SPACING.spacing16}>
+      <LegacyStyledText forwardedAs="h1" marginBottom={SPACING.spacing16}>
         {t('did_pipette_pick_up_tip')}
       </LegacyStyledText>
 

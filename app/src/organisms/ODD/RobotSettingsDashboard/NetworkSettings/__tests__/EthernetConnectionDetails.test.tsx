@@ -1,23 +1,24 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import '@testing-library/jest-dom/vitest'
 
-import { i18n } from '/app/i18n'
-import { INTERFACE_ETHERNET } from '/app/redux/networking'
-import { getNetworkInterfaces } from '/app/redux/networking/selectors'
 import { renderWithProviders } from '/app/__testing-utils__'
+import { i18n } from '/app/i18n'
 import { getLocalRobot } from '/app/redux/discovery'
 import { mockConnectedRobot } from '/app/redux/discovery/__fixtures__'
+import { INTERFACE_ETHERNET } from '/app/redux/networking'
+import { getNetworkInterfaces } from '/app/redux/networking/selectors'
+
 import { EthernetConnectionDetails } from '../EthernetConnectionDetails'
+
+import type { ComponentProps } from 'react'
 
 vi.mock('/app/redux/discovery')
 vi.mock('/app/redux/discovery/selectors')
 vi.mock('/app/redux/networking/selectors')
 
-const render = (
-  props: React.ComponentProps<typeof EthernetConnectionDetails>
-) => {
+const render = (props: ComponentProps<typeof EthernetConnectionDetails>) => {
   return renderWithProviders(<EthernetConnectionDetails {...props} />, {
     i18nInstance: i18n,
   })
@@ -31,7 +32,7 @@ const mockEthernet = {
 }
 
 describe('EthernetConnectionDetails', () => {
-  let props: React.ComponentProps<typeof EthernetConnectionDetails>
+  let props: ComponentProps<typeof EthernetConnectionDetails>
   beforeEach(() => {
     props = {
       handleGoBack: vi.fn(),

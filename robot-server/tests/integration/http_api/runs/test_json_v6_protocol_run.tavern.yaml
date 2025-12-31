@@ -51,6 +51,7 @@ stages:
               displayName: Water
               description: Liquid H2O
               displayColor: '#7332a8'
+          liquidClasses: []
           runTimeParameters: []
           outputFileIds: []
           protocolId: '{protocol_id}'
@@ -408,6 +409,7 @@ stages:
                   y: 0
                   z: 0
               alternateDropLocation: false
+              scrape_tips: false
 
   - name: Verify commands succeeded with pageLength and cursor
     request:

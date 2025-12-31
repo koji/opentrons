@@ -1,7 +1,7 @@
-import * as React from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useDispatch } from 'react-redux'
 import { useTranslation } from 'react-i18next'
+import { useDispatch } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 
 import {
@@ -16,15 +16,17 @@ import {
   TYPOGRAPHY,
 } from '@opentrons/components'
 
+import { getTopPortalEl } from '/app/App/portal'
 import { home, ROBOT } from '/app/redux/robot-controls'
 import { useLights } from '/app/resources/devices'
-import { getTopPortalEl } from '/app/App/portal'
+
 import { RestartRobotConfirmationModal } from './RestartRobotConfirmationModal'
 
+import type { MouseEventHandler } from 'react'
 import type { Dispatch } from '/app/redux/types'
 
 interface NavigationMenuProps {
-  onClick: React.MouseEventHandler
+  onClick: MouseEventHandler
   robotName: string
   setShowNavMenu: (showNavMenu: boolean) => void
 }
@@ -37,7 +39,7 @@ export function NavigationMenu(props: NavigationMenuProps): JSX.Element {
   const [
     showRestartRobotConfirmationModal,
     setShowRestartRobotConfirmationModal,
-  ] = React.useState<boolean>(false)
+  ] = useState<boolean>(false)
 
   const navigate = useNavigate()
 
@@ -69,7 +71,7 @@ export function NavigationMenu(props: NavigationMenuProps): JSX.Element {
               size="2.5rem"
             />
             <LegacyStyledText
-              as="h4"
+              forwardedAs="h4"
               fontWeight={TYPOGRAPHY.fontWeightSemiBold}
               marginLeft={SPACING.spacing12}
             >
@@ -86,7 +88,7 @@ export function NavigationMenu(props: NavigationMenuProps): JSX.Element {
               aria-label="restart_icon"
             />
             <LegacyStyledText
-              as="h4"
+              forwardedAs="h4"
               fontWeight={TYPOGRAPHY.fontWeightSemiBold}
               marginLeft={SPACING.spacing12}
             >
@@ -103,7 +105,7 @@ export function NavigationMenu(props: NavigationMenuProps): JSX.Element {
           <Flex alignItems={ALIGN_CENTER}>
             <Icon name="deck-map" aria-label="deck-map_icon" size="2.5rem" />
             <LegacyStyledText
-              as="h4"
+              forwardedAs="h4"
               fontWeight={TYPOGRAPHY.fontWeightSemiBold}
               marginLeft={SPACING.spacing12}
             >
@@ -120,7 +122,7 @@ export function NavigationMenu(props: NavigationMenuProps): JSX.Element {
               aria-label="light_icon"
             />
             <LegacyStyledText
-              as="h4"
+              forwardedAs="h4"
               fontWeight={TYPOGRAPHY.fontWeightSemiBold}
               marginLeft={SPACING.spacing12}
             >

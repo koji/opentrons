@@ -1,4 +1,3 @@
-import type * as React from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 
@@ -9,8 +8,8 @@ import {
   DIRECTION_COLUMN,
   Flex,
   Icon,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
@@ -18,12 +17,13 @@ import { getTopPortalEl } from '/app/App/portal'
 import { SmallButton } from '/app/atoms/buttons'
 import { OddModal } from '/app/molecules/OddModal'
 
+import type { Dispatch, SetStateAction } from 'react'
 import type { OddModalHeaderBaseProps } from '/app/molecules/OddModal/types'
 
 interface TakeoverModalProps {
   title: string
   showConfirmTerminateModal: boolean
-  setShowConfirmTerminateModal: React.Dispatch<React.SetStateAction<boolean>>
+  setShowConfirmTerminateModal: Dispatch<SetStateAction<boolean>>
   confirmTerminate: () => void
   terminateInProgress: boolean
 }
@@ -48,8 +48,8 @@ export function TakeoverModal(props: TakeoverModalProps): JSX.Element {
     showConfirmTerminateModal ? (
       //    confirm terminate modal
       <OddModal header={terminateHeader}>
-        <Flex flexDirection={DIRECTION_COLUMN}>
-          <LegacyStyledText as="p" marginBottom={SPACING.spacing32}>
+        <Flex flexDirection={DIRECTION_COLUMN} width="100%">
+          <LegacyStyledText forwardedAs="p" marginBottom={SPACING.spacing32}>
             {t('branded:confirm_terminate')}
           </LegacyStyledText>
           <Flex flex="1" gridGap={SPACING.spacing8}>
@@ -79,6 +79,7 @@ export function TakeoverModal(props: TakeoverModalProps): JSX.Element {
           gridGap={SPACING.spacing40}
           alignItems={ALIGN_CENTER}
           justifyContent={ALIGN_CENTER}
+          width="100%"
         >
           <Flex
             height="12.5rem"
@@ -88,6 +89,7 @@ export function TakeoverModal(props: TakeoverModalProps): JSX.Element {
             color={COLORS.grey60}
             padding={SPACING.spacing24}
             alignItems={ALIGN_CENTER}
+            width="100%"
           >
             <Icon
               name="ot-alert"
@@ -95,18 +97,21 @@ export function TakeoverModal(props: TakeoverModalProps): JSX.Element {
               marginBottom={SPACING.spacing16}
             />
             <LegacyStyledText
-              as="h4"
+              forwardedAs="h4"
               marginBottom={SPACING.spacing4}
               fontWeight={TYPOGRAPHY.fontWeightBold}
             >
               {title}
             </LegacyStyledText>
-            <LegacyStyledText as="p" textAlign={TYPOGRAPHY.textAlignCenter}>
+            <LegacyStyledText
+              forwardedAs="p"
+              textAlign={TYPOGRAPHY.textAlignCenter}
+            >
               {t('branded:computer_in_app_is_controlling_robot')}
             </LegacyStyledText>
           </Flex>
           <LegacyStyledText
-            as="p"
+            forwardedAs="p"
             fontWeight={TYPOGRAPHY.fontWeightSemiBold}
             onClick={() => {
               setShowConfirmTerminateModal(true)

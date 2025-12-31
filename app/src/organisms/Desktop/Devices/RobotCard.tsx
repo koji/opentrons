@@ -1,5 +1,5 @@
-import { useSelector } from 'react-redux'
 import { useTranslation } from 'react-i18next'
+import { useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 
 import {
@@ -10,45 +10,49 @@ import {
   DIRECTION_COLUMN,
   DIRECTION_ROW,
   Flex,
+  Icon,
   JUSTIFY_FLEX_START,
   JUSTIFY_SPACE_BETWEEN,
   POSITION_ABSOLUTE,
   POSITION_RELATIVE,
   SPACING,
-  LegacyStyledText,
-  TYPOGRAPHY,
+  StyledText,
   WRAP,
 } from '@opentrons/components'
+import {
+  useInstrumentsQuery,
+  useModulesQuery,
+  usePipettesQuery,
+} from '@opentrons/react-api-client'
 import {
   getGripperDisplayName,
   getModuleDisplayName,
   getPipetteModelSpecs,
 } from '@opentrons/shared-data'
-import {
-  useInstrumentsQuery,
-  usePipettesQuery,
-  useModulesQuery,
-} from '@opentrons/react-api-client'
 
-import OT2_PNG from '/app/assets/images/OT2-R_HERO.png'
 import FLEX_PNG from '/app/assets/images/FLEX.png'
+import OT2_PNG from '/app/assets/images/OT2-R_HERO.png'
 import { InstrumentContainer } from '/app/atoms/InstrumentContainer'
-import { CONNECTABLE, getRobotModelByName } from '/app/redux/discovery'
 import { ModuleIcon } from '/app/molecules/ModuleIcon'
-import { UpdateRobotBanner } from '../UpdateRobotBanner'
 import { useIsFlex } from '/app/redux-resources/robots'
-import { ReachableBanner } from './ReachableBanner'
-import { RobotOverflowMenu } from './RobotOverflowMenu'
-import { RobotStatusHeader } from './RobotStatusHeader'
+import { CONNECTABLE, getRobotModelByName } from '/app/redux/discovery'
+import { useNotifyCamera } from '/app/resources/camera/useNotifyCamera'
+
+import { UpdateRobotBanner } from '../UpdateRobotBanner'
 import {
   ErrorRecoveryBanner,
   useErrorRecoveryBanner,
 } from './ErrorRecoveryBanner'
+import { ReachableBanner } from './ReachableBanner'
+import { RobotOverflowMenu } from './RobotOverflowMenu'
+import { RobotStatusHeader } from './RobotStatusHeader'
 
 import type { GripperData } from '@opentrons/api-client'
 import type { GripperModel } from '@opentrons/shared-data'
 import type { DiscoveredRobot } from '/app/redux/discovery/types'
 import type { State } from '/app/redux/types'
+
+const CAMERA_REFETCH_MS = 5000
 
 interface RobotCardProps {
   robot: DiscoveredRobot
@@ -115,7 +119,13 @@ export function RobotCard(props: RobotCardProps): JSX.Element | null {
               justifyContent={JUSTIFY_SPACE_BETWEEN}
             >
               <AttachedInstruments robotName={robotName} />
-              <AttachedModules robotName={robotName} />
+              <Flex
+                gridGap={SPACING.spacing4}
+                justifyContent={JUSTIFY_SPACE_BETWEEN}
+              >
+                <AttachedModules robotName={robotName} />
+                <AttachedDevices robotName={robotName} />
+              </Flex>
             </Flex>
           ) : null}
         </Flex>
@@ -134,21 +144,19 @@ export function RobotCard(props: RobotCardProps): JSX.Element | null {
 function AttachedModules(props: { robotName: string }): JSX.Element | null {
   const { robotName } = props
   const { t } = useTranslation('devices_landing')
-  const {
-    data: modulesData,
-    isLoading: isModulesQueryLoading,
-  } = useModulesQuery()
+  const { data: modulesData, isLoading: isModulesQueryLoading } =
+    useModulesQuery()
   const attachedModules = modulesData?.data ?? []
 
   return !isModulesQueryLoading && attachedModules.length > 0 ? (
-    <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing4}>
-      <LegacyStyledText
-        as="h6"
-        textTransform={TYPOGRAPHY.textTransformUppercase}
-        color={COLORS.grey60}
-      >
+    <Flex
+      flexDirection={DIRECTION_COLUMN}
+      gridGap={SPACING.spacing4}
+      width="100%"
+    >
+      <StyledText desktopStyle="bodyDefaultRegular" color={COLORS.grey60}>
         {t('modules')}
-      </LegacyStyledText>
+      </StyledText>
       <Flex>
         {attachedModules.map((module, i) => (
           <ModuleIcon
@@ -164,18 +172,38 @@ function AttachedModules(props: { robotName: string }): JSX.Element | null {
   ) : null
 }
 
-function AttachedInstruments(props: { robotName: string }): JSX.Element {
+function AttachedDevices(props: { robotName: string }): JSX.Element | null {
+  const { robotName } = props
   const { t } = useTranslation('devices_landing')
-  const isFlex = useIsFlex(props.robotName)
-  const {
-    data: pipettesData,
-    isLoading: isPipetteQueryLoading,
-  } = usePipettesQuery()
+  const { data } = useNotifyCamera({ refetchInterval: CAMERA_REFETCH_MS })
 
-  const {
-    data: attachedInstruments,
-    isLoading: isInstrumentsQueryLoading,
-  } = useInstrumentsQuery({ enabled: isFlex })
+  return data?.cameraEnabled ? (
+    <Flex
+      flexDirection={DIRECTION_COLUMN}
+      gridGap={SPACING.spacing4}
+      width="85px"
+    >
+      <StyledText desktopStyle="bodyDefaultRegular" color={COLORS.grey60}>
+        {t('peripherals')}
+      </StyledText>
+      <Icon
+        key={`${String('camera')}_${robotName}`}
+        name="camera"
+        color={COLORS.grey50}
+        size={SPACING.spacing16}
+      ></Icon>
+    </Flex>
+  ) : null
+}
+
+function AttachedInstruments(props: { robotName: string }): JSX.Element {
+  const { t, i18n } = useTranslation('devices_landing')
+  const isFlex = useIsFlex(props.robotName)
+  const { data: pipettesData, isLoading: isPipetteQueryLoading } =
+    usePipettesQuery()
+
+  const { data: attachedInstruments, isLoading: isInstrumentsQueryLoading } =
+    useInstrumentsQuery({ enabled: isFlex })
   const attachedGripper =
     (attachedInstruments?.data ?? []).find(
       (i): i is GripperData => i.instrumentType === 'gripper' && i.ok
@@ -192,15 +220,10 @@ function AttachedInstruments(props: { robotName: string }): JSX.Element {
   const leftAndRightMountsPipetteDisplayName = null
 
   return (
-    <Flex
-      flex="1"
-      flexDirection={DIRECTION_COLUMN}
-      gridGap={SPACING.spacing4}
-      minWidth="24rem"
-    >
-      <LegacyStyledText as="h6" color={COLORS.grey60}>
-        {t('shared:instruments')}
-      </LegacyStyledText>
+    <Flex flex="1" flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing4}>
+      <StyledText desktopStyle="bodyDefaultRegular" color={COLORS.grey60}>
+        {i18n.format(t('shared:instruments'), 'capitalize')}
+      </StyledText>
 
       {isPipetteQueryLoading || isInstrumentsQueryLoading ? null : (
         <Flex flexWrap={WRAP} gridGap={SPACING.spacing4}>

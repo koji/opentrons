@@ -1,30 +1,32 @@
-import { useState, useLayoutEffect, useCallback } from 'react'
+import { useCallback, useLayoutEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { css } from 'styled-components'
 
 import {
   DIRECTION_COLUMN,
-  RESPONSIVENESS,
   Flex,
+  JUSTIFY_SPACE_BETWEEN,
+  OVERFLOW_AUTO,
+  RadioButton,
+  RESPONSIVENESS,
   SPACING,
   StyledText,
-  RadioButton,
-  OVERFLOW_AUTO,
-  JUSTIFY_SPACE_BETWEEN,
 } from '@opentrons/components'
 
 import { BLOWOUT_SUCCESS, DROP_TIP_SUCCESS, DT_ROUTES } from '../constants'
 import { DropTipFooterButtons } from '../shared'
 
+import type { FlattenSimpleInterpolation } from 'styled-components'
 import type { AddressableAreaName } from '@opentrons/shared-data'
-import type {
-  DropTipWizardContainerProps,
-  ValidDropTipBlowoutLocation,
-} from '../types'
 import type {
   DropTipBlowoutLocationDetails,
   DropTipBlowoutSlotName,
 } from '../hooks'
+import type {
+  DropTipModalStyle,
+  DropTipWizardContainerProps,
+  ValidDropTipBlowoutLocation,
+} from '../types'
 import type { UseConfirmPositionResult } from './ConfirmPosition'
 
 interface ChooseLocationProps extends DropTipWizardContainerProps {
@@ -32,6 +34,7 @@ interface ChooseLocationProps extends DropTipWizardContainerProps {
 }
 
 export function ChooseLocation({
+  issuedCommandsType,
   dropTipCommandLocations,
   dropTipCommands,
   goBackRunValid,
@@ -44,10 +47,8 @@ export function ChooseLocation({
   const { t } = useTranslation('drop_tip_wizard')
   const { moveToAddressableArea, blowoutOrDropTip } = dropTipCommands
 
-  const [
-    selectedLocation,
-    setSelectedLocation,
-  ] = useState<DropTipBlowoutLocationDetails | null>(null)
+  const [selectedLocation, setSelectedLocation] =
+    useState<DropTipBlowoutLocationDetails | null>(null)
 
   // On initial render with values, synchronously set the first option as the selected option.
   useLayoutEffect(() => {
@@ -97,7 +98,7 @@ export function ChooseLocation({
     toggleIsRobotPipetteMoving()
     void moveToAddressableArea(
       selectedLocation?.slotName as AddressableAreaName,
-      false
+      true
     ).then(() => {
       void blowoutOrDropTip(currentRoute, () => {
         const successStep =
@@ -128,13 +129,7 @@ export function ChooseLocation({
   }
 
   return (
-    <Flex
-      css={
-        modalStyle === 'simple'
-          ? CONTAINER_STYLE_SIMPLE
-          : CONTAINER_STYLE_INTERVENTION
-      }
-    >
+    <Flex css={buildContainerStyle(modalStyle, dropTipCommandLocations.length)}>
       <Flex css={OPTION_CONTAINER_STYLE}>
         <StyledText
           oddStyle="level4HeaderSemiBold"
@@ -168,6 +163,17 @@ export function ChooseLocation({
   )
 }
 
+// TODO(jh, 10-31-24): The numLocations logic is a hack to get around some unexpected ODD-specific CSS behavior in RadioButton.
+//  Investigate RadioButton ODD styling.
+const buildContainerStyle = (
+  modalStyle: DropTipModalStyle,
+  numLocations: number
+): FlattenSimpleInterpolation => {
+  return modalStyle === 'simple'
+    ? containerStyleSimple(numLocations)
+    : CONTAINER_STYLE_INTERVENTION
+}
+
 const CONTAINER_STYLE_BASE = `
   overflow: ${OVERFLOW_AUTO};
   flex-direction: ${DIRECTION_COLUMN};
@@ -181,12 +187,14 @@ const CONTAINER_STYLE_INTERVENTION = css`
   ${CONTAINER_STYLE_BASE}
 `
 
-const CONTAINER_STYLE_SIMPLE = css`
+const containerStyleSimple = (
+  numLocations: number
+): FlattenSimpleInterpolation => css`
   ${CONTAINER_STYLE_BASE}
   justify-content: ${JUSTIFY_SPACE_BETWEEN};
 
   @media ${RESPONSIVENESS.touchscreenMediaQuerySpecs} {
-    height: 80%;
+    height: ${numLocations >= 4 ? '80%' : '100%'};
     flex-grow: 0;
   }
 `

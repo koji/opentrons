@@ -1,15 +1,15 @@
-@import '@opentrons/components/styles';
+@import url('@opentrons/components/styles');
 
 .option_row {
   display: flex;
-  align-items: center;
   height: 2rem;
+  align-items: center;
 }
 
 .option_image {
   flex: 1;
-  object-fit: contain;
   padding-right: 1rem;
+  object-fit: contain;
 }
 
 .option_label {

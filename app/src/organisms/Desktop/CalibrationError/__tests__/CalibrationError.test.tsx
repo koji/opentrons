@@ -1,14 +1,15 @@
-import { describe, it, vi, expect, beforeEach } from 'vitest'
-import { screen, fireEvent } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
+
 import { CalibrationError } from '..'
 
 import type { ComponentProps } from 'react'
 
 describe('CalibrationError', () => {
-  let props: React.ComponentProps<typeof CalibrationError>
+  let props: ComponentProps<typeof CalibrationError>
 
   beforeEach(() => {
     props = {

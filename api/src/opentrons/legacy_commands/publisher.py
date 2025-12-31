@@ -59,9 +59,9 @@ def publish(command: CommandPayloadCreator) -> Callable[[FuncT], FuncT]:
 
             broker = getattr(args[0], "broker", None)
 
-            assert isinstance(
-                broker, LegacyBroker
-            ), "Only methods of CommandPublisher classes should be decorated."
+            assert isinstance(broker, LegacyBroker), (
+                "Only methods of CommandPublisher classes should be decorated."
+            )
 
             func_sig = _inspect_signature(func)
             bound_func_args = func_sig.bind(*args, **kwargs)
@@ -124,7 +124,7 @@ def publish_context(broker: LegacyBroker, command: CommandPayload) -> Iterator[N
         _do_publish(broker=broker, message_id=message_id, command=command, when="after")
 
 
-@functools.lru_cache(maxsize=None)
+@functools.lru_cache(maxsize=100)
 def _inspect_signature(func: Callable[..., Any]) -> inspect.Signature:
     """Inspect function signatures, memoized because it is called very often."""
     return inspect.signature(func)

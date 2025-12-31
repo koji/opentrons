@@ -1,13 +1,16 @@
-import type * as React from 'react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
+
 import { FileUpload } from '..'
+
+import type { ComponentProps } from 'react'
+
 import testFile from './test-file.png'
 
-const render = (props: React.ComponentProps<typeof FileUpload>) => {
+const render = (props: ComponentProps<typeof FileUpload>) => {
   return renderWithProviders(<FileUpload {...props} />, {
     i18nInstance: i18n,
   })[0]
@@ -16,7 +19,7 @@ const render = (props: React.ComponentProps<typeof FileUpload>) => {
 const handleClick = vi.fn()
 
 describe('FileUpload', () => {
-  let props: React.ComponentProps<typeof FileUpload>
+  let props: ComponentProps<typeof FileUpload>
 
   beforeEach(() => {
     const file = new File([testFile], 'a-file-to-test.png')

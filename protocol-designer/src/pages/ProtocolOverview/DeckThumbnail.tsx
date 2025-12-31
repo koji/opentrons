@@ -1,10 +1,12 @@
 import { Fragment, useMemo } from 'react'
 import { useSelector } from 'react-redux'
+
 import {
   ALIGN_CENTER,
   BORDERS,
   COLORS,
   DeckFromLayers,
+  FixedTrashText,
   Flex,
   FlexTrash,
   JUSTIFY_CENTER,
@@ -18,23 +20,27 @@ import {
 } from '@opentrons/components'
 import {
   FLEX_ROBOT_TYPE,
+  FLEX_STACKER_MODULE_TYPE,
   getCutoutIdForAddressableArea,
   getDeckDefFromRobotType,
+  getModuleType,
   isAddressableAreaStandardSlot,
   OT2_ROBOT_TYPE,
   STAGING_AREA_CUTOUTS,
   TRASH_BIN_ADAPTER_FIXTURE,
   WASTE_CHUTE_CUTOUT,
 } from '@opentrons/shared-data'
-import { getRobotType } from '../../file-data/selectors'
+
 import { getInitialDeckSetup } from '../../step-forms/selectors'
 import { DeckThumbnailDetails } from './DeckThumbnailDetails'
 
 import type { Dispatch, SetStateAction } from 'react'
 import type { StagingAreaLocation, TrashCutoutId } from '@opentrons/components'
-import type { CutoutId, DeckSlotId } from '@opentrons/shared-data'
+import type { CutoutId, DeckSlotId, RobotType } from '@opentrons/shared-data'
 import type { AdditionalEquipmentEntity } from '@opentrons/step-generation'
 
+const RIGHT_COLUMN_FIXTURE_PADDING = 50 // mm
+const FLEX_STACKER_FIXTURE_PADDING = 220 // mm
 const WASTE_CHUTE_SPACE = 30
 const OT2_STANDARD_DECK_VIEW_LAYER_BLOCK_LIST: string[] = [
   'calibrationMarkings',
@@ -48,16 +54,17 @@ const OT2_STANDARD_DECK_VIEW_LAYER_BLOCK_LIST: string[] = [
 ]
 
 const lightFill = COLORS.grey35
+const darkFill = COLORS.grey60
 
 interface DeckThumbnailProps {
   hoverSlot: DeckSlotId | null
   setHoverSlot: Dispatch<SetStateAction<string | null>>
+  robotType: RobotType
 }
 export function DeckThumbnail(props: DeckThumbnailProps): JSX.Element {
-  const { hoverSlot, setHoverSlot } = props
+  const { hoverSlot, setHoverSlot, robotType } = props
   const initialDeckSetup = useSelector(getInitialDeckSetup)
-  const robotType = useSelector(getRobotType)
-  const deckDef = useMemo(() => getDeckDefFromRobotType(robotType), [])
+  const deckDef = useMemo(() => getDeckDefFromRobotType(robotType), [robotType])
   const trash = Object.values(initialDeckSetup.additionalEquipmentOnDeck).find(
     ae => ae.name === 'trashBin'
   )
@@ -95,9 +102,18 @@ export function DeckThumbnail(props: DeckThumbnailProps): JSX.Element {
   const hasWasteChute =
     wasteChuteFixtures.length > 0 || wasteChuteStagingAreaFixtures.length > 0
 
+  const hasFlexStacker = Object.values(initialDeckSetup.modules).some(
+    module => getModuleType(module.model) === FLEX_STACKER_MODULE_TYPE
+  )
   const filteredAddressableAreas = deckDef.locations.addressableAreas.filter(
     aa => isAddressableAreaStandardSlot(aa.id, deckDef)
   )
+  const hasRightColumnFixtures =
+    stagingAreaFixtures.length + wasteChuteFixtures.length > 0 || hasFlexStacker
+  const rightColumnAdjustment = hasFlexStacker
+    ? FLEX_STACKER_FIXTURE_PADDING
+    : RIGHT_COLUMN_FIXTURE_PADDING
+
   return (
     <Flex
       width="100%"
@@ -106,7 +122,7 @@ export function DeckThumbnail(props: DeckThumbnailProps): JSX.Element {
       backgroundColor={
         robotType === OT2_ROBOT_TYPE ? COLORS.white : COLORS.grey10
       }
-      paddingY={robotType === FLEX_ROBOT_TYPE && SPACING.spacing24}
+      paddingY={robotType === FLEX_ROBOT_TYPE ? SPACING.spacing24 : undefined}
       borderRadius={BORDERS.borderRadius8}
     >
       <RobotCoordinateSpaceWithRef
@@ -117,15 +133,23 @@ export function DeckThumbnail(props: DeckThumbnailProps): JSX.Element {
           hasWasteChute
             ? deckDef.cornerOffsetFromOrigin[1] - WASTE_CHUTE_SPACE
             : deckDef.cornerOffsetFromOrigin[1]
-        } ${deckDef.dimensions[0]} ${deckDef.dimensions[1]}`}
+        } ${
+          hasRightColumnFixtures
+            ? deckDef.dimensions[0] + rightColumnAdjustment
+            : deckDef.dimensions[0]
+        } ${deckDef.dimensions[1]}`}
+        zoomed
       >
         {() => (
           <>
             {robotType === OT2_ROBOT_TYPE ? (
-              <DeckFromLayers
-                robotType={robotType}
-                layerBlocklist={OT2_STANDARD_DECK_VIEW_LAYER_BLOCK_LIST}
-              />
+              <>
+                <DeckFromLayers
+                  robotType={robotType}
+                  layerBlocklist={OT2_STANDARD_DECK_VIEW_LAYER_BLOCK_LIST}
+                />
+                <FixedTrashText />
+              </>
             ) : (
               <>
                 {filteredAddressableAreas.map(addressableArea => {
@@ -140,6 +164,7 @@ export function DeckThumbnail(props: DeckThumbnailProps): JSX.Element {
                       deckDefinition={deckDef}
                       showExpansion={cutoutId === 'cutoutA1'}
                       fixtureBaseColor={lightFill}
+                      slotClipColor={darkFill}
                     />
                   ) : null
                 })}
@@ -149,6 +174,7 @@ export function DeckThumbnail(props: DeckThumbnailProps): JSX.Element {
                     cutoutId={fixture.location as StagingAreaLocation}
                     deckDefinition={deckDef}
                     fixtureBaseColor={lightFill}
+                    slotClipColor={darkFill}
                   />
                 ))}
                 {trash != null
@@ -185,6 +211,7 @@ export function DeckThumbnail(props: DeckThumbnailProps): JSX.Element {
                     cutoutId={fixture.location as typeof WASTE_CHUTE_CUTOUT}
                     deckDefinition={deckDef}
                     fixtureBaseColor={lightFill}
+                    slotClipColor={darkFill}
                   />
                 ))}
               </>

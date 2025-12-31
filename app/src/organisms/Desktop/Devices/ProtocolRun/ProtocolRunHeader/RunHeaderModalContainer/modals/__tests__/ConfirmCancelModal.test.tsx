@@ -1,22 +1,25 @@
-import type * as React from 'react'
-import { when } from 'vitest-when'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { when } from 'vitest-when'
+
 import '@testing-library/jest-dom/vitest'
+
 import {
   RUN_STATUS_RUNNING,
-  RUN_STATUS_STOPPED,
   RUN_STATUS_STOP_REQUESTED,
+  RUN_STATUS_STOPPED,
 } from '@opentrons/api-client'
 import { useStopRunMutation } from '@opentrons/react-api-client'
 
-import { i18n } from '/app/i18n'
 import { renderWithProviders } from '/app/__testing-utils__'
+import { i18n } from '/app/i18n'
 import { useTrackProtocolRunEvent } from '/app/redux-resources/analytics'
 import { useIsFlex } from '/app/redux-resources/robots'
 import { useTrackEvent } from '/app/redux/analytics'
+
 import { ConfirmCancelModal } from '../ConfirmCancelModal'
 
+import type { ComponentProps } from 'react'
 import type * as ApiClient from '@opentrons/react-api-client'
 
 vi.mock('@opentrons/react-api-client', async importOriginal => {
@@ -30,7 +33,7 @@ vi.mock('/app/redux/analytics')
 vi.mock('/app/redux-resources/analytics')
 vi.mock('/app/redux-resources/robots')
 
-const render = (props: React.ComponentProps<typeof ConfirmCancelModal>) => {
+const render = (props: ComponentProps<typeof ConfirmCancelModal>) => {
   return renderWithProviders(<ConfirmCancelModal {...props} />, {
     i18nInstance: i18n,
   })[0]
@@ -43,7 +46,7 @@ let mockTrackProtocolRunEvent: any
 const ROBOT_NAME = 'otie'
 
 describe('ConfirmCancelModal', () => {
-  let props: React.ComponentProps<typeof ConfirmCancelModal>
+  let props: ComponentProps<typeof ConfirmCancelModal>
   beforeEach(() => {
     mockTrackEvent = vi.fn()
     mockStopRun = vi.fn((_runId, opts) => opts.onSuccess())

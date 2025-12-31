@@ -1,12 +1,14 @@
-import type * as React from 'react'
 import { screen } from '@testing-library/react'
-import { describe, it, beforeEach, vi } from 'vitest'
+import { beforeEach, describe, it, vi } from 'vitest'
+
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
+
 import { ProtocolLabwareDetails } from '../ProtocolLabwareDetails'
 
-import type { LoadLabwareRunTimeCommand } from '@opentrons/shared-data'
+import type { ComponentProps } from 'react'
 import type { InfoScreen } from '@opentrons/components'
+import type { LoadLabwareRunTimeCommand } from '@opentrons/shared-data'
 
 vi.mock('@opentrons/components', async importOriginal => {
   const actual = await importOriginal<typeof InfoScreen>()
@@ -67,17 +69,17 @@ const mockRequiredLabwareDetails = [
   } as LoadLabwareRunTimeCommand,
 ]
 
-const render = (props: React.ComponentProps<typeof ProtocolLabwareDetails>) => {
+const render = (props: ComponentProps<typeof ProtocolLabwareDetails>) => {
   return renderWithProviders(<ProtocolLabwareDetails {...props} />, {
     i18nInstance: i18n,
   })[0]
 }
 
 describe('ProtocolLabwareDetails', () => {
-  let props: React.ComponentProps<typeof ProtocolLabwareDetails>
+  let props: ComponentProps<typeof ProtocolLabwareDetails>
   beforeEach(() => {
     props = {
-      requiredLabwareDetails: mockRequiredLabwareDetails,
+      commands: mockRequiredLabwareDetails,
     }
   })
 
@@ -148,7 +150,7 @@ describe('ProtocolLabwareDetails', () => {
 
   it('should render mock infoscreen when no labware', () => {
     props = {
-      requiredLabwareDetails: [],
+      commands: [],
     }
     render(props)
     screen.getByText('mock InfoScreen')

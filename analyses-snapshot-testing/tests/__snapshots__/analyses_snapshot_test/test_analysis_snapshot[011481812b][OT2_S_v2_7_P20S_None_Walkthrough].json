@@ -1,4 +1,8 @@
 {
+  "commandAnnotations": [],
+  "commandPreconditions": {
+    "isCameraUsed": false
+  },
   "commands": [
     {
       "commandType": "home",
@@ -1161,7 +1165,13 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "1",
+            "kind": "onAddressableArea"
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -2313,7 +2323,13 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "2",
+            "kind": "onAddressableArea"
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -2347,9 +2363,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -2361,9 +2377,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 30.950000000000003,
-        "tipVolume": 20
+        "tipVolume": 20.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -2397,9 +2413,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -2431,9 +2447,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -2465,9 +2481,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -2499,9 +2515,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -2533,9 +2549,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -2567,9 +2583,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -2601,9 +2617,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -2635,9 +2651,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -2669,9 +2685,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -2703,9 +2719,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -2737,9 +2753,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -2771,9 +2787,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -2805,9 +2821,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -2839,9 +2855,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -2873,9 +2889,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -2907,9 +2923,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -2941,9 +2957,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -2975,9 +2991,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3009,9 +3025,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3058,9 +3074,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3092,9 +3108,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3141,9 +3157,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3175,9 +3191,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3209,9 +3225,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3242,9 +3258,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3275,9 +3291,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3309,9 +3325,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3342,9 +3358,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3375,9 +3391,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3409,9 +3425,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3442,9 +3458,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3472,11 +3488,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -3504,9 +3521,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -3518,9 +3535,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 30.950000000000003,
-        "tipVolume": 20
+        "tipVolume": 20.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -3554,9 +3571,9 @@
         "volume": 4.444444444444445,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3588,9 +3605,9 @@
         "volume": 6.666666666666667,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3637,9 +3654,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3671,9 +3688,9 @@
         "volume": 4.444444444444445,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3705,9 +3722,9 @@
         "volume": 6.666666666666667,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3754,9 +3771,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3788,9 +3805,9 @@
         "volume": 4.444444444444445,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3822,9 +3839,9 @@
         "volume": 6.666666666666667,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3871,9 +3888,9 @@
         "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3905,9 +3922,9 @@
         "volume": 1.6666666666666667,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3939,9 +3956,9 @@
         "volume": 2.5,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3973,9 +3990,9 @@
         "volume": 1.6666666666666667,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4007,9 +4024,9 @@
         "volume": 2.5,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4055,9 +4072,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4085,11 +4102,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -4117,9 +4135,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -4131,9 +4149,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 30.950000000000003,
-        "tipVolume": 20
+        "tipVolume": 20.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -4152,9 +4170,9 @@
         "volume": 1.6666666666666667,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4186,9 +4204,9 @@
         "volume": 1.6666666666666667,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4220,9 +4238,9 @@
         "volume": 1.6666666666666667,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4254,9 +4272,9 @@
         "volume": 1.6666666666666667,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4288,9 +4306,9 @@
         "volume": 1.6666666666666667,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4322,9 +4340,9 @@
         "volume": 1.6666666666666667,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4356,9 +4374,9 @@
         "volume": 1.6666666666666667,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4390,9 +4408,9 @@
         "volume": 1.6666666666666667,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4421,12 +4439,12 @@
         "flowRate": 15.12,
         "labwareId": "UUID",
         "pipetteId": "UUID",
-        "volume": 13.333333333333332,
+        "volume": 13.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4439,7 +4457,7 @@
           "y": 0.0,
           "z": 0.0
         },
-        "volume": 13.333333333333332
+        "volume": 13.333333333333334
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -4455,11 +4473,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -4487,9 +4506,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -4501,9 +4520,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 30.950000000000003,
-        "tipVolume": 20
+        "tipVolume": 20.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -4519,12 +4538,12 @@
         "flowRate": 15.12,
         "labwareId": "UUID",
         "pipetteId": "UUID",
-        "volume": 14.333333333333332,
+        "volume": 14.333333333333334,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4537,7 +4556,7 @@
           "y": 0.0,
           "z": 0.0
         },
-        "volume": 14.333333333333332
+        "volume": 14.333333333333334
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -4556,9 +4575,9 @@
         "volume": 1.6666666666666667,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4590,9 +4609,9 @@
         "volume": 1.6666666666666667,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4624,9 +4643,9 @@
         "volume": 1.6666666666666667,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4658,9 +4677,9 @@
         "volume": 1.6666666666666667,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4692,9 +4711,9 @@
         "volume": 1.6666666666666667,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4726,9 +4745,9 @@
         "volume": 1.6666666666666667,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4760,9 +4779,9 @@
         "volume": 1.6666666666666667,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4794,9 +4813,9 @@
         "volume": 1.6666666666666667,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4827,9 +4846,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4857,11 +4876,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -4887,12 +4907,7 @@
   },
   "createdAt": "TIMESTAMP",
   "errors": [],
-  "files": [
-    {
-      "name": "OT2_S_v2_7_P20S_None_Walkthrough.py",
-      "role": "main"
-    }
-  ],
+  "files": [],
   "labware": [
     {
       "definitionUri": "opentrons/opentrons_1_trash_1100ml_fixed/1",
@@ -4919,6 +4934,7 @@
       }
     }
   ],
+  "liquidClasses": [],
   "liquids": [],
   "metadata": {
     "apiLevel": "2.7",

@@ -1,29 +1,20 @@
 # opentrons robot server makefile
 
 include ../scripts/push.mk
-include ../scripts/python.mk
+include ../scripts/python-uv.mk
 
 SHX := npx shx
 REDOC := npx @redocly/cli
 
 # Path of source package
 SRC_PATH = robot_server
-
-# Project to get the version for
-ot_project := $(OPENTRONS_PROJECT)
-project_rs_default = $(if $(ot_project),$(ot_project),robot-stack)
-project_ir_default = $(if $(ot_project),$(ot_project),ot3)
-
+SCRIPTS_PATH = scripts
+TESTS_PATH = tests
 
 # Find the version of the wheel from git using a helper script. We
 # use python here so we can use the same version normalization that will be
 # used to create the wheel.
 wheel_file = dist/$(call python_get_wheelname,robot-server,$(project_rs_default),robot_server,$(BUILD_NUMBER))
-
-# Find the version of the sdist from git using a helper script. We
-# use python here so we can use the same version normalization that will be
-# used to create the sdist.
-sdist_file = dist/$(call python_get_sdistname,robot-server,$(project_rs_default),robot_server)
 
 # Find the branch, sha, version that will be used to update the VERSION.json file
 version_file = $(call python_get_git_version,robot-server,$(project_rs_default),robot_server)
@@ -36,7 +27,6 @@ tests ?= tests
 cov_opts ?= --cov=$(SRC_PATH) --cov-report term-missing:skip-covered --cov-report xml:coverage.xml
 test_opts ?=
 
-black_opts := --extend-exclude tests/integration/persistence_snapshots/
 
 # Host key location for robot
 ssh_key ?= $(default_ssh_key)
@@ -55,7 +45,6 @@ ot_sources := $(ot_py_sources)
 clean_cmd = $(SHX) rm -rf build .coverage coverage.xml '*.egg-info'
 clean_cache_cmd = $(SHX) rm -rf '**/__pycache__' '**/*.pyc' '**/.mypy_cache'
 clean_wheel_cmd = $(clean_cmd) dist/*.whl
-clean_sdist_cmd = $(clean_cmd) dist/*.tar.gz
 clean_all_cmd = $(clean_cmd) dist
 # Uvicorn command to run the robot server in dev mode.
 #
@@ -65,30 +54,35 @@ clean_all_cmd = $(clean_cmd) dist
 # todo(mm, 2021-07-08): Figure out how to run the server with Python development
 # mode enabled, to expose more errors and warnings.
 #   * Using a Makefile target-specific variable to set PYTHONDEVMODE=1
-#     doesn't work because it applies the variable to the whole `pipenv run`
+#     doesn't work because it applies the variable to the whole `uv run`
 #     command, and we only want our inner server process running under dev mode,
-#     not the outer pipenv process.
+#     not the outer uv process.
 #   * Adding PYTHONDEVMODE=1 to the .env file specified by
 #     OT_ROBOT_SERVER_DOT_ENV_PATH doesn't work because that's read too late.
-#   * Doing `pipenv run env PYTHONDEVMODE=1 uvicorn ...` works, except it's
+#   * Doing `uv run env PYTHONDEVMODE=1 uvicorn ...` works, except it's
 #     probably POSIX-only.
 dev_port ?= "31950"
 dev_host ?= "localhost"
-run_dev ?= uvicorn "robot_server.app:app" --host $(dev_host) --port $(dev_port) --ws wsproto --lifespan on --reload
+run_dev ?= uvicorn "robot_server.app:app" --host $(dev_host) --port $(dev_port) --ws wsproto --lifespan on --reload --reload-dir robot_server
 
 .PHONY: all
-all: clean sdist wheel
+all: clean wheel
+
+
 
 .PHONY: setup
 setup:
-	$(pipenv) sync $(pipenv_opts)
-	$(pipenv) run pip freeze
+	@$(uv_sync_dev)
+	@$(UV) pip list
+
+.PHONY: setup-py
+setup-py: setup
 
 .PHONY: setup-ot2
 setup-ot2:
-	$(pipenv) sync $(pipenv_opts)
-	$(pipenv) run pip uninstall -y python-can
-	$(pipenv) run pip freeze
+	@$(uv_sync_dev)
+	@$(UV) pip uninstall python-can
+	@$(UV) pip list
 
 .PHONY: clean
 clean:
@@ -97,21 +91,15 @@ clean:
 
 .PHONY: teardown
 teardown:
-	$(pipenv) --rm
+	$(SHX) rm -rf .venv
 
 .PHONY: wheel
-wheel: export OPENTRONS_PROJECT=$(project_rs_default)
-wheel: setup.py $(ot_sources)
+wheel: export OPENTRONS_PROJECT=$(PROJECT)
+wheel: export HATCH_VCS_TUNABLE_TAG_PATTERN=$(call git_tag_regex_for_project,$(PROJECT))
+wheel: export HATCH_VCS_TUNABLE_RAW_OPTIONS=$(call hatch_raw_options_for_project,$(PROJECT))
+wheel: $(ot_sources)
 	$(clean_wheel_cmd)
-	$(python) setup.py $(wheel_opts) bdist_wheel
-	$(SHX) rm -rf build
-	$(SHX) ls dist
-
-.PHONY: sdist
-sdist: export OPENTRONS_PROJECT=$(project_rs_default)
-sdist: setup.py $(ot_sources)
-	$(clean_sdist_cmd)
-	$(python) setup.py sdist
+	$(python) -m build --wheel .
 	$(SHX) rm -rf build
 	$(SHX) ls dist
 
@@ -123,19 +111,22 @@ test:
 test-cov:
 	$(pytest) $(tests) $(test_opts) $(cov_opts)
 
+.PHONY: test-fast
+test-fast:
+	$(pytest) $(tests) $(test_opts) -m 'not slow'
+
 .PHONY: lint
 lint:
-	$(python) -m mypy $(SRC_PATH) $(tests)
-	$(python) -m black $(black_opts) --check .
-	$(python) -m flake8 $(SRC_PATH) $(tests) setup.py
+	$(python) -m mypy $(SRC_PATH) $(SCRIPTS_PATH) $(TESTS_PATH)
+	$(ruff) check $(ruff_opts) .
 
 .PHONY: format
 format:
-	$(python) -m black $(black_opts) .
+	$(ruff) format $(ruff_opts) .
 
 .PHONY: _dev
 _dev:
-	$(pipenv) run $(run_dev)
+	$(UV) run $(run_dev)
 
 .PHONY: dev
 dev: dev-ot2
@@ -152,28 +143,28 @@ dev-ot2: _dev
 .PHONY: dev-with-emulator
 dev-with-emulator: export OT_ROBOT_SERVER_DOT_ENV_PATH ?= emulator.env
 dev-with-emulator:
-	$(pipenv) run $(run_dev)
+	$(UV) run $(run_dev)
 
 
 .PHONY: dev-with-ot3-emulator
 dev-with-ot3-emulator: export OT_ROBOT_SERVER_DOT_ENV_PATH ?= emulator_ot3.env
 dev-with-ot3-emulator:
-	$(pipenv) run $(run_dev)
+	$(UV) run $(run_dev)
 
 
 .PHONY: local-shell
 local-shell:
-	$(pipenv) shell
+	$(UV) shell
 
 .PHONY: push
 push: wheel
-	$(call push-python-package,$(host),$(ssh_key),$(ssh_opts),$(wheel_file))
+	$(call push-python,$(host),$(ssh_key),$(ssh_opts),$(wheel_file),/usr/lib/python3.10/site-packages/)
 	$(call push-systemd-unit,$(host),$(ssh_key),$(ssh_opts),./opentrons-robot-server.service)
 	$(call restart-service,$(host),$(ssh_key),$(ssh_opts),opentrons-robot-server)
 
 .PHONY: push-ot3
-push-ot3: sdist
-	$(call push-python-sdist,$(host),$(ssh_key),$(ssh_opts),$(sdist_file),"/opt/opentrons-robot-server","robot_server",,,$(version_file))
+push-ot3: wheel
+	$(call push-python,$(host),$(ssh_key),$(ssh_opts),$(wheel_file),/opt/opentrons-robot-server/)
 	$(call restart-service,$(host),$(ssh_key),$(ssh_opts),opentrons-robot-server)
 
 .PHONY: install-key

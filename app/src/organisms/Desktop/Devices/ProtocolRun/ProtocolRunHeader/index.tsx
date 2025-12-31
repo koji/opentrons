@@ -1,7 +1,8 @@
-import * as React from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { css } from 'styled-components'
 
+import { RUN_STATUS_IDLE, RUN_STATUS_RUNNING } from '@opentrons/api-client'
 import {
   BORDERS,
   COLORS,
@@ -10,28 +11,33 @@ import {
   SPACING,
 } from '@opentrons/components'
 import { useModulesQuery } from '@opentrons/react-api-client'
-import { RUN_STATUS_IDLE, RUN_STATUS_RUNNING } from '@opentrons/api-client'
 
+import { useInitializeCameraState } from '/app/local-resources/images/hooks/useInitializeCameraState'
+import { isCancellableStatus } from '/app/local-resources/runs/utils'
 import { useIsRobotViewable } from '/app/redux-resources/robots'
-import { RunProgressMeter } from '../../../RunProgressMeter'
+import { useRunGeneratedDataFiles } from '/app/resources/dataFiles/useRunGeneratedDataFiles'
 import {
+  DEFAULT_STATUS_REFETCH_INTERVAL,
+  useCloseCurrentRun,
   useNotifyRunQuery,
   useProtocolDetailsForRun,
-  useRunStatus,
 } from '/app/resources/runs'
-import { RunHeaderProtocolName } from './RunHeaderProtocolName'
+
+import { EQUIPMENT_POLL_MS } from '../../../../DoorOpenControl/constants'
+import { RunProgressMeter } from '../../../RunProgressMeter'
+import { useRunAnalytics, useRunErrors, useRunHeaderRunControls } from './hooks'
+import { RunHeaderBannerContainer } from './RunHeaderBannerContainer'
+import { RunHeaderContent } from './RunHeaderContent'
 import {
   RunHeaderModalContainer,
   useRunHeaderModalContainer,
 } from './RunHeaderModalContainer'
-import { RunHeaderBannerContainer } from './RunHeaderBannerContainer'
-import { useRunAnalytics, useRunErrors, useRunHeaderRunControls } from './hooks'
-import { RunHeaderContent } from './RunHeaderContent'
-import { EQUIPMENT_POLL_MS } from './constants'
-import { isCancellableStatus } from './utils'
+import { RunHeaderProtocolName } from './RunHeaderProtocolName'
+
+import type { RefObject } from 'react'
 
 export interface ProtocolRunHeaderProps {
-  protocolRunHeaderRef: React.RefObject<HTMLDivElement> | null
+  protocolRunHeaderRef: RefObject<HTMLDivElement> | null
   robotName: string
   runId: string
   makeHandleJumpToStep: (index: number) => () => void
@@ -44,10 +50,14 @@ export function ProtocolRunHeader(
 
   const navigate = useNavigate()
 
-  const { data: runRecord } = useNotifyRunQuery(runId, { staleTime: Infinity })
+  const { data: runRecord } = useNotifyRunQuery(runId, {
+    staleTime: Infinity,
+    refetchInterval: DEFAULT_STATUS_REFETCH_INTERVAL,
+  })
   const { protocolData } = useProtocolDetailsForRun(runId)
   const isRobotViewable = useIsRobotViewable(robotName)
-  const runStatus = useRunStatus(runId)
+  const runStatus = runRecord?.data.status ?? null
+
   const attachedModules =
     useModulesQuery({
       refetchInterval: EQUIPMENT_POLL_MS,
@@ -55,9 +65,10 @@ export function ProtocolRunHeader(
     })?.data?.data ?? []
   const runErrors = useRunErrors({
     runRecord: runRecord ?? null,
-    runStatus,
+    runStatus: runStatus,
     runId,
   })
+  const { closeCurrentRun, isClosingCurrentRun } = useCloseCurrentRun()
 
   const enteredER = runRecord?.data.hasEverEnteredErrorRecovery ?? false
   const protocolRunControls = useRunHeaderRunControls(runId, robotName)
@@ -68,9 +79,10 @@ export function ProtocolRunHeader(
     protocolRunControls,
     runRecord: runRecord ?? null,
     runErrors,
+    closeCurrentRun,
   })
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (protocolData != null && !isRobotViewable) {
       navigate('/devices')
     }
@@ -78,12 +90,14 @@ export function ProtocolRunHeader(
 
   // To persist "run again" loading conditions into a new run, we need a scalar that persists longer than
   // the runControl isResetRunLoading, which completes before we want to change user-facing copy/CTAs.
-  const isResetRunLoadingRef = React.useRef(false)
+  const isResetRunLoadingRef = useRef(false)
   if (runStatus === RUN_STATUS_IDLE || runStatus === RUN_STATUS_RUNNING) {
     isResetRunLoadingRef.current = false
   }
 
+  useInitializeCameraState(runId)
   useRunAnalytics({ runId, robotName, enteredER })
+  const outputFileIds = useRunGeneratedDataFiles(runId)
 
   return (
     <>
@@ -102,19 +116,18 @@ export function ProtocolRunHeader(
           isResetRunLoading={isResetRunLoadingRef.current}
           runErrors={runErrors}
           runHeaderModalContainerUtils={runHeaderModalContainerUtils}
-          hasDownloadableFiles={
-            runRecord?.data != null &&
-            'outputFileIds' in runRecord.data &&
-            runRecord.data.outputFileIds.length > 0
-          }
+          hasImages={outputFileIds.jpeg.length > 0}
+          hasCsvFiles={outputFileIds.csv.length > 0}
           {...props}
         />
         <RunHeaderContent
+          runRecord={runRecord ?? null}
           runStatus={runStatus}
           isResetRunLoadingRef={isResetRunLoadingRef}
           attachedModules={attachedModules}
           protocolRunControls={protocolRunControls}
           runHeaderModalContainerUtils={runHeaderModalContainerUtils}
+          isClosingCurrentRun={isClosingCurrentRun}
           {...props}
         />
         <RunProgressMeter {...props} />

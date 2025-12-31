@@ -1,22 +1,22 @@
-import type * as React from 'react'
-import { useDispatch } from 'react-redux'
 import { useTranslation } from 'react-i18next'
+import { useDispatch } from 'react-redux'
 
 import {
   ALIGN_CENTER,
   Box,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
 import { ToggleButton } from '/app/atoms/buttons'
 import { updateSetting } from '/app/redux/robot-settings'
 
-import type { Dispatch } from '/app/redux/types'
+import type { MouseEventHandler } from 'react'
 import type { RobotSettingsField } from '/app/redux/robot-settings/types'
+import type { Dispatch } from '/app/redux/types'
 
 interface UseOlderAspirateBehaviorProps {
   settings: RobotSettingsField | undefined
@@ -34,7 +34,7 @@ export function UseOlderAspirateBehavior({
   const value = settings?.value ? settings.value : false
   const id = settings?.id ? settings.id : 'useOldAspirationFunctions'
 
-  const handleClick: React.MouseEventHandler<Element> = () => {
+  const handleClick: MouseEventHandler<Element> = () => {
     if (!isRobotBusy) {
       dispatch(updateSetting(robotName, id, !value))
     }
@@ -50,7 +50,7 @@ export function UseOlderAspirateBehavior({
         >
           {t('use_older_aspirate')}
         </LegacyStyledText>
-        <LegacyStyledText as="p">
+        <LegacyStyledText forwardedAs="p">
           {t('use_older_aspirate_description')}
         </LegacyStyledText>
       </Box>

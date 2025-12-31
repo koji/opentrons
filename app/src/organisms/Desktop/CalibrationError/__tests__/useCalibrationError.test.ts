@@ -1,9 +1,9 @@
-import { describe, it, vi, expect, beforeEach, afterEach } from 'vitest'
-import { renderHook } from '@testing-library/react'
 import { useDispatch, useSelector } from 'react-redux'
+import { renderHook } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { getRequests, dismissAllRequests } from '/app/redux/robot-api'
 import { useCalibrationError } from '/app/organisms/Desktop/CalibrationError'
+import { dismissAllRequests, getRequests } from '/app/redux/robot-api'
 
 vi.mock('react-redux', () => ({
   useDispatch: vi.fn(),
@@ -75,7 +75,7 @@ describe('useCalibrationError', () => {
       useCalibrationError(mockRequestIds, mockSessionId)
     )
     expect(result.current).toEqual({
-      title: 'robot_calibration:error',
+      title: 'error',
       subText: 'Test Message',
     })
   })
@@ -92,8 +92,8 @@ describe('useCalibrationError', () => {
       useCalibrationError(mockRequestIds, mockSessionId)
     )
     expect(result.current).toEqual({
-      title: 'robot_calibration:error',
-      subText: 'branded:unexpected_error',
+      title: 'error',
+      subText: 'unexpected_error',
     })
   })
 })

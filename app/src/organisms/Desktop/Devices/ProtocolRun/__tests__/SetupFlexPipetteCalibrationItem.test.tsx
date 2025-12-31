@@ -1,16 +1,18 @@
-import type * as React from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, beforeEach, vi, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, it, vi } from 'vitest'
 
 import { useInstrumentsQuery } from '@opentrons/react-api-client'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { useMostRecentCompletedAnalysis } from '/app/resources/runs'
 import { PipetteWizardFlows } from '/app/organisms/PipetteWizardFlows'
-import { SetupFlexPipetteCalibrationItem } from '../SetupFlexPipetteCalibrationItem'
+import { useMostRecentCompletedAnalysis } from '/app/resources/runs'
 import { modifiedSimpleV6Protocol as _uncastedModifiedSimpleV6Protocol } from '/app/resources/runs/__fixtures__'
+
+import { SetupFlexPipetteCalibrationItem } from '../SetupFlexPipetteCalibrationItem'
+
+import type { ComponentProps } from 'react'
 import type { CompletedProtocolAnalysis } from '@opentrons/shared-data'
 
 vi.mock('@opentrons/react-api-client')
@@ -19,7 +21,7 @@ vi.mock('/app/resources/runs')
 vi.mock('/app/resources/analysis')
 
 const RUN_ID = '1'
-const modifiedSimpleV6Protocol = ({
+const modifiedSimpleV6Protocol = {
   ..._uncastedModifiedSimpleV6Protocol,
   pipettes: [
     {
@@ -27,15 +29,13 @@ const modifiedSimpleV6Protocol = ({
       pipetteName: 'p10_single',
     },
   ],
-} as any) as CompletedProtocolAnalysis
+} as any as CompletedProtocolAnalysis
 
 describe('SetupFlexPipetteCalibrationItem', () => {
   const render = ({
     mount = 'left',
     runId = RUN_ID,
-  }: Partial<
-    React.ComponentProps<typeof SetupFlexPipetteCalibrationItem>
-  > = {}) => {
+  }: Partial<ComponentProps<typeof SetupFlexPipetteCalibrationItem>> = {}) => {
     return renderWithProviders(
       <MemoryRouter>
         <SetupFlexPipetteCalibrationItem

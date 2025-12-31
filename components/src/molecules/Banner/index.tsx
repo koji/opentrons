@@ -1,16 +1,18 @@
-import type * as React from 'react'
 import { css } from 'styled-components'
-import { Btn, Flex } from '../../primitives'
-import { Icon } from '../../icons'
+
 import { BORDERS, COLORS } from '../../helix-design-system'
-import { RESPONSIVENESS, SPACING, TYPOGRAPHY } from '../../ui-style-constants'
+import { Icon } from '../../icons'
+import { Btn, Flex } from '../../primitives'
 import {
   ALIGN_CENTER,
   DIRECTION_ROW,
   JUSTIFY_SPACE_BETWEEN,
 } from '../../styles'
-import type { StyleProps } from '../../primitives'
+import { RESPONSIVENESS, SPACING, TYPOGRAPHY } from '../../ui-style-constants'
+
+import type { MouseEvent, MouseEventHandler, ReactNode } from 'react'
 import type { IconProps } from '../../icons'
+import type { StyleProps } from '../../primitives'
 
 export type BannerType =
   | 'success'
@@ -23,15 +25,15 @@ export interface BannerProps extends StyleProps {
   /** name constant of the icon to display */
   type: BannerType
   /** Banner contents */
-  children?: React.ReactNode
+  children?: ReactNode
   /** optional handler to show close button/clear alert  */
-  onCloseClick?: (() => void) | React.MouseEventHandler<HTMLButtonElement>
+  onCloseClick?: (() => void) | MouseEventHandler<HTMLButtonElement>
   /** Override the default Alert Icon */
   icon?: IconProps
   /** some banner onCloseClicks fire events, this allows a spinner after click but before event finishes */
   isCloseActionLoading?: boolean
   /** Override the Exit icon */
-  closeButton?: React.ReactNode
+  closeButton?: ReactNode
   /** Icon margin right for large banners */
   iconMarginRight?: string
   /** Icon margin left for large banners */
@@ -48,12 +50,12 @@ const BANNER_PROPS_BY_TYPE: Record<
     color: COLORS.green60,
   },
   error: {
-    icon: { name: 'alert-circle' },
+    icon: { name: 'ot-alert' },
     backgroundColor: COLORS.red30,
     color: COLORS.red60,
   },
   warning: {
-    icon: { name: 'alert-circle' },
+    icon: { name: 'ot-alert' },
     backgroundColor: COLORS.yellow30,
     color: COLORS.yellow60,
   },
@@ -112,7 +114,7 @@ export function Banner(props: BannerProps): JSX.Element {
       justifyContent={JUSTIFY_SPACE_BETWEEN}
       alignItems={ALIGN_CENTER}
       padding={padding ?? SPACING.spacing8}
-      onClick={(e: React.MouseEvent) => {
+      onClick={(e: MouseEvent) => {
         e.stopPropagation()
       }}
       data-testid={`Banner_${type}`}

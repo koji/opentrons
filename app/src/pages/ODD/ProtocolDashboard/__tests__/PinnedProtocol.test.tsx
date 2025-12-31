@@ -1,20 +1,22 @@
-import type * as React from 'react'
-import { vi, it, describe, expect, beforeEach } from 'vitest'
-import { act, fireEvent, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import { fireEvent, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { COLORS, TYPOGRAPHY } from '@opentrons/components'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 import { useFeatureFlag } from '/app/redux/config'
+
 import { PinnedProtocol } from '../PinnedProtocol'
 
-import type { Chip } from '@opentrons/components'
-import type { ProtocolResource } from '@opentrons/shared-data'
+import type { ComponentProps } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
+import type { UseLongPressResult } from '@opentrons/components'
+import type { ProtocolResource } from '@opentrons/shared-data'
 
 const mockNavigate = vi.fn()
+const mockUseLongPress = vi.hoisted(() => vi.fn())
 
 vi.mock('react-router-dom', async importOriginal => {
   const actual = await importOriginal<NavigateFunction>()
@@ -23,14 +25,15 @@ vi.mock('react-router-dom', async importOriginal => {
     useNavigate: () => mockNavigate,
   }
 })
-vi.mock('@opentrons/components', async importOriginal => {
-  const actual = await importOriginal<typeof Chip>()
+vi.mock('/app/redux/config')
+vi.mock('@opentrons/components', async () => {
+  const actual = await vi.importActual('@opentrons/components')
   return {
     ...actual,
     Chip: () => <div>mock Chip</div>,
+    useLongPress: () => mockUseLongPress(),
   }
 })
-vi.mock('/app/redux/config')
 
 const mockProtocol: ProtocolResource = {
   id: 'mockProtocol1',
@@ -50,7 +53,7 @@ const mockProtocol: ProtocolResource = {
   key: '26ed5a82-502f-4074-8981-57cdda1d066d',
 }
 
-const render = (props: React.ComponentProps<typeof PinnedProtocol>) => {
+const render = (props: ComponentProps<typeof PinnedProtocol>) => {
   return renderWithProviders(
     <MemoryRouter>
       <PinnedProtocol {...props} />
@@ -62,10 +65,23 @@ const render = (props: React.ComponentProps<typeof PinnedProtocol>) => {
 }
 
 describe('Pinned Protocol', () => {
-  let props: React.ComponentProps<typeof PinnedProtocol>
+  let props: ComponentProps<typeof PinnedProtocol>
+  let mockLongPress: UseLongPressResult
   vi.useFakeTimers()
 
   beforeEach(() => {
+    mockLongPress = {
+      isLongPressed: false,
+      isTapped: false,
+      isEnabled: true,
+      ref: { current: null },
+      style: { touchAction: 'none' },
+      setIsLongPressed: vi.fn(),
+      setIsTapped: vi.fn(),
+      enable: vi.fn(),
+      disable: vi.fn(),
+    }
+    mockUseLongPress.mockReturnValue(mockLongPress)
     props = {
       protocol: mockProtocol,
       longPress: vi.fn(),
@@ -123,13 +139,8 @@ describe('Pinned Protocol', () => {
   })
 
   it('should display modal after long click', async () => {
-    vi.useFakeTimers()
+    mockLongPress.isLongPressed = true
     render(props)
-    const name = screen.getByText('yay mock protocol')
-    fireEvent.mouseDown(name)
-    act(() => {
-      vi.advanceTimersByTime(1005)
-    })
     expect(props.longPress).toHaveBeenCalled()
     screen.getByText('Run protocol')
     // This should ne "Unpin protocol" but I don't know how to pass state into the render

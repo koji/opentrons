@@ -1,20 +1,23 @@
-import type * as React from 'react'
 import { screen } from '@testing-library/react'
-import { describe, it, beforeEach, vi } from 'vitest'
+import { beforeEach, describe, it, vi } from 'vitest'
+
+import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 import { getIsOnDevice } from '/app/redux/config'
-import { renderWithProviders } from '/app/__testing-utils__'
+
 import { InProgressModal } from '../InProgressModal'
+
+import type { ComponentProps } from 'react'
 
 vi.mock('/app/redux/config')
 
-const render = (props: React.ComponentProps<typeof InProgressModal>) => {
+const render = (props: ComponentProps<typeof InProgressModal>) => {
   return renderWithProviders(<InProgressModal {...props} />, {
     i18nInstance: i18n,
   })[0]
 }
 describe('InProgressModal', () => {
-  let props: React.ComponentProps<typeof InProgressModal>
+  let props: ComponentProps<typeof InProgressModal>
   beforeEach(() => {
     vi.mocked(getIsOnDevice).mockReturnValue(false)
   })

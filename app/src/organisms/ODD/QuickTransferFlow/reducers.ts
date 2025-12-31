@@ -1,9 +1,10 @@
 import { CONSOLIDATE, DISTRIBUTE, TRANSFER } from './constants'
+
 import type {
-  QuickTransferWizardState,
+  QuickTransferSummaryAction,
   QuickTransferSummaryState,
   QuickTransferWizardAction,
-  QuickTransferSummaryAction,
+  QuickTransferWizardState,
   TransferType,
 } from './types'
 
@@ -89,6 +90,31 @@ export function quickTransferWizardReducer(
         volume: action.volume,
       }
     }
+    case 'SET_PIPETTE_PATH': {
+      return {
+        ...state,
+        path: action.path,
+      }
+    }
+
+    case 'SET_CHANGE_TIP': {
+      return {
+        ...state,
+        changeTip: action.changeTip,
+      }
+    }
+    case 'SET_DROP_TIP_LOCATION': {
+      return {
+        ...state,
+        dropTipLocation: action.location,
+      }
+    }
+    case 'SET_LIQUID_CLASS': {
+      return {
+        ...state,
+        liquidClassName: action.liquidClassName,
+      }
+    }
   }
 }
 
@@ -110,19 +136,9 @@ export function quickTransferSummaryReducer(
       }
     }
     case 'SET_PIPETTE_PATH': {
-      if (action.path === 'multiDispense') {
-        return {
-          ...state,
-          path: action.path,
-          disposalVolume: action.disposalVolume,
-          blowOut: action.blowOutLocation,
-        }
-      } else {
-        return {
-          ...state,
-          path: action.path,
-          disposalVolume: undefined,
-        }
+      return {
+        ...state,
+        path: action.path,
       }
     }
     case 'SET_ASPIRATE_TIP_POSITION': {
@@ -149,10 +165,23 @@ export function quickTransferSummaryReducer(
         delayAspirate: action.delaySettings,
       }
     }
+    case 'SET_SUBMERGE_ASPIRATE': {
+      return {
+        ...state,
+        submergeAspirate: action.submergeSettings,
+      }
+    }
+    case 'SET_RETRACT_ASPIRATE': {
+      return {
+        ...state,
+        retractAspirate: action.retractSettings,
+      }
+    }
     case 'SET_TOUCH_TIP_ASPIRATE': {
       return {
         ...state,
         touchTipAspirate: action.position,
+        touchTipAspirateSpeed: action.touchTipAspirateSpeed,
       }
     }
     case 'SET_AIR_GAP_ASPIRATE': {
@@ -179,16 +208,29 @@ export function quickTransferSummaryReducer(
         delayDispense: action.delaySettings,
       }
     }
+    case 'SET_SUBMERGE_DISPENSE': {
+      return {
+        ...state,
+        submergeDispense: action.submergeSettings,
+      }
+    }
+    case 'SET_RETRACT_DISPENSE': {
+      return {
+        ...state,
+        retractDispense: action.retractSettings,
+      }
+    }
     case 'SET_TOUCH_TIP_DISPENSE': {
       return {
         ...state,
         touchTipDispense: action.position,
+        touchTipDispenseSpeed: action.touchTipDispenseSpeed,
       }
     }
     case 'SET_BLOW_OUT': {
       return {
         ...state,
-        blowOut: action.location,
+        blowOutDispense: action.blowOutSettings,
       }
     }
     case 'SET_AIR_GAP_DISPENSE': {
@@ -207,6 +249,30 @@ export function quickTransferSummaryReducer(
       return {
         ...state,
         dropTipLocation: action.location,
+      }
+    }
+    case 'SET_PUSH_OUT': {
+      return {
+        ...state,
+        pushOutDispense: action.pushOutSettings,
+      }
+    }
+    case 'SET_CONDITION_ASPIRATE': {
+      return {
+        ...state,
+        conditionAspirate: action.conditionAspirate,
+      }
+    }
+    case 'SET_DISPOSAL_VOLUME_DISPENSE': {
+      return {
+        ...state,
+        disposalVolumeDispenseSettings: action.disposalVolumeDispenseSettings,
+      }
+    }
+    case 'SET_LIQUID_CLASS_VALUES': {
+      return {
+        ...state,
+        ...action.liquidClassValues,
       }
     }
   }

@@ -1,5 +1,5 @@
-import type * as React from 'react'
 import { Controller } from 'react-hook-form'
+
 import {
   CheckboxField,
   DIRECTION_COLUMN,
@@ -10,13 +10,15 @@ import {
   SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
+
 import styles from './styles.module.css'
 
+import type { ReactNode } from 'react'
 import type { Control } from 'react-hook-form'
 import type { DisplayFieldProps, DisplayQuirkFieldProps } from './ConfigForm'
 
 export interface FormColumnProps {
-  children: React.ReactNode
+  children: ReactNode
 }
 
 export function FormColumn(props: FormColumnProps): JSX.Element {
@@ -65,7 +67,7 @@ export function ConfigFormGroup(props: ConfigFormGroupProps): JSX.Element {
 export interface ConfigFormRowProps {
   label: string
   labelFor: string
-  children: React.ReactNode
+  children: ReactNode
 }
 
 const FIELD_ID_PREFIX = '__PipetteConfig__'
@@ -79,7 +81,7 @@ export function ConfigFormRow(props: ConfigFormRowProps): JSX.Element {
       paddingBottom={SPACING.spacing4}
     >
       <LegacyStyledText
-        as="label"
+        forwardedAs="label"
         id={props.labelFor}
         paddingBottom={SPACING.spacing8}
         fontWeight={TYPOGRAPHY.fontWeightSemiBold}

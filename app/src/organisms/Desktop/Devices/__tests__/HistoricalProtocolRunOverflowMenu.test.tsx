@@ -1,28 +1,36 @@
-import type * as React from 'react'
-import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, vi, beforeEach, expect } from 'vitest'
-import { when } from 'vitest-when'
 import { MemoryRouter } from 'react-router-dom'
+import NiceModal from '@ebay/nice-modal-react'
+import { fireEvent, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { when } from 'vitest-when'
 
-import { useDeleteRunMutation } from '@opentrons/react-api-client'
+import {
+  useDeleteRunImages,
+  useDeleteRunMutation,
+} from '@opentrons/react-api-client'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { mockConnectableRobot } from '/app/redux/discovery/__fixtures__'
-import runRecord from '../ProtocolRun/ProtocolRunHeader/RunHeaderModalContainer/modals/__fixtures__/runRecord.json'
-import { useDownloadRunLog } from '../hooks'
-import { useRobot } from '/app/redux-resources/robots'
-import { useTrackProtocolRunEvent } from '/app/redux-resources/analytics'
 import { useRunControls } from '/app/organisms/RunTimeControl'
 import {
-  useTrackEvent,
+  useCameraAnalytics,
+  useTrackProtocolRunEvent,
+} from '/app/redux-resources/analytics'
+import { useRobot } from '/app/redux-resources/robots'
+import {
   ANALYTICS_PROTOCOL_PROCEED_TO_RUN,
+  useTrackEvent,
 } from '/app/redux/analytics'
+import { mockConnectableRobot } from '/app/redux/discovery/__fixtures__'
 import { useIsRobotOnWrongVersionOfSoftware } from '/app/redux/robot-update'
 import { useIsEstopNotDisengaged } from '/app/resources/devices'
-import { HistoricalProtocolRunOverflowMenu } from '../HistoricalProtocolRunOverflowMenu'
 import { useNotifyAllCommandsQuery } from '/app/resources/runs'
 
+import { HistoricalProtocolRunOverflowMenu } from '../HistoricalProtocolRunOverflowMenu'
+import { useDownloadRunLog } from '../hooks'
+import runRecord from '../ProtocolRun/ProtocolRunHeader/RunHeaderModalContainer/modals/__fixtures__/runRecord.json'
+
+import type { ComponentProps } from 'react'
 import type { UseQueryResult } from 'react-query'
 import type { CommandsData } from '@opentrons/api-client'
 
@@ -40,12 +48,14 @@ vi.mock('/app/redux-resources/analytics')
 vi.mock('@opentrons/react-api-client')
 
 const render = (
-  props: React.ComponentProps<typeof HistoricalProtocolRunOverflowMenu>
+  props: ComponentProps<typeof HistoricalProtocolRunOverflowMenu>
 ) => {
   return renderWithProviders(
-    <MemoryRouter>
-      <HistoricalProtocolRunOverflowMenu {...props} />
-    </MemoryRouter>,
+    <NiceModal.Provider>
+      <MemoryRouter>
+        <HistoricalProtocolRunOverflowMenu {...props} />
+      </MemoryRouter>
+    </NiceModal.Provider>,
     {
       i18nInstance: i18n,
     }
@@ -56,10 +66,11 @@ const RUN_ID = 'id'
 const ROBOT_NAME = 'otie'
 let mockTrackEvent: any
 let mockTrackProtocolRunEvent: any
+const mockDeleteRunImages = vi.fn().mockResolvedValue(undefined)
 const mockDownloadRunLog = vi.fn()
 
 describe('HistoricalProtocolRunOverflowMenu', () => {
-  let props: React.ComponentProps<typeof HistoricalProtocolRunOverflowMenu>
+  let props: ComponentProps<typeof HistoricalProtocolRunOverflowMenu>
   beforeEach(() => {
     mockTrackEvent = vi.fn()
     vi.mocked(useTrackEvent).mockReturnValue(mockTrackEvent)
@@ -100,18 +111,26 @@ describe('HistoricalProtocolRunOverflowMenu', () => {
         },
         { staleTime: Infinity }
       )
-      .thenReturn(({
+      .thenReturn({
         data: { data: runRecord.data.commands, meta: { totalLength: 14 } },
-      } as unknown) as UseQueryResult<CommandsData>)
+      } as unknown as UseQueryResult<CommandsData>)
     when(useIsEstopNotDisengaged).calledWith(ROBOT_NAME).thenReturn(false)
     props = {
       runId: RUN_ID,
       robotName: ROBOT_NAME,
       robotIsBusy: false,
+      runHasImages: true,
     }
     when(vi.mocked(useRobot))
       .calledWith(ROBOT_NAME)
       .thenReturn(mockConnectableRobot)
+
+    vi.mocked(useDeleteRunImages).mockReturnValue({
+      mutateAsync: mockDeleteRunImages,
+    } as any)
+    vi.mocked(useCameraAnalytics).mockReturnValue({
+      reportPhotoAccessUsage: vi.fn(),
+    } as any)
   })
 
   it('renders the correct menu when a runId is present', () => {
@@ -183,5 +202,21 @@ describe('HistoricalProtocolRunOverflowMenu', () => {
     when(useIsEstopNotDisengaged).calledWith(ROBOT_NAME).thenReturn(true)
     render(props)
     expect(screen.getByRole('button')).toBeDisabled()
+  })
+
+  it('correctly renders the clear run images flow when images are present', () => {
+    render(props)
+
+    const btn = screen.getByRole('button')
+    fireEvent.click(btn)
+
+    const overFlowBtn = screen.getByText('Clear run images')
+    fireEvent.click(overFlowBtn)
+
+    screen.getByText('Cancel')
+    const modalDeleteBtn = screen.getByText('Clear images')
+    fireEvent.click(modalDeleteBtn)
+
+    expect(mockDeleteRunImages).toHaveBeenCalled()
   })
 })

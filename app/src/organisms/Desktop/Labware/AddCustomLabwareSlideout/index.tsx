@@ -1,24 +1,28 @@
+import { Trans, useTranslation } from 'react-i18next'
 import { useDispatch } from 'react-redux'
-import { useTranslation, Trans } from 'react-i18next'
+
 import {
   ALIGN_CENTER,
   COLORS,
   DIRECTION_COLUMN,
   Flex,
+  LegacyStyledText,
   Link,
   SPACING,
-  LegacyStyledText,
 } from '@opentrons/components'
-import {
-  addCustomLabwareFile,
-  addCustomLabware,
-} from '/app/redux/custom-labware'
+
 import { Slideout } from '/app/atoms/Slideout'
-import {
-  useTrackEvent,
-  ANALYTICS_ADD_CUSTOM_LABWARE,
-} from '/app/redux/analytics'
 import { UploadInput } from '/app/molecules/UploadInput'
+import {
+  ANALYTICS_ADD_CUSTOM_LABWARE,
+  useTrackEvent,
+} from '/app/redux/analytics'
+import {
+  addCustomLabware,
+  addCustomLabwareFile,
+} from '/app/redux/custom-labware'
+import { remote } from '/app/redux/shell/remote'
+
 import type { Dispatch } from '/app/redux/types'
 
 export interface AddCustomLabwareSlideoutProps {
@@ -46,7 +50,9 @@ export function AddCustomLabwareSlideout(
       >
         <UploadInput
           onUpload={(file: File) => {
-            dispatch(addCustomLabwareFile(file.path))
+            void remote.getFilePathFrom(file).then(filePath => {
+              dispatch(addCustomLabwareFile(filePath))
+            })
           }}
           onClick={() => {
             dispatch(addCustomLabware())
@@ -57,7 +63,7 @@ export function AddCustomLabwareSlideout(
           }}
           uploadText={t('choose_file_to_upload')}
           dragAndDropText={
-            <LegacyStyledText as="p">
+            <LegacyStyledText forwardedAs="p">
               <Trans
                 t={t}
                 i18nKey="shared:drag_and_drop"

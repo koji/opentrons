@@ -1,4 +1,3 @@
-import type * as React from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -9,14 +8,16 @@ import {
   Flex,
   Icon,
   JUSTIFY_CENTER,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
+import type { ReactNode } from 'react'
+
 interface ErrorUpdateSoftwareProps {
   errorMessage: string
-  children: React.ReactNode
+  children: ReactNode
 }
 export function ErrorUpdateSoftware({
   errorMessage,
@@ -46,13 +47,16 @@ export function ErrorUpdateSoftware({
           alignItems={ALIGN_CENTER}
         >
           <LegacyStyledText
-            as="h2"
+            forwardedAs="h2"
             fontWeight={TYPOGRAPHY.fontWeightBold}
             color={COLORS.black90}
           >
             {t('software_update_error')}
           </LegacyStyledText>
-          <LegacyStyledText as="h3" fontWeight={TYPOGRAPHY.fontWeightRegular}>
+          <LegacyStyledText
+            forwardedAs="h3"
+            fontWeight={TYPOGRAPHY.fontWeightRegular}
+          >
             {errorMessage}
           </LegacyStyledText>
         </Flex>

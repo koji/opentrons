@@ -23,6 +23,9 @@ All :ref:`building block <v2-atomic-commands>` and :ref:`complex commands <v2-co
 
 To keep the protocol API consistent when using single- and multi-channel pipettes, location arguments of pipetting commands use the pipette's *primary channel*. For multi-channel pipettes picking up tips with all of their channels, the back-left channel is considered primary. When using fewer channels, the ``start`` parameter of the :py:meth:`.InstrumentContext.configure_nozzle_layout` method can change the pipette's primary channel. See :ref:`partial-tip-pickup` for more information.
 
+.. note::
+    Complex commands with liquid classes, like :py:meth:`.transfer_with_liquid_class`, handle multi-channel movement differently. By default, they expect a list of *all wells* that the pipette will access. If you want to only provide the wells that the primary channel will access, set ``group_wells=False`` when using those commands.
+
 With a pipette's default settings, you can generally access the wells indicated in the table below. Moving to any other well may cause the pipette to crash.
 
 .. list-table::
@@ -184,29 +187,32 @@ These flow rates will remain in effect until you change the ``flow_rate`` attrib
 Flex Pipette Flow Rates
 -----------------------
 
-Flex pipette flow rates depend on pipette volume and tip capacity. Each pipette–tip combination has a default flow rate for aspirating, dispensing, and blowing out liquid. When using a 50 µL pipette, you should only use 50 µL tips.
+The following table provides data on the default aspirate, dispense, and blowout flow rates (in µL/s) for Flex pipettes. Default flow rates for each pipette-tip combination are the same across all three actions.
 
-.. list-table::
-    :header-rows: 1
-    
-    * - Pipette Model
-      - Tip Capacity (µL)
-      - Flow Rate (µL/s)
-    * - 50 µL (1- and 8-channel)
-      - 50
-      - 57
-    * - 1000 µL (1-, 8-, and 96-channel)
-      - 50
-      - 478
-    * - 1000 µL (1-, 8-, and 96-channel)
-      - 200
-      - 716
-    * - 1000 µL (1-, 8-, and 96-channel)
-      - 1000
-      - 716
+.. Excludes low-vol 96 channel. Not yet released.
 
++-----------------------------+-------------------+--------------------------+
+| Pipette Model               | Tip Capacity (µL) | Default Flow Rate (µL/s) |
++=============================+===================+==========================+
+| 1- and 8-channel (50 µL)    | 50                | 35                       |
++-----------------------------+-------------------+--------------------------+
+| 1- and 8-channel (1000 µL)  | 50                | 478                      |
++                             +-------------------+--------------------------+
+|                             | 200               | 716                      |
++                             +-------------------+--------------------------+
+|                             | 1000              | 716                      |
++-----------------------------+-------------------+--------------------------+
+| 96-channel (5-1000 µL)      | 50                | 6                        |
++                             +-------------------+--------------------------+
+|                             | 200               | 80                       |
++                             +-------------------+--------------------------+
+|                             | 1000              | 160                      |
++-----------------------------+-------------------+--------------------------+
 
-Additionally, all Flex pipettes have a well bottom clearance of 1 mm for aspirate and dispense actions.
+Additionally:
+
+- When using a 50 µL pipette, you should only use 50 µL tips.
+- All Flex pipettes have a well bottom clearance of 1 mm for aspirate and dispense actions.
 
 .. _ot2-flow-rates:
 

@@ -1,16 +1,18 @@
 import { css } from 'styled-components'
+
 import {
   DIRECTION_COLUMN,
   Flex,
+  RESPONSIVENESS,
   SPACING,
   StyledText,
-  RESPONSIVENESS,
 } from '@opentrons/components'
 
-import { RecoverySingleColumnContentWrapper } from './RecoveryContentWrapper'
 import { TwoColumn } from '/app/molecules/InterventionModal'
-import { RecoveryFooterButtons } from './RecoveryFooterButtons'
+
 import { FailedStepNextStep } from './FailedStepNextStep'
+import { RecoverySingleColumnContentWrapper } from './RecoveryContentWrapper'
+import { RecoveryFooterButtons } from './RecoveryFooterButtons'
 
 import type { RecoveryContentProps } from '../types'
 
@@ -71,7 +73,11 @@ export function TwoColTextAndFailedStepNextStep(
             leftColBodyText
           )}
         </Flex>
-        <FailedStepNextStep {...props} />
+        {!props.stepCounts.hasRunDiverged ? (
+          <FailedStepNextStep {...props} />
+        ) : (
+          <Flex />
+        )}
       </TwoColumn>
       <RecoveryFooterButtons
         primaryBtnOnClick={primaryBtnOnClick}

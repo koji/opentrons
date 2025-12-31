@@ -3,16 +3,17 @@
 Actions can be passed to the ActionDispatcher, where they will trigger
 reactions in objects that subscribe to the pipeline, like the StateStore.
 """
+
 import dataclasses
 from datetime import datetime
-from enum import Enum
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Tuple
 
-from opentrons.protocols.models import LabwareDefinition
+from opentrons_shared_data.util import StrEnum
+from opentrons_shared_data.errors import EnumeratedError
+from opentrons_shared_data.labware.labware_definition import LabwareDefinition
+
 from opentrons.hardware_control.types import DoorState
 from opentrons.hardware_control.modules import LiveData
-
-from opentrons_shared_data.errors import EnumeratedError
 
 from ..commands import (
     Command,
@@ -20,14 +21,16 @@ from ..commands import (
     CommandDefinedErrorData,
 )
 from ..error_recovery_policy import ErrorRecoveryPolicy, ErrorRecoveryType
+from ..errors import ErrorOccurrence
 from ..notes.notes import CommandNote
 from ..state.update_types import StateUpdate
+from ..resources.camera_provider import CameraSettings
 from ..types import (
-    LabwareOffsetCreate,
+    LabwareOffsetCreateInternal,
     ModuleDefinition,
     Liquid,
     DeckConfigurationType,
-    AddressableAreaLocation,
+    Task,
 )
 
 
@@ -38,7 +41,7 @@ class PlayAction:
     requested_at: datetime
 
 
-class PauseSource(str, Enum):
+class PauseSource(StrEnum):
     """The source of a PauseAction.
 
     Attributes:
@@ -61,7 +64,7 @@ class PauseAction:
 class StopAction:
     """Request engine execution to stop soon."""
 
-    from_estop: bool = False
+    from_asynchronous_error: bool = False
 
 
 @dataclasses.dataclass(frozen=True)
@@ -110,6 +113,7 @@ class DoorChangeAction:
     """Handle events coming in from hardware control."""
 
     door_state: DoorState
+    module_serial: str | None = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -202,12 +206,28 @@ class FailCommandAction:
 
 
 @dataclasses.dataclass(frozen=True)
+class StartTaskAction:
+    """Store new task in state."""
+
+    task: Task
+
+
+@dataclasses.dataclass(frozen=True)
+class FinishTaskAction:
+    """Mark task as finished in state."""
+
+    task_id: str
+    finished_at: datetime
+    error: ErrorOccurrence | None
+
+
+@dataclasses.dataclass(frozen=True)
 class AddLabwareOffsetAction:
     """Add a labware offset, to apply to subsequent `LoadLabwareCommand`s."""
 
     labware_offset_id: str
     created_at: datetime
-    request: LabwareOffsetCreate
+    request: LabwareOffsetCreateInternal
 
 
 @dataclasses.dataclass(frozen=True)
@@ -215,6 +235,26 @@ class AddLabwareDefinitionAction:
     """Add a labware definition, to apply to subsequent `LoadLabwareCommand`s."""
 
     definition: LabwareDefinition
+
+
+@dataclasses.dataclass(frozen=True)
+class AddCameraSettingsAction:
+    """Add Camera settings to be used in place of the Camera Provider accessible settings."""
+
+    enablement_settings: CameraSettings
+
+
+@dataclasses.dataclass(frozen=True)
+class AddCameraCaptureImageSettingsAction:
+    """Add Camera capture image settings to be used in place of the system default settings."""
+
+    camera_id: Optional[str] = None
+    resolution: Optional[Tuple[int, int]] = None
+    zoom: Optional[float] = None
+    pan: Optional[Tuple[int, int]] = None
+    contrast: Optional[float] = None
+    brightness: Optional[float] = None
+    saturation: Optional[float] = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -235,12 +275,12 @@ class SetDeckConfigurationAction:
 class AddAddressableAreaAction:
     """Add a single addressable area to state.
 
-    This differs from the deck configuration in ProvideDeckConfigurationAction which
+    This differs from the deck configuration in SetDeckConfigurationAction which
     sends over a mapping of cutout fixtures. This action will only load one addressable
     area and that should be pre-validated before being sent via the action.
     """
 
-    addressable_area: AddressableAreaLocation
+    addressable_area_name: str
 
 
 @dataclasses.dataclass(frozen=True)
@@ -254,13 +294,6 @@ class AddModuleAction:
 
 
 @dataclasses.dataclass(frozen=True)
-class ResetTipsAction:
-    """Reset the tip tracking state of a given tip rack."""
-
-    labware_id: str
-
-
-@dataclasses.dataclass(frozen=True)
 class SetPipetteMovementSpeedAction:
     """Set the speed of a pipette's X/Y/Z movements. Does not affect plunger speed.
 
@@ -269,17 +302,6 @@ class SetPipetteMovementSpeedAction:
 
     pipette_id: str
     speed: Optional[float]
-
-
-@dataclasses.dataclass(frozen=True)
-class AddAbsorbanceReaderLidAction:
-    """Add the absorbance reader lid id to the absorbance reader module substate.
-
-    This action is dispatched the absorbance reader module is first loaded.
-    """
-
-    module_id: str
-    lid_id: str
 
 
 @dataclasses.dataclass(frozen=True)
@@ -304,11 +326,13 @@ Action = Union[
     AddLabwareOffsetAction,
     AddLabwareDefinitionAction,
     AddModuleAction,
+    AddCameraSettingsAction,
+    AddCameraCaptureImageSettingsAction,
     SetDeckConfigurationAction,
     AddAddressableAreaAction,
     AddLiquidAction,
-    ResetTipsAction,
     SetPipetteMovementSpeedAction,
-    AddAbsorbanceReaderLidAction,
     SetErrorRecoveryPolicyAction,
+    StartTaskAction,
+    FinishTaskAction,
 ]

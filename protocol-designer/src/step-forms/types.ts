@@ -1,24 +1,21 @@
 import type { Mount } from '@opentrons/components'
 import type {
-  ModuleType,
+  CutoutId,
+  FlexModuleCutoutFixtureId,
   ModuleModel,
-  MAGNETIC_MODULE_TYPE,
-  TEMPERATURE_MODULE_TYPE,
-  THERMOCYCLER_MODULE_TYPE,
-  HEATERSHAKER_MODULE_TYPE,
-  MAGNETIC_BLOCK_TYPE,
-  ABSORBANCE_READER_TYPE,
+  ModuleType,
   NozzleConfigurationStyle,
 } from '@opentrons/shared-data'
+import type {
+  AdditionalEquipmentEntity,
+  LabwareEntity,
+  ModuleEntity,
+  ModuleTemporalProperties,
+  PipetteEntity,
+  TOUCHED_PIPETTABLE_LABWARE,
+} from '@opentrons/step-generation'
 import type { DeckSlot } from '../types'
 
-import type {
-  TemperatureStatus,
-  ModuleEntity,
-  PipetteEntity,
-  LabwareEntity,
-  AdditionalEquipmentEntity,
-} from '@opentrons/step-generation'
 export interface FormPipette {
   pipetteName?: string | null
   tiprackDefURI?: string[] | null
@@ -32,49 +29,13 @@ export interface FormModule {
   model: ModuleModel
   type: ModuleType
   slot: DeckSlot
+  cutoutFixtureId: FlexModuleCutoutFixtureId | null
+  cutoutId: CutoutId | null
 }
 export type FormModules = Record<number, FormModule>
 export type ModuleEntities = Record<string, ModuleEntity>
 // NOTE: semi-redundant 'type' key in FooModuleState types is required for Flow to disambiguate 'moduleState'
-export interface MagneticModuleState {
-  type: typeof MAGNETIC_MODULE_TYPE
-  engaged: boolean
-}
-export interface TemperatureModuleState {
-  type: typeof TEMPERATURE_MODULE_TYPE
-  status: TemperatureStatus
-  targetTemperature: number | null
-}
-export interface ThermocyclerModuleState {
-  type: typeof THERMOCYCLER_MODULE_TYPE
-  blockTargetTemp: number | null
-  // null means block is deactivated
-  lidTargetTemp: number | null
-  // null means lid is deactivated
-  lidOpen: boolean | null // if false, closed. If null, unknown
-}
-export interface HeaterShakerModuleState {
-  type: typeof HEATERSHAKER_MODULE_TYPE
-  targetTemp: number | null
-  targetSpeed: number | null
-  latchOpen: boolean | null
-}
-export interface MagneticBlockState {
-  type: typeof MAGNETIC_BLOCK_TYPE
-}
-export interface AbsorbanceReaderState {
-  type: typeof ABSORBANCE_READER_TYPE
-}
-export interface ModuleTemporalProperties {
-  slot: DeckSlot
-  moduleState:
-    | MagneticModuleState
-    | TemperatureModuleState
-    | ThermocyclerModuleState
-    | HeaterShakerModuleState
-    | MagneticBlockState
-    | AbsorbanceReaderState
-}
+
 export type ModuleOnDeck = ModuleEntity & ModuleTemporalProperties
 export type ModulesForEditModulesCard = Partial<
   Record<ModuleType, ModuleOnDeck[] | null | undefined>
@@ -84,13 +45,19 @@ export type NormalizedLabwareById = Record<
   string,
   {
     labwareDefURI: string
+    pythonName: string
+    displayCategory: string
   }
 >
-export type NormalizedLabware = NormalizedLabwareById[keyof NormalizedLabwareById]
+export type NormalizedLabware =
+  NormalizedLabwareById[keyof NormalizedLabwareById]
 // =========== TEMPORAL ONLY =====
 // Temporal properties (eg location) that are time-variant
 export interface LabwareTemporalProperties {
-  slot: DeckSlot
+  stack: string[] // a stack of ids from top to bottom
+  // we currently use this property only to track if a lid has been placed on a "pipettable" labware that could presumably contain liquid
+  // we can expand this type in the future to track other types of sterility for various labware types
+  sterility?: typeof TOUCHED_PIPETTABLE_LABWARE
 }
 export interface PipetteTemporalProperties {
   mount: Mount

@@ -1,28 +1,26 @@
 import { getIsTiprack } from '@opentrons/shared-data'
-import { uuid } from '../../utils'
+import { getSlotInLocationStack } from '@opentrons/step-generation'
+
+import { getRobotType } from '../../file-data/selectors'
 import { selectors as labwareDefSelectors } from '../../labware-defs'
 import { selectors as stepFormSelectors } from '../../step-forms'
+import { getLabwareEntities } from '../../step-forms/selectors'
 import { selectors as uiLabwareSelectors } from '../../ui/labware'
+import { getLabwarePythonName, uuid } from '../../utils'
 import { getNextAvailableDeckSlot, getNextNickname } from '../utils'
-import { getRobotType } from '../../file-data/selectors'
-import {
-  selectNestedLabware,
-  selectLabware,
-  selectModule,
-  selectFixture,
-} from './actions'
-import type { LabwareOnDeck, ModuleOnDeck } from '../../step-forms'
-import type {
-  CreateContainerArgs,
-  CreateContainerAction,
-  DuplicateLabwareAction,
-  SelectNestedLabwareAction,
-  SelectLabwareAction,
-  SelectModuleAction,
-  SelectFixtureAction,
-} from './actions'
+
+import type { LabwareEntities } from '@opentrons/step-generation'
+import type { NormalizedLabware, NormalizedLabwareById } from '../../step-forms'
+import type { UpdateStackerModuleStateAction } from '../../step-forms/actions/modules'
 import type { ThunkAction } from '../../types'
-import type { Fixture } from '../types'
+import type {
+  CreateContainerAction,
+  CreateContainerArgs,
+  DeleteContainerAction,
+  DuplicateLabwareAction,
+  OpenIngredientSelectorAction,
+  ZoomedIntoSlotAction,
+} from './actions'
 
 export interface RenameLabwareAction {
   type: 'RENAME_LABWARE'
@@ -33,14 +31,16 @@ export interface RenameLabwareAction {
 }
 export const renameLabware: (
   args: RenameLabwareAction['payload']
-) => ThunkAction<CreateContainerAction | RenameLabwareAction> = args => (
-  dispatch,
-  getState
-) => {
+) => ThunkAction<
+  | CreateContainerAction
+  | RenameLabwareAction
+  | ZoomedIntoSlotAction
+  | OpenIngredientSelectorAction
+  | UpdateStackerModuleStateAction
+> = args => (dispatch, getState) => {
   const { labwareId } = args
-  const allNicknamesById = uiLabwareSelectors.getLabwareNicknamesById(
-    getState()
-  )
+  const allNicknamesById =
+    uiLabwareSelectors.getLabwareNicknamesById(getState())
   const defaultNickname = allNicknamesById[labwareId]
   const nextNickname = getNextNickname(
     // NOTE: flow won't do Object.values here >:(
@@ -59,160 +59,196 @@ export const renameLabware: (
 }
 export const createContainer: (
   args: CreateContainerArgs
-) => ThunkAction<CreateContainerAction | RenameLabwareAction> = args => (
-  dispatch,
-  getState
-) => {
+) => ThunkAction<
+  | CreateContainerAction
+  | RenameLabwareAction
+  | ZoomedIntoSlotAction
+  | OpenIngredientSelectorAction
+  | UpdateStackerModuleStateAction
+> = args => (dispatch, getState) => {
+  const { labwareDefURIStack, slot, updateSelectedLabwareId, uuids } = args
   const state = getState()
   const initialDeckSetup = stepFormSelectors.getInitialDeckSetup(state)
   const robotType = getRobotType(state)
-  const labwareDef = labwareDefSelectors.getLabwareDefsByURI(state)[
-    args.labwareDefURI
-  ]
-  const slot =
-    args.slot ||
-    getNextAvailableDeckSlot(initialDeckSetup, robotType, labwareDef)
-  const isTiprack = getIsTiprack(labwareDef)
+  const labwareDefForOt2HS =
+    labwareDefSelectors.getLabwareDefsByURI(state)[labwareDefURIStack[0]]
+  const availableSlot =
+    slot ||
+    getNextAvailableDeckSlot(initialDeckSetup, robotType, labwareDefForOt2HS)
+  if (availableSlot) {
+    let currentSlot = availableSlot
+    labwareDefURIStack.forEach((labwareUri, index) => {
+      const lwUuid =
+        uuids != null && uuids.length > index ? uuids[index] : uuid()
+      const id = `${lwUuid}:${labwareUri}`
+      const labwareDef =
+        labwareDefSelectors.getLabwareDefsByURI(state)[labwareUri]
+      const labwareDisplayCategory = labwareDef.metadata.displayCategory
+      const isTiprack = getIsTiprack(labwareDef)
 
-  if (slot) {
-    const id = `${uuid()}:${args.labwareDefURI}`
-    const adapterId =
-      args.adapterUnderLabwareDefURI != null
-        ? `${uuid()}:${args.adapterUnderLabwareDefURI}`
-        : null
-
-    if (adapterId != null && args.adapterUnderLabwareDefURI != null) {
       dispatch({
         type: 'CREATE_CONTAINER',
         payload: {
-          ...args,
-          labwareDefURI: args.adapterUnderLabwareDefURI,
-          id: adapterId,
-          slot,
-        },
-      })
-      dispatch({
-        type: 'CREATE_CONTAINER',
-        payload: {
-          ...args,
           id,
-          slot: adapterId,
+          labwareDefURI: labwareUri,
+          slot: currentSlot,
+          displayCategory: labwareDisplayCategory,
         },
       })
-    } else {
-      dispatch({
-        type: 'CREATE_CONTAINER',
-        payload: { ...args, id, slot },
-      })
-    }
-    if (isTiprack) {
-      // Tipracks cannot be named, but should auto-increment.
-      // We can't rely on reducers to do that themselves bc they don't have access
-      // to both the nickname state and the isTiprack condition
-      renameLabware({
-        labwareId: id,
-      })(dispatch, getState)
-    }
+
+      // If the user wants to update the selected labware id,
+      // we do not have the option to return the created id, so we need to open the ingredient selector manually.
+      if (updateSelectedLabwareId) {
+        dispatch({
+          type: 'OPEN_INGREDIENT_SELECTOR',
+          payload: id,
+        })
+      }
+
+      if (isTiprack) {
+        // Tipracks cannot be named, but should auto-increment.
+        // We can't rely on reducers to do that themselves bc they don't have access
+        // to both the nickname state and the isTiprack condition
+        renameLabware({
+          labwareId: id,
+        })(dispatch, getState)
+      }
+
+      if (availableSlot === 'offDeck') {
+        dispatch({
+          type: 'ZOOMED_INTO_SLOT',
+          payload: { slot: id, cutout: null },
+        })
+      }
+      currentSlot = id
+    })
   } else {
     console.warn('no slots available, cannot create labware')
   }
 }
 
 export const duplicateLabware: (
-  templateLabwareId: string
-) => ThunkAction<DuplicateLabwareAction> = templateLabwareId => (
-  dispatch,
-  getState
-) => {
-  const state = getState()
-  const robotType = state.fileData.robotType
-  const templateLabwareDefURI = stepFormSelectors.getLabwareEntities(state)[
-    templateLabwareId
-  ].labwareDefURI
-  console.assert(
-    templateLabwareDefURI,
-    `no labwareDefURI for labware ${templateLabwareId}, cannot run duplicateLabware thunk`
-  )
-  const initialDeckSetup = stepFormSelectors.getInitialDeckSetup(state)
-  const templateLabwareIdIsOffDeck =
-    initialDeckSetup.labware[templateLabwareId].slot === 'offDeck'
-  const labwareDef = labwareDefSelectors.getLabwareDefsByURI(state)[
-    templateLabwareDefURI
-  ]
-  const duplicateSlot = getNextAvailableDeckSlot(
-    initialDeckSetup,
-    robotType,
-    labwareDef
-  )
-  if (duplicateSlot == null && !templateLabwareIdIsOffDeck) {
-    console.error('no slots available, cannot duplicate labware')
-  }
-  const allNicknamesById = uiLabwareSelectors.getLabwareNicknamesById(state)
-  const templateNickname = allNicknamesById[templateLabwareId]
-  const duplicateLabwareNickname = getNextNickname(
-    Object.keys(allNicknamesById).map((id: string) => allNicknamesById[id]), // NOTE: flow won't do Object.values here >:(
-    templateNickname
-  )
-  const duplicateLabwareId = uuid() + ':' + templateLabwareDefURI
+  templateLabwareIds: string[]
+) => ThunkAction<DuplicateLabwareAction> =
+  templateLabwareIds => (dispatch, getState) => {
+    const state = getState()
+    const robotType = state.fileData.robotType
+    const labwareEntities = stepFormSelectors.getLabwareEntities(state)
+    const labwareDefsByURI = labwareDefSelectors.getLabwareDefsByURI(state)
+    const initialDeckSetup = stepFormSelectors.getInitialDeckSetup(state)
+    const allNicknamesById = uiLabwareSelectors.getLabwareNicknamesById(state)
 
-  if (templateLabwareDefURI) {
-    if (templateLabwareIdIsOffDeck) {
+    const templateLabwareDefURIs = templateLabwareIds.map(
+      id => labwareEntities[id]?.labwareDefURI
+    )
+
+    console.assert(
+      !templateLabwareDefURIs.some(uri => uri == null),
+      'Missing labwareDefURI for one or more templateLabwareIds:',
+      templateLabwareIds
+    )
+
+    // determine if duplicating off-deck
+    const firstTemplateId = templateLabwareIds[0]
+    const firstLabwareStack = initialDeckSetup.labware[firstTemplateId].stack
+    const isOffDeck = getSlotInLocationStack(firstLabwareStack) === 'offDeck'
+
+    const firstLabwareDefURI = templateLabwareDefURIs[0] as string
+    const labwareDef = labwareDefsByURI[firstLabwareDefURI]
+    const displayCategory = labwareDef?.metadata?.displayCategory
+
+    const templateSlot = isOffDeck
+      ? 'offDeck'
+      : getNextAvailableDeckSlot(initialDeckSetup, robotType, labwareDef)
+
+    //  ensure templateSlot is not null
+    if (templateSlot == null) {
+      console.error('no slots available, cannot duplicate labware')
+      return
+    }
+
+    const duplicateNicknames = templateLabwareIds.map(id => {
+      const templateNickname = allNicknamesById[id]
+      return getNextNickname(Object.values(allNicknamesById), templateNickname)
+    })
+
+    let slot: string = templateSlot as string
+    templateLabwareIds.reverse().forEach((templateLabwareId, index) => {
+      const defURI = labwareEntities[templateLabwareId].labwareDefURI
+      const duplicateLabwareId = `${uuid()}:${defURI}`
+
       dispatch({
         type: 'DUPLICATE_LABWARE',
         payload: {
-          duplicateLabwareNickname,
+          duplicateLabwareNickname: duplicateNicknames[index],
           templateLabwareId,
           duplicateLabwareId,
-          slot: 'offDeck',
+          slot,
+          displayCategory,
         },
+      })
+
+      if (!isOffDeck) {
+        slot = duplicateLabwareId
+      }
+    })
+  }
+
+export interface EditMultipleLabwareAction {
+  type: 'EDIT_MULTIPLE_LABWARE_PYTHON_NAME'
+  payload: NormalizedLabwareById
+}
+
+interface DeleteContainerArgs {
+  labwareId: string
+}
+export const deleteContainer: (
+  args: DeleteContainerArgs
+) => ThunkAction<DeleteContainerAction | EditMultipleLabwareAction> =
+  args => (dispatch, getState) => {
+    const { labwareId } = args
+    const state = getState()
+    const labwareEntities = getLabwareEntities(state)
+    const displayCategory =
+      labwareEntities[labwareId].def.metadata.displayCategory
+    const labwareOfSameCategory: LabwareEntities = Object.fromEntries(
+      Object.entries(labwareEntities).filter(
+        ([_, labware]) =>
+          labware.def.metadata.displayCategory === displayCategory
+      )
+    )
+    const typeCount = Object.keys(labwareOfSameCategory).length
+
+    dispatch({
+      type: 'DELETE_CONTAINER',
+      payload: {
+        labwareId,
+      },
+    })
+
+    if (typeCount > 1) {
+      const { [labwareId]: _, ...remainingLabwareEntities } =
+        labwareOfSameCategory
+
+      const updatedLabwarePythonName: NormalizedLabwareById = Object.keys(
+        remainingLabwareEntities
+      )
+        .sort()
+        .reduce<Record<string, NormalizedLabware>>(
+          (acc: NormalizedLabwareById, oldId, index) => {
+            acc[oldId] = {
+              ...remainingLabwareEntities[oldId],
+              pythonName: getLabwarePythonName(displayCategory, index + 1),
+              displayCategory,
+            }
+            return acc
+          },
+          {}
+        )
+
+      dispatch({
+        type: 'EDIT_MULTIPLE_LABWARE_PYTHON_NAME',
+        payload: updatedLabwarePythonName,
       })
     }
   }
-  if (duplicateSlot != null && !templateLabwareIdIsOffDeck) {
-    dispatch({
-      type: 'DUPLICATE_LABWARE',
-      payload: {
-        duplicateLabwareNickname,
-        templateLabwareId,
-        duplicateLabwareId,
-        slot: duplicateSlot,
-      },
-    })
-  }
-}
-
-interface EditSlotInfo {
-  createdModuleForSlot?: ModuleOnDeck | null
-  createdLabwareForSlot?: LabwareOnDeck | null
-  createdNestedLabwareForSlot?: LabwareOnDeck | null
-  preSelectedFixture?: Fixture | null
-}
-
-export const editSlotInfo: (
-  args: EditSlotInfo
-) => ThunkAction<
-  | SelectNestedLabwareAction
-  | SelectLabwareAction
-  | SelectModuleAction
-  | SelectFixtureAction
-> = args => dispatch => {
-  const {
-    createdModuleForSlot,
-    createdLabwareForSlot,
-    createdNestedLabwareForSlot,
-    preSelectedFixture,
-  } = args
-
-  dispatch(
-    selectNestedLabware({
-      nestedLabwareDefUri: createdNestedLabwareForSlot?.labwareDefURI ?? null,
-    })
-  )
-  dispatch(
-    selectLabware({
-      labwareDefUri: createdLabwareForSlot?.labwareDefURI ?? null,
-    })
-  )
-  dispatch(selectModule({ moduleModel: createdModuleForSlot?.model ?? null }))
-  dispatch(selectFixture({ fixture: preSelectedFixture ?? null }))
-}

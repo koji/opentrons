@@ -1,43 +1,47 @@
 // Deck Calibration Orchestration Component
-import * as React from 'react'
+import { useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from 'react-query'
 
+import {
+  ModalShell,
+  useConditionalConfirm,
+  WizardHeader,
+} from '@opentrons/components'
 import { useHost } from '@opentrons/react-api-client'
 import { getPipetteModelSpecs } from '@opentrons/shared-data'
-import { useConditionalConfirm, ModalShell } from '@opentrons/components'
 
-import * as Sessions from '/app/redux/sessions'
-import {
-  Introduction,
-  DeckSetup,
-  TipPickUp,
-  TipConfirmation,
-  SaveZPoint,
-  SaveXYPoint,
-  ConfirmExit,
-  LoadingState,
-  CompleteConfirmation,
-} from '/app/organisms/Desktop/CalibrationPanels'
-import { WizardHeader } from '/app/molecules/WizardHeader'
 import { getTopPortalEl } from '/app/App/portal'
 import {
   CalibrationError,
   useCalibrationError,
 } from '/app/organisms/Desktop/CalibrationError'
+import {
+  CompleteConfirmation,
+  ConfirmExit,
+  DeckSetup,
+  Introduction,
+  LoadingState,
+  SaveXYPoint,
+  SaveZPoint,
+  TipConfirmation,
+  TipPickUp,
+} from '/app/organisms/Desktop/CalibrationPanels'
+import * as Sessions from '/app/redux/sessions'
 
+import type { ComponentType } from 'react'
 import type { Mount } from '@opentrons/components'
+import type { CalibrationPanelProps } from '/app/organisms/Desktop/CalibrationPanels/types'
 import type {
   CalibrationLabware,
   CalibrationSessionStep,
   SessionCommandParams,
 } from '/app/redux/sessions/types'
-import type { CalibrationPanelProps } from '/app/organisms/Desktop/CalibrationPanels/types'
 import type { CalibrateDeckParentProps } from './types'
 
 const PANEL_BY_STEP: Partial<
-  Record<CalibrationSessionStep, React.ComponentType<CalibrationPanelProps>>
+  Record<CalibrationSessionStep, ComponentType<CalibrationPanelProps>>
 > = {
   [Sessions.DECK_STEP_SESSION_STARTED]: Introduction,
   [Sessions.DECK_STEP_LABWARE_LOADED]: DeckSetup,
@@ -89,7 +93,7 @@ export function CalibrateDeck({
 
   const errorInfo = useCalibrationError(requestIds, session?.id)
 
-  const isMulti = React.useMemo(() => {
+  const isMulti = useMemo(() => {
     const spec = instrument && getPipetteModelSpecs(instrument.model)
     return spec ? spec.channels > 1 : false
   }, [instrument])

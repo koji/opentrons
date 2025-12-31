@@ -1,24 +1,25 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 
 import { SetupInstructionsModal } from '../SetupInstructionsModal'
 
+import type { ComponentProps } from 'react'
+
 const mockSetShowSetupInstructionsModal = vi.fn()
 const QR_CODE_IMAGE_FILE =
   '/app/src/assets/images/on-device-display/setup_instructions_qr_code.png'
 
-const render = (props: React.ComponentProps<typeof SetupInstructionsModal>) => {
+const render = (props: ComponentProps<typeof SetupInstructionsModal>) => {
   return renderWithProviders(<SetupInstructionsModal {...props} />, {
     i18nInstance: i18n,
   })
 }
 
 describe('SetupInstructionsModal', () => {
-  let props: React.ComponentProps<typeof SetupInstructionsModal>
+  let props: ComponentProps<typeof SetupInstructionsModal>
 
   beforeEach(() => {
     props = {

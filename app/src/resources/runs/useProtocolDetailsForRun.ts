@@ -1,17 +1,18 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import last from 'lodash/last'
-import { FLEX_ROBOT_TYPE } from '@opentrons/shared-data'
+
 import {
-  useProtocolQuery,
   useProtocolAnalysisAsDocumentQuery,
+  useProtocolQuery,
 } from '@opentrons/react-api-client'
+import { FLEX_ROBOT_TYPE } from '@opentrons/shared-data'
 
 import { useNotifyRunQuery } from './useNotifyRunQuery'
 
 import type {
-  RobotType,
   CompletedProtocolAnalysis,
   PendingProtocolAnalysis,
+  RobotType,
 } from '@opentrons/shared-data'
 
 const ANALYSIS_POLL_MS = 5000
@@ -29,10 +30,8 @@ export function useProtocolDetailsForRun(
 ): ProtocolDetails {
   const { data: runRecord } = useNotifyRunQuery(runId, { staleTime: Infinity })
   const protocolId = runRecord?.data?.protocolId ?? null
-  const [
-    isPollingProtocolAnalyses,
-    setIsPollingProtocolAnalyses,
-  ] = useState<boolean>(true)
+  const [isPollingProtocolAnalyses, setIsPollingProtocolAnalyses] =
+    useState<boolean>(true)
 
   const { data: protocolRecord } = useProtocolQuery(protocolId, {
     staleTime: Infinity,
@@ -66,7 +65,7 @@ export function useProtocolDetailsForRun(
     robotType:
       protocolRecord?.data.robotType ??
       (mostRecentAnalysis?.status === 'completed'
-        ? mostRecentAnalysis?.robotType ?? FLEX_ROBOT_TYPE
+        ? (mostRecentAnalysis?.robotType ?? FLEX_ROBOT_TYPE)
         : FLEX_ROBOT_TYPE),
     isQuickTransfer: protocolRecord?.data.protocolKind === 'quick-transfer',
   }

@@ -10,8 +10,8 @@ on:
       - 'Makefile'
       - 'api/**'
       - 'g-code-testing/**'
-      - 'scripts/**/*.mk'
-      - 'scripts/**/*.py'
+      - 'scripts/**.mk'
+      - 'scripts/**.py'
       - '.github/workflows/g-code-testing-lint-test.yaml'
       - '.github/actions/python/**'
     branches:
@@ -23,8 +23,8 @@ on:
       - 'Makefile'
       - 'g-code-testing/**'
       - 'api/**'
-      - 'scripts/**/*.mk'
-      - 'scripts/**/*.py'
+      - 'scripts/**.mk'
+      - 'scripts/**.py'
       - '.github/workflows/g-code-testing-lint-test.yaml'
       - '.github/actions/python/**'
   workflow_dispatch:
@@ -40,9 +40,9 @@ defaults:
 jobs:
   lint-test:
     name: 'g-code-testing package linting and tests'
-    runs-on: 'ubuntu-22.04'
+    runs-on: 'ubuntu-24.04'
     steps:
-      - uses: 'actions/checkout@v3'
+      - uses: 'actions/checkout@v4'
         with:
           fetch-depth: 0
       - name: 'install udev'
@@ -50,9 +50,9 @@ jobs:
           # WORKAROUND: Remove microsoft debian repo due to https://github.com/microsoft/linux-package-repositories/issues/130. Remove line below after it is resolved
           sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
           sudo apt-get update && sudo apt-get install libudev-dev
-      - uses: 'actions/setup-node@v3'
+      - uses: 'actions/setup-node@v6'
         with:
-          node-version: '18.19.0'
+          node-version: '22.21.1'
       - name: 'set complex environment variables'
         id: 'set-vars'
         uses: actions/github-script@v6
@@ -60,14 +60,11 @@ jobs:
           script: |
             const { buildComplexEnvVars } = require(`${process.env.GITHUB_WORKSPACE}/.github/workflows/utils.js`)
             buildComplexEnvVars(core, context)
-      - uses: 'actions/setup-python@v4'
-        with:
-          python-version: '3.10'
-      - uses: './.github/actions/python/setup'
+      - uses: './.github/actions/python/setup-uv'
         with:
           project: 'g-code-testing'
       - name: 'cache yarn cache'
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ${{ github.workspace }}/.npm-cache/_prebuild

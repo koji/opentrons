@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import startCase from 'lodash/startCase'
 import { format } from 'date-fns'
+import startCase from 'lodash/startCase'
 
 import {
   ALIGN_CENTER,
@@ -8,20 +8,26 @@ import {
   Box,
   COLORS,
   DIRECTION_COLUMN,
+  DISPLAY_GRID,
   Flex,
   Icon,
   JUSTIFY_SPACE_BETWEEN,
   LabwareRender,
+  LegacyStyledText,
   OVERFLOW_WRAP_ANYWHERE,
   RobotWorkSpace,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
-  DISPLAY_GRID,
 } from '@opentrons/components'
+import {
+  getLabwareDefIsStandard,
+  getLabwareDisplayName,
+  getLabwareViewBox,
+} from '@opentrons/shared-data'
 
 import { UNIVERSAL_FLAT_ADAPTER_X_DIMENSION } from '../LabwareDetails/Gallery'
 import { CustomLabwareOverflowMenu } from './CustomLabwareOverflowMenu'
+
 import type { LabwareDefAndDate } from '/app/local-resources/labware'
 
 export interface LabwareCardProps {
@@ -33,13 +39,18 @@ export function LabwareCard(props: LabwareCardProps): JSX.Element {
   const { t } = useTranslation(['labware_landing', 'branded'])
   const { definition, modified, filename } = props.labware
   const apiName = definition.parameters.loadName
-  const displayName = definition?.metadata.displayName
+  const displayName = getLabwareDisplayName(definition)
   const displayCategory = startCase(definition.metadata.displayCategory)
-  const isCustomDefinition = definition.namespace !== 'opentrons'
-  const xDimensionOverride =
-    definition.parameters.loadName === 'opentrons_universal_flat_adapter'
-      ? UNIVERSAL_FLAT_ADAPTER_X_DIMENSION
-      : definition.dimensions.xDimension
+  const isCustomDefinition = !getLabwareDefIsStandard(definition)
+
+  const viewBox = getLabwareViewBox(definition)
+
+  const xDimensionOverride = [
+    'opentrons_universal_flat_adapter',
+    'opentrons_universal_flat_adapter_type_b',
+  ].includes(definition.parameters.loadName)
+    ? UNIVERSAL_FLAT_ADAPTER_X_DIMENSION
+    : viewBox.xDimension
 
   return (
     <Box
@@ -59,9 +70,14 @@ export function LabwareCard(props: LabwareCardProps): JSX.Element {
     >
       <Box id="LabwareCard_labwareImage" marginRight={SPACING.spacing24}>
         <RobotWorkSpace
-          viewBox={`${definition.cornerOffsetFromSlot.x} ${definition.cornerOffsetFromSlot.y} ${xDimensionOverride} ${definition.dimensions.yDimension}`}
+          viewBox={`${viewBox.minX} ${viewBox.minY} ${xDimensionOverride} ${viewBox.yDimension}`}
         >
-          {() => <LabwareRender definition={definition} />}
+          {() => (
+            <LabwareRender
+              definition={definition}
+              positioningMode="passThrough"
+            />
+          )}
         </RobotWorkSpace>
       </Box>
       {/* labware category name min:7.5 rem for the longest, Aluminum Block  */}
@@ -77,12 +93,12 @@ export function LabwareCard(props: LabwareCardProps): JSX.Element {
           justifyContent={JUSTIFY_SPACE_BETWEEN}
         >
           <Box>
-            <LegacyStyledText as="h3" id="LabwareCard_labwareName">
+            <LegacyStyledText forwardedAs="h3" id="LabwareCard_labwareName">
               {displayName}
             </LegacyStyledText>
             {isCustomDefinition ? (
               <LegacyStyledText
-                as="label"
+                forwardedAs="label"
                 color={COLORS.grey50}
                 id="LabwareCard_customDef"
               >
@@ -96,7 +112,7 @@ export function LabwareCard(props: LabwareCardProps): JSX.Element {
                   height=".7rem"
                 />
                 <LegacyStyledText
-                  as="label"
+                  forwardedAs="label"
                   id="LabwareCard_opentronsDef"
                   marginLeft={SPACING.spacing4}
                 >
@@ -107,7 +123,7 @@ export function LabwareCard(props: LabwareCardProps): JSX.Element {
           </Box>
           <Box paddingTop={SPACING.spacing16}>
             <LegacyStyledText
-              as="h6"
+              forwardedAs="h6"
               textTransform={TYPOGRAPHY.textTransformUppercase}
               color={COLORS.grey60}
               id="LabwareCard_apiName"
@@ -116,7 +132,7 @@ export function LabwareCard(props: LabwareCardProps): JSX.Element {
             </LegacyStyledText>
 
             <Box overflowWrap={OVERFLOW_WRAP_ANYWHERE}>
-              <LegacyStyledText as="p">{apiName}</LegacyStyledText>
+              <LegacyStyledText forwardedAs="p">{apiName}</LegacyStyledText>
             </Box>
           </Box>
         </Flex>
@@ -133,16 +149,12 @@ export function LabwareCard(props: LabwareCardProps): JSX.Element {
             alignItems={ALIGN_FLEX_END}
           >
             <CustomLabwareOverflowMenu filename={filename} />
-            <Flex flexDirection={DIRECTION_COLUMN}>
-              <LegacyStyledText
-                as="label"
-                color={COLORS.grey50}
-                textAlign={TYPOGRAPHY.textAlignRight}
-              >
+            <Flex flexDirection={DIRECTION_COLUMN} alignItems={ALIGN_FLEX_END}>
+              <LegacyStyledText forwardedAs="label" color={COLORS.grey50}>
                 {t('date_added')}
               </LegacyStyledText>
               <LegacyStyledText
-                as="label"
+                forwardedAs="label"
                 color={COLORS.grey50}
                 id="LabwareCard_dateAdded"
               >

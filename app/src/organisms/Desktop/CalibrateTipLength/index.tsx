@@ -1,49 +1,53 @@
 // Tip Length Calibration Orchestration Component
-import * as React from 'react'
+import { useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from 'react-query'
 import { css } from 'styled-components'
 
+import {
+  AnimationVideo,
+  ModalShell,
+  useConditionalConfirm,
+  WizardHeader,
+} from '@opentrons/components'
 import { useHost } from '@opentrons/react-api-client'
 import { getPipetteModelSpecs } from '@opentrons/shared-data'
-import { useConditionalConfirm, ModalShell } from '@opentrons/components'
 
-import * as Sessions from '/app/redux/sessions'
-import {
-  Introduction,
-  DeckSetup,
-  TipPickUp,
-  TipConfirmation,
-  MeasureNozzle,
-  MeasureTip,
-  ConfirmExit,
-  LoadingState,
-  CompleteConfirmation,
-} from '/app/organisms/Desktop/CalibrationPanels'
-import { WizardHeader } from '/app/molecules/WizardHeader'
 import { getTopPortalEl } from '/app/App/portal'
+import slotOneRemoveBlockAsset from '/app/assets/videos/tip-length-cal/Slot_1_Remove_CalBlock_(330x260)REV1.webm'
+import slotThreeRemoveBlockAsset from '/app/assets/videos/tip-length-cal/Slot_3_Remove_CalBlock_(330x260)REV1.webm'
 import {
   CalibrationError,
   useCalibrationError,
 } from '/app/organisms/Desktop/CalibrationError'
-import slotOneRemoveBlockAsset from '/app/assets/videos/tip-length-cal/Slot_1_Remove_CalBlock_(330x260)REV1.webm'
-import slotThreeRemoveBlockAsset from '/app/assets/videos/tip-length-cal/Slot_3_Remove_CalBlock_(330x260)REV1.webm'
+import {
+  CompleteConfirmation,
+  ConfirmExit,
+  DeckSetup,
+  Introduction,
+  LoadingState,
+  MeasureNozzle,
+  MeasureTip,
+  TipConfirmation,
+  TipPickUp,
+} from '/app/organisms/Desktop/CalibrationPanels'
+import * as Sessions from '/app/redux/sessions'
 
+import type { ComponentType } from 'react'
 import type { Mount } from '@opentrons/components'
+import type { CalibrationPanelProps } from '/app/organisms/Desktop/CalibrationPanels/types'
 import type {
-  SessionCommandParams,
   CalibrationLabware,
   CalibrationSessionStep,
+  SessionCommandParams,
 } from '/app/redux/sessions/types'
-import type { CalibrationPanelProps } from '/app/organisms/Desktop/CalibrationPanels/types'
 import type { CalibrateTipLengthParentProps } from './types'
 
 export { AskForCalibrationBlockModal } from './AskForCalibrationBlockModal'
-export { ConfirmRecalibrationModal } from './ConfirmRecalibrationModal'
 
 const PANEL_BY_STEP: Partial<
-  Record<CalibrationSessionStep, React.ComponentType<CalibrationPanelProps>>
+  Record<CalibrationSessionStep, ComponentType<CalibrationPanelProps>>
 > = {
   sessionStarted: Introduction,
   labwareLoaded: DeckSetup,
@@ -80,16 +84,16 @@ export function CalibrateTipLength({
   const queryClient = useQueryClient()
   const host = useHost()
 
-  const isMulti = React.useMemo(() => {
+  const isMulti = useMemo(() => {
     const spec =
       instrument != null ? getPipetteModelSpecs(instrument.model) : null
     return spec != null ? spec.channels > 1 : false
   }, [instrument])
 
   const tipRack: CalibrationLabware | null =
-    labware != null ? labware.find(l => l.isTiprack) ?? null : null
+    labware != null ? (labware.find(l => l.isTiprack) ?? null) : null
   const calBlock: CalibrationLabware | null =
-    labware != null ? labware.find(l => !l.isTiprack) ?? null : null
+    labware != null ? (labware.find(l => !l.isTiprack) ?? null) : null
 
   const errorInfo = useCalibrationError(requestIds, session?.id)
 
@@ -185,9 +189,7 @@ export function CalibrateTipLength({
   )
 }
 
-const blockRemovalAssetBySlot: {
-  [slot in CalibrationLabware['slot']]: string
-} = {
+const blockRemovalAssetBySlot: Record<string, string> = {
   '1': slotOneRemoveBlockAsset,
   '3': slotThreeRemoveBlockAsset,
 }
@@ -200,18 +202,25 @@ function TipLengthCalibrationComplete(
 
   const visualAid =
     calBlock != null ? (
-      <video
-        key={blockRemovalAssetBySlot[calBlock.slot]}
+      <AnimationVideo
+        key={
+          blockRemovalAssetBySlot[
+            Sessions.slotNameFromCalibrationSlot(calBlock.slot)
+          ]
+        }
         css={css`
           max-width: 100%;
           max-height: 15rem;
         `}
-        autoPlay={true}
-        loop={true}
-        controls={false}
       >
-        <source src={blockRemovalAssetBySlot[calBlock.slot]} />
-      </video>
+        <source
+          src={
+            blockRemovalAssetBySlot[
+              Sessions.slotNameFromCalibrationSlot(calBlock.slot)
+            ]
+          }
+        />
+      </AnimationVideo>
     ) : null
 
   return (

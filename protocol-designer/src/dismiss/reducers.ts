@@ -1,10 +1,12 @@
 import { combineReducers } from 'redux'
 import { handleActions } from 'redux-actions'
+
 import { getPDMetadata } from '../file-types'
+
 import type { Reducer } from 'redux'
-import type { BaseState, Action } from '../types'
-import type { LoadFileAction } from '../load-file'
 import type { StepIdType } from '../form-types'
+import type { LoadFileAction } from '../load-file'
+import type { Action, BaseState } from '../types'
 import type { DismissFormWarning, DismissTimelineWarning } from './actions'
 
 export type WarningType = string
@@ -65,7 +67,6 @@ export const _allReducers = {
 export interface RootState {
   dismissedWarnings: DismissedWarningState
 }
-export const rootReducer: Reducer<RootState, Action> = combineReducers(
-  _allReducers
-)
+export const rootReducer: Reducer<RootState, Action> =
+  combineReducers(_allReducers)
 export const rootSelector = (state: BaseState): RootState => state.dismiss

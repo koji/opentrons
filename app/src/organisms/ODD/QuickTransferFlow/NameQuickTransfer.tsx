@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react'
-import { useTranslation } from 'react-i18next'
+import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
 
 import {
   COLORS,
@@ -8,9 +8,9 @@ import {
   Flex,
   InputField,
   JUSTIFY_CENTER,
-  LegacyStyledText,
   POSITION_FIXED,
   SPACING,
+  StyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
@@ -33,7 +33,6 @@ export function NameQuickTransfer(props: NameQuickTransferProps): JSX.Element {
   if (name.length > 60) {
     error = t('character_limit_error')
   }
-  // TODO add error handling for quick transfer name replication
 
   return createPortal(
     <Flex position={POSITION_FIXED} backgroundColor={COLORS.white} width="100%">
@@ -68,22 +67,20 @@ export function NameQuickTransfer(props: NameQuickTransferProps): JSX.Element {
             value={name}
             textAlign={TYPOGRAPHY.textAlignCenter}
           />
-          <LegacyStyledText
-            as="p"
+          <StyledText
+            oddStyle="bodyTextRegular"
             color={COLORS.grey60}
-            fontWeight={TYPOGRAPHY.fontWeightRegular}
             textAlign={TYPOGRAPHY.textAlignCenter}
           >
             {t('enter_characters')}
-          </LegacyStyledText>
-          <LegacyStyledText
-            as="p"
+          </StyledText>
+          <StyledText
+            oddStyle="bodyTextRegular"
             color={COLORS.red50}
-            fontWeight={TYPOGRAPHY.fontWeightRegular}
             textAlign={TYPOGRAPHY.textAlignCenter}
           >
             {error}
-          </LegacyStyledText>
+          </StyledText>
         </Flex>
       </Flex>
       <Flex width="100%" position={POSITION_FIXED} left="0" bottom="0">

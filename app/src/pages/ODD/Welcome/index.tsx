@@ -1,17 +1,18 @@
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+
 import {
   COLORS,
   DIRECTION_COLUMN,
   Flex,
   JUSTIFY_CENTER,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
-import { MediumButton } from '/app/atoms/buttons'
 
 import screenImage from '/app/assets/images/on-device-display/welcome_background.png'
+import { MediumButton } from '/app/atoms/buttons'
 
 const IMAGE_ALT = 'Welcome screen background image'
 
@@ -28,7 +29,10 @@ export function Welcome(): JSX.Element {
     >
       <img alt={IMAGE_ALT} src={screenImage} width="904px" height="189px" />
       <Flex justifyContent={JUSTIFY_CENTER}>
-        <LegacyStyledText as="h2" fontWeight={TYPOGRAPHY.fontWeightBold}>
+        <LegacyStyledText
+          forwardedAs="h2"
+          fontWeight={TYPOGRAPHY.fontWeightBold}
+        >
           {t('branded:welcome_title')}
         </LegacyStyledText>
       </Flex>

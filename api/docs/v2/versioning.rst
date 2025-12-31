@@ -68,7 +68,7 @@ The maximum supported API version for your robot is listed in the Opentrons App 
 
 If you upload a protocol that specifies a higher API level than the maximum supported, your robot won't be able to analyze or run your protocol. You can increase the maximum supported version by updating your robot software and Opentrons App. 
 
-Opentrons robots running the latest software (8.0.0) support the following version ranges: 
+Opentrons robots running the latest software (8.8.0) support the following version ranges: 
 
     * **Flex:** version 2.15–|apiLevel|.
     * **OT-2:** versions 2.0–|apiLevel|.
@@ -84,6 +84,20 @@ This table lists the correspondence between Protocol API versions and robot soft
 +-------------+------------------------------+
 | API Version | Introduced in Robot Software |
 +=============+==============================+
+|     2.27    |          8.8.0               |
++-------------+------------------------------+
+|     2.26    |          8.7.0               |
++-------------+------------------------------+
+|     2.25    |          8.6.0               |
++-------------+------------------------------+
+|     2.24    |          8.5.0               |
++-------------+------------------------------+
+|     2.23    |          8.4.0               |
++-------------+------------------------------+
+|     2.22    |          8.3.0               |
++-------------+------------------------------+
+|     2.21    |          8.2.0               |
++-------------+------------------------------+
 |     2.20    |          8.0.0               |
 +-------------+------------------------------+
 |     2.19    |          7.3.1               |
@@ -133,6 +147,60 @@ This table lists the correspondence between Protocol API versions and robot soft
 
 Changes in API Versions
 =======================
+
+Version 2.27
+------------
+- Adds :ref:`concurrent module commands <concurrent-module>` to perform Temperature, Heater-Shaker, or Thermocycler Module actions alongside other protocol steps: 
+    - :py:meth:`.TemperatureModuleContext.start_set_temperature`
+    - :py:meth:`.HeaterShakerContext.set_shake_speed`
+    - :py:meth:`.ThermocyclerContext.start_set_block_temperature`, :py:meth:`.ThermocyclerContext.start_set_lid_temperature`, and :py:meth:`.ThermocyclerContext.start_execute_profile`
+- Control pipette movement while aspirating or dispensing: 
+    - Use the ``end_location`` and ``movement_delay`` parameters to control pipette movement while :ref:`aspirating <new-aspirate>` or :ref:`dispensing <new-dispense>`.
+    - Pipette relative to the :ref:`liquid meniscus <well-meniscus>` as liquid level changes.
+    -  Set locations to start and end aspirating and dispensing in a :ref:`dynamic-mix`. 
+- Take images using the Flex or OT-2's built in-camera with the new :py:meth:`.ProtocolContext.capture_image` method.
+- Use the ``tips`` parameter to select tips to use during a :py:meth:`~.InstrumentContext.transfer_with_liquid_class`. 
+
+Version 2.26
+-------------
+
+- Adds the ability to use the ``flex_96channel_200`` pipette to perform liquid handling actions using :ref:`liquid classes <liquid-classes>`. 
+
+Version 2.25
+-------------
+
+- Adds :py:class:`.FlexStackerContext` to support the :ref:`Flex Stacker Module <stacker>`. Use the load name ``flexStackerModuleV1`` with :py:meth:`.ProtocolContext.load_module` to add a Flex Stacker and automate labware storage in a protocol.
+- Use the load name ``flex_96channel_200`` with :py:meth:`.load_instrument` to add the Opentrons Flex 96-Channel Pipette (1–200 µL) to a protocol. Note that this pipette does not work with liquid class commands in this API version. 
+
+Version 2.24
+-------------
+- Adds the ability to perform liquid handling actions using :ref:`liquid classes <liquid-classes>`.
+
+  - :py:meth:`.ProtocolContext.get_liquid_class` accesses :ref:`Opentrons-verified liquid class definitions <liquid-class-definitions>` for aqueous, volatile, and viscous liquids.
+  - :py:meth:`.ProtocolContext.define_liquid_class` lets you create your own liquid classes from verified classes or from scratch.
+  - New :py:class:`.InstrumentContext` methods — :py:meth:`.transfer_with_liquid_class`, :py:meth:`.distribute_with_liquid_class`, and :py:meth:`.consolidate_with_liquid_class` — move liquids according to their properties.
+- :py:meth:`.air_gap`, :py:meth:`.blow_out`, :py:meth:`.dispense`, :py:meth:`.mix`, and :py:meth:`.touch_tip` have new parameters for advanced settings that are also available in Protocol Designer.
+
+Version 2.23
+-------------
+- Wells now have a :py:meth:`~.Well.meniscus` location that corresponds to the top of the liquid, either as set in the protocol or measured by probing with a pipette tip. See :ref:`well-meniscus`.
+- Load and move labware lids with a new ``lid`` parameter of :py:meth:`~.ProtocolContext.load_labware` and standalone methods. See :ref:`loading-lids` and :ref:`moving-lids`.
+- Updated :py:meth:`.set_offset` to match new Labware Position Check behavior in Opentrons App v8.4.0.
+
+Version 2.22
+-------------
+- Improvements to loading liquids. Use the new :py:meth:`.Labware.load_liquid`, :py:meth:`.Labware.load_liquid_by_well`, and :py:meth:`.Labware.load_empty` methods instead of ``Well.load_liquid()``, which is now deprecated.
+- Use new robot motor control methods to control individual robot motors. 
+    - The :py:meth:`.RobotContext.move_to`, :py:meth:`.RobotContext.move_axes_to`, and :py:meth:`.RobotContext.move_axes_relative` methods move robot motors to specific deck positions. 
+    - Calculate specific deck positions with the :py:meth:`.RobotContext.axis_coordinates_for` method, and pipette plunger positions with :py:meth:`.RobotContext.plunger_coordinates_for_volume` and :py:meth:`.RobotContext.plunger_coordinates_for_named_position`. 
+    - Control the Flex Gripper with the :py:meth:`.RobotContext.open_gripper_jaw` and :py:meth:`.RobotContext.close_gripper_jaw` methods. 
+- Beta features for our commercial partners.
+
+Version 2.21
+------------
+- Adds :py:class:`.AbsorbanceReaderContext` to support the :ref:`Absorbance Plate Reader Module <absorbance-plate-reader-module>`. Use the load name ``absorbanceReaderV1`` with :py:meth:`.ProtocolContext.load_module` to add an Absorbance Plate Reader to a protocol.
+- :ref:`Liquid presence detection <lpd>` now only checks on the first aspiration of the :py:meth:`.mix` cycle.
+- Improved the run log output of :py:meth:`.ThermocyclerContext.execute_profile`.
 
 Version 2.20
 ------------

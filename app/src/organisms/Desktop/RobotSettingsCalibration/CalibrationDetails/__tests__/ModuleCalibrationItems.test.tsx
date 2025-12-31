@@ -1,13 +1,17 @@
-import type * as React from 'react'
 import { screen } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { i18n } from '/app/i18n'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { ABSORBANCE_READER_TYPE } from '@opentrons/shared-data'
+
 import { renderWithProviders } from '/app/__testing-utils__'
+import { i18n } from '/app/i18n'
 import { mockFetchModulesSuccessActionPayloadModules } from '/app/redux/modules/__fixtures__'
+
+import { ModuleCalibrationItems } from '../ModuleCalibrationItems'
 import { ModuleCalibrationOverflowMenu } from '../ModuleCalibrationOverflowMenu'
 import { formatLastCalibrated } from '../utils'
-import { ModuleCalibrationItems } from '../ModuleCalibrationItems'
 
+import type { ComponentProps } from 'react'
 import type { AttachedModule } from '@opentrons/api-client'
 
 vi.mock('../ModuleCalibrationOverflowMenu')
@@ -42,7 +46,7 @@ const mockCalibratedModule = {
     totalCycleCount: 1,
     currentStepIndex: 1,
     totalStepCount: 1,
-  },
+  } as any,
   usbPort: {
     port: 3,
     portGroup: 'left',
@@ -54,7 +58,7 @@ const mockCalibratedModule = {
 const ROBOT_NAME = 'mockRobot'
 
 const render = (
-  props: React.ComponentProps<typeof ModuleCalibrationItems>
+  props: ComponentProps<typeof ModuleCalibrationItems>
 ): ReturnType<typeof renderWithProviders> => {
   return renderWithProviders(<ModuleCalibrationItems {...props} />, {
     i18nInstance: i18n,
@@ -62,14 +66,14 @@ const render = (
 }
 
 describe('ModuleCalibrationItems', () => {
-  let props: React.ComponentProps<typeof ModuleCalibrationItems>
+  let props: ComponentProps<typeof ModuleCalibrationItems>
 
   beforeEach(() => {
     props = {
       attachedModules: mockFetchModulesSuccessActionPayloadModules,
-      updateRobotStatus: vi.fn(),
       formattedPipetteOffsetCalibrations: [],
       robotName: ROBOT_NAME,
+      isRobotBusy: false,
     }
     vi.mocked(ModuleCalibrationOverflowMenu).mockReturnValue(
       <div>mock ModuleCalibrationOverflowMenu</div>
@@ -100,5 +104,24 @@ describe('ModuleCalibrationItems', () => {
     }
     render(props)
     screen.getByText(formatLastCalibrated('2023-06-01T14:42:20.131798+00:00'))
+  })
+
+  it('should say no calibration required if module is absorbance reader', () => {
+    const absorbanceReaderAttachedModule = {
+      ...mockCalibratedModule,
+      moduleType: ABSORBANCE_READER_TYPE,
+      moduleOffset: undefined,
+    }
+    props = {
+      ...props,
+      attachedModules: [
+        absorbanceReaderAttachedModule as AttachedModule,
+      ] as AttachedModule[],
+    }
+    render(props)
+    expect(
+      screen.queryByText('mock ModuleCalibrationOverflowMenu')
+    ).not.toBeInTheDocument()
+    screen.getByText('No calibration required')
   })
 })

@@ -1,11 +1,12 @@
-import * as React from 'react'
-import { useSelector, useDispatch } from 'react-redux'
-import { useNavigate } from 'react-router-dom'
-import { useForm, Controller } from 'react-hook-form'
+import { useState } from 'react'
+import { Controller, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
+import { useDispatch, useSelector } from 'react-redux'
+import { useNavigate } from 'react-router-dom'
+
 import {
-  COLORS,
   Banner,
+  COLORS,
   DIRECTION_COLUMN,
   Flex,
   InputField,
@@ -14,19 +15,23 @@ import {
   SPACING,
 } from '@opentrons/components'
 import { useUpdateRobotNameMutation } from '@opentrons/react-api-client'
+import { FLEX_ROBOT_TYPE, OT2_ROBOT_TYPE } from '@opentrons/shared-data'
+
+import { Slideout } from '/app/atoms/Slideout'
+import { useIsFlex } from '/app/redux-resources/robots'
+import { ANALYTICS_RENAME_ROBOT, useTrackEvent } from '/app/redux/analytics'
 import {
-  removeRobot,
   getConnectableRobots,
   getReachableRobots,
   getUnreachableRobots,
+  removeRobot,
 } from '/app/redux/discovery'
-import { useTrackEvent, ANALYTICS_RENAME_ROBOT } from '/app/redux/analytics'
-import { Slideout } from '/app/atoms/Slideout'
-import { useIsFlex } from '/app/redux-resources/robots'
 
-import type { Resolver, FieldError } from 'react-hook-form'
+import type { ChangeEvent } from 'react'
+import type { FieldError, Resolver } from 'react-hook-form'
 import type { UpdatedRobotName } from '@opentrons/api-client'
-import type { State, Dispatch } from '/app/redux/types'
+import type { Dispatch, State } from '/app/redux/types'
+
 interface RenameRobotSlideoutProps {
   isExpanded: boolean
   onCloseClick: () => void
@@ -49,9 +54,7 @@ export function RenameRobotSlideout({
   robotName,
 }: RenameRobotSlideoutProps): JSX.Element {
   const { t } = useTranslation('device_settings')
-  const [previousRobotName, setPreviousRobotName] = React.useState<string>(
-    robotName
-  )
+  const [previousRobotName, setPreviousRobotName] = useState<string>(robotName)
   const isFlex = useIsFlex(robotName)
   const trackEvent = useTrackEvent()
   const navigate = useNavigate()
@@ -152,6 +155,7 @@ export function RenameRobotSlideout({
       properties: {
         previousRobotName,
         newRobotName: newRobotName,
+        robotType: isFlex ? FLEX_ROBOT_TYPE : OT2_ROBOT_TYPE,
       },
     })
     handleSubmit(onSubmit)()
@@ -172,47 +176,45 @@ export function RenameRobotSlideout({
         </PrimaryButton>
       }
     >
-      <Flex flexDirection={DIRECTION_COLUMN}>
+      <Flex flexDirection={DIRECTION_COLUMN} gap={SPACING.spacing16}>
         {isFlex ? null : (
           <Banner type="informing" marginBottom={SPACING.spacing16}>
             {t('rename_robot_prefer_usb_connection')}
           </Banner>
         )}
-        <LegacyStyledText as="p" marginBottom={SPACING.spacing16}>
+        <LegacyStyledText forwardedAs="p">
           {t('rename_robot_input_limitation_detail')}
         </LegacyStyledText>
-        <Controller
-          control={control}
-          name="newRobotName"
-          render={({ field, fieldState }) => (
-            <InputField
-              data-testid="rename-robot_input"
-              id="newRobotName"
-              name="newRobotName"
-              type="text"
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                field.onChange(e)
-                trigger('newRobotName')
-              }}
-              value={field.value}
-              error={fieldState.error?.message && ' '}
-              onBlur={field.onBlur}
-              title={t('robot_name')}
-            />
-          )}
-        />
-        <LegacyStyledText as="label" color={COLORS.grey50}>
-          {t('characters_max')}
-        </LegacyStyledText>
-        {errors.newRobotName != null ? (
-          <LegacyStyledText
-            as="label"
-            color={COLORS.red50}
-            marginTop={SPACING.spacing4}
-          >
-            {errors.newRobotName.message}
+        <Flex flexDirection={DIRECTION_COLUMN} gap={SPACING.spacing4}>
+          <Controller
+            control={control}
+            name="newRobotName"
+            render={({ field, fieldState }) => (
+              <InputField
+                data-testid="rename-robot_input"
+                id="newRobotName"
+                name="newRobotName"
+                type="text"
+                onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                  field.onChange(e)
+                  trigger('newRobotName')
+                }}
+                value={field.value}
+                error={fieldState.error?.message && ' '}
+                onBlur={field.onBlur}
+                title={t('robot_name')}
+              />
+            )}
+          />
+          <LegacyStyledText forwardedAs="label" color={COLORS.grey50}>
+            {t('characters_max')}
           </LegacyStyledText>
-        ) : null}
+          {errors.newRobotName != null ? (
+            <LegacyStyledText forwardedAs="label" color={COLORS.red50}>
+              {errors.newRobotName.message}
+            </LegacyStyledText>
+          ) : null}
+        </Flex>
       </Flex>
     </Slideout>
   )

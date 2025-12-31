@@ -2,14 +2,17 @@
 
 Contains routes dealing primarily with `Run` models.
 """
+
 import logging
 from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
-from typing import Annotated, Callable, Final, Literal, Optional, Union
+from typing import Annotated, Callable, Final, Literal, Optional, Union, Dict
 
-from fastapi import APIRouter, Depends, status, Query
+from fastapi import Depends, status, Query
 from pydantic import BaseModel, Field
+from server_utils.fastapi_utils.light_router import LightRouter
+
 
 from opentrons_shared_data.errors import ErrorCodes
 from opentrons_shared_data.robot.types import RobotTypeEnum
@@ -30,7 +33,6 @@ from robot_server.data_files.dependencies import (
 )
 from robot_server.data_files.data_files_store import DataFilesStore
 from robot_server.errors.error_responses import ErrorDetails, ErrorBody
-from robot_server.protocols.protocol_models import ProtocolKind
 from robot_server.service.dependencies import get_current_time, get_unique_id
 from robot_server.robot.control.dependencies import require_estop_in_good_state
 from robot_server.hardware import get_hardware, get_robot_type_enum
@@ -61,6 +63,8 @@ from ..run_models import (
     RunCurrentState,
     CommandLinkNoMeta,
     NozzleLayoutConfig,
+    TipState,
+    FlexStackerState,
 )
 from ..run_auto_deleter import RunAutoDeleter
 from ..run_models import Run, BadRun, RunCreate, RunUpdate
@@ -72,22 +76,20 @@ from ..run_data_manager import (
 from ..dependencies import (
     get_run_data_manager,
     get_run_auto_deleter,
-    get_quick_transfer_run_auto_deleter,
 )
-from ..error_recovery_models import ErrorRecoveryPolicy
 
 from robot_server.deck_configuration.fastapi_dependencies import (
     get_deck_configuration_store,
 )
 from robot_server.deck_configuration.store import DeckConfigurationStore
-from robot_server.file_provider.fastapi_dependencies import (
-    get_file_provider,
+from robot_server.camera.fastapi_dependencies import (
+    get_camera_provider,
 )
-from opentrons.protocol_engine.resources.file_provider import FileProvider
+from opentrons.protocol_engine.resources.camera_provider import CameraProvider
 from robot_server.service.notifications import get_pe_notify_publishers
 
 log = logging.getLogger(__name__)
-base_router = APIRouter()
+base_router = LightRouter()
 
 _DEFAULT_COMMAND_ERROR_LIST_LENGTH: Final = 20
 
@@ -192,14 +194,11 @@ async def create_run(  # noqa: C901
     run_auto_deleter: Annotated[RunAutoDeleter, Depends(get_run_auto_deleter)],
     data_files_directory: Annotated[Path, Depends(get_data_files_directory)],
     data_files_store: Annotated[DataFilesStore, Depends(get_data_files_store)],
-    quick_transfer_run_auto_deleter: Annotated[
-        RunAutoDeleter, Depends(get_quick_transfer_run_auto_deleter)
-    ],
     check_estop: Annotated[bool, Depends(require_estop_in_good_state)],
     deck_configuration_store: Annotated[
         DeckConfigurationStore, Depends(get_deck_configuration_store)
     ],
-    file_provider: Annotated[FileProvider, Depends(get_file_provider)],
+    camera_provider: Annotated[CameraProvider, Depends(get_camera_provider)],
     notify_publishers: Annotated[Callable[[], None], Depends(get_pe_notify_publishers)],
     request_body: Optional[RequestModel[RunCreate]] = None,
 ) -> PydanticResponse[SimpleBody[Union[Run, BadRun]]]:
@@ -213,13 +212,12 @@ async def create_run(  # noqa: C901
         created_at: Timestamp to attach to created run.
         run_auto_deleter: An interface to delete old resources to make room for
             the new run.
-        quick_transfer_run_auto_deleter: An interface to delete old quick-transfer
         data_files_directory: Persistence directory for data files.
         data_files_store: Database of data file resources.
         resources to make room for the new run.
         check_estop: Dependency to verify the estop is in a valid state.
         deck_configuration_store: Dependency to fetch the deck configuration.
-        file_provider: Dependency to provide access to file Reading and Writing to Protocol engine.
+        camera_provider: Dependency to provide access to the Camera Settings to the run.
         notify_publishers: Utilized by the engine to notify publishers of state changes.
     """
     protocol_id = request_body.data.protocolId if request_body is not None else None
@@ -260,13 +258,7 @@ async def create_run(  # noqa: C901
     # TODO(mc, 2022-05-13): move inside `RunDataManager` or return data
     # to pass to `RunDataManager.create`. Right now, runs may be deleted
     # even if a new create is unable to succeed due to a conflict
-    run_deleter: RunAutoDeleter = run_auto_deleter
-    if (
-        protocol_resource
-        and protocol_resource.protocol_kind == ProtocolKind.QUICK_TRANSFER
-    ):
-        run_deleter = quick_transfer_run_auto_deleter
-    run_deleter.make_room_for_new_run()
+    run_auto_deleter.make_room_for_new_run()
 
     try:
         run_data = await run_data_manager.create(
@@ -274,7 +266,7 @@ async def create_run(  # noqa: C901
             created_at=created_at,
             labware_offsets=offsets,
             deck_configuration=deck_configuration,
-            file_provider=file_provider,
+            camera_provider=camera_provider,
             run_time_param_values=rtp_values,
             run_time_param_paths=rtp_paths,
             protocol=protocol_resource,
@@ -288,7 +280,7 @@ async def create_run(  # noqa: C901
     log.info(f'Created protocol run "{run_id}" from protocol "{protocol_id}".')
 
     return await PydanticResponse.create(
-        content=SimpleBody.construct(data=run_data),
+        content=SimpleBody.model_construct(data=run_data),
         status_code=status.HTTP_201_CREATED,
     )
 
@@ -328,13 +320,13 @@ async def get_runs(
     current_run_id = run_data_manager.current_run_id
     meta = MultiBodyMeta(cursor=0, totalLength=len(data))
     links = AllRunsLinks(
-        current=ResourceLink.construct(href=f"/runs/{current_run_id}")
+        current=ResourceLink.model_construct(href=f"/runs/{current_run_id}")
         if current_run_id is not None
         else None
     )
 
     return await PydanticResponse.create(
-        content=MultiBody.construct(data=data, links=links, meta=meta),
+        content=MultiBody.model_construct(data=data, links=links, meta=meta),
         status_code=status.HTTP_200_OK,
     )
 
@@ -358,7 +350,7 @@ async def get_run(
         run_data: Data of the run specified in the runId url parameter.
     """
     return await PydanticResponse.create(
-        content=SimpleBody.construct(data=run_data),
+        content=SimpleBody.model_construct(data=run_data),
         status_code=status.HTTP_200_OK,
     )
 
@@ -393,7 +385,7 @@ async def remove_run(
         raise RunNotFound(detail=str(e)).as_error(status.HTTP_404_NOT_FOUND) from e
 
     return await PydanticResponse.create(
-        content=SimpleEmptyBody.construct(),
+        content=SimpleEmptyBody.model_construct(),
         status_code=status.HTTP_200_OK,
     )
 
@@ -433,48 +425,7 @@ async def update_run(
         raise RunNotFound(detail=str(e)).as_error(status.HTTP_404_NOT_FOUND) from e
 
     return await PydanticResponse.create(
-        content=SimpleBody.construct(data=run_data),
-        status_code=status.HTTP_200_OK,
-    )
-
-
-@PydanticResponse.wrap_route(
-    base_router.put,
-    path="/runs/{runId}/errorRecoveryPolicy",
-    summary="Set a run's error recovery policy",
-    description=dedent(
-        """
-        Update how to handle different kinds of command failures.
-
-        For this to have any effect, error recovery must also be enabled globally.
-        See `PATCH /errorRecovery/settings`.
-        """
-    ),
-    responses={
-        status.HTTP_200_OK: {"model": SimpleEmptyBody},
-        status.HTTP_409_CONFLICT: {"model": ErrorBody[RunStopped]},
-    },
-)
-async def put_error_recovery_policy(
-    runId: str,
-    request_body: RequestModel[ErrorRecoveryPolicy],
-    run_data_manager: Annotated[RunDataManager, Depends(get_run_data_manager)],
-) -> PydanticResponse[SimpleEmptyBody]:
-    """Create run polices.
-
-    Arguments:
-        runId: Run ID pulled from URL.
-        request_body:  Request body with run policies data.
-        run_data_manager: Current and historical run data management.
-    """
-    rules = request_body.data.policyRules
-    try:
-        run_data_manager.set_error_recovery_rules(run_id=runId, rules=rules)
-    except RunNotCurrentError as e:
-        raise RunStopped(detail=str(e)).as_error(status.HTTP_409_CONFLICT) from e
-
-    return await PydanticResponse.create(
-        content=SimpleEmptyBody.construct(),
+        content=SimpleBody.model_construct(data=run_data),
         status_code=status.HTTP_200_OK,
     )
 
@@ -512,7 +463,8 @@ async def get_run_commands_error(
             description=(
                 "The starting index of the desired first command error in the list."
                 " If unspecified, a cursor will be selected automatically"
-                " based on the last error added."
+                " based on the last error added, and the slice of errors returned "
+                " is the previous `pageLength` errors."
             ),
         ),
     ] = None,
@@ -526,16 +478,12 @@ async def get_run_commands_error(
         run_data_manager: Run data retrieval interface.
     """
     try:
-        all_errors = run_data_manager.get_command_errors(run_id=runId)
-        total_length = len(all_errors)
+        all_errors_count = run_data_manager.get_command_errors_count(run_id=runId)
 
         if cursor is None:
-            if len(all_errors) > 0:
-                # Get the most recent error,
-                # which we can find just at the end of the list.
-                cursor = total_length - 1
-            else:
-                cursor = 0
+            cursor = max(all_errors_count - 1, 0)
+            cursor = max(cursor - pageLength + 1, 0)
+            cursor = min(cursor, all_errors_count)
 
         command_error_slice = run_data_manager.get_command_error_slice(
             run_id=runId,
@@ -551,7 +499,7 @@ async def get_run_commands_error(
     )
 
     return await PydanticResponse.create(
-        content=SimpleMultiBody.construct(
+        content=SimpleMultiBody.model_construct(
             data=command_error_slice.commands_errors,
             meta=meta,
         ),
@@ -591,32 +539,27 @@ async def get_current_state(  # noqa: C901
     """
     try:
         run = run_data_manager.get(run_id=runId)
-        active_nozzle_maps = run_data_manager.get_nozzle_maps(run_id=runId)
-
-        nozzle_layouts = {
-            pipetteId: ActiveNozzleLayout.construct(
-                startingNozzle=nozzle_map.starting_nozzle,
-                activeNozzles=list(nozzle_map.map_store.keys()),
-                config=NozzleLayoutConfig(nozzle_map.configuration.value.lower()),
-            )
-            for pipetteId, nozzle_map in active_nozzle_maps.items()
-        }
-
-        current_command = run_data_manager.get_current_command(run_id=runId)
-        last_completed_command = run_data_manager.get_last_completed_command(
-            run_id=runId
-        )
     except RunNotCurrentError as e:
         raise RunStopped(detail=str(e)).as_error(status.HTTP_409_CONFLICT)
 
-    links = CurrentStateLinks.construct(
-        lastCompleted=CommandLinkNoMeta.construct(
-            id=last_completed_command.command_id,
-            href=f"/runs/{runId}/commands/{last_completed_command.command_id}",
+    active_nozzle_maps = run_data_manager.get_nozzle_maps(run_id=runId)
+    nozzle_layouts = {
+        pipetteId: ActiveNozzleLayout.model_construct(
+            startingNozzle=nozzle_map.starting_nozzle,
+            activeNozzles=nozzle_map.active_nozzles,
+            config=NozzleLayoutConfig(nozzle_map.configuration.value.lower()),
         )
-        if last_completed_command is not None
-        else None
-    )
+        for pipetteId, nozzle_map in active_nozzle_maps.items()
+    }
+
+    tip_states = {
+        pipette_id: TipState.model_construct(hasTip=has_tip)
+        for pipette_id, has_tip in run_data_manager.get_tip_attached(
+            run_id=runId
+        ).items()
+    }
+
+    current_command = run_data_manager.get_current_command(run_id=runId)
 
     estop_engaged = False
     place_labware = None
@@ -636,11 +579,14 @@ async def get_current_state(  # noqa: C901
         if isinstance(command, MoveLabware):
             location = command.params.newLocation
             if isinstance(location, DeckSlotLocation):
-                place_labware = PlaceLabwareState(
-                    location=location,
-                    labwareId=command.params.labwareId,
-                    shouldPlaceDown=False,
-                )
+                for labware in run.labware:
+                    if labware.id == command.params.labwareId:
+                        place_labware = PlaceLabwareState(
+                            location=location,
+                            labwareURI=labware.definitionUri,
+                            shouldPlaceDown=False,
+                        )
+                        break
         # Handle absorbance reader lid
         elif isinstance(command, (OpenLid, CloseLid)):
             for mod in run.modules:
@@ -655,22 +601,86 @@ async def get_current_state(  # noqa: C901
                         and hw_mod.serial_number == mod.serialNumber
                     ):
                         location = mod.location
-                        labware_id = f"{mod.model}Lid{location.slotName}"
+                        # TODO: Not the best location for this, we should
+                        # remove this once we are no longer defining the plate reader lid
+                        # as a labware.
+                        labware_uri = "opentrons/opentrons_flex_lid_absorbance_plate_reader_module/1"
                         place_labware = PlaceLabwareState(
                             location=location,
-                            labwareId=labware_id,
+                            labwareURI=labware_uri,
                             shouldPlaceDown=estop_engaged,
                         )
                         break
                 if place_labware:
                     break
 
+    flex_stacker_substates = run_data_manager.get_flex_stacker_substate(run_id=runId)
+    flex_stacker_states: Dict[str, FlexStackerState] | None
+    if len(flex_stacker_substates) > 0:
+        flex_stacker_states = {}
+        for module_id in flex_stacker_substates:
+            primary_uri: str | None = None
+            adapter_uri: str | None = None
+            lid_uri: str | None = None
+            primary_def = flex_stacker_substates[module_id].pool_primary_definition
+            adapter_def = flex_stacker_substates[module_id].pool_adapter_definition
+            lid_def = flex_stacker_substates[module_id].pool_lid_definition
+            if primary_def is not None:
+                primary_uri = (
+                    primary_def.namespace
+                    + "/"
+                    + primary_def.parameters.loadName
+                    + "/"
+                    + str(primary_def.version)
+                )
+            if adapter_def is not None:
+                adapter_uri = (
+                    adapter_def.namespace
+                    + "/"
+                    + adapter_def.parameters.loadName
+                    + "/"
+                    + str(adapter_def.version)
+                )
+            if lid_def is not None:
+                lid_uri = (
+                    lid_def.namespace
+                    + "/"
+                    + lid_def.parameters.loadName
+                    + "/"
+                    + str(lid_def.version)
+                )
+            max_count = flex_stacker_substates[module_id].get_max_pool_count()
+            if max_count is None:
+                max_count = 0
+
+            flex_stacker_states[module_id] = FlexStackerState.model_construct(
+                primaryLabwareURI=primary_uri,
+                adapterLabwareURI=adapter_uri,
+                lidLabwareURI=lid_uri,
+                count=len(flex_stacker_substates[module_id].get_contained_labware()),
+                maxCount=max_count,
+            )
+    else:
+        flex_stacker_states = None
+
+    last_completed_command = run_data_manager.get_last_completed_command(run_id=runId)
+    links = CurrentStateLinks.model_construct(
+        lastCompleted=CommandLinkNoMeta.model_construct(
+            id=last_completed_command.command_id,
+            href=f"/runs/{runId}/commands/{last_completed_command.command_id}",
+        )
+        if last_completed_command is not None
+        else None
+    )
+
     return await PydanticResponse.create(
-        content=Body.construct(
-            data=RunCurrentState.construct(
+        content=Body.model_construct(
+            data=RunCurrentState.model_construct(
                 estopEngaged=estop_engaged,
                 activeNozzleLayouts=nozzle_layouts,
+                tipStates=tip_states,
                 placeLabwareState=place_labware,
+                flexStackerStates=flex_stacker_states,
             ),
             links=links,
         ),

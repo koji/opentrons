@@ -1,8 +1,9 @@
 """Tests for the sensor drivers."""
+
 import pytest
 import mock
 from typing import Union, List
-from pytest_lazyfixture import lazy_fixture  # type: ignore[import-untyped]
+from pytest_lazy_fixtures import lf as lazy_fixture
 
 from unittest.mock import patch
 from mock.mock import AsyncMock
@@ -629,12 +630,11 @@ async def test_debug_poll(
             "_multi_wait_for_response",
             new=AsyncMock(return_value=data_points),
         ):
-
             data = await sensor_driver.get_report(sensor_type, mock_messenger, timeout)
             if isinstance(data, EnvironmentSensorDataType):
-                expected_result: Union[
-                    EnvironmentSensorDataType, SensorDataType
-                ] = EnvironmentSensorDataType.build(data_points)
+                expected_result: Union[EnvironmentSensorDataType, SensorDataType] = (
+                    EnvironmentSensorDataType.build(data_points)
+                )
             else:
                 expected_result = data_points[0]
             assert data == expected_result

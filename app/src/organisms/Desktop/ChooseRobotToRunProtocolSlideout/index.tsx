@@ -1,7 +1,7 @@
-import * as React from 'react'
-import first from 'lodash/first'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import first from 'lodash/first'
 
 import {
   ALIGN_CENTER,
@@ -17,22 +17,27 @@ import {
   useHoverTooltip,
 } from '@opentrons/components'
 import {
-  useUploadCsvFileMutation,
   ApiHostProvider,
+  useUploadCsvFileMutation,
 } from '@opentrons/react-api-client'
+import { FLEX_ROBOT_TYPE } from '@opentrons/shared-data'
 
-import { useIsRobotOnWrongVersionOfSoftware } from '/app/redux/robot-update'
-import { OPENTRONS_USB } from '/app/redux/discovery'
-import { appShellRequestor } from '/app/redux/shell/remote'
 import { useTrackCreateProtocolRunEvent } from '/app/organisms/Desktop/Devices/hooks'
+import { LegacyApplyHistoricOffsets } from '/app/organisms/LegacyApplyHistoricOffsets'
+import { useOffsetCandidatesForAnalysis } from '/app/organisms/LegacyApplyHistoricOffsets/hooks/useOffsetCandidatesForAnalysis'
+import { useRobotType } from '/app/redux-resources/robots'
+import { OPENTRONS_USB } from '/app/redux/discovery'
+import { useIsRobotOnWrongVersionOfSoftware } from '/app/redux/robot-update'
+import { appShellRequestor } from '/app/redux/shell/remote'
 import {
   getRunTimeParameterFilesForRun,
   getRunTimeParameterValuesForRun,
 } from '/app/transformations/runs'
-import { ApplyHistoricOffsets } from '/app/organisms/ApplyHistoricOffsets'
-import { useOffsetCandidatesForAnalysis } from '/app/organisms/ApplyHistoricOffsets/hooks/useOffsetCandidatesForAnalysis'
+
 import { ChooseRobotSlideout } from '../ChooseRobotSlideout'
 import { useCreateRunFromProtocol } from './useCreateRunFromProtocol'
+
+import type { MouseEventHandler } from 'react'
 import type { StyleProps } from '@opentrons/components'
 import type { RunTimeParameter } from '@opentrons/shared-data'
 import type { Robot } from '/app/redux/discovery/types'
@@ -47,8 +52,7 @@ interface ChooseRobotToRunProtocolSlideoutProps extends StyleProps {
   showSlideout: boolean
 }
 
-interface ChooseRobotToRunProtocolSlideoutComponentProps
-  extends ChooseRobotToRunProtocolSlideoutProps {
+interface ChooseRobotToRunProtocolSlideoutComponentProps extends ChooseRobotToRunProtocolSlideoutProps {
   selectedRobot: Robot | null
   setSelectedRobot: (robot: Robot | null) => void
 }
@@ -65,16 +69,12 @@ export function ChooseRobotToRunProtocolSlideoutComponent(
     setSelectedRobot,
   } = props
   const navigate = useNavigate()
-  const [shouldApplyOffsets, setShouldApplyOffsets] = React.useState<boolean>(
-    true
-  )
-  const {
-    protocolKey,
-    srcFileNames,
-    srcFiles,
-    mostRecentAnalysis,
-  } = storedProtocolData
-  const [currentPage, setCurrentPage] = React.useState<number>(1)
+  const isFlex =
+    useRobotType(selectedRobot?.displayName ?? '') === FLEX_ROBOT_TYPE
+  const [shouldApplyOffsets, setShouldApplyOffsets] = useState<boolean>(true)
+  const { protocolKey, srcFileNames, srcFiles, mostRecentAnalysis } =
+    storedProtocolData
+  const [currentPage, setCurrentPage] = useState<number>(1)
   const { trackCreateProtocolRunEvent } = useTrackCreateProtocolRunEvent(
     storedProtocolData,
     selectedRobot?.name ?? ''
@@ -82,19 +82,21 @@ export function ChooseRobotToRunProtocolSlideoutComponent(
   const runTimeParameters =
     storedProtocolData.mostRecentAnalysis?.runTimeParameters ?? []
 
-  const [
-    runTimeParametersOverrides,
-    setRunTimeParametersOverrides,
-  ] = React.useState<RunTimeParameter[]>(runTimeParameters)
-  const [hasParamError, setHasParamError] = React.useState<boolean>(false)
-  const [hasMissingFileParam, setHasMissingFileParam] = React.useState<boolean>(
+  const [runTimeParametersOverrides, setRunTimeParametersOverrides] =
+    useState<RunTimeParameter[]>(runTimeParameters)
+  const [hasParamError, setHasParamError] = useState<boolean>(false)
+  const [hasMissingFileParam, setHasMissingFileParam] = useState<boolean>(
     runTimeParameters?.some(parameter => parameter.type === 'csv_file') ?? false
   )
+  useEffect(() => {
+    setRunTimeParametersOverrides(runTimeParameters)
+  }, [protocolKey])
 
   const [targetProps, tooltipProps] = useHoverTooltip()
 
   const offsetCandidates = useOffsetCandidatesForAnalysis(
     mostRecentAnalysis,
+    isFlex,
     null
   )
 
@@ -133,7 +135,7 @@ export function ChooseRobotToRunProtocolSlideoutComponent(
         }))
       : []
   )
-  const handleProceed: React.MouseEventHandler<HTMLButtonElement> = () => {
+  const handleProceed: MouseEventHandler<HTMLButtonElement> = () => {
     trackCreateProtocolRunEvent({ name: 'createProtocolRecordRequest' })
     const dataFilesForProtocolMap = runTimeParametersOverrides.reduce<
       Record<string, File>
@@ -172,9 +174,8 @@ export function ChooseRobotToRunProtocolSlideoutComponent(
     })
   }
 
-  const isSelectedRobotOnDifferentSoftwareVersion = useIsRobotOnWrongVersionOfSoftware(
-    selectedRobot?.name ?? ''
-  )
+  const isSelectedRobotOnDifferentSoftwareVersion =
+    useIsRobotOnWrongVersionOfSoftware(selectedRobot?.name ?? '')
 
   const hasRunTimeParameters = runTimeParameters.length > 0
 
@@ -199,7 +200,7 @@ export function ChooseRobotToRunProtocolSlideoutComponent(
   // intentionally show both robot types if analysis fails
   const robotType =
     mostRecentAnalysis != null && mostRecentAnalysis.result !== 'not-ok'
-      ? mostRecentAnalysis?.robotType ?? null
+      ? (mostRecentAnalysis?.robotType ?? null)
       : null
 
   const singlePageButton = (
@@ -220,8 +221,8 @@ export function ChooseRobotToRunProtocolSlideoutComponent(
     </PrimaryButton>
   )
 
-  const offsetsComponent = (
-    <ApplyHistoricOffsets
+  const offsetsComponent = isFlex ? null : (
+    <LegacyApplyHistoricOffsets
       offsetCandidates={offsetCandidates}
       shouldApplyOffsets={shouldApplyOffsets}
       setShouldApplyOffsets={setShouldApplyOffsets}
@@ -353,7 +354,7 @@ export function ChooseRobotToRunProtocolSlideoutComponent(
 export function ChooseRobotToRunProtocolSlideout(
   props: ChooseRobotToRunProtocolSlideoutProps
 ): JSX.Element | null {
-  const [selectedRobot, setSelectedRobot] = React.useState<Robot | null>(null)
+  const [selectedRobot, setSelectedRobot] = useState<Robot | null>(null)
   return (
     <ApiHostProvider
       hostname={selectedRobot?.ip ?? null}

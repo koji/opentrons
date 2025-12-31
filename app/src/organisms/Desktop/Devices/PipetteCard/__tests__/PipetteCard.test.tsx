@@ -1,20 +1,23 @@
-import type * as React from 'react'
-import { when } from 'vitest-when'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, vi, beforeEach, expect } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { when } from 'vitest-when'
+
 import '@testing-library/jest-dom/vitest'
-import { renderWithProviders } from '/app/__testing-utils__'
-import { LEFT, RIGHT } from '@opentrons/shared-data'
+
 import { usePipetteSettingsQuery } from '@opentrons/react-api-client'
+import { LEFT, RIGHT } from '@opentrons/shared-data'
+
+import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { getHasCalibrationBlock } from '/app/redux/config'
-import { useDispatchApiRequest } from '/app/redux/robot-api'
-import { PipetteOverflowMenu } from '../PipetteOverflowMenu'
-import { PipetteCard } from '..'
 import { useDropTipWizardFlows } from '/app/organisms/DropTipWizardFlows'
-
+import { getHasCalibrationBlock } from '/app/redux/config'
 import { mockLeftSpecs, mockRightSpecs } from '/app/redux/pipettes/__fixtures__'
+import { useDispatchApiRequest } from '/app/redux/robot-api'
 
+import { PipetteCard } from '..'
+import { PipetteOverflowMenu } from '../PipetteOverflowMenu'
+
+import type { ComponentProps } from 'react'
 import type { DispatchApiRequestType } from '/app/redux/robot-api'
 
 vi.mock('../PipetteOverflowMenu')
@@ -24,7 +27,7 @@ vi.mock('@opentrons/react-api-client')
 vi.mock('/app/redux/pipettes')
 vi.mock('/app/organisms/DropTipWizardFlows')
 
-const render = (props: React.ComponentProps<typeof PipetteCard>) => {
+const render = (props: ComponentProps<typeof PipetteCard>) => {
   return renderWithProviders(<PipetteCard {...props} />, {
     i18nInstance: i18n,
   })[0]
@@ -33,7 +36,7 @@ const render = (props: React.ComponentProps<typeof PipetteCard>) => {
 const mockRobotName = 'mockRobotName'
 describe('PipetteCard', () => {
   let dispatchApiRequest: DispatchApiRequestType
-  let props: React.ComponentProps<typeof PipetteCard>
+  let props: ComponentProps<typeof PipetteCard>
 
   beforeEach(() => {
     dispatchApiRequest = vi.fn()

@@ -1,38 +1,51 @@
-import * as React from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+
 import {
-  Flex,
-  SPACING,
   DIRECTION_COLUMN,
+  Flex,
   RadioButton,
+  SPACING,
 } from '@opentrons/components'
-import { getAllDefinitions } from '@opentrons/shared-data'
+import {
+  getAllDefinitions,
+  LABWAREV2_DO_NOT_LIST,
+} from '@opentrons/shared-data'
+
 import { ChildNavigation } from '/app/organisms/ODD/ChildNavigation'
 
+import type { ComponentProps, Dispatch } from 'react'
 import type { LabwareDefinition2 } from '@opentrons/shared-data'
 import type { SmallButton } from '/app/atoms/buttons'
 import type {
-  QuickTransferWizardState,
   QuickTransferWizardAction,
+  QuickTransferWizardState,
 } from './types'
 
 interface SelectTipRackProps {
   onNext: () => void
   onBack: () => void
-  exitButtonProps: React.ComponentProps<typeof SmallButton>
+  exitButtonProps: ComponentProps<typeof SmallButton>
   state: QuickTransferWizardState
-  dispatch: React.Dispatch<QuickTransferWizardAction>
+  dispatch: Dispatch<QuickTransferWizardAction>
 }
 
 export function SelectTipRack(props: SelectTipRackProps): JSX.Element {
   const { onNext, onBack, exitButtonProps, state, dispatch } = props
   const { i18n, t } = useTranslation(['quick_transfer', 'shared'])
 
-  const allLabwareDefinitionsByUri = getAllDefinitions()
-  const selectedPipetteDefaultTipracks =
-    state.pipette?.liquids.default.defaultTipracks ?? []
+  // (kk:2025-09-30) this should be temporary until fix getAllDefinitions cache issue
 
-  const [selectedTipRack, setSelectedTipRack] = React.useState<
+  const allLabwareDefinition2sByUri = getAllDefinitions()
+  const selectedPipetteDefaultTipracks =
+    state.pipette?.liquids.default.defaultTipracks.filter(tiprackUri => {
+      // "opentrons/opentrons_flex_96_tiprack_20ul/1" -> "opentrons_flex_96_tiprack_20ul"
+      const loadName = tiprackUri.split('/')[1]
+      const isBlockedTiprack = LABWAREV2_DO_NOT_LIST.has(loadName)
+      return !isBlockedTiprack
+    }) ?? []
+
+  const [selectedTipRack, setSelectedTipRack] = useState<
     LabwareDefinition2 | undefined
   >(state.tipRack)
 
@@ -60,12 +73,12 @@ export function SelectTipRack(props: SelectTipRackProps): JSX.Element {
       <Flex
         marginTop={SPACING.spacing120}
         flexDirection={DIRECTION_COLUMN}
-        padding={`${SPACING.spacing16} ${SPACING.spacing60} ${SPACING.spacing40} ${SPACING.spacing60}`}
-        gridGap={SPACING.spacing4}
+        padding={`${SPACING.spacing32} ${SPACING.spacing60} ${SPACING.spacing40}`}
+        gridGap={SPACING.spacing8}
         width="100%"
       >
         {selectedPipetteDefaultTipracks.map(tipRack => {
-          const tipRackDef = allLabwareDefinitionsByUri[tipRack]
+          const tipRackDef = allLabwareDefinition2sByUri[tipRack]
 
           return tipRackDef != null ? (
             <RadioButton

@@ -1,9 +1,10 @@
-import * as React from 'react'
-import last from 'lodash/last'
-import { useSelector } from 'react-redux'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate, useParams } from 'react-router-dom'
 import first from 'lodash/first'
+import last from 'lodash/last'
+import { css } from 'styled-components'
 
 import { RUN_STATUS_IDLE, RUN_STATUS_STOPPED } from '@opentrons/api-client'
 import {
@@ -22,80 +23,116 @@ import {
   useConditionalConfirm,
 } from '@opentrons/components'
 import {
-  useProtocolQuery,
+  useAddCameraSettingsToRunMutation,
   useInstrumentsQuery,
-  useDoorQuery,
   useProtocolAnalysisAsDocumentQuery,
+  useProtocolQuery,
 } from '@opentrons/react-api-client'
 import {
   getDeckDefFromRobotType,
-  getModuleDisplayName,
   getFixtureDisplayName,
+  getModuleDisplayName,
 } from '@opentrons/shared-data'
 
-import { useRobotType } from '/app/redux-resources/robots'
+import { useScrollPosition } from '/app/local-resources/dom-utils'
+import { useInitializeCameraState } from '/app/local-resources/images/hooks/useInitializeCameraState'
+import { getIncompleteInstrumentCount } from '/app/local-resources/instruments'
 import {
-  useRobotAnalyticsData,
-  useTrackProtocolRunEvent,
-} from '/app/redux-resources/analytics'
-import { useAttachedModules } from '/app/resources/modules'
-
-import { getProtocolModulesInfo } from '/app/transformations/analysis'
+  NOT_CONFIGURED,
+  useIsDoorOpen,
+} from '/app/organisms/DoorOpenControl/useIsDoorOpen'
+import { LabwareOffsetsConflictModal } from '/app/organisms/LabwareOffsetsConflictModal'
+import {
+  useApplyOffsets,
+  useLPCFlows,
+} from '/app/organisms/LabwarePositionCheck'
+import { useIsHeaterShakerInProtocol } from '/app/organisms/ModuleCard/hooks'
 import {
   AnalysisFailedModal,
-  ProtocolSetupDeckConfiguration,
+  getUnmatchedModulesForProtocol,
   ProtocolSetupInstruments,
   ProtocolSetupLabware,
-  ProtocolSetupLiquids,
   ProtocolSetupModulesAndDeck,
   ProtocolSetupOffsets,
   ProtocolSetupStep,
   ProtocolSetupStepSkeleton,
   ProtocolSetupTitleSkeleton,
-  getUnmatchedModulesForProtocol,
-  getIncompleteInstrumentCount,
   ViewOnlyParameters,
 } from '/app/organisms/ODD/ProtocolSetup'
-import { useLaunchLPC } from '/app/organisms/LabwarePositionCheck/useLaunchLPC'
+import { ProtocolSetupCamera } from '/app/organisms/ODD/ProtocolSetup/ProtocolSetupCamera'
 import { ConfirmCancelRunModal } from '/app/organisms/ODD/RunningProtocol'
 import { useRunControls } from '/app/organisms/RunTimeControl/hooks'
 import { useToaster } from '/app/organisms/ToasterOven'
-import { useIsHeaterShakerInProtocol } from '/app/organisms/ModuleCard/hooks'
-import { getLocalRobot, getRobotSerialNumber } from '/app/redux/discovery'
+import {
+  SOURCE_RUN_RECORD,
+  useRobotAnalyticsData,
+  useTrackProtocolRunEvent,
+} from '/app/redux-resources/analytics'
+import { useCameraAnalytics } from '/app/redux-resources/analytics/'
+import { useRobotType } from '/app/redux-resources/robots'
 import {
   ANALYTICS_PROTOCOL_PROCEED_TO_RUN,
   ANALYTICS_PROTOCOL_RUN_ACTION,
   useTrackEvent,
 } from '/app/redux/analytics'
 import { getIsHeaterShakerAttached } from '/app/redux/config'
-import { ConfirmAttachedModal } from './ConfirmAttachedModal'
-import { ConfirmSetupStepsCompleteModal } from './ConfirmSetupStepsCompleteModal'
-import { getLatestCurrentOffsets } from '/app/transformations/runs'
-import { CloseButton, PlayButton } from './Buttons'
+import { getLocalRobot, getRobotSerialNumber } from '/app/redux/discovery'
+import {
+  CAMERA_SETUP_STEP_KEY,
+  getCameraUsageState,
+  LABWARE_SETUP_STEP_KEY,
+  LPC_STEP_KEY,
+  OFFSETS_CONFLICT,
+  selectAreOffsetsApplied,
+  selectCountMissingLSOffsetsWithoutDefault,
+  selectIsAnyNecessaryDefaultOffsetMissing,
+  selectOffsetSource,
+  selectTotalCountLocationSpecificOffsets,
+  updateCameraEnablement,
+} from '/app/redux/protocol-runs'
+import { useStoredProtocolAnalysis } from '/app/resources/analysis'
+import { useNotifyCamera } from '/app/resources/camera/useNotifyCamera'
 import { useDeckConfigurationCompatibility } from '/app/resources/deck_configuration/hooks'
 import { getRequiredDeckConfig } from '/app/resources/deck_configuration/utils'
+import { useRobotStorageInfo } from '/app/resources/health/useIsImageStorageLow'
+import { useNotifyCurrentMaintenanceRun } from '/app/resources/maintenance_runs'
+import { useAttachedModules } from '/app/resources/modules'
 import {
-  useNotifyRunQuery,
-  useRunStatus,
   useLPCDisabledReason,
   useModuleCalibrationStatus,
+  useMostRecentCompletedAnalysis,
+  useNotifyRunQuery,
   useProtocolAnalysisErrors,
 } from '/app/resources/runs'
-
-import type { Run } from '@opentrons/api-client'
-import type { CutoutFixtureId, CutoutId } from '@opentrons/shared-data'
-import type { OnDeviceRouteParams } from '/app/App/types'
-import type { ProtocolModuleInfo } from '/app/transformations/analysis'
-import type { SetupScreens } from '/app/organisms/ODD/ProtocolSetup'
-import type {
-  ProtocolHardware,
-  ProtocolFixture,
-} from '/app/transformations/commands'
+import { getProtocolModulesInfo } from '/app/transformations/analysis'
 import {
   getLabwareSetupItemGroups,
   getProtocolUsesGripper,
-  useRequiredProtocolHardwareFromAnalysis,
   useMissingProtocolHardwareFromAnalysis,
+  useRequiredProtocolHardwareFromAnalysis,
+} from '/app/transformations/commands'
+
+import { CloseButton, PlayButton } from './Buttons'
+import { ConfirmAttachedModal } from './ConfirmAttachedModal'
+import { ConfirmSetupStepsCompleteModal } from './ConfirmSetupStepsCompleteModal'
+
+import type { TFunction } from 'i18next'
+import type { FlattenSimpleInterpolation } from 'styled-components'
+import type { Dispatch, SetStateAction } from 'react'
+import type { Run, RunStatus } from '@opentrons/api-client'
+import type { OnDeviceRouteParams } from '/app/App/types'
+import type {
+  ProtocolSetupStepProps,
+  SetupScreens,
+} from '/app/organisms/ODD/ProtocolSetup'
+import type { StepKey } from '/app/redux/protocol-runs'
+import type { CameraState } from '/app/redux/protocol-runs/types'
+import type { State } from '/app/redux/types'
+import type { RobotStorageInfo } from '/app/resources/health/useIsImageStorageLow'
+import type { ProtocolModuleInfo } from '/app/transformations/analysis'
+import type {
+  ProtocolFixture,
+  ProtocolHardware,
 } from '/app/transformations/commands'
 
 const FETCH_DURATION_MS = 5000
@@ -103,40 +140,47 @@ const FETCH_DURATION_MS = 5000
 const ANALYSIS_POLL_MS = 5000
 interface PrepareToRunProps {
   runId: string
-  setSetupScreen: React.Dispatch<React.SetStateAction<SetupScreens>>
+  runStatus: RunStatus | null
+  setSetupScreen: Dispatch<SetStateAction<SetupScreens>>
   confirmAttachment: () => void
   confirmStepsComplete: () => void
   play: () => void
   robotName: string
   runRecord: Run | null
   labwareConfirmed: boolean
-  liquidsConfirmed: boolean
   offsetsConfirmed: boolean
+  cameraSettingsConfirmed: boolean
+  isLPCInitializing: boolean
+  isCameraRequired: boolean
+  appCameraSettings: CameraState
+  storageInfo: RobotStorageInfo
 }
 
 function PrepareToRun({
   runId,
+  runStatus,
   setSetupScreen,
   confirmAttachment,
   play,
   robotName,
   runRecord,
   labwareConfirmed,
-  liquidsConfirmed,
-  offsetsConfirmed,
+  isLPCInitializing,
   confirmStepsComplete,
+  offsetsConfirmed,
+  cameraSettingsConfirmed,
+  isCameraRequired,
+  appCameraSettings,
+  storageInfo,
 }: PrepareToRunProps): JSX.Element {
-  const { t, i18n } = useTranslation(['protocol_setup', 'shared'])
+  const { t, i18n } = useTranslation([
+    'protocol_setup',
+    'shared',
+    'deck_configuration',
+  ])
   const navigate = useNavigate()
   const { makeSnackbar } = useToaster()
-  const scrollRef = React.useRef<HTMLDivElement>(null)
-  const [isScrolled, setIsScrolled] = React.useState<boolean>(false)
-  const observer = new IntersectionObserver(([entry]) => {
-    setIsScrolled(!entry.isIntersecting)
-  })
-  if (scrollRef.current != null) {
-    observer.observe(scrollRef.current)
-  }
+  const { scrollRef, isScrolled } = useScrollPosition()
 
   const protocolId = runRecord?.data?.protocolId ?? null
   const { data: protocolRecord } = useProtocolQuery(protocolId, {
@@ -148,38 +192,41 @@ function PrepareToRun({
     protocolRecord?.data.metadata.protocolName ??
     protocolRecord?.data.files[0].name ??
     ''
-
-  const mostRecentAnalysisSummary = last(protocolRecord?.data.analysisSummaries)
-  const [
-    isPollingForCompletedAnalysis,
-    setIsPollingForCompletedAnalysis,
-  ] = React.useState<boolean>(mostRecentAnalysisSummary?.status !== 'completed')
-
-  const {
-    data: mostRecentAnalysis = null,
-  } = useProtocolAnalysisAsDocumentQuery(
-    protocolId,
-    last(protocolRecord?.data.analysisSummaries)?.id ?? null,
-    {
-      enabled: protocolRecord != null && isPollingForCompletedAnalysis,
-      refetchInterval: ANALYSIS_POLL_MS,
+  const robotType = useRobotType(robotName)
+  const { reportCameraEnablementSettings, reportPhotoAccessUsage } =
+    useCameraAnalytics({
+      source: SOURCE_RUN_RECORD,
+      robotType: robotType,
+    })
+  useEffect(() => {
+    if (storageInfo.isImageStorageLow) {
+      reportPhotoAccessUsage({
+        action: 'storageWarning',
+        transactionId: runId,
+      })
     }
-  )
+  }, [storageInfo.isImageStorageLow != null])
+  const mostRecentAnalysisSummary = last(protocolRecord?.data.analysisSummaries)
+  const [isPollingForCompletedAnalysis, setIsPollingForCompletedAnalysis] =
+    useState<boolean>(mostRecentAnalysisSummary?.status !== 'completed')
 
-  const runStatus = useRunStatus(runId)
-  if (runStatus === RUN_STATUS_STOPPED) {
-    navigate('/protocols')
-  }
+  const { data: mostRecentAnalysis = null } =
+    useProtocolAnalysisAsDocumentQuery(
+      protocolId,
+      last(protocolRecord?.data.analysisSummaries)?.id ?? null,
+      {
+        enabled: protocolRecord != null && isPollingForCompletedAnalysis,
+        refetchInterval: ANALYSIS_POLL_MS,
+      }
+    )
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (mostRecentAnalysis?.status === 'completed') {
       setIsPollingForCompletedAnalysis(false)
     } else {
       setIsPollingForCompletedAnalysis(true)
     }
   }, [mostRecentAnalysis?.status])
-
-  const robotType = useRobotType(robotName)
 
   const onConfirmCancelClose = (): void => {
     setShowConfirmCancelModal(false)
@@ -194,9 +241,8 @@ function PrepareToRun({
       refetchInterval: FETCH_DURATION_MS,
     }) ?? []
 
-  const { requiredProtocolHardware } = useRequiredProtocolHardwareFromAnalysis(
-    mostRecentAnalysis
-  )
+  const { requiredProtocolHardware } =
+    useRequiredProtocolHardwareFromAnalysis(mostRecentAnalysis)
 
   const requiredFixtures = requiredProtocolHardware.filter(
     (hardware): hardware is ProtocolFixture => {
@@ -235,10 +281,8 @@ function PrepareToRun({
       parameter.type === 'csv_file' || parameter.value !== parameter.default
   )
 
-  const [
-    showConfirmCancelModal,
-    setShowConfirmCancelModal,
-  ] = React.useState<boolean>(false)
+  const [showConfirmCancelModal, setShowConfirmCancelModal] =
+    useState<boolean>(false)
 
   const deckConfigCompatibility = useDeckConfigurationCompatibility(
     robotType,
@@ -256,6 +300,7 @@ function PrepareToRun({
   const isLoading =
     mostRecentAnalysis == null ||
     attachedInstruments == null ||
+    isLPCInitializing ||
     (protocolHasModules && attachedModules == null)
 
   const speccedInstrumentCount =
@@ -271,10 +316,8 @@ function PrepareToRun({
 
   const locationConflictSlots = requiredDeckConfigCompatibility.map(
     fixtureCompatibility => {
-      const {
-        compatibleCutoutFixtureIds,
-        cutoutFixtureId,
-      } = fixtureCompatibility
+      const { compatibleCutoutFixtureIds, cutoutFixtureId } =
+        fixtureCompatibility
       const isCurrentFixtureCompatible =
         cutoutFixtureId != null &&
         compatibleCutoutFixtureIds.includes(cutoutFixtureId)
@@ -338,25 +381,46 @@ function PrepareToRun({
     areModulesReady && areFixturesReady && !isLocationConflict
       ? 'ready'
       : 'not ready'
-  // Liquids information
-  const liquidsInProtocol = mostRecentAnalysis?.liquids ?? []
-  const areLiquidsInProtocol = liquidsInProtocol.length > 0
+
+  const isAnyNecessaryDefaultOffsetMissing = useSelector(
+    selectIsAnyNecessaryDefaultOffsetMissing(runId)
+  )
+
+  const { enabled: isCameraEnabledForRun } = useSelector((state: State) =>
+    getCameraUsageState(state, runId)
+  )
+  const isCameraReadyToRun = isCameraRequired
+    ? isCameraEnabledForRun || cameraSettingsConfirmed
+    : true
 
   const isReadyToRun =
-    incompleteInstrumentCount === 0 && areModulesReady && areFixturesReady
+    incompleteInstrumentCount === 0 &&
+    areModulesReady &&
+    areFixturesReady &&
+    !isAnyNecessaryDefaultOffsetMissing &&
+    isCameraReadyToRun
   const onPlay = (): void => {
-    if (isDoorOpen) {
-      makeSnackbar(t('shared:close_robot_door') as string)
+    if (doorStatus.isDoorOpen) {
+      if (
+        doorStatus.moduleDoorLocation !== null &&
+        doorStatus.moduleDoorLocation !== NOT_CONFIGURED
+      ) {
+        makeSnackbar(
+          t('shared:close_stacker_door', {
+            module_door_location: doorStatus.moduleDoorLocation,
+          }) as string
+        )
+      } else if (
+        doorStatus.moduleDoorLocation !== null &&
+        doorStatus.moduleDoorLocation === NOT_CONFIGURED
+      ) {
+        makeSnackbar(t('shared:close_unconfigured_stacker_door') as string)
+      } else {
+        makeSnackbar(t('shared:close_robot_door') as string)
+      }
     } else {
       if (isReadyToRun) {
-        if (
-          runStatus === RUN_STATUS_IDLE &&
-          !(
-            labwareConfirmed &&
-            offsetsConfirmed &&
-            (liquidsConfirmed || !areLiquidsInProtocol)
-          )
-        ) {
+        if (runStatus === RUN_STATUS_IDLE && !labwareConfirmed) {
           confirmStepsComplete()
         } else if (runStatus === RUN_STATUS_IDLE && isHeaterShakerInProtocol) {
           confirmAttachment()
@@ -366,7 +430,14 @@ function PrepareToRun({
             name: ANALYTICS_PROTOCOL_RUN_ACTION.START,
             properties: robotAnalyticsData ?? {},
           })
+          reportCameraEnablementSettings({
+            cameraEnabled: appCameraSettings.enabled,
+            liveFeedEnabled: appCameraSettings.liveStreamEnabled,
+            recoveryCaptureEnabled: appCameraSettings.recoveryEnabled,
+          })
         }
+      } else if (!isCameraReadyToRun) {
+        makeSnackbar(i18n.format(t('enable_camera')))
       } else {
         makeSnackbar(
           i18n.format(t('complete_setup_before_proceeding'), 'capitalize')
@@ -435,6 +506,7 @@ function PrepareToRun({
   const missingFixturesText =
     missingFixtures.length === 1
       ? `${t('missing')} ${getFixtureDisplayName(
+          t as TFunction,
           missingFixtures[0].cutoutFixtureId
         )}`
       : t('multiple_fixtures_missing', { count: missingFixtures.length })
@@ -455,7 +527,7 @@ function PrepareToRun({
   } else if (isMissingModules) {
     modulesDetail = missingModulesText
   } else if (!moduleCalibrationStatus.complete) {
-    modulesDetail = t('calibration_required')
+    modulesDetail = t('action_needed')
   } else {
     // modules and deck are ready
     const hardwareDetail = getConnectedHardwareText(
@@ -482,16 +554,45 @@ function PrepareToRun({
       ? t('additional_labware', { count: additionalLabwareCount })
       : null
 
-  const latestCurrentOffsets = getLatestCurrentOffsets(
-    runRecord?.data?.labwareOffsets ?? []
+  const totalOffsets = useSelector(
+    selectTotalCountLocationSpecificOffsets(runId)
+  )
+  const numMissingLSOffsets = useSelector(
+    selectCountMissingLSOffsetsWithoutDefault(runId)
   )
 
-  const { data: doorStatus } = useDoorQuery({
-    refetchInterval: FETCH_DURATION_MS,
-  })
-  const isDoorOpen =
-    doorStatus?.data.status === 'open' &&
-    doorStatus?.data.doorRequiredClosedForProtocol
+  const lpcSetupStepProps = (): Pick<
+    ProtocolSetupStepProps,
+    'detail' | 'status' | 'interactionDisabled'
+  > => {
+    if (totalOffsets === 0) {
+      return {
+        detail: t('offsets_not_required'),
+        status: 'ready',
+        interactionDisabled: true,
+      }
+    } else if (offsetsConfirmed) {
+      return {
+        detail: t('num_offsets_applied', { num: totalOffsets }),
+        status: 'ready',
+      }
+    } else if (isAnyNecessaryDefaultOffsetMissing) {
+      return {
+        detail:
+          numMissingLSOffsets > 1
+            ? t('num_missing_offsets', { num: numMissingLSOffsets })
+            : t('one_missing_offset'),
+        status: 'not ready',
+      }
+    } else {
+      return {
+        detail: t('offsets_not_applied'),
+        status: 'not ready',
+      }
+    }
+  }
+
+  const doorStatus = useIsDoorOpen(robotName)
 
   const parametersDetail = hasRunTimeParameters
     ? hasCustomRunTimeParameters
@@ -524,13 +625,13 @@ function PrepareToRun({
             {!isLoading ? (
               <>
                 <LegacyStyledText
-                  as="h4"
+                  forwardedAs="h4"
                   fontWeight={TYPOGRAPHY.fontWeightBold}
                 >
                   {t('prepare_to_run')}
                 </LegacyStyledText>
                 <LegacyStyledText
-                  as="h4"
+                  forwardedAs="h4"
                   color={COLORS.grey50}
                   fontWeight={TYPOGRAPHY.fontWeightSemiBold}
                   overflowWrap={OVERFLOW_WRAP_ANYWHERE}
@@ -556,7 +657,7 @@ function PrepareToRun({
               disabled={isLoading}
               onPlay={!isLoading ? onPlay : undefined}
               ready={!isLoading ? isReadyToRun : false}
-              isDoorOpen={isDoorOpen}
+              isDoorOpen={doorStatus.isDoorOpen}
             />
           </Flex>
         </Flex>
@@ -569,6 +670,16 @@ function PrepareToRun({
       >
         {!isLoading ? (
           <>
+            <ProtocolSetupStep
+              onClickSetupStep={() => {
+                setSetupScreen('view only parameters')
+              }}
+              title={t('parameters')}
+              detail={parametersDetail}
+              subDetail={null}
+              status="ready"
+              interactionDisabled={!hasRunTimeParameters}
+            />
             <ProtocolSetupStep
               onClickSetupStep={() => {
                 setSetupScreen('instruments')
@@ -594,30 +705,14 @@ function PrepareToRun({
               onClickSetupStep={() => {
                 setSetupScreen('offsets')
               }}
-              title={t('labware_position_check')}
-              detail={t('recommended')}
-              subDetail={
-                latestCurrentOffsets.length > 0
-                  ? t('offsets_applied', { count: latestCurrentOffsets.length })
-                  : null
-              }
-              status={offsetsConfirmed ? 'ready' : 'general'}
-            />
-            <ProtocolSetupStep
-              onClickSetupStep={() => {
-                setSetupScreen('view only parameters')
-              }}
-              title={t('parameters')}
-              detail={parametersDetail}
-              subDetail={null}
-              status="ready"
-              interactionDisabled={!hasRunTimeParameters}
+              title={t('labware_offsets')}
+              {...lpcSetupStepProps()}
             />
             <ProtocolSetupStep
               onClickSetupStep={() => {
                 setSetupScreen('labware')
               }}
-              title={i18n.format(t('labware'), 'capitalize')}
+              title={t('labware_liquids_setup_step_title')}
               detail={labwareDetail}
               subDetail={labwareSubDetail}
               status={labwareConfirmed ? 'ready' : 'general'}
@@ -625,20 +720,15 @@ function PrepareToRun({
             />
             <ProtocolSetupStep
               onClickSetupStep={() => {
-                setSetupScreen('liquids')
+                setSetupScreen('camera')
               }}
-              title={i18n.format(t('liquids'), 'capitalize')}
-              status={
-                liquidsConfirmed || !areLiquidsInProtocol ? 'ready' : 'general'
-              }
+              title={t('camera_setup_step_title')}
               detail={
-                areLiquidsInProtocol
-                  ? t('initial_liquids_num', {
-                      count: liquidsInProtocol.length,
-                    })
-                  : t('liquids_not_in_setup')
+                appCameraSettings.enabled
+                  ? t('protocol_setup:enabled')
+                  : t('protocol_setup:disabled')
               }
-              interactionDisabled={!areLiquidsInProtocol}
+              status={cameraSettingsConfirmed ? 'ready' : 'general'}
             />
           </>
         ) : (
@@ -660,23 +750,32 @@ function PrepareToRun({
   )
 }
 
+const MAINTENANCE_RUN_POLL_MS = 5000
+const RUN_RECORD_REFETCH_MS = 5000
+
 export function ProtocolSetup(): JSX.Element {
   const { runId } = useParams<
     keyof OnDeviceRouteParams
   >() as OnDeviceRouteParams
-  const { data: runRecord } = useNotifyRunQuery(runId, { staleTime: Infinity })
+  const { data: runRecord } = useNotifyRunQuery(runId, {
+    staleTime: Infinity,
+    refetchInterval: RUN_RECORD_REFETCH_MS,
+  })
+  const runStatus = runRecord?.data.status ?? null
+  const dispatch = useDispatch()
   const { analysisErrors } = useProtocolAnalysisErrors(runId)
-  const { t } = useTranslation(['protocol_setup'])
+  const robotProtocolAnalysis = useMostRecentCompletedAnalysis(runId)
+  const storedProtocolAnalysis = useStoredProtocolAnalysis(runId)
+  const protocolAnalysis = robotProtocolAnalysis ?? storedProtocolAnalysis
   const localRobot = useSelector(getLocalRobot)
   const robotName = localRobot?.name != null ? localRobot.name : 'no name'
   const robotSerialNumber =
     localRobot?.status != null ? getRobotSerialNumber(localRobot) : null
   const trackEvent = useTrackEvent()
   const { play } = useRunControls(runId)
-  const [
-    showAnalysisFailedModal,
-    setShowAnalysisFailedModal,
-  ] = React.useState<boolean>(true)
+  const { addCameraSettingsToRun } = useAddCameraSettingsToRunMutation()
+  const [showAnalysisFailedModal, setShowAnalysisFailedModal] =
+    useState<boolean>(true)
   const robotType = useRobotType(robotName)
   const attachedModules =
     useAttachedModules({
@@ -687,25 +786,29 @@ export function ProtocolSetup(): JSX.Element {
     staleTime: Infinity,
   })
   const mostRecentAnalysisSummary = last(protocolRecord?.data.analysisSummaries)
-  const [
-    isPollingForCompletedAnalysis,
-    setIsPollingForCompletedAnalysis,
-  ] = React.useState<boolean>(mostRecentAnalysisSummary?.status !== 'completed')
+  const [isPollingForCompletedAnalysis, setIsPollingForCompletedAnalysis] =
+    useState<boolean>(mostRecentAnalysisSummary?.status !== 'completed')
+  const isMaintenanceRunActive =
+    useNotifyCurrentMaintenanceRun({ refetchInterval: MAINTENANCE_RUN_POLL_MS })
+      .data?.data.id != null
 
-  const {
-    data: mostRecentAnalysis = null,
-  } = useProtocolAnalysisAsDocumentQuery(
-    protocolId,
-    last(protocolRecord?.data.analysisSummaries)?.id ?? null,
-    {
-      enabled: protocolRecord != null && isPollingForCompletedAnalysis,
-      refetchInterval: ANALYSIS_POLL_MS,
-    }
-  )
+  const navigate = useNavigate()
 
-  const areLiquidsInProtocol = (mostRecentAnalysis?.liquids?.length ?? 0) > 0
+  if (runStatus === RUN_STATUS_STOPPED) {
+    navigate('/protocols')
+  }
 
-  React.useEffect(() => {
+  const { data: mostRecentAnalysis = null } =
+    useProtocolAnalysisAsDocumentQuery(
+      protocolId,
+      last(protocolRecord?.data.analysisSummaries)?.id ?? null,
+      {
+        enabled: protocolRecord != null && isPollingForCompletedAnalysis,
+        refetchInterval: ANALYSIS_POLL_MS,
+      }
+    )
+
+  useEffect(() => {
     if (mostRecentAnalysis?.status === 'completed') {
       setIsPollingForCompletedAnalysis(false)
     } else {
@@ -732,23 +835,90 @@ export function ProtocolSetup(): JSX.Element {
       : null
   const lpcDisabledReason = useLPCDisabledReason({
     runId,
-    hasMissingModulesForOdd: isMissingModules,
-    hasMissingCalForOdd:
+    robotName,
+    hasMissingModulesForFlex: isMissingModules,
+    hasMissingCalForFlex:
       incompleteInstrumentCount != null && incompleteInstrumentCount > 0,
   })
   const protocolName =
     protocolRecord?.data.metadata.protocolName ??
     protocolRecord?.data.files[0].name ??
     ''
+  const { trackProtocolRunEvent } = useTrackProtocolRunEvent(runId, robotName)
+  const robotAnalyticsData = useRobotAnalyticsData(robotName)
 
-  const { launchLPC, LPCWizard } = useLaunchLPC(runId, robotType, protocolName)
-  const handleProceedToRunClick = (): void => {
+  const offsetsConfirmed = useSelector(selectAreOffsetsApplied(runId))
+  const { applyOffsets, isApplyingOffsets } = useApplyOffsets(runId)
+
+  const [cameraSettingsConfirmed, setCameraSettingsConfirmed] = useState(false)
+  const { data: initialRobotCameraSettings } = useNotifyCamera({
+    staleTime: Infinity,
+  })
+
+  // The initial app-internal camera state should match the server state.
+  useEffect(() => {
+    if (initialRobotCameraSettings != null) {
+      dispatch(
+        updateCameraEnablement(runId, initialRobotCameraSettings.cameraEnabled)
+      )
+    }
+  }, [initialRobotCameraSettings])
+
+  const appCameraSettings = useSelector((state: State) =>
+    getCameraUsageState(state, runId)
+  )
+  const isCameraRequired =
+    protocolAnalysis?.commandPreconditions?.isCameraUsed ?? false
+  const cameraSettingsApplied = runRecord?.data.cameraSettings != null
+  const confirmCameraSettings = (): void => {
+    setCameraSettingsConfirmed(!cameraSettingsConfirmed)
+  }
+  if (cameraSettingsApplied && !cameraSettingsConfirmed) {
+    setCameraSettingsConfirmed(true)
+  }
+
+  const proceedToRun = (): void => {
+    // Camera settings do not require explicit confirmation by *any* user,
+    // so if the settings haven't been confirmed, use this user's settings
+    // before starting the run.
+    if (!cameraSettingsApplied) {
+      addCameraSettingsToRun(
+        {
+          runId,
+          settings: {
+            errorRecoveryCameraEnabled: appCameraSettings.recoveryEnabled,
+            liveStreamEnabled: appCameraSettings.liveStreamEnabled,
+            cameraEnabled: appCameraSettings.enabled,
+          },
+        },
+        { onSettled: onPlay }
+      )
+    } else {
+      onPlay()
+    }
+  }
+
+  const onPlay = (): void => {
     trackEvent({
       name: ANALYTICS_PROTOCOL_PROCEED_TO_RUN,
       properties: { robotSerialNumber },
     })
+    trackProtocolRunEvent({
+      name: ANALYTICS_PROTOCOL_RUN_ACTION.START,
+      properties: robotAnalyticsData ?? {},
+    })
     play()
   }
+
+  const handleProceedToRunClick = (): Promise<void> => {
+    if (!offsetsConfirmed) {
+      return applyOffsets().then(proceedToRun)
+    } else {
+      proceedToRun()
+      return Promise.resolve()
+    }
+  }
+
   const configBypassHeaterShakerAttachmentConfirmation = useSelector(
     getIsHeaterShakerAttached
   )
@@ -760,37 +930,35 @@ export function ProtocolSetup(): JSX.Element {
     handleProceedToRunClick,
     !configBypassHeaterShakerAttachmentConfirmation
   )
-  const [cutoutId, setCutoutId] = React.useState<CutoutId | null>(null)
-  const [providedFixtureOptions, setProvidedFixtureOptions] = React.useState<
-    CutoutFixtureId[]
-  >([])
-  const [labwareConfirmed, setLabwareConfirmed] = React.useState<boolean>(false)
-  const [liquidsConfirmed, setLiquidsConfirmed] = React.useState<boolean>(false)
-  const [offsetsConfirmed, setOffsetsConfirmed] = React.useState<boolean>(false)
+  // TODO(jh 10-31-24): Refactor the below to utilize useMissingStepsModal.
+  const [labwareConfirmed, setLabwareConfirmed] = useState<boolean>(false)
   const missingSteps = [
-    !offsetsConfirmed ? t('applied_labware_offsets') : null,
-    !labwareConfirmed ? t('labware_placement') : null,
-    !liquidsConfirmed && areLiquidsInProtocol ? t('liquids') : null,
-  ].filter(s => s != null)
+    !labwareConfirmed ? LABWARE_SETUP_STEP_KEY : null,
+    !offsetsConfirmed ? LPC_STEP_KEY : null,
+    !cameraSettingsConfirmed ? CAMERA_SETUP_STEP_KEY : null,
+  ].filter(s => s != null) as StepKey[]
   const {
     confirm: confirmMissingSteps,
     showConfirmation: showMissingStepsConfirmation,
     cancel: cancelExitMissingStepsConfirmation,
-  } = useConditionalConfirm(
-    handleProceedToRunClick,
-    !(labwareConfirmed && liquidsConfirmed && offsetsConfirmed)
-  )
-  const runStatus = useRunStatus(runId)
+  } = useConditionalConfirm(handleProceedToRunClick, !labwareConfirmed)
   const isHeaterShakerInProtocol = useIsHeaterShakerInProtocol()
+  const lpcLaunchProps = useLPCFlows({
+    runId,
+    robotType,
+    protocolName,
+  })
+  const offsetSource = useSelector(selectOffsetSource(runId))
+  const storageInfo = useRobotStorageInfo()
+  useInitializeCameraState(runId)
 
   // orchestrate setup subpages/components
-  const [setupScreen, setSetupScreen] = React.useState<SetupScreens>(
-    'prepare to run'
-  )
+  const [setupScreen, setSetupScreen] = useState<SetupScreens>('prepare to run')
   const setupComponentByScreen = {
     'prepare to run': (
       <PrepareToRun
         runId={runId}
+        runStatus={runStatus}
         setSetupScreen={setSetupScreen}
         confirmAttachment={confirmAttachment}
         confirmStepsComplete={confirmMissingSteps}
@@ -798,8 +966,12 @@ export function ProtocolSetup(): JSX.Element {
         robotName={robotName}
         runRecord={runRecord ?? null}
         labwareConfirmed={labwareConfirmed}
-        liquidsConfirmed={liquidsConfirmed}
+        isLPCInitializing={lpcLaunchProps.isFlexLPCInitializing}
         offsetsConfirmed={offsetsConfirmed}
+        cameraSettingsConfirmed={cameraSettingsConfirmed}
+        isCameraRequired={isCameraRequired}
+        appCameraSettings={appCameraSettings}
+        storageInfo={storageInfo}
       />
     ),
     instruments: (
@@ -809,19 +981,16 @@ export function ProtocolSetup(): JSX.Element {
       <ProtocolSetupModulesAndDeck
         runId={runId}
         setSetupScreen={setSetupScreen}
-        setCutoutId={setCutoutId}
-        setProvidedFixtureOptions={setProvidedFixtureOptions}
       />
     ),
     offsets: (
       <ProtocolSetupOffsets
         runId={runId}
+        runRecord={runRecord}
+        lpcLaunchProps={lpcLaunchProps}
         setSetupScreen={setSetupScreen}
         lpcDisabledReason={lpcDisabledReason}
-        launchLPC={launchLPC}
-        LPCWizard={LPCWizard}
         isConfirmed={offsetsConfirmed}
-        setIsConfirmed={setOffsetsConfirmed}
       />
     ),
     labware: (
@@ -832,20 +1001,15 @@ export function ProtocolSetup(): JSX.Element {
         setIsConfirmed={setLabwareConfirmed}
       />
     ),
-    liquids: (
-      <ProtocolSetupLiquids
+    camera: (
+      <ProtocolSetupCamera
         runId={runId}
+        isCameraRequired={isCameraRequired}
+        cameraConfirmed={cameraSettingsConfirmed}
+        robotName={robotName}
+        confirmCameraSettings={confirmCameraSettings}
         setSetupScreen={setSetupScreen}
-        isConfirmed={liquidsConfirmed}
-        setIsConfirmed={setLiquidsConfirmed}
-      />
-    ),
-    'deck configuration': (
-      <ProtocolSetupDeckConfiguration
-        cutoutId={cutoutId}
-        runId={runId}
-        setSetupScreen={setSetupScreen}
-        providedFixtureOptions={providedFixtureOptions}
+        storageInfo={storageInfo}
       />
     ),
     'view only parameters': (
@@ -873,6 +1037,7 @@ export function ProtocolSetup(): JSX.Element {
               ? confirmAttachment()
               : handleProceedToRunClick()
           }}
+          isRunStarting={isApplyingOffsets}
         />
       ) : null}
       {showHSConfirmationModal ? (
@@ -882,16 +1047,33 @@ export function ProtocolSetup(): JSX.Element {
           onConfirmClick={handleProceedToRunClick}
         />
       ) : null}
-      <Flex
-        flexDirection={DIRECTION_COLUMN}
-        padding={
-          setupScreen === 'prepare to run'
-            ? `0 ${SPACING.spacing32} ${SPACING.spacing40}`
-            : `${SPACING.spacing32} ${SPACING.spacing40} ${SPACING.spacing40}`
-        }
-      >
+      {offsetSource === OFFSETS_CONFLICT && !isMaintenanceRunActive ? (
+        <LabwareOffsetsConflictModal runId={runId} isOnDevice={true} />
+      ) : null}
+      <Flex css={buildSetupScreenStyle(setupScreen)}>
         {setupComponentByScreen[setupScreen]}
       </Flex>
     </>
   )
+}
+
+const buildSetupScreenStyle = (
+  setupScreen: SetupScreens
+): FlattenSimpleInterpolation => {
+  const paddingStyle = (): string => {
+    switch (setupScreen) {
+      case 'prepare to run':
+        return `0 ${SPACING.spacing32} ${SPACING.spacing40}`
+      case 'offsets':
+      case 'camera':
+        return ''
+      default:
+        return `${SPACING.spacing32} ${SPACING.spacing40} ${SPACING.spacing40}`
+    }
+  }
+
+  return css`
+    flex-direction: ${DIRECTION_COLUMN};
+    padding: ${paddingStyle()};
+  `
 }

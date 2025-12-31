@@ -1,16 +1,19 @@
 import { useMutation, useQueryClient } from 'react-query'
+
 import { uploadCsvFile } from '@opentrons/api-client'
+
 import { useHost } from '../api'
+
 import type { AxiosError } from 'axios'
 import type {
-  UseMutationResult,
-  UseMutationOptions,
   UseMutateAsyncFunction,
+  UseMutationOptions,
+  UseMutationResult,
 } from 'react-query'
 import type {
   ErrorResponse,
-  HostConfig,
   FileData,
+  HostConfig,
   UploadedCsvFileResponse,
 } from '@opentrons/api-client'
 
@@ -47,7 +50,7 @@ export function useUploadCsvFileMutation(
     FileData
   >(
     (fileData: FileData) =>
-      uploadCsvFile(host as HostConfig, fileData).then(response => {
+      uploadCsvFile(host!, fileData).then(response => {
         queryClient
           .invalidateQueries([host, 'dataFiles'])
           .then(() =>

@@ -1,25 +1,26 @@
-import NiceModal, { useModal } from '@ebay/nice-modal-react'
 import { Trans, useTranslation } from 'react-i18next'
+import NiceModal, { useModal } from '@ebay/nice-modal-react'
 
 import {
   COLORS,
   DIRECTION_COLUMN,
   Flex,
-  SPACING,
   LegacyStyledText,
+  SPACING,
 } from '@opentrons/components'
 import { ApiHostProvider } from '@opentrons/react-api-client'
 import { FLEX_ROBOT_TYPE } from '@opentrons/shared-data'
 
 import { SmallButton } from '/app/atoms/buttons'
-import { OddModal } from '/app/molecules/OddModal'
-import { DropTipWizardFlows, useDropTipWizardFlows } from '.'
 import { useHomePipettes } from '/app/local-resources/instruments'
+import { OddModal } from '/app/molecules/OddModal'
+
+import { DropTipWizardFlows, useDropTipWizardFlows } from '.'
 
 import type { HostConfig } from '@opentrons/api-client'
-import type { OddModalHeaderBaseProps } from '/app/molecules/OddModal/types'
 import type { UseHomePipettesProps } from '/app/local-resources/instruments'
-import type { PipetteWithTip } from './hooks'
+import type { OddModalHeaderBaseProps } from '/app/molecules/OddModal/types'
+import type { PipetteWithTip } from '/app/resources/instruments'
 import type { PipetteDetails } from '/app/resources/maintenance_runs'
 
 type TipsAttachedModalProps = Pick<UseHomePipettesProps, 'onSettled'> & {
@@ -38,12 +39,8 @@ export const handleTipsAttachedModal = (
 
 const TipsAttachedModal = NiceModal.create(
   (props: TipsAttachedModalProps): JSX.Element => {
-    const {
-      aPipetteWithTip,
-      host,
-      setTipStatusResolved,
-      ...homePipetteProps
-    } = props
+    const { aPipetteWithTip, host, setTipStatusResolved, ...homePipetteProps } =
+      props
     const { t } = useTranslation(['drop_tip_wizard'])
     const modal = useModal()
 
@@ -84,7 +81,7 @@ const TipsAttachedModal = NiceModal.create(
       <ApiHostProvider {...host} hostname={host?.hostname ?? null}>
         <OddModal header={tipsAttachedHeader}>
           <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing32}>
-            <LegacyStyledText as="p">
+            <LegacyStyledText forwardedAs="p">
               <Trans
                 t={t}
                 i18nKey="liquid_damages_this_pipette"

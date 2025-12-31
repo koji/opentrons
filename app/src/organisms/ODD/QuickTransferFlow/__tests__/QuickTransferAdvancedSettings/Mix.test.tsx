@@ -1,13 +1,15 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { InputField } from '@opentrons/components'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 import { useTrackEventWithRobotSerial } from '/app/redux-resources/analytics'
+
 import { Mix } from '../../QuickTransferAdvancedSettings/Mix'
+
+import type { ComponentProps } from 'react'
 import type { QuickTransferSummaryState } from '../../types'
 
 vi.mock('/app/redux-resources/analytics')
@@ -21,7 +23,7 @@ vi.mock('@opentrons/components', async importOriginal => {
   }
 })
 
-const render = (props: React.ComponentProps<typeof Mix>) => {
+const render = (props: ComponentProps<typeof Mix>) => {
   return renderWithProviders(<Mix {...props} />, {
     i18nInstance: i18n,
   })
@@ -29,7 +31,7 @@ const render = (props: React.ComponentProps<typeof Mix>) => {
 let mockTrackEventWithRobotSerial: any
 
 describe('Mix', () => {
-  let props: React.ComponentProps<typeof Mix>
+  let props: ComponentProps<typeof Mix>
 
   beforeEach(() => {
     props = {
@@ -89,7 +91,7 @@ describe('Mix', () => {
       kind: 'dispense',
     }
     render(props)
-    screen.getByText('Mix before dispensing')
+    screen.getByText('Mix after dispensing')
   })
 
   it('renders save button if you select enabled, then moves to second screen', () => {
@@ -131,7 +133,7 @@ describe('Mix', () => {
     expect(vi.mocked(InputField)).toHaveBeenCalledWith(
       {
         title: 'Mix volume (µL)',
-        error: 'Value must be between 1-200',
+        error: 'Value must be between 1 to 200',
         readOnly: true,
         type: 'number',
         value: 0,
@@ -157,7 +159,7 @@ describe('Mix', () => {
     expect(vi.mocked(InputField)).toHaveBeenCalledWith(
       {
         title: 'Mix repetitions',
-        error: 'Value must be between 1-999',
+        error: 'Value must be between 1 to 999',
         readOnly: true,
         type: 'number',
         value: 0,
@@ -193,7 +195,7 @@ describe('Mix', () => {
         ...props.state,
         mixOnAspirate: {
           mixVolume: 15,
-          repititions: 55,
+          repetitions: 55,
         },
       },
     }
@@ -231,7 +233,7 @@ describe('Mix', () => {
         ...props.state,
         mixOnDispense: {
           mixVolume: 18,
-          repititions: 2,
+          repetitions: 2,
         },
       },
     }

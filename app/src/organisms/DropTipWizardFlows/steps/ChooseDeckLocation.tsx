@@ -10,8 +10,8 @@ import {
 } from '@opentrons/components'
 import { getDeckDefFromRobotType } from '@opentrons/shared-data'
 
-import { DT_ROUTES } from '/app/organisms/DropTipWizardFlows/constants'
 import { DeckMapContent, TwoColumn } from '/app/molecules/InterventionModal'
+import { DT_ROUTES } from '/app/organisms/DropTipWizardFlows/constants'
 import { DropTipFooterButtons } from '/app/organisms/DropTipWizardFlows/shared'
 
 import type { ModuleLocation } from '@opentrons/shared-data'
@@ -36,7 +36,7 @@ export function ChooseDeckLocation({
     )?.id
 
     if (deckSlot != null) {
-      void moveToAddressableArea(deckSlot).then(() => {
+      void moveToAddressableArea(deckSlot, false).then(() => {
         proceedWithConditionalClose()
       })
     }
@@ -69,7 +69,9 @@ export function ChooseDeckLocation({
             <Trans
               t={t}
               i18nKey={buildBodyText()}
-              components={{ block: <LegacyStyledText as="p" /> }}
+              components={{
+                block: <LegacyStyledText forwardedAs="p" />,
+              }}
             />
           </StyledText>
         </Flex>

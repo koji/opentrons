@@ -1,4 +1,5 @@
 """Test calibrate-pipette command."""
+
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
@@ -27,7 +28,6 @@ if TYPE_CHECKING:
     from opentrons.hardware_control.ot3api import OT3API
 
 
-@pytest.mark.ot3_only
 @pytest.fixture(autouse=True)
 def _mock_ot3_calibration(decoy: Decoy, monkeypatch: pytest.MonkeyPatch) -> None:
     for name, func in inspect.getmembers(calibration, inspect.isfunction):

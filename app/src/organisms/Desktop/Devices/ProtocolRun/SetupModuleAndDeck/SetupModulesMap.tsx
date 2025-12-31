@@ -1,8 +1,9 @@
 import {
+  AlignToModuleChildSlot,
   BaseDeck,
   Box,
-  Flex,
   DIRECTION_COLUMN,
+  Flex,
   SPACING,
 } from '@opentrons/components'
 import {
@@ -11,16 +12,19 @@ import {
   getSimplestDeckConfigForProtocol,
 } from '@opentrons/shared-data'
 
-import { useMostRecentCompletedAnalysis } from '/app/resources/runs'
-import { ModuleInfo } from '/app/molecules/ModuleInfo'
-import { useAttachedModules } from '/app/resources/modules'
-import {
-  getProtocolModulesInfo,
-  getAttachedProtocolModuleMatches,
-} from '/app/transformations/analysis'
 import { getStandardDeckViewLayerBlockList } from '/app/local-resources/deck_configuration'
-import { useNotifyDeckConfigurationQuery } from '/app/resources/deck_configuration'
+import { useModuleUSBPort } from '/app/local-resources/modules'
+import { ModuleInfo } from '/app/molecules/ModuleInfo'
 import { useStoredProtocolAnalysis } from '/app/resources/analysis'
+import { useNotifyDeckConfigurationQuery } from '/app/resources/deck_configuration'
+import { useAttachedModules } from '/app/resources/modules'
+import { useMostRecentCompletedAnalysis } from '/app/resources/runs'
+import {
+  getAttachedProtocolModuleMatches,
+  getProtocolModulesInfo,
+} from '/app/transformations/analysis'
+
+import type { ModuleOnDeck } from '@opentrons/components'
 
 const ATTACHED_MODULE_POLL_MS = 5000
 const DECK_CONFIG_POLL_MS = 5000
@@ -33,6 +37,7 @@ export const SetupModulesMap = ({
   runId,
 }: SetupModulesMapProps): JSX.Element | null => {
   // similar data pattern to ODD ProtocolSetupModules, with addition of stored analysis
+  const { parseModuleUSBPort } = useModuleUSBPort()
   const robotProtocolAnalysis = useMostRecentCompletedAnalysis(runId)
   const storedProtocolAnalysis = useStoredProtocolAnalysis(runId)
   const protocolAnalysis = robotProtocolAnalysis ?? storedProtocolAnalysis
@@ -59,22 +64,30 @@ export const SetupModulesMap = ({
     robotType
   )
 
-  const modulesOnDeck = attachedProtocolModuleMatches.map(module => ({
-    moduleModel: module.moduleDef.model,
-    moduleLocation: { slotName: module.slotName },
-    moduleChildren: (
-      <ModuleInfo
-        moduleModel={module.moduleDef.model}
-        isAttached={module.attachedModuleMatch != null}
-        physicalPort={module.attachedModuleMatch?.usbPort ?? null}
-        runId={runId}
-      />
-    ),
-  }))
-
-  const simplestProtocolDeckConfig = getSimplestDeckConfigForProtocol(
-    protocolAnalysis
+  const modulesOnDeck = attachedProtocolModuleMatches.map(
+    (module): ModuleOnDeck => ({
+      nestedLabwareDefsBottomToTop: [],
+      moduleModel: module.moduleDef.model,
+      moduleLocation: { slotName: module.slotName },
+      moduleChildren: (
+        <AlignToModuleChildSlot
+          deckId={deckDef.otId}
+          slotId={module.slotName}
+          moduleDefinition={module.moduleDef}
+        >
+          <ModuleInfo
+            moduleModel={module.moduleDef.model}
+            isAttached={module.attachedModuleMatch != null}
+            physicalPort={parseModuleUSBPort(module.attachedModuleMatch)}
+            runId={runId}
+          />
+        </AlignToModuleChildSlot>
+      ),
+    })
   )
+
+  const simplestProtocolDeckConfig =
+    getSimplestDeckConfigForProtocol(protocolAnalysis)
 
   return (
     <Flex

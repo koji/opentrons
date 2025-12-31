@@ -3,9 +3,10 @@
 
 import pick from 'lodash/pick'
 
+import type { CSSProperties } from 'react'
 import type * as Types from './types'
 
-import type { CSSObject } from 'styled-components'
+type Text = string | number
 
 const COLOR_PROPS = ['color', 'backgroundColor', 'opacity'] as const
 
@@ -52,7 +53,10 @@ const BORDER_PROPS = [
 const FLEXBOX_PROPS = [
   'flex',
   'alignItems',
+  'alignContent',
   'justifyContent',
+  'justifyItems',
+  'justifySelf',
   'flexDirection',
   'flexGrow',
   'flexWrap',
@@ -63,6 +67,7 @@ const FLEXBOX_PROPS = [
 
 const GRID_PROPS = [
   'columnGap',
+  'rowGap',
   'gridGap',
   'gridTemplateAreas',
   'gridTemplateRows',
@@ -74,6 +79,7 @@ const GRID_PROPS = [
 
 const LAYOUT_PROPS = [
   'display',
+  'visibility',
   'size',
   'width',
   'minWidth',
@@ -104,7 +110,7 @@ const POSITION_PROPS = [
 
 const TRANSITION_PROPS = ['transition'] as const
 
-const STYLE_PROPS = [
+export const STYLE_PROPS = [
   ...COLOR_PROPS,
   ...TYPOGRAPHY_PROPS,
   ...SPACING_PROPS,
@@ -116,15 +122,15 @@ const STYLE_PROPS = [
   ...TRANSITION_PROPS,
 ]
 
-const colorStyles = (props: Types.StyleProps): CSSObject => {
-  return pick(props, COLOR_PROPS) as CSSObject
+const colorStyles = (props: Types.StyleProps): CSSProperties => {
+  return pick(props, COLOR_PROPS) as CSSProperties
 }
 
-const typographyStyles = (props: Types.StyleProps): CSSObject => {
-  return pick(props, TYPOGRAPHY_PROPS) as CSSObject
+const typographyStyles = (props: Types.StyleProps): CSSProperties => {
+  return pick(props, TYPOGRAPHY_PROPS) as CSSProperties
 }
 
-const spacingStyles = (props: Types.StyleProps): CSSObject => {
+const spacingStyles = (props: Types.StyleProps): CSSProperties => {
   const { marginX, marginY, paddingX, paddingY, ...styles } = pick(
     props,
     SPACING_PROPS
@@ -147,41 +153,42 @@ const spacingStyles = (props: Types.StyleProps): CSSObject => {
     styles.paddingBottom = styles.paddingBottom ?? paddingY
   }
 
-  return styles as CSSObject
+  return styles as CSSProperties
 }
 
-const borderStyles = (props: Types.StyleProps): CSSObject => {
-  return pick(props, BORDER_PROPS) as CSSObject
+const borderStyles = (props: Types.StyleProps): CSSProperties => {
+  return pick(props, BORDER_PROPS) as CSSProperties
 }
 
-const flexboxStyles = (props: Types.StyleProps): CSSObject => {
-  return pick(props, FLEXBOX_PROPS) as CSSObject
+const flexboxStyles = (props: Types.StyleProps): CSSProperties => {
+  return pick(props, FLEXBOX_PROPS) as CSSProperties
 }
 
-const gridStyles = (props: Types.StyleProps): CSSObject => {
-  return pick(props, GRID_PROPS) as CSSObject
+const gridStyles = (props: Types.StyleProps): CSSProperties => {
+  return pick(props, GRID_PROPS) as CSSProperties
 }
 
-const layoutStyles = (props: Types.StyleProps): CSSObject => {
-  const { size, ...styles } = pick(props, LAYOUT_PROPS) as CSSObject
+const layoutStyles = (props: Types.StyleProps): CSSProperties => {
+  const picked = pick(props, LAYOUT_PROPS)
+  const { size, ...styles } = picked
 
   if (size != null) {
-    styles.width = styles.width ?? ((size as unknown) as typeof styles.width)
-    styles.height = styles.height ?? ((size as unknown) as typeof styles.height)
+    styles.width = styles.width ?? (size as unknown as typeof styles.width)
+    styles.height = styles.height ?? (size as unknown as typeof styles.height)
   }
 
-  return styles
+  return styles as CSSProperties
 }
 
-const positionStyles = (props: Types.StyleProps): CSSObject => {
-  return pick(props, POSITION_PROPS) as CSSObject
+const positionStyles = (props: Types.StyleProps): CSSProperties => {
+  return pick(props, POSITION_PROPS) as CSSProperties
 }
 
-const transitionStyles = (props: Types.StyleProps): CSSObject => {
+const transitionStyles = (props: Types.StyleProps): CSSProperties => {
   return pick(props, TRANSITION_PROPS)
 }
 
-export const styleProps = (props: Types.StyleProps): CSSObject => ({
+export const styleProps = (props: Types.StyleProps): CSSProperties => ({
   ...colorStyles(props),
   ...typographyStyles(props),
   ...spacingStyles(props),
@@ -193,5 +200,5 @@ export const styleProps = (props: Types.StyleProps): CSSObject => ({
   ...transitionStyles(props),
 })
 
-export const isntStyleProp = (prop: string | React.ReactText): boolean =>
-  !STYLE_PROPS.includes(prop as typeof STYLE_PROPS[number])
+export const isntStyleProp = (prop: string | Text): boolean =>
+  !STYLE_PROPS.includes(prop as (typeof STYLE_PROPS)[number])

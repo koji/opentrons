@@ -1,4 +1,12 @@
+import type { ReleaseNoteInfo } from 'builder-util-runtime'
 import type { IpcMainEvent } from 'electron'
+import type { UpdateFileInfo } from 'electron-updater'
+import type {
+  Liquid,
+  ProtocolAnalysisOutput,
+  RunTimeCommand,
+} from '@opentrons/shared-data'
+import type { InvariantContext, RobotState } from '@opentrons/step-generation'
 import type { Error } from '../types'
 import type { RobotSystemAction } from './is-ready/types'
 
@@ -9,6 +17,8 @@ export interface Remote {
     on: (channel: string, listener: IpcListener) => void
     off: (channel: string, listener: IpcListener) => void
   }
+  /* The renderer process isn't allowed the file path for security reasons. */
+  getFilePathFrom: (file: File) => Promise<string>
 }
 
 export type IpcListener = (
@@ -31,16 +41,11 @@ export type NotifyBrokerResponses = NotifyRefetchData | NotifyUnsubscribeData
 export type NotifyNetworkError = 'ECONNFAILED' | 'ECONNREFUSED'
 export type NotifyResponseData = NotifyBrokerResponses | NotifyNetworkError
 
-interface File {
-  sha512: string
-  url: string
-  [key: string]: unknown
-}
 export interface UpdateInfo {
   version: string
-  files: File[]
+  files: UpdateFileInfo[]
   releaseDate?: string
-  releaseNotes?: string
+  releaseNotes?: string | null | ReleaseNoteInfo[]
 }
 
 export interface ShellUpdateState {
@@ -147,13 +152,16 @@ export interface RobotMassStorageDeviceRemoved {
 
 export type NotifyTopic =
   | 'ALL_TOPICS'
+  | `robot-server/clientData/${string}`
+  | 'robot-server/deck_configuration'
+  | 'robot-server/labwareOffsets'
   | 'robot-server/maintenance_runs/current_run'
   | 'robot-server/runs/commands_links'
   | 'robot-server/runs'
   | `robot-server/runs/${string}`
-  | 'robot-server/deck_configuration'
   | `robot-server/runs/pre_serialized_commands/${string}`
-  | `robot-server/clientData/${string}`
+  | `robot-server/dataFiles/${string}/images`
+  | 'robot-server/camera'
 
 export interface NotifySubscribeAction {
   type: 'shell:NOTIFY_SUBSCRIBE'
@@ -172,6 +180,68 @@ export interface SendFilePathsAction {
   meta: { shell: true }
 }
 
+export interface CameraStreamOpenAction {
+  type: 'shell:CAMERA_STREAM_OPEN'
+  payload: {
+    hostname: string
+    robotName: string
+    windowTitle: string
+  }
+  meta: { shell: true }
+}
+
+export interface CameraPhotoOpenAction {
+  type: 'shell:CAMERA_PHOTO_OPEN'
+  payload: {
+    robotName: string
+    windowTitle: string
+    photoUrl: string
+  }
+  meta: {
+    shell: true
+  }
+}
+
+export interface StepDetailViewerOpenAction {
+  type: 'shell:STEP_DETAIL_VIEWER_OPEN'
+  payload: {
+    protocolKey: string
+    slot: string
+    command: RunTimeCommand
+    robotState: RobotState
+    invariantContext: InvariantContext
+    analysis: ProtocolAnalysisOutput
+    liquids: Liquid[]
+  }
+  meta: {
+    shell: true
+  }
+}
+
+export interface StepDetailViewerUpdateAction {
+  type: 'shell:STEP_DETAIL_VIEWER_UPDATE'
+  payload: {
+    protocolKey: string
+    slot: string | null
+    command: RunTimeCommand
+    robotState: RobotState
+    invariantContext: InvariantContext
+    analysis: ProtocolAnalysisOutput
+    liquids: Liquid[]
+  }
+  meta: {
+    shell: true
+  }
+}
+
+export interface StepDetailViewerCloseAction {
+  type: 'shell:STEP_DETAIL_VIEWER_CLOSE'
+  payload: { protocolKey: string }
+  meta: {
+    shell: true
+  }
+}
+
 export type ShellAction =
   | UiInitializedAction
   | ShellUpdateAction
@@ -187,6 +257,11 @@ export type ShellAction =
   | NotifySubscribeAction
   | SendFilePathsAction
   | SystemLanguageAction
+  | CameraStreamOpenAction
+  | CameraPhotoOpenAction
+  | StepDetailViewerOpenAction
+  | StepDetailViewerUpdateAction
+  | StepDetailViewerCloseAction
 
 export type IPCSafeFormDataEntry =
   | {

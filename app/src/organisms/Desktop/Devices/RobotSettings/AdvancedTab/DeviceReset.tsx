@@ -1,4 +1,3 @@
-import type * as React from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -6,13 +5,15 @@ import {
   Box,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
-  SPACING_AUTO,
-  SPACING,
   LegacyStyledText,
+  SPACING,
+  SPACING_AUTO,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
 import { TertiaryButton } from '/app/atoms/buttons'
+
+import type { MouseEventHandler } from 'react'
 
 interface DeviceResetProps {
   updateIsExpanded: (
@@ -28,7 +29,7 @@ export function DeviceReset({
 }: DeviceResetProps): JSX.Element {
   const { t } = useTranslation('device_settings')
 
-  const handleClick: React.MouseEventHandler<HTMLButtonElement> = () => {
+  const handleClick: MouseEventHandler<HTMLButtonElement> = () => {
     if (!isRobotBusy) {
       updateIsExpanded(true, 'deviceReset')
     }
@@ -44,7 +45,7 @@ export function DeviceReset({
         >
           {t('device_reset')}
         </LegacyStyledText>
-        <LegacyStyledText as="p">
+        <LegacyStyledText forwardedAs="p">
           {t('device_reset_description')}
         </LegacyStyledText>
       </Box>

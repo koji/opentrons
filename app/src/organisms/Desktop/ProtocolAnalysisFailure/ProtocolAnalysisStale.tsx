@@ -1,6 +1,5 @@
-import type * as React from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { useDispatch } from 'react-redux'
-import { useTranslation, Trans } from 'react-i18next'
 
 import {
   ALIGN_CENTER,
@@ -8,14 +7,17 @@ import {
   Btn,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
   WRAP_REVERSE,
 } from '@opentrons/components'
 
-import type { Dispatch } from '/app/redux/types'
 import { analyzeProtocol } from '/app/redux/protocol-storage'
+
+import type { MouseEventHandler } from 'react'
+import type { Dispatch } from '/app/redux/types'
+
 interface ProtocolAnalysisStaleProps {
   protocolKey: string
 }
@@ -27,7 +29,7 @@ export function ProtocolAnalysisStale(
   const { t } = useTranslation(['protocol_list', 'shared'])
   const dispatch = useDispatch<Dispatch>()
 
-  const handleClickReanalyze: React.MouseEventHandler = e => {
+  const handleClickReanalyze: MouseEventHandler = e => {
     e.preventDefault()
     e.stopPropagation()
     dispatch(analyzeProtocol(protocolKey))
@@ -42,18 +44,17 @@ export function ProtocolAnalysisStale(
         alignItems={ALIGN_CENTER}
         width="100%"
       >
-        <LegacyStyledText as="p">
+        <LegacyStyledText forwardedAs="p">
           {t('protocol_analysis_outdated')}
         </LegacyStyledText>
-        <LegacyStyledText as="p">
+        <LegacyStyledText forwardedAs="p">
           <Trans
             t={t}
             i18nKey="reanalyze_to_view"
             components={{
               analysisLink: (
                 <Btn
-                  as="a"
-                  role="button"
+                  // forwardedAs="a"
                   textDecoration={TYPOGRAPHY.textDecorationUnderline}
                   onClick={handleClickReanalyze}
                 />

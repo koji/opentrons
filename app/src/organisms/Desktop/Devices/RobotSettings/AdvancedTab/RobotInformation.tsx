@@ -1,18 +1,20 @@
 import { useTranslation } from 'react-i18next'
+
 import {
   Box,
   DIRECTION_COLUMN,
   Flex,
   JUSTIFY_FLEX_START,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
+
 import { useRobot } from '/app/redux-resources/robots'
 import {
-  getRobotSerialNumber,
   getRobotFirmwareVersion,
   getRobotProtocolApiVersion,
+  getRobotSerialNumber,
 } from '/app/redux/discovery'
 
 interface RobotInformationProps {
@@ -54,7 +56,7 @@ export function RobotInformation({
           <LegacyStyledText css={TYPOGRAPHY.pSemiBold}>
             {t('robot_serial_number')}
           </LegacyStyledText>
-          <LegacyStyledText as="p">
+          <LegacyStyledText forwardedAs="p">
             {serialNumber != null
               ? serialNumber
               : t('robot_settings_advanced_unknown')}
@@ -64,7 +66,7 @@ export function RobotInformation({
           <LegacyStyledText css={TYPOGRAPHY.pSemiBold}>
             {t('firmware_version')}
           </LegacyStyledText>
-          <LegacyStyledText as="p">
+          <LegacyStyledText forwardedAs="p">
             {firmwareVersion != null
               ? firmwareVersion
               : t('robot_settings_advanced_unknown')}
@@ -74,7 +76,9 @@ export function RobotInformation({
           <LegacyStyledText css={TYPOGRAPHY.pSemiBold}>
             {t('supported_protocol_api_versions')}
           </LegacyStyledText>
-          <LegacyStyledText as="p">{formatApiVersionMinMax()}</LegacyStyledText>
+          <LegacyStyledText forwardedAs="p">
+            {formatApiVersionMinMax()}
+          </LegacyStyledText>
         </Flex>
       </Flex>
     </Box>

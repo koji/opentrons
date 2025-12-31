@@ -1,19 +1,28 @@
-import type * as React from 'react'
 import { screen } from '@testing-library/react'
-import { describe, it, afterEach, vi, beforeEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import {
+  TRASH_BIN_ADAPTER_FIXTURE,
+  WATER_LIQUID_CLASS_NAME,
+} from '@opentrons/shared-data'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
+
 import { Overview } from '../Overview'
 
-const render = (props: React.ComponentProps<typeof Overview>) => {
+import type { ComponentProps } from 'react'
+
+vi.mock('/app/redux/config')
+
+const render = (props: ComponentProps<typeof Overview>) => {
   return renderWithProviders(<Overview {...props} />, {
     i18nInstance: i18n,
   })
 }
 
 describe('Overview', () => {
-  let props: React.ComponentProps<typeof Overview>
+  let props: ComponentProps<typeof Overview>
 
   beforeEach(() => {
     props = {
@@ -38,6 +47,7 @@ describe('Overview', () => {
         } as any,
         transferType: 'transfer',
         volume: 25,
+        liquidClassName: WATER_LIQUID_CLASS_NAME,
       } as any,
     }
   })
@@ -49,7 +59,6 @@ describe('Overview', () => {
     render(props)
     screen.getByText('Pipette')
     screen.getByText('Pipette display name')
-    screen.getByText('Tip rack')
     screen.getByText('Tip rack display name')
     screen.getByText('Source labware')
     screen.getByText('Source labware name')
@@ -57,6 +66,12 @@ describe('Overview', () => {
     screen.getByText('Destination labware name')
     screen.getByText('Volume per well')
     screen.getByText('25µL')
+    screen.getByText('Pipette path')
+    screen.getByText('Tip change frequency')
+    screen.getByText('Tip drop location')
+    screen.getByText('Liquid class')
+    // one is for item title, one is for the value of tip drop location
+    expect(screen.getAllByText('Tip rack')).toHaveLength(2)
   })
   it('renders the correct volume wording for n to 1 transfer', () => {
     props = {
@@ -109,9 +124,60 @@ describe('Overview', () => {
         } as any,
         transferType: 'distribute',
         volume: 25,
+        dropTipLocation: {
+          cutoutFixtureId: TRASH_BIN_ADAPTER_FIXTURE,
+          cutoutId: 'cutoutA3',
+        },
       } as any,
     }
     render(props)
     screen.getByText('Dispense volume per well')
+  })
+
+  it('should render correct items when liquid classes are enabled', () => {
+    props = {
+      state: {
+        pipette: {
+          displayName: 'Pipette display name',
+        } as any,
+        tipRack: {
+          metadata: {
+            displayName: 'Tip rack display name',
+          },
+        } as any,
+        source: {
+          metadata: {
+            displayName: 'Source labware name',
+          },
+        } as any,
+        destination: {
+          metadata: {
+            displayName: 'Destination labware name',
+          },
+        } as any,
+        transferType: 'distribute',
+        volume: 25,
+        dropTipLocation: {
+          cutoutFixtureId: TRASH_BIN_ADAPTER_FIXTURE,
+          cutoutId: 'cutoutA3',
+        },
+        liquidClassName: WATER_LIQUID_CLASS_NAME,
+      } as any,
+    }
+    render(props)
+    screen.getByText('Pipette')
+    screen.getByText('Pipette display name')
+    screen.getByText('Tip rack')
+    screen.getByText('Tip rack display name')
+    screen.getByText('Source labware')
+    screen.getByText('Source labware name')
+    screen.getByText('Destination labware')
+    screen.getByText('Destination labware name')
+    screen.getByText('Pipette path')
+    screen.getByText('Tip change frequency')
+    screen.getByText('Tip drop location')
+    screen.getByText('Trash bin in A3')
+    screen.getByText('Liquid class')
+    screen.getByText('Aqueous')
   })
 })

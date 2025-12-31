@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { useSelector } from 'react-redux'
-import { createPortal } from 'react-dom'
+
 import {
   COLORS,
   DIRECTION_COLUMN,
@@ -10,9 +11,13 @@ import {
   SPACING,
   StyledText,
 } from '@opentrons/components'
-import { getPipetteEntities } from '../../../../../step-forms/selectors'
-import { SelectWellsModal } from '../../../../../organisms'
-import { getMainPagePortalEl } from '../../../../../components/portals/MainPageModalPortal'
+
+import {
+  getMainPagePortalEl,
+  SelectWellsModal,
+} from '/protocol-designer/components/organisms'
+import { getPipetteEntities } from '/protocol-designer/step-forms/selectors'
+
 import { getNozzleType } from '../utils'
 
 import type { FieldProps } from '../types'
@@ -52,7 +57,7 @@ export function TipWellSelectionField(
         <SelectWellsModal
           isOpen={openModal}
           key={`${labwareId}_${name}_TipField`}
-          labwareId={String(labwareId)}
+          labwareId={typeof labwareId === 'string' ? labwareId : null}
           name={name}
           onCloseClick={() => {
             setOpenModal(false)

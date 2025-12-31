@@ -1,24 +1,19 @@
-import { createSelector } from 'reselect'
 import isIp from 'is-ip'
 import unionBy from 'lodash/unionBy'
+import { createSelector } from 'reselect'
+
 import {
-  HEALTH_STATUS_OK,
   HEALTH_STATUS_NOT_OK,
+  HEALTH_STATUS_OK,
   HEALTH_STATUS_UNREACHABLE,
-  RE_HOSTNAME_IPV6_LL,
   RE_HOSTNAME_IPV4_LL,
+  RE_HOSTNAME_IPV6_LL,
   RE_HOSTNAME_LOCALHOST,
   RE_HOSTNAME_LOOPBACK,
 } from '../constants'
 
 import type { DiscoveryClientRobot } from '../types'
-import type {
-  State,
-  RobotState,
-  HostState,
-  Address,
-  HealthStatus,
-} from './types'
+import type { Address, HostState, RobotState, State } from './types'
 
 export const getRobotStates: (state: State) => RobotState[] = createSelector(
   state => state.robotsByName,
@@ -48,12 +43,8 @@ export const getAddresses: (state: State) => Address[] = createSelector(
   }
 )
 
-export const getRobots: (
-  state: State
-) => DiscoveryClientRobot[] = createSelector(
-  getRobotStates,
-  getHostStates,
-  (robots, hosts) => {
+export const getRobots: (state: State) => DiscoveryClientRobot[] =
+  createSelector(getRobotStates, getHostStates, (robots, hosts) => {
     return robots.map(robot => ({
       ...robot,
       addresses: hosts
@@ -61,8 +52,7 @@ export const getRobots: (
         .sort(compareHostsByConnectability)
         .map(({ robotName, ...host }) => host),
     }))
-  }
-)
+  })
 
 // ascending priority order, where no match is lowest priority
 const HEALTH_PRIORITY = [
@@ -87,14 +77,14 @@ export function compareHostsByConnectability(
   b: HostState
 ): number {
   const healthSort =
-    HEALTH_PRIORITY.indexOf(b.healthStatus as HealthStatus) -
-    HEALTH_PRIORITY.indexOf(a.healthStatus as HealthStatus)
+    HEALTH_PRIORITY.indexOf(b.healthStatus!) -
+    HEALTH_PRIORITY.indexOf(a.healthStatus!)
 
   if (healthSort !== 0) return healthSort
 
   const serverHealthSort =
-    HEALTH_PRIORITY.indexOf(b.serverHealthStatus as HealthStatus) -
-    HEALTH_PRIORITY.indexOf(a.serverHealthStatus as HealthStatus)
+    HEALTH_PRIORITY.indexOf(b.serverHealthStatus!) -
+    HEALTH_PRIORITY.indexOf(a.serverHealthStatus!)
 
   if (serverHealthSort !== 0) return serverHealthSort
 

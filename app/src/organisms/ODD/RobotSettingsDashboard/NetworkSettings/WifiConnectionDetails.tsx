@@ -13,16 +13,17 @@ import {
   Flex,
   Icon,
   JUSTIFY_SPACE_BETWEEN,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
-import { NetworkDetailsModal } from './NetworkDetailsModal'
-import { DisplayWifiList } from '../../NetworkSettings'
 import { getLocalRobot } from '/app/redux/discovery'
 import { getNetworkInterfaces } from '/app/redux/networking'
 import { useWifiList } from '/app/resources/networking/hooks'
+
+import { DisplayWifiList } from '../../NetworkSettings'
+import { NetworkDetailsModal } from './NetworkDetailsModal'
 
 import type { WifiSecurityType } from '@opentrons/api-client'
 import type { State } from '/app/redux/types'
@@ -42,9 +43,8 @@ export function WifiConnectionDetails({
   handleJoinAnotherNetwork,
 }: WifiConnectionDetailsProps): JSX.Element {
   const { i18n, t } = useTranslation(['device_settings', 'shared'])
-  const [showNetworkDetailModal, setShowNetworkDetailModal] = useState<boolean>(
-    false
-  )
+  const [showNetworkDetailModal, setShowNetworkDetailModal] =
+    useState<boolean>(false)
   const localRobot = useSelector(getLocalRobot)
   const robotName = localRobot?.name != null ? localRobot.name : 'no name'
   const list = useWifiList(robotName, FETCH_WIFI_LIST_MS)
@@ -76,7 +76,7 @@ export function WifiConnectionDetails({
             padding={`0 ${SPACING.spacing40} ${SPACING.spacing40}`}
           >
             <LegacyStyledText
-              as="p"
+              forwardedAs="p"
               fontWeight={TYPOGRAPHY.fontWeightSemiBold}
               color={COLORS.grey60}
             >
@@ -111,7 +111,7 @@ export function WifiConnectionDetails({
                       gridGap={SPACING.spacing2}
                     >
                       <LegacyStyledText
-                        as="h4"
+                        forwardedAs="h4"
                         textAlign={TYPOGRAPHY.textAlignLeft}
                       >
                         {activeSsid}
@@ -131,7 +131,7 @@ export function WifiConnectionDetails({
                     color={COLORS.black90}
                   />
                   <LegacyStyledText
-                    as="p"
+                    forwardedAs="p"
                     fontWeight={TYPOGRAPHY.fontWeightSemiBold}
                   >
                     {t('view_details')}
@@ -143,7 +143,7 @@ export function WifiConnectionDetails({
         ) : null}
         {activeSsid != null ? (
           <LegacyStyledText
-            as="p"
+            forwardedAs="p"
             fontWeight={TYPOGRAPHY.fontWeightSemiBold}
             color={COLORS.grey60}
             paddingX={SPACING.spacing40}

@@ -1,28 +1,29 @@
-import type * as React from 'react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { when } from 'vitest-when'
-import { fireEvent, waitFor, screen } from '@testing-library/react'
-import { describe, it, vi, beforeEach, expect } from 'vitest'
+
 import '@testing-library/jest-dom/vitest'
-import { renderWithProviders } from '/app/__testing-utils__'
+
 import {
   useHost,
   useUpdatePipetteSettingsMutation,
 } from '@opentrons/react-api-client'
-import { i18n } from '/app/i18n'
-import { PipetteSettingsSlideout } from '../PipetteSettingsSlideout'
 
+import { renderWithProviders } from '/app/__testing-utils__'
+import { i18n } from '/app/i18n'
 import {
   mockLeftSpecs,
   mockPipetteSettingsFieldsMap,
 } from '/app/redux/pipettes/__fixtures__'
 
+import { PipetteSettingsSlideout } from '../PipetteSettingsSlideout'
+
 import type { Mock } from 'vitest'
+import type { ComponentProps } from 'react'
 
 vi.mock('@opentrons/react-api-client')
 
-const render = (
-  props: React.ComponentProps<typeof PipetteSettingsSlideout>
-) => {
+const render = (props: ComponentProps<typeof PipetteSettingsSlideout>) => {
   return renderWithProviders(<PipetteSettingsSlideout {...props} />, {
     i18nInstance: i18n,
   })[0]
@@ -31,7 +32,7 @@ const render = (
 const mockRobotName = 'mockRobotName'
 
 describe('PipetteSettingsSlideout', () => {
-  let props: React.ComponentProps<typeof PipetteSettingsSlideout>
+  let props: ComponentProps<typeof PipetteSettingsSlideout>
   let mockUpdatePipetteSettings: Mock
 
   beforeEach(() => {

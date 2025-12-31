@@ -1,50 +1,51 @@
 import { useEffect } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
+
 import {
-  COLORS,
   Banner,
+  COLORS,
   DIRECTION_COLUMN,
   Flex,
-  SPACING,
   LegacyStyledText,
+  SPACING,
 } from '@opentrons/components'
 import {
   NINETY_SIX_CHANNEL,
   RIGHT,
   SINGLE_MOUNT_PIPETTES,
   WEIGHT_OF_96_CHANNEL,
-  WASTE_CHUTE_CUTOUT,
 } from '@opentrons/shared-data'
+
+import { usePipetteNameSpecs } from '/app/local-resources/instruments'
+import { GenericWizardTile } from '/app/molecules/GenericWizardTile'
 import {
   SimpleWizardBody,
   SimpleWizardInProgressBody,
 } from '/app/molecules/SimpleWizardBody'
-import { GenericWizardTile } from '/app/molecules/GenericWizardTile'
 import { WizardRequiredEquipmentList } from '/app/molecules/WizardRequiredEquipmentList'
-import { usePipetteNameSpecs } from '/app/local-resources/instruments'
+
 import {
+  BODY_STYLE,
   CALIBRATION_PROBE,
   FLOWS,
-  PIPETTE,
   HEX_SCREWDRIVER,
-  NINETY_SIX_CHANNEL_PIPETTE,
   NINETY_SIX_CHANNEL_MOUNTING_PLATE,
-  BODY_STYLE,
+  NINETY_SIX_CHANNEL_PIPETTE,
+  PIPETTE,
 } from './constants'
-import { getIsGantryEmpty } from './utils'
-import { useNotifyDeckConfigurationQuery } from '/app/resources/deck_configuration'
+import { getIsGantryEmpty, isWasteChuteOnDeck } from './utils'
 
-import type { UseMutateFunction } from 'react-query'
 import type { AxiosError } from 'axios'
-import type {
-  CreateCommand,
-  LoadedPipette,
-  PipetteName,
-} from '@opentrons/shared-data'
+import type { UseMutateFunction, UseQueryResult } from 'react-query'
 import type {
   CreateMaintenanceRunData,
   MaintenanceRun,
 } from '@opentrons/api-client'
+import type {
+  CreateCommand,
+  DeckConfiguration,
+  LoadedPipette,
+} from '@opentrons/shared-data'
 import type { PipetteWizardStepProps } from './types'
 
 interface BeforeBeginningProps extends PipetteWizardStepProps {
@@ -56,6 +57,7 @@ interface BeforeBeginningProps extends PipetteWizardStepProps {
   >
   isCreateLoading: boolean
   createdMaintenanceRunId: string | null
+  deckConfig: UseQueryResult<DeckConfiguration>
   requiredPipette?: LoadedPipette
 }
 export const BeforeBeginning = (
@@ -77,6 +79,7 @@ export const BeforeBeginning = (
     requiredPipette,
     maintenanceRunId,
     createdMaintenanceRunId,
+    deckConfig,
   } = props
   const { t } = useTranslation(['pipette_wizard_flows', 'shared'])
   useEffect(() => {
@@ -90,13 +93,8 @@ export const BeforeBeginning = (
     isGantryEmpty &&
     selectedPipette === NINETY_SIX_CHANNEL &&
     flowType === FLOWS.ATTACH
-  const deckConfig = useNotifyDeckConfigurationQuery().data
-  const isWasteChuteOnDeck =
-    deckConfig?.find(fixture => fixture.cutoutId === WASTE_CHUTE_CUTOUT) ??
-    false
-
   const pipetteDisplayName = usePipetteNameSpecs(
-    requiredPipette?.pipetteName as PipetteName
+    requiredPipette?.pipetteName!
   )?.displayName
 
   if (
@@ -107,11 +105,21 @@ export const BeforeBeginning = (
 
   let equipmentList = [CALIBRATION_PROBE]
   const proceedButtonText = t('move_gantry_to_front')
+  const hexScrewdriverWithSubtitle = {
+    ...HEX_SCREWDRIVER,
+    subtitle: t('provided_with_robot'),
+  }
   let bodyTranslationKey: string = ''
 
   switch (flowType) {
     case FLOWS.CALIBRATE: {
       bodyTranslationKey = 'remove_labware_to_get_started'
+      if (
+        selectedPipette === NINETY_SIX_CHANNEL &&
+        isWasteChuteOnDeck(deckConfig)
+      ) {
+        equipmentList.push(hexScrewdriverWithSubtitle)
+      }
       break
     }
     case FLOWS.ATTACH: {
@@ -124,7 +132,7 @@ export const BeforeBeginning = (
         equipmentList = [
           { ...PIPETTE, displayName: displayName ?? PIPETTE.displayName },
           CALIBRATION_PROBE,
-          HEX_SCREWDRIVER,
+          hexScrewdriverWithSubtitle,
         ]
       } else {
         equipmentList = [
@@ -133,7 +141,7 @@ export const BeforeBeginning = (
             displayName: displayName ?? NINETY_SIX_CHANNEL_PIPETTE.displayName,
           },
           CALIBRATION_PROBE,
-          HEX_SCREWDRIVER,
+          hexScrewdriverWithSubtitle,
           NINETY_SIX_CHANNEL_MOUNTING_PLATE,
         ]
       }
@@ -144,23 +152,26 @@ export const BeforeBeginning = (
         const displayName = pipetteDisplayName ?? requiredPipette.pipetteName
         bodyTranslationKey = 'remove_labware'
 
-        if (requiredPipette.pipetteName === 'p1000_96') {
+        if (
+          requiredPipette.pipetteName === 'p1000_96' ||
+          requiredPipette.pipetteName === 'p200_96'
+        ) {
           equipmentList = [
             { ...NINETY_SIX_CHANNEL_PIPETTE, displayName },
             CALIBRATION_PROBE,
-            HEX_SCREWDRIVER,
+            hexScrewdriverWithSubtitle,
             NINETY_SIX_CHANNEL_MOUNTING_PLATE,
           ]
         } else {
           equipmentList = [
             { ...PIPETTE, displayName },
             CALIBRATION_PROBE,
-            HEX_SCREWDRIVER,
+            hexScrewdriverWithSubtitle,
           ]
         }
       } else {
         bodyTranslationKey = 'get_started_detach'
-        equipmentList = [HEX_SCREWDRIVER]
+        equipmentList = [hexScrewdriverWithSubtitle]
       }
       break
     }
@@ -258,37 +269,18 @@ export const BeforeBeginning = (
               }}
             />
             {selectedPipette === NINETY_SIX_CHANNEL &&
-              flowType === FLOWS.ATTACH &&
-              !Boolean(isOnDevice) && (
-                <LegacyStyledText css={BODY_STYLE}>
+              (flowType === FLOWS.ATTACH || flowType === FLOWS.DETACH) && (
+                <Banner
+                  type="warning"
+                  size={Boolean(isOnDevice) ? '1.5rem' : '1rem'}
+                  marginTop={
+                    Boolean(isOnDevice) ? SPACING.spacing24 : SPACING.spacing16
+                  }
+                >
                   {t('pipette_heavy', { weight: WEIGHT_OF_96_CHANNEL })}
-                </LegacyStyledText>
+                </Banner>
               )}
           </Flex>
-          {selectedPipette === NINETY_SIX_CHANNEL &&
-            (flowType === FLOWS.CALIBRATE || flowType === FLOWS.ATTACH ? (
-              <Banner
-                type={Boolean(isWasteChuteOnDeck) ? 'error' : 'warning'}
-                size={Boolean(isOnDevice) ? '1.5rem' : '1rem'}
-                marginTop={
-                  Boolean(isOnDevice) ? SPACING.spacing24 : SPACING.spacing16
-                }
-              >
-                {Boolean(isWasteChuteOnDeck)
-                  ? t('waste_chute_error')
-                  : t('waste_chute_warning')}
-              </Banner>
-            ) : (
-              <Banner
-                type="warning"
-                size={Boolean(isOnDevice) ? '1.5rem' : '1rem'}
-                marginTop={
-                  Boolean(isOnDevice) ? SPACING.spacing24 : SPACING.spacing16
-                }
-              >
-                {t('pipette_heavy', { weight: WEIGHT_OF_96_CHANNEL })}
-              </Banner>
-            ))}
         </>
       }
       proceedButtonText={proceedButtonText}

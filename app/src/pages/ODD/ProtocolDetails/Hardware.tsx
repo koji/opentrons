@@ -1,27 +1,28 @@
 import { useTranslation } from 'react-i18next'
 import styled from 'styled-components'
+
 import {
   ALIGN_CENTER,
   BORDERS,
   COLORS,
-  DeckInfoLabel,
   Flex,
-  ModuleIcon,
-  SPACING,
   LegacyStyledText,
+  ModuleIcon,
+  RobotInfoLabel,
+  SPACING,
   TYPOGRAPHY,
   WRAP,
 } from '@opentrons/components'
 import {
   getCutoutDisplayName,
+  getFixtureDisplayName,
+  getModuleDeckLabel,
   getModuleDisplayName,
   getModuleType,
-  getFixtureDisplayName,
   GRIPPER_V1_2,
   MAGNETIC_BLOCK_FIXTURES,
   MAGNETIC_BLOCK_TYPE,
-  TC_MODULE_LOCATION_OT3,
-  THERMOCYCLER_MODULE_TYPE,
+  STAGING_AREA_RIGHT_SLOT_FIXTURE,
 } from '@opentrons/shared-data'
 
 import {
@@ -29,6 +30,7 @@ import {
   usePipetteNameSpecs,
 } from '/app/local-resources/instruments'
 import { useRequiredProtocolHardware } from '/app/resources/protocols'
+
 import { EmptySection } from './EmptySection'
 
 import type { TFunction } from 'i18next'
@@ -84,7 +86,10 @@ const getHardwareLocation = (
   }
 }
 
-const useHardwareName = (protocolHardware: ProtocolHardware): string => {
+const useHardwareName = (
+  protocolHardware: ProtocolHardware,
+  t: TFunction
+): string => {
   const gripperDisplayName = useGripperDisplayName(GRIPPER_V1_2)
 
   const pipetteDisplayName =
@@ -95,10 +100,15 @@ const useHardwareName = (protocolHardware: ProtocolHardware): string => {
     return gripperDisplayName
   } else if (protocolHardware.hardwareType === 'pipette') {
     return pipetteDisplayName
+  } else if (
+    protocolHardware.hardwareType === 'module' &&
+    protocolHardware.comboFixtureId != null
+  ) {
+    return getFixtureDisplayName(t, protocolHardware.comboFixtureId)
   } else if (protocolHardware.hardwareType === 'module') {
     return getModuleDisplayName(protocolHardware.moduleModel)
   } else {
-    return getFixtureDisplayName(protocolHardware.cutoutFixtureId)
+    return getFixtureDisplayName(t, protocolHardware.cutoutFixtureId)
   }
 }
 
@@ -107,27 +117,34 @@ function HardwareItem({
 }: {
   hardware: ProtocolHardware
 }): JSX.Element {
-  const { t, i18n } = useTranslation('protocol_details')
+  const { t, i18n } = useTranslation(['protocol_details', 'deck_configuration'])
 
-  const hardwareName = useHardwareName(hardware)
+  const hardwareName = useHardwareName(hardware, t as TFunction)
 
   let location: JSX.Element = (
-    <LegacyStyledText as="p" fontWeight={TYPOGRAPHY.fontWeightSemiBold}>
+    <LegacyStyledText
+      forwardedAs="p"
+      fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+    >
       {i18n.format(getHardwareLocation(hardware, t as TFunction), 'titleCase')}
     </LegacyStyledText>
   )
   if (hardware.hardwareType === 'module') {
-    const slot =
-      getModuleType(hardware.moduleModel) === THERMOCYCLER_MODULE_TYPE
-        ? TC_MODULE_LOCATION_OT3
-        : hardware.slot
-    location = <DeckInfoLabel deckLabel={slot} />
-  } else if (hardware.hardwareType === 'fixture') {
     location = (
-      <DeckInfoLabel
-        deckLabel={getCutoutDisplayName(hardware.location.cutout)}
+      <RobotInfoLabel
+        deckLabel={getModuleDeckLabel(
+          getModuleType(hardware.moduleModel),
+          hardware.slot
+        )}
       />
     )
+  } else if (hardware.hardwareType === 'fixture') {
+    const cutoutDisplayName = getCutoutDisplayName(hardware.location.cutout)
+    const slotName =
+      hardware.cutoutFixtureId === STAGING_AREA_RIGHT_SLOT_FIXTURE
+        ? `${cutoutDisplayName[0]}4`
+        : cutoutDisplayName
+    location = <RobotInfoLabel deckLabel={slotName} />
   }
   const isMagneticBlockFixture =
     hardware.hardwareType === 'fixture' &&
@@ -156,7 +173,7 @@ function HardwareItem({
               <ModuleIcon moduleType={iconModuleType} size="1.75rem" />
             </Flex>
           ) : null}
-          <LegacyStyledText as="p">{hardwareName}</LegacyStyledText>
+          <LegacyStyledText forwardedAs="p">{hardwareName}</LegacyStyledText>
         </Flex>
       </TableDatum>
     </TableRow>

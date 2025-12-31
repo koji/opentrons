@@ -1,4 +1,3 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -6,9 +5,11 @@ import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 import { home } from '/app/redux/robot-controls'
 import { useLights } from '/app/resources/devices'
-import { RestartRobotConfirmationModal } from '../RestartRobotConfirmationModal'
-import { NavigationMenu } from '../NavigationMenu'
 
+import { NavigationMenu } from '../NavigationMenu'
+import { RestartRobotConfirmationModal } from '../RestartRobotConfirmationModal'
+
+import type { ComponentProps } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
 vi.mock('/app/redux/robot-admin')
@@ -27,14 +28,14 @@ vi.mock('react-router-dom', async importOriginal => {
 
 const mockToggleLights = vi.fn()
 
-const render = (props: React.ComponentProps<typeof NavigationMenu>) => {
+const render = (props: ComponentProps<typeof NavigationMenu>) => {
   return renderWithProviders(<NavigationMenu {...props} />, {
     i18nInstance: i18n,
   })[0]
 }
 
 describe('NavigationMenu', () => {
-  let props: React.ComponentProps<typeof NavigationMenu>
+  let props: ComponentProps<typeof NavigationMenu>
   beforeEach(() => {
     props = {
       onClick: vi.fn(),

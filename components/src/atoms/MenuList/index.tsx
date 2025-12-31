@@ -1,19 +1,19 @@
-import type * as React from 'react'
-
 import { BORDERS, COLORS } from '../../helix-design-system'
+import { ModalShell } from '../../modals'
+import { Flex } from '../../primitives'
 import {
   DIRECTION_COLUMN,
   JUSTIFY_CENTER,
   POSITION_ABSOLUTE,
 } from '../../styles'
-import { Flex } from '../../primitives'
 import { SPACING } from '../../ui-style-constants'
-import { ModalShell } from '../../modals'
+
+import type { MouseEventHandler, ReactNode } from 'react'
 
 interface MenuListProps {
-  children: React.ReactNode
+  children: ReactNode
   isOnDevice?: boolean
-  onClick?: React.MouseEventHandler
+  onClick?: MouseEventHandler
 }
 
 export const MenuList = (props: MenuListProps): JSX.Element | null => {

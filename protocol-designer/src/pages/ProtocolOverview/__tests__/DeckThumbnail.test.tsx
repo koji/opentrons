@@ -1,17 +1,25 @@
-import type * as React from 'react'
-import { describe, it, vi, beforeEach, expect } from 'vitest'
-import '@testing-library/jest-dom/vitest'
-import { screen } from '@testing-library/react'
-import { FLEX_ROBOT_TYPE, fixture12Trough } from '@opentrons/shared-data'
-import { renderWithProviders } from '../../../__testing-utils__'
-import { getInitialDeckSetup } from '../../../step-forms/selectors'
-import { LabwareOnDeck } from '../../../components/DeckSetup/LabwareOnDeck'
-import { getRobotType } from '../../../file-data/selectors'
-import { DeckThumbnail } from '../DeckThumbnail'
-import type { LabwareDefinition2 } from '@opentrons/shared-data'
-import type * as Components from '@opentrons/components'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../../../components/DeckSetup/LabwareOnDeck')
+import '@testing-library/jest-dom/vitest'
+
+import { screen } from '@testing-library/react'
+
+import {
+  fixture12Trough,
+  FLEX_ROBOT_TYPE,
+  OT2_ROBOT_TYPE,
+} from '@opentrons/shared-data'
+
+import { renderWithProviders } from '../../../__testing-utils__'
+import { LabwareOnDeck } from '../../../components/organisms'
+import { getInitialDeckSetup } from '../../../step-forms/selectors'
+import { DeckThumbnail } from '../DeckThumbnail'
+
+import type { ComponentProps } from 'react'
+import type * as Components from '@opentrons/components'
+import type { LabwareDefinition2 } from '@opentrons/shared-data'
+
+vi.mock('../../../components/organisms')
 vi.mock('../../../file-data/selectors')
 vi.mock('../../../step-forms/selectors')
 vi.mock('@opentrons/components', async importOriginal => {
@@ -20,23 +28,24 @@ vi.mock('@opentrons/components', async importOriginal => {
     ...actual,
     SingleSlotFixture: () => <div>mock single slot fixture</div>,
     Module: () => <div>mock module</div>,
+    DeckFromLayers: () => <div>mock DeckFromLayers</div>,
   }
 })
 
-const render = (props: React.ComponentProps<typeof DeckThumbnail>) => {
+const render = (props: ComponentProps<typeof DeckThumbnail>) => {
   return renderWithProviders(<DeckThumbnail {...props} />)[0]
 }
 
 describe('DeckThumbnail', () => {
-  let props: React.ComponentProps<typeof DeckThumbnail>
+  let props: ComponentProps<typeof DeckThumbnail>
 
   beforeEach(() => {
     props = {
       hoverSlot: null,
       setHoverSlot: vi.fn(),
+      robotType: FLEX_ROBOT_TYPE,
     }
     vi.mocked(LabwareOnDeck).mockReturnValue(<div>mock LabwareOnDeck</div>)
-    vi.mocked(getRobotType).mockReturnValue(FLEX_ROBOT_TYPE)
     vi.mocked(getInitialDeckSetup).mockReturnValue({
       modules: {},
       additionalEquipmentOnDeck: {},
@@ -46,7 +55,8 @@ describe('DeckThumbnail', () => {
           id: 'mockId',
           def: fixture12Trough as LabwareDefinition2,
           labwareDefURI: 'mockDefUri',
-          slot: 'A1',
+          stack: ['mockId', 'A1'],
+          pythonName: 'mockPythonName',
         },
       },
     })
@@ -56,5 +66,11 @@ describe('DeckThumbnail', () => {
     render(props)
     screen.getByText('mock LabwareOnDeck')
     expect(screen.getAllByText('mock single slot fixture')).toHaveLength(12)
+  })
+
+  it('renders a ot-2 deck ', () => {
+    props = { ...props, robotType: OT2_ROBOT_TYPE }
+    render(props)
+    screen.getByText('mock DeckFromLayers')
   })
 })

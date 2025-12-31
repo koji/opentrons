@@ -1,36 +1,29 @@
 # opentrons api makefile
 
 include ../scripts/push.mk
-include ../scripts/python.mk
+include ../scripts/python-uv.mk
 
 SHX := npx shx
 
 # make push wheel file (= rather than := to expand at every use)
 firmware = $(wildcard smoothie/*.hex)
 
-# python and pipenv config
-sphinx_build := $(pipenv) run sphinx-build -W --keep-going
+# python and uv config
+sphinx_build := $(UV) run --python $(UV_PYTHON) sphinx-build -W --keep-going
 # todo(mm, 2021-10-04):
 # 1. Resolve all Sphinx warnings.
 # 2. Convert all recipes to use $(sphinx_build).
 # 3. Delete $(sphinx_build_allow_warnings).
 # github.com/Opentrons/opentrons/issues/6135
-sphinx_build_allow_warnings := $(pipenv) run sphinx-build
-
-ot_project := $(OPENTRONS_PROJECT)
-project_rs_default = $(if $(ot_project),$(ot_project),robot-stack)
-project_ir_default = $(if $(ot_project),$(ot_project),ot3)
+sphinx_build_allow_warnings := $(UV) run --python $(UV_PYTHON) sphinx-build
 
 # Find the version of the wheel from git using a helper script. We
 # use python here so we can use the same version normalization that will be
 # used to create the wheel.
-wheel_file = dist/$(call python_get_wheelname,api,$(project_rs_default),opentrons,$(BUILD_NUMBER))
-
-# Find the version of the sdist file from git using a helper script.
-sdist_file = dist/$(call python_get_sdistname,api,$(project_rs_default),opentrons)
+wheel_file = dist/$(call python_get_wheelname,api,$(PROJECT),opentrons,$(BUILD_NUMBER))
 
 # Find the branch, sha, version that will be used to update the VERSION.json file
-version_file = $(call python_get_git_version,api,$(project_rs_default),opentrons)
+version_file = $(call python_get_git_version,api,$(PROJECT),opentrons)
 
 # These variables are for simulating python protocols
 sim_log_level ?= info
@@ -64,24 +57,26 @@ twine_repository_url ?= $(pypi_test_upload_url)
 clean_cmd = $(SHX) rm -rf build .coverage coverage.xml '*.egg-info'
 clean_cache_cmd = $(SHX) rm -rf '**/__pycache__' '**/*.pyc' '**/.mypy_cache'
 clean_wheel_cmd = $(clean_cmd) dist/*.whl
-clean_sdist_cmd = $(clean_cmd) dist/*.tar.gz
 clean_all_cmd = $(clean_cmd) dist
 
 plot_type ?=
 
 .PHONY: all
-all: clean sdist wheel
+all: clean wheel
 
 .PHONY: setup
 setup:
-	$(pipenv) sync $(pipenv_opts)
-	$(pipenv) run pip freeze
+	@$(uv_sync_dev)
+	@$(UV) pip list
+
+.PHONY: setup-py
+setup-py: setup
 
 .PHONY: setup-ot2
 setup-ot2:
-	$(pipenv) sync $(pipenv_opts)
-	$(pipenv) run pip uninstall -y python-can
-	$(pipenv) run pip freeze
+	@$(uv_sync_dev)
+	@$(UV) pip uninstall python-can
+	@$(UV) pip list
 
 .PHONY: clean
 clean: docs-clean
@@ -90,28 +85,39 @@ clean: docs-clean
 
 .PHONY: teardown
 teardown:
-	$(pipenv) --rm
+	$(SHX) rm -rf .venv
 
 .PHONY: wheel
-wheel: export OPENTRONS_PROJECT=$(project_rs_default)
+wheel: export OPENTRONS_PROJECT=$(PROJECT)
+wheel: export HATCH_VCS_TUNABLE_TAG_PATTERN=$(call git_tag_regex_for_project,$(PROJECT))
+wheel: export HATCH_VCS_TUNABLE_RAW_OPTIONS=$(call hatch_raw_options_for_project,$(PROJECT))
 wheel:
 	$(clean_wheel_cmd)
-	$(python) setup.py $(wheel_opts) bdist_wheel
+	$(python) -m build --wheel .
 	$(SHX) rm -rf build
 	$(SHX) ls dist
 
 
 .PHONY: sdist
-sdist: export OPENTRONS_PROJECT=$(project_rs_default)
+sdist: export OPENTRONS_PROJECT=$(PROJECT)
+sdist: export HATCH_VCS_TUNABLE_TAG_PATTERN=$(call git_tag_regex_for_project,$(PROJECT))
+sdist: export HATCH_VCS_TUNABLE_RAW_OPTIONS=$(call hatch_raw_options_for_project,$(PROJECT))
 sdist:
 	$(clean_sdist_cmd)
-	$(python) setup.py sdist
+	$(python) -m build --sdist .
 	$(SHX) rm -rf build
 	$(SHX) ls dist
 
-.PHONY: test
-test:
+.PHONY: test-unit
+test-unit:
 	$(pytest) $(tests) $(test_opts)
+
+.PHONY: test-integration
+test-integration:
+	$(python) -m integration_testing.labware_stackup
+
+.PHONY: test
+test: test-unit
 
 .PHONY: test-cov
 test-cov:
@@ -123,13 +129,12 @@ test-ot2:
 
 .PHONY: lint
 lint:
-	$(python) -m mypy src tests
-	$(python) -m black --check src tests setup.py
-	$(python) -m flake8 src tests setup.py
+	$(python) -m mypy src tests integration_testing
+	$(ruff) check src tests integration_testing docs/v2/example_protocols
 
 .PHONY: format
 format:
-	$(python) -m black src tests setup.py
+	$(ruff) format src tests integration_testing docs/v2/example_protocols
 
 docs/build/html/v%: docs/v%
 	$(sphinx_build) -b html -d docs/build/doctrees -n $< $@
@@ -155,11 +160,11 @@ docs/dist/%: docs/root/%
 	$(SHX) cp -R docs/root/* docs/dist/
 
 .PHONY: docs
-docs: docs/dist/index.html docs/dist/v1 docs/dist/v2 docs/dist/ot1 docs/dist/hardware
+docs: docs/dist/v2 docs/dist/hardware
 
 .PHONY: docs-clean
 docs-clean:
-	$(SHX) rm -rf docs/dist docs/build
+	$(SHX) rm -rf docs/dist/v2 docs/dist/hardware docs/build
 
 .PHONY: dev
 dev:
@@ -168,20 +173,19 @@ dev:
 
 .PHONY: local-shell
 local-shell:
-	$(pipenv) shell
+	$(UV) run --python $(UV_PYTHON) bash
 
 .PHONY: push-no-restart
 push-no-restart: wheel
-	$(call push-python-package,$(host),$(ssh_key),$(ssh_opts),$(wheel_file))
+	$(call push-python,$(host),$(ssh_key),$(ssh_opts),$(wheel_file),/usr/lib/python3.10/site-packages/)
 
 .PHONY: push
 push: push-no-restart
 	$(call restart-service,$(host),$(ssh_key),$(ssh_opts),"jupyter-notebook opentrons-robot-server")
 
 .PHONY: push-no-restart-ot3
-push-no-restart-ot3: sdist
-	echo $(sdist_file)
-	$(call push-python-sdist,$(host),$(ssh_key),$(ssh_opts),$(sdist_file),/opt/opentrons-robot-server,opentrons,src,,$(version_file))
+push-no-restart-ot3: wheel
+	$(call push-python,$(host),$(ssh_key),$(ssh_opts),$(wheel_file),/opt/opentrons-robot-server)
 	ssh $(ssh_helper) root@$(host) "mount -o remount,rw / && mkdir -p /usr/local/bin"
 	scp $(ssh_helper) ./src/opentrons/hardware_control/scripts/ot3repl root@$(host):/usr/local/bin/
 	scp $(ssh_helper) ./src/opentrons/hardware_control/scripts/ot3gripper root@$(host):/usr/local/bin/
@@ -213,6 +217,6 @@ term:
 plot-session:
 	$(python) util/plot_session.py $(plot_type) $(plot_type).pdf
 
-PHONY: command-schema
+.PHONY: command-schema
 command-schema: 
-	$(python) src/opentrons/protocol_engine/commands/generate_command_schema.py $(COMMAND_SCHEMA_VERSION) > ../shared-data/command/schemas/$(COMMAND_SCHEMA_VERSION).json
+	$(python) src/opentrons/protocol_engine/commands/generate_command_schema.py --overwrite-shared-data

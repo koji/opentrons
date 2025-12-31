@@ -1,15 +1,16 @@
 """Smoke tests for the ProtocolEngine creation factory."""
-import pytest
-from pytest_lazyfixture import lazy_fixture  # type: ignore[import-untyped]
 
-from opentrons_shared_data.deck.types import DeckDefinitionV5
-from opentrons_shared_data.robot.types import RobotType
+import pytest
+from pytest_lazy_fixtures import lf as lazy_fixture
+
 from opentrons_shared_data.deck import load as load_deck
+from opentrons_shared_data.deck.types import DeckDefinitionV5
+from opentrons_shared_data.labware.labware_definition import LabwareDefinition
+from opentrons_shared_data.robot.types import RobotType
 
 from opentrons.calibration_storage.helpers import uri_from_details
 from opentrons.hardware_control import API as HardwareAPI
 from opentrons.hardware_control.types import DoorState
-from opentrons.protocols.models import LabwareDefinition
 from opentrons.protocol_engine import (
     ProtocolEngine,
     Config as EngineConfig,

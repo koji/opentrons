@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import interact from 'interactjs'
-import type { MutableRefObject, CSSProperties } from 'react'
+
+import type { CSSProperties, MutableRefObject } from 'react'
 
 interface UseSwipeResult {
   ref: MutableRefObject<null>
@@ -54,7 +55,7 @@ export const useSwipe = (): UseSwipeResult => {
 
   const disable = (): void => {
     if (interactiveRef.current != null) {
-      interact((interactiveRef.current as unknown) as HTMLElement).unset()
+      interact(interactiveRef.current as unknown as HTMLElement).unset()
     }
   }
 

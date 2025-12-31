@@ -1,10 +1,8 @@
 import { MemoryRouter } from 'react-router-dom'
-import { vi, it, describe, expect, beforeEach, afterEach } from 'vitest'
 import { fireEvent, screen } from '@testing-library/react'
-import { when } from 'vitest-when'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithProviders } from '/app/__testing-utils__'
-
 import {
   i18n,
   SIMPLIFIED_CHINESE,
@@ -14,11 +12,12 @@ import {
 } from '/app/i18n'
 import { getAlertIsPermanentlyIgnored } from '/app/redux/alerts'
 import {
-  getAppLanguage,
-  updateConfigValue,
-  useFeatureFlag,
-} from '/app/redux/config'
+  ANALYTICS_LANGUAGE_UPDATED_DESKTOP_APP_SETTINGS,
+  useTrackEvent,
+} from '/app/redux/analytics'
+import { getAppLanguage, updateConfigValue } from '/app/redux/config'
 import * as Shell from '/app/redux/shell'
+
 import { GeneralSettings } from '../GeneralSettings'
 
 vi.mock('/app/redux/config')
@@ -37,14 +36,14 @@ const render = (): ReturnType<typeof renderWithProviders> => {
   )
 }
 
+const mockTrackEvent = vi.fn()
+
 describe('GeneralSettings', () => {
   beforeEach(() => {
     vi.mocked(Shell.getAvailableShellUpdate).mockReturnValue(null)
     vi.mocked(getAlertIsPermanentlyIgnored).mockReturnValue(false)
     vi.mocked(getAppLanguage).mockReturnValue(US_ENGLISH)
-    when(vi.mocked(useFeatureFlag))
-      .calledWith('enableLocalization')
-      .thenReturn(true)
+    vi.mocked(useTrackEvent).mockReturnValue(mockTrackEvent)
   })
   afterEach(() => {
     vi.resetAllMocks()
@@ -73,8 +72,7 @@ describe('GeneralSettings', () => {
     ).toBeTruthy()
     expect(
       screen.getByRole('link', {
-        name:
-          'Learn more about keeping the Opentrons App and robot software in sync',
+        name: 'Learn more about keeping the Opentrons App and robot software in sync',
       })
     ).toHaveAttribute('href', 'https://support.opentrons.com/s/')
   })
@@ -126,5 +124,12 @@ describe('GeneralSettings', () => {
       'language.appLanguage',
       SIMPLIFIED_CHINESE
     )
+    expect(mockTrackEvent).toHaveBeenCalledWith({
+      name: ANALYTICS_LANGUAGE_UPDATED_DESKTOP_APP_SETTINGS,
+      properties: {
+        language: SIMPLIFIED_CHINESE,
+        transactionId: expect.anything(),
+      },
+    })
   })
 })

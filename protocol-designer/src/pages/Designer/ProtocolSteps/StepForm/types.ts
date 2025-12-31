@@ -1,8 +1,10 @@
-import type { FormData, StepFieldName } from '../../../../form-types'
-import type { StepFormErrors } from '../../../../steplist'
+import type { Dispatch, SetStateAction } from 'react'
+import type { FormData, StepFieldName } from '/protocol-designer/form-types'
+
 export interface FocusHandlers {
   focusedField: StepFieldName | null
   dirtyFields: StepFieldName[]
+  // NOTE: focus & blur take a field name as an arg, unlike onFieldBlur/onFieldFocus in FieldProps
   focus: (arg: StepFieldName) => void
   blur: (arg: StepFieldName) => void
 }
@@ -16,17 +18,21 @@ export interface FieldProps {
   errorToShow?: string | null
   isIndeterminate?: boolean
   tooltipContent?: string | null
+  padding?: string // needed to accommodate full-width divider in toolbox
+  caption?: string
 }
 export type FieldPropsByName = Record<StepFieldName, FieldProps>
 
 // Shared props across all step forms
+export type LiquidHandlingTab = 'aspirate' | 'dispense'
 export interface StepFormProps {
   formData: FormData
   focusHandlers: FocusHandlers
   propsForFields: FieldPropsByName
   toolboxStep: number
-  visibleFormErrors: StepFormErrors
   showFormErrors: boolean
   focusedField?: string | null
-  setShowFormErrorsAndWarnings?: React.Dispatch<React.SetStateAction<boolean>>
+  setShowFormErrors?: Dispatch<SetStateAction<boolean>>
+  tab: LiquidHandlingTab
+  setTab: Dispatch<SetStateAction<LiquidHandlingTab>>
 }

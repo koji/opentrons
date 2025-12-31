@@ -1,16 +1,20 @@
-import { dependentFieldsUpdateMoveLiquid } from './dependentFieldsUpdateMoveLiquid'
-import { dependentFieldsUpdateMix } from './dependentFieldsUpdateMix'
+import { dependentFieldsUpdateAbsorbanceReader } from './dependentFieldsUpdateAbsorbanceReader'
+import { dependentFieldsUpdateFlexStacker } from './dependentFieldsUpdateFlexStacker'
+import { dependentFieldsUpdateHeaterShaker } from './dependentFieldsUpdateHeaterShaker'
 import { dependentFieldsUpdateMagnet } from './dependentFieldsUpdateMagnet'
+import { dependentFieldsUpdateMix } from './dependentFieldsUpdateMix'
+import { dependentFieldsUpdateMoveLiquid } from './dependentFieldsUpdateMoveLiquid'
 import { dependentFieldsUpdatePause } from './dependentFieldsUpdatePause'
 import { dependentFieldsUpdateTemperature } from './dependentFieldsUpdateTemperature'
-import { dependentFieldsUpdateHeaterShaker } from './dependentFieldsUpdateHeaterShaker'
 import { dependentFieldsUpdateThermocycler } from './dependentFieldsUpdateThermocycler'
+
 import type {
   LabwareEntities,
   PipetteEntities,
 } from '@opentrons/step-generation'
 import type { FormData } from '../../../form-types'
 import type { FormPatch } from '../../actions/types'
+
 export function handleFormChange(
   patch: FormPatch,
   rawForm: FormData | null | undefined,
@@ -67,9 +71,23 @@ export function handleFormChange(
     )
     return { ...patch, ...dependentFieldsPatch }
   }
-
+  if (rawForm.stepType === 'flexStacker') {
+    const dependentFieldsPatch = dependentFieldsUpdateFlexStacker(
+      patch,
+      rawForm
+    )
+    return { ...patch, ...dependentFieldsPatch }
+  }
   if (rawForm.stepType === 'pause') {
     const dependentFieldsPatch = dependentFieldsUpdatePause(patch, rawForm)
+    return { ...patch, ...dependentFieldsPatch }
+  }
+
+  if (rawForm.stepType === 'absorbanceReader') {
+    const dependentFieldsPatch = dependentFieldsUpdateAbsorbanceReader(
+      patch,
+      rawForm
+    )
     return { ...patch, ...dependentFieldsPatch }
   }
 

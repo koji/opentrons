@@ -1,11 +1,13 @@
-import { getRun } from '@opentrons/api-client'
-import { useQuery, useQueryClient } from 'react-query'
-import { useHost } from '../api'
 import { useEffect } from 'react'
+import { useQuery, useQueryClient } from 'react-query'
 import { some } from 'lodash'
-import type { HostConfig, Run, RunError } from '@opentrons/api-client'
 
-import type { UseQueryResult, UseQueryOptions } from 'react-query'
+import { getRun } from '@opentrons/api-client'
+
+import { useHost } from '../api'
+
+import type { UseQueryOptions, UseQueryResult } from 'react-query'
+import type { HostConfig, Run, RunError } from '@opentrons/api-client'
 
 export function useRunQuery<TError = Error>(
   runId: string | null,
@@ -18,10 +20,7 @@ export function useRunQuery<TError = Error>(
   const queryClient = useQueryClient()
   const query = useQuery<Run, TError>(
     [host, 'runs', runId, 'details'],
-    () =>
-      getRun(host as HostConfig, runId as string).then(
-        response => response.data
-      ),
+    () => getRun(host!, runId!).then(response => response.data),
     {
       enabled: host !== null && runId != null && options.enabled !== false,
       ...options,

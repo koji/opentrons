@@ -10,13 +10,13 @@ import {
   Flex,
   RESPONSIVENESS,
   SPACING,
-  TYPOGRAPHY,
+  StyledText,
   useInterval,
-  LegacyStyledText,
 } from '@opentrons/components'
 
 import { EMPTY_TIMESTAMP } from '/app/resources/runs'
 import { formatInterval } from '/app/transformations/commands'
+
 import { InterventionCommandMessage } from './InterventionCommandMessage'
 
 const PAUSE_INTERVENTION_CONTENT_STYLE = css`
@@ -61,20 +61,6 @@ const PAUSE_HEADER_STYLE = css`
   }
 `
 
-const PAUSE_TEXT_STYLE = css`
-  ${TYPOGRAPHY.h1Default}
-  @media ${RESPONSIVENESS.touchscreenMediaQuerySpecs} {
-    ${TYPOGRAPHY.level4HeaderSemiBold}
-  }
-`
-
-const PAUSE_TIME_STYLE = css`
-  ${TYPOGRAPHY.h1Default}
-  @media ${RESPONSIVENESS.touchscreenMediaQuerySpecs} {
-    ${TYPOGRAPHY.level1Header}
-  }
-`
-
 interface PauseHeaderProps {
   startedAt: string | null
 }
@@ -95,10 +81,15 @@ function PauseHeader({ startedAt }: PauseHeaderProps): JSX.Element {
 
   return (
     <Flex css={PAUSE_HEADER_STYLE}>
-      <LegacyStyledText css={PAUSE_TEXT_STYLE}>
+      <StyledText
+        desktopStyle="bodyDefaultSemiBold"
+        oddStyle="level4HeaderSemiBold"
+      >
         {i18n.format(t('paused_for'), 'capitalize')}
-      </LegacyStyledText>
-      <LegacyStyledText css={PAUSE_TIME_STYLE}>{runTime}</LegacyStyledText>
+      </StyledText>
+      <StyledText desktopStyle="bodyDefaultSemiBold" oddStyle="level1Header">
+        {runTime}
+      </StyledText>
     </Flex>
   )
 }

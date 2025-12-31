@@ -1,10 +1,10 @@
-import type * as React from 'react'
-import { when } from 'vitest-when'
-import { vi, it, expect, describe, beforeEach } from 'vitest'
-import { Provider } from 'react-redux'
-import { createStore } from 'redux'
-import { renderHook } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from 'react-query'
+import { Provider } from 'react-redux'
+import { renderHook } from '@testing-library/react'
+import { legacy_createStore } from 'redux'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { when } from 'vitest-when'
+
 import {
   useAllPipetteOffsetCalibrationsQuery,
   useAllTipLengthCalibrationsQuery,
@@ -21,7 +21,9 @@ import {
 } from '/app/redux/calibration/tip-length/__fixtures__'
 
 import { useAttachedPipetteCalibrations } from '..'
+
 import type { Store } from 'redux'
+import type { FunctionComponent, ReactNode } from 'react'
 import type { State } from '/app/redux/types'
 
 vi.mock('@opentrons/react-api-client')
@@ -29,7 +31,7 @@ vi.mock('/app/redux/calibration')
 vi.mock('/app/redux/pipettes')
 vi.mock('/app/redux/robot-api')
 
-const store: Store<State> = createStore(state => state, {})
+const store: Store<State> = legacy_createStore(state => state, {})
 
 const PIPETTE_CALIBRATIONS = {
   left: {
@@ -43,7 +45,7 @@ const PIPETTE_CALIBRATIONS = {
 }
 
 describe('useAttachedPipetteCalibrations hook', () => {
-  let wrapper: React.FunctionComponent<{ children: React.ReactNode }>
+  let wrapper: FunctionComponent<{ children: ReactNode }>
   beforeEach(() => {
     const queryClient = new QueryClient()
     wrapper = ({ children }) => (

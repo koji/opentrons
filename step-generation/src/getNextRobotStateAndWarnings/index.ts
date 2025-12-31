@@ -1,30 +1,23 @@
 import assert from 'assert'
-import produce from 'immer'
+import { produce } from 'immer'
+
 import { stripNoOpCommands } from '../utils/stripNoOpCommands'
-import { forLoadLiquid } from './forLoadLiquid'
+import {
+  forAbsorbanceReaderCloseLid,
+  forAbsorbanceReaderInitialize,
+  forAbsorbanceReaderOpenLid,
+} from './absorbanceReaderUpdates'
 import { forAspirate } from './forAspirate'
-import { forDispense } from './forDispense'
 import { forBlowout } from './forBlowout'
+import { forConfigureNozzleLayout } from './forConfigureNozzleLayout'
+import { forDispense } from './forDispense'
 import { forDropTip } from './forDropTip'
+import { forLoadLiquid } from './forLoadLiquid'
+import { forMoveLabware } from './forMoveLabware'
+import { forMoveToAddressableArea } from './forMoveToAddressableArea'
+import { forMoveToWell } from './forMoveToWell'
 import { forPickUpTip } from './forPickUpTip'
-import { forEngageMagnet, forDisengageMagnet } from './magnetUpdates'
-import {
-  forThermocyclerAwaitBlockTemperature,
-  forThermocyclerAwaitLidTemperature,
-  forThermocyclerAwaitProfileComplete,
-  forThermocyclerCloseLid,
-  forThermocyclerDeactivateBlock,
-  forThermocyclerDeactivateLid,
-  forThermocyclerOpenLid,
-  forThermocyclerRunProfile,
-  forThermocyclerSetTargetBlockTemperature,
-  forThermocyclerSetTargetLidTemperature,
-} from './thermocyclerUpdates'
-import {
-  forAwaitTemperature,
-  forSetTemperature,
-  forDeactivateTemperature,
-} from './temperatureUpdates'
+import { forWaitForTasks } from './forWaitForTasks'
 import {
   forHeaterShakerCloseLatch,
   forHeaterShakerDeactivateHeater,
@@ -33,20 +26,41 @@ import {
   forHeaterShakerSetTargetTemperature,
   forHeaterShakerStopShake,
 } from './heaterShakerUpdates'
-import { forMoveLabware } from './forMoveLabware'
+import { forBlowOutInPlace, forDropTipInPlace } from './inPlaceCommandUpdates'
+import { forDisengageMagnet, forEngageMagnet } from './magnetUpdates'
 import {
-  forAspirateInPlace,
-  forBlowOutInPlace,
-  forDispenseInPlace,
-  forDropTipInPlace,
-} from './inPlaceCommandUpdates'
+  forFlexStackerEmpty,
+  forFlexStackerFill,
+  forFlexStackerFillItems,
+  forFlexStackerRetrieve,
+  forFlexStackerStore,
+} from './stackerUpdates'
+import {
+  forAwaitTemperature,
+  forDeactivateTemperature,
+  forSetTemperature,
+} from './temperatureUpdates'
+import {
+  forThermocyclerAwaitBlockTemperature,
+  forThermocyclerAwaitLidTemperature,
+  forThermocyclerAwaitProfileComplete,
+  forThermocyclerCloseLid,
+  forThermocyclerDeactivateBlock,
+  forThermocyclerDeactivateLid,
+  forThermocyclerOpenLid,
+  forThermocyclerRunExtendedProfile,
+  forThermocyclerRunProfile,
+  forThermocyclerSetTargetBlockTemperature,
+  forThermocyclerSetTargetLidTemperature,
+  forThermocyclerStartRunExtendedProfile,
+} from './thermocyclerUpdates'
+
 import type { CreateCommand } from '@opentrons/shared-data'
 import type {
   InvariantContext,
   RobotState,
   RobotStateAndWarnings,
 } from '../types'
-import { forConfigureNozzleLayout } from './forConfigureNozzleLayout'
 
 // WARNING this will mutate the prevRobotState
 function _getNextRobotStateAndWarningsSingleCommand(
@@ -56,7 +70,11 @@ function _getNextRobotStateAndWarningsSingleCommand(
 ): void {
   assert(command, 'undefined command passed to getNextRobotStateAndWarning')
   switch (command.commandType) {
+    case 'aspirateWhileTracking':
     case 'aspirate':
+    case 'aspirateInPlace':
+      //  TODO: robot state will be updated for air gaps in PV since completedProtocolAnalysis
+      //  won't have isAirGap... so we need to figure out a fix for this but not sure how
       if (command.meta?.isAirGap === true) {
         break
       } else {
@@ -64,7 +82,11 @@ function _getNextRobotStateAndWarningsSingleCommand(
       }
       break
 
+    case 'dispenseWhileTracking':
     case 'dispense':
+    case 'dispenseInPlace':
+      //  TODO: robot state will be updated for air gaps in PV since completedProtocolAnalysis
+      //  won't have isAirGap... so we need to figure out a fix for this but not sure how
       if (command.meta?.isAirGap === true) {
         break
       } else {
@@ -100,6 +122,55 @@ function _getNextRobotStateAndWarningsSingleCommand(
       forMoveLabware(command.params, invariantContext, robotStateAndWarnings)
       break
 
+    case 'waitForTasks':
+      forWaitForTasks(command.params, invariantContext, robotStateAndWarnings)
+      break
+
+    // setStoredLabware and setStoredLabwareItems handled in the python file while adding a labware on the stacker. no need to update state
+    case 'flexStacker/setStoredLabware':
+    case 'flexStacker/setStoredLabwareItems':
+      break
+    // unsafe commands, no need to update state
+    case 'flexStacker/prepareShuttle':
+    case 'flexStacker/closeLatch':
+    case 'flexStacker/openLatch':
+      break
+    case 'flexStacker/empty':
+      forFlexStackerEmpty(
+        command.params,
+        invariantContext,
+        robotStateAndWarnings
+      )
+      break
+    case 'flexStacker/fill':
+      forFlexStackerFill(
+        command.params,
+        invariantContext,
+        robotStateAndWarnings
+      )
+      break
+    case 'flexStacker/fillItems':
+      forFlexStackerFillItems(
+        command.params,
+        invariantContext,
+        robotStateAndWarnings
+      )
+      break
+    case 'flexStacker/retrieve':
+      forFlexStackerRetrieve(
+        command.params,
+        invariantContext,
+        robotStateAndWarnings
+      )
+      break
+    case 'flexStacker/store':
+      forFlexStackerStore(
+        command.params,
+        invariantContext,
+        robotStateAndWarnings
+      )
+      break
+
     // the following commands currently don't effect tracked robot state
     case 'touchTip': // pipetting
     case 'configureForVolume':
@@ -108,11 +179,8 @@ function _getNextRobotStateAndWarningsSingleCommand(
     case 'loadModule':
     case 'home': // gantry VVV
     case 'moveRelative':
-    case 'moveToAddressableArea':
-    case 'moveToAddressableAreaForDropTip':
     case 'moveToSlot':
     case 'moveToCoordinates':
-    case 'moveToWell':
     case 'savePosition':
     case 'waitForResume': // timing VVV
     case 'waitForDuration':
@@ -120,18 +188,40 @@ function _getNextRobotStateAndWarningsSingleCommand(
     case 'delay': // deprecated, use waitForDuration instead
     case 'custom': // fall-back
     case 'comment':
+    case 'captureImage':
+    case 'airGapInPlace':
+    case 'prepareToAspirate':
+    case 'liquidProbe':
+    case 'loadLiquidClass':
+    case 'loadLidStack':
+    case 'loadLid':
+    case 'getTipPresence':
+    case 'identifyModule':
+    case 'getNextTip':
+    case 'retractAxis':
+    case 'sealPipetteToTip':
+    case 'tryLiquidProbe':
+    case 'unsealPipetteFromTip':
+    case 'verifyTipPresence':
+    case 'pressureDispense': //  evo tip specific command
+    case 'createTimer':
       break
 
-    case 'loadLiquid':
-      forLoadLiquid(command.params, invariantContext, robotStateAndWarnings)
-      break
-
-    case 'aspirateInPlace':
-      forAspirateInPlace(
+    case 'moveToAddressableArea':
+    case 'moveToAddressableAreaForDropTip':
+      forMoveToAddressableArea(
         command.params,
         invariantContext,
         robotStateAndWarnings
       )
+      break
+
+    case 'moveToWell':
+      forMoveToWell(command.params, invariantContext, robotStateAndWarnings)
+      break
+
+    case 'loadLiquid':
+      forLoadLiquid(command.params, invariantContext, robotStateAndWarnings)
       break
 
     case 'dropTipInPlace':
@@ -140,14 +230,6 @@ function _getNextRobotStateAndWarningsSingleCommand(
 
     case 'blowOutInPlace':
       forBlowOutInPlace(command.params, invariantContext, robotStateAndWarnings)
-      break
-
-    case 'dispenseInPlace':
-      forDispenseInPlace(
-        command.params,
-        invariantContext,
-        robotStateAndWarnings
-      )
       break
 
     case 'configureNozzleLayout':
@@ -249,6 +331,20 @@ function _getNextRobotStateAndWarningsSingleCommand(
         robotStateAndWarnings
       )
       break
+    case 'thermocycler/runExtendedProfile':
+      forThermocyclerRunExtendedProfile(
+        command.params,
+        invariantContext,
+        robotStateAndWarnings
+      )
+      break
+    case 'thermocycler/startRunExtendedProfile':
+      forThermocyclerStartRunExtendedProfile(
+        command.params,
+        invariantContext,
+        robotStateAndWarnings
+      )
+      break
 
     case 'thermocycler/awaitProfileComplete':
       forThermocyclerAwaitProfileComplete(
@@ -302,9 +398,31 @@ function _getNextRobotStateAndWarningsSingleCommand(
     //  no state updates required
     case 'heaterShaker/waitForTemperature':
       break
+    case 'absorbanceReader/openLid':
+      forAbsorbanceReaderOpenLid(
+        command.params,
+        invariantContext,
+        robotStateAndWarnings
+      )
+      break
+    case 'absorbanceReader/closeLid':
+      forAbsorbanceReaderCloseLid(
+        command.params,
+        invariantContext,
+        robotStateAndWarnings
+      )
+      break
+    case 'absorbanceReader/initialize':
+      forAbsorbanceReaderInitialize(
+        command.params,
+        invariantContext,
+        robotStateAndWarnings
+      )
+      break
+    case 'absorbanceReader/read':
+      break
     default:
-      assert(
-        false,
+      console.error(
         `unknown command: ${command.commandType} passed to getNextRobotStateAndWarning`
       )
   }
@@ -329,11 +447,12 @@ export function getNextRobotStateAndWarnings(
   invariantContext: InvariantContext,
   initialRobotState: RobotState
 ): RobotStateAndWarnings {
+  const strippedCommands = stripNoOpCommands(commands)
+
   const prevState = {
     warnings: [],
     robotState: initialRobotState,
   }
-  const strippedCommands = stripNoOpCommands(commands)
   return produce(prevState, draft => {
     strippedCommands.forEach(command => {
       _getNextRobotStateAndWarningsSingleCommand(

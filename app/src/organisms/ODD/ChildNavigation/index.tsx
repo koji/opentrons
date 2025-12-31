@@ -1,44 +1,48 @@
-import type * as React from 'react'
 import styled from 'styled-components'
 
 import {
   ALIGN_CENTER,
   COLORS,
+  CURSOR_DEFAULT,
   DIRECTION_ROW,
   Flex,
   Icon,
+  InlineNotification,
   JUSTIFY_FLEX_START,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   POSITION_FIXED,
   RESPONSIVENESS,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
-  CURSOR_DEFAULT,
 } from '@opentrons/components'
-import { ODD_FOCUS_VISIBLE } from '/app/atoms/buttons/constants'
 
 import { SmallButton } from '/app/atoms/buttons'
-import { InlineNotification } from '/app/atoms/InlineNotification'
+import { ODD_FOCUS_VISIBLE } from '/app/atoms/buttons/constants'
 
-import type { IconName, StyleProps } from '@opentrons/components'
-import type { InlineNotificationProps } from '/app/atoms/InlineNotification'
+import type { ComponentProps, MouseEventHandler, ReactNode } from 'react'
+import type {
+  IconName,
+  InlineNotificationProps,
+  StyleProps,
+} from '@opentrons/components'
 import type {
   IconPlacement,
   SmallButtonTypes,
 } from '/app/atoms/buttons/SmallButton'
 
-interface ChildNavigationProps extends StyleProps {
+export interface ChildNavigationProps extends StyleProps {
   header: string
-  onClickBack?: React.MouseEventHandler
-  buttonText?: React.ReactNode
+  onClickBack?: MouseEventHandler
+  buttonText?: ReactNode
   inlineNotification?: InlineNotificationProps
-  onClickButton?: React.MouseEventHandler
+  onClickButton?: MouseEventHandler
   buttonType?: SmallButtonTypes
   buttonIsDisabled?: boolean
   iconName?: IconName
+  backIconName?: IconName
   iconPlacement?: IconPlacement
-  secondaryButtonProps?: React.ComponentProps<typeof SmallButton>
+  secondaryButtonProps?: ComponentProps<typeof SmallButton>
   ariaDisabled?: boolean
 }
 
@@ -50,6 +54,7 @@ export function ChildNavigation({
   onClickButton,
   buttonType = 'primary',
   iconName,
+  backIconName,
   iconPlacement,
   secondaryButtonProps,
   buttonIsDisabled,
@@ -76,10 +81,17 @@ export function ChildNavigation({
             onClick={onClickBack}
             data-testid="ChildNavigation_Back_Button"
           >
-            <Icon name="back" size="3rem" color={COLORS.black90} />
+            <Icon
+              name={backIconName || 'back'}
+              size="3rem"
+              color={COLORS.black90}
+            />
           </IconButton>
         ) : null}
-        <LegacyStyledText as="h2" fontWeight={TYPOGRAPHY.fontWeightBold}>
+        <LegacyStyledText
+          forwardedAs="h2"
+          fontWeight={TYPOGRAPHY.fontWeightBold}
+        >
           {header}
         </LegacyStyledText>
       </Flex>

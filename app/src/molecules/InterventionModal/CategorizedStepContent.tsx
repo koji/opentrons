@@ -1,23 +1,23 @@
 import { css } from 'styled-components'
 
 import {
-  StyledText,
-  Flex,
   DIRECTION_COLUMN,
-  SPACING,
+  Flex,
   JUSTIFY_FLEX_START,
   RESPONSIVENESS,
+  SPACING,
+  StyledText,
 } from '@opentrons/components'
 
 import { Command, CommandIndex } from '../Command'
 
-import type { CommandTextData } from '/app/local-resources/commands'
-import type { NonSkeletonCommandState } from '../Command'
+import type { CommandTextData } from '@opentrons/components'
 import type {
-  LabwareDefinition2,
+  LabwareDefinition,
   RobotType,
   RunTimeCommand,
 } from '@opentrons/shared-data'
+import type { NonSkeletonCommandState } from '../Command'
 
 export interface CommandWithIndex {
   index: number | undefined
@@ -27,7 +27,7 @@ export interface CommandWithIndex {
 export interface CategorizedStepContentProps {
   robotType: RobotType
   commandTextData: CommandTextData | null
-  allRunDefs: LabwareDefinition2[]
+  allRunDefs: LabwareDefinition[]
   topCategoryHeadline: string
   topCategory: NonSkeletonCommandState
   topCategoryCommand: CommandWithIndex | null
@@ -36,7 +36,7 @@ export interface CategorizedStepContentProps {
   bottomCategoryCommands: readonly [
     CommandWithIndex | null,
     CommandWithIndex | null,
-    ...Array<CommandWithIndex | null>
+    ...Array<CommandWithIndex | null>,
   ]
 }
 
@@ -52,7 +52,7 @@ type MappedState =
       command: RunTimeCommand
       state: NonSkeletonCommandState
       commandTextData: CommandTextData
-      allRunDefs: LabwareDefinition2[]
+      allRunDefs: LabwareDefinition[]
     }
   | typeof EMPTY_COMMAND
 
@@ -60,7 +60,7 @@ const commandAndState = (
   command: CommandWithIndex | null,
   state: NonSkeletonCommandState,
   commandTextData: CommandTextData | null,
-  allRunDefs: LabwareDefinition2[]
+  allRunDefs: LabwareDefinition[]
 ): MappedState =>
   command == null || commandTextData == null
     ? EMPTY_COMMAND

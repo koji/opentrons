@@ -1,15 +1,19 @@
-import { screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import { screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { when } from 'vitest-when'
-import { describe, it, vi, beforeEach, expect, afterEach } from 'vitest'
+
 import '@testing-library/jest-dom/vitest'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
+import { useIsFlex, useIsRobotBusy } from '/app/redux-resources/robots'
 import { getShellUpdateState } from '/app/redux/shell'
-import { useIsRobotBusy, useIsFlex } from '/app/redux-resources/robots'
+import { useCurrentRun } from '/app/resources/runs'
+
 import {
   DeviceReset,
+  DisableStackerSensors,
   DisplayRobotName,
   EnableStatusLight,
   GantryHoming,
@@ -51,16 +55,13 @@ vi.mock('../AdvancedTab/Troubleshooting')
 vi.mock('../AdvancedTab/UpdateRobotSoftware')
 vi.mock('../AdvancedTab/UsageSettings')
 vi.mock('../AdvancedTab/UseOlderAspirateBehavior')
-
-const mockUpdateRobotStatus = vi.fn()
+vi.mock('../AdvancedTab/DisableStackerSensors')
+vi.mock('/app/resources/runs')
 
 const render = () => {
   return renderWithProviders(
     <MemoryRouter>
-      <RobotSettingsAdvanced
-        robotName="otie"
-        updateRobotStatus={mockUpdateRobotStatus}
-      />
+      <RobotSettingsAdvanced robotName="otie" isRobotBusy={false} />
     </MemoryRouter>,
     {
       i18nInstance: i18n,
@@ -111,7 +112,14 @@ describe('RobotSettings Advanced tab', () => {
     vi.mocked(EnableStatusLight).mockReturnValue(
       <div>mock EnableStatusLight</div>
     )
+    vi.mocked(GantryHoming).mockReturnValue(
+      <div>Mock GantryHoming Section</div>
+    )
+    vi.mocked(DisableStackerSensors).mockReturnValue(
+      <div>Mock DisableStackerSensors Section</div>
+    )
     vi.mocked(useIsRobotBusy).mockReturnValue(false)
+    vi.mocked(useCurrentRun).mockReturnValue(null)
   })
 
   afterEach(() => {
@@ -213,5 +221,18 @@ describe('RobotSettings Advanced tab', () => {
     when(useIsFlex).calledWith('otie').thenReturn(true)
     render()
     screen.getByText('mock EnableStatusLight')
+  })
+
+  it('should not render DisableStackerSensors section for OT-2', () => {
+    render()
+    expect(
+      screen.queryByText('Mock DisableStackerSensors')
+    ).not.toBeInTheDocument()
+  })
+
+  it('should render DisableStackerSensors section for Flex', () => {
+    when(useIsFlex).calledWith('otie').thenReturn(true)
+    render()
+    screen.getByText('Mock DisableStackerSensors Section')
   })
 })

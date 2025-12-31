@@ -1,18 +1,19 @@
 import last from 'lodash/last'
+
 import {
-  RUN_ACTION_TYPE_PLAY,
   RUN_ACTION_TYPE_PAUSE,
-  RUN_STATUS_STOPPED,
+  RUN_ACTION_TYPE_PLAY,
+  RUN_ACTION_TYPE_STOP,
   RUN_STATUS_FAILED,
   RUN_STATUS_FINISHING,
-  RUN_STATUS_SUCCEEDED,
-  RUN_ACTION_TYPE_STOP,
   RUN_STATUS_STOP_REQUESTED,
+  RUN_STATUS_STOPPED,
+  RUN_STATUS_SUCCEEDED,
 } from '@opentrons/api-client'
+
 import { DEFAULT_RUN_QUERY_REFETCH_INTERVAL } from './constants'
-import { useRunCommands } from './useRunCommands'
 import { useNotifyRunQuery } from './useNotifyRunQuery'
-import { useRunStatus } from './useRunStatus'
+import { useRunCommands } from './useRunCommands'
 
 export interface RunTimestamps {
   startedAt: string | null
@@ -22,15 +23,16 @@ export interface RunTimestamps {
 }
 
 export function useRunTimestamps(runId: string | null): RunTimestamps {
-  const runStatus = useRunStatus(runId)
-  const { actions = [], errors = [] } =
-    useNotifyRunQuery(runId, {
-      refetchInterval: DEFAULT_RUN_QUERY_REFETCH_INTERVAL,
-    })?.data?.data ?? {}
+  const { data: runRecord } = useNotifyRunQuery(runId, {
+    refetchInterval: DEFAULT_RUN_QUERY_REFETCH_INTERVAL,
+  })
+  const runStatus = runRecord?.data.status ?? null
+  const actions = runRecord?.data.actions ?? null
+  const errors = runRecord?.data.errors ?? null
   const runCommands =
     useRunCommands(
       runId,
-      { cursor: null, pageLength: 1 },
+      { pageLength: 1 },
       {
         enabled:
           runStatus === RUN_STATUS_SUCCEEDED ||
@@ -42,7 +44,7 @@ export function useRunTimestamps(runId: string | null): RunTimestamps {
       }
     ) ?? []
 
-  const firstPlay = actions.find(
+  const firstPlay = actions?.find(
     action => action.actionType === RUN_ACTION_TYPE_PLAY
   )
   const lastAction = last(actions)

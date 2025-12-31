@@ -1,17 +1,18 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, vi, beforeEach, expect } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useCreateLiveCommandMutation } from '@opentrons/react-api-client'
 
-import { i18n } from '/app/i18n'
 import { renderWithProviders } from '/app/__testing-utils__'
+import { i18n } from '/app/i18n'
 import { mockHeaterShaker } from '/app/redux/modules/__fixtures__'
-import { HeaterShakerIsRunningModal } from '../HeaterShakerIsRunningModal'
-import { HeaterShakerModuleCard } from '../HeaterShakerModuleCard'
 import { useAttachedModules } from '/app/resources/modules'
 import { useMostRecentCompletedAnalysis } from '/app/resources/runs'
 
+import { HeaterShakerIsRunningModal } from '../HeaterShakerIsRunningModal'
+import { HeaterShakerModuleCard } from '../HeaterShakerModuleCard'
+
+import type { ComponentProps } from 'react'
 import type * as ReactApiClient from '@opentrons/react-api-client'
 
 vi.mock('@opentrons/react-api-client', async importOriginal => {
@@ -69,16 +70,14 @@ const mockMovingHeaterShakerTwo = {
   usbPort: { path: '/dev/ot_module_heatershaker0', port: 1 },
 } as any
 
-const render = (
-  props: React.ComponentProps<typeof HeaterShakerIsRunningModal>
-) => {
+const render = (props: ComponentProps<typeof HeaterShakerIsRunningModal>) => {
   return renderWithProviders(<HeaterShakerIsRunningModal {...props} />, {
     i18nInstance: i18n,
   })[0]
 }
 
 describe('HeaterShakerIsRunningModal', () => {
-  let props: React.ComponentProps<typeof HeaterShakerIsRunningModal>
+  let props: ComponentProps<typeof HeaterShakerIsRunningModal>
   let mockCreateLiveCommand = vi.fn()
   beforeEach(() => {
     props = {

@@ -1,7 +1,10 @@
-import * as React from 'react'
+import { Component } from 'react'
+
+import type { ReactNode } from 'react'
+
 export interface KeypressHandler {
   key: string
-  shiftKey?: boolean | null | undefined
+  shiftKey?: boolean | null
   onPress: () => unknown
 }
 
@@ -9,9 +12,9 @@ export interface HandleKeypressProps {
   /** array of keypress handlers to attach to the window */
   handlers: KeypressHandler[]
   /** optionally call event.preventDefault if keypress is handled */
-  preventDefault?: boolean | null | undefined
+  preventDefault?: boolean | null
   /** wrapped children */
-  children?: React.ReactNode
+  children?: ReactNode
 }
 
 const matchHandler = (e: KeyboardEvent) => (h: KeypressHandler) =>
@@ -23,7 +26,7 @@ const matchHandler = (e: KeyboardEvent) => (h: KeypressHandler) =>
  * `keyup` event. `event.preventDefault` will be called if a key is handled
  * and `props.preventDefault` is true.
  */
-export class HandleKeypress extends React.Component<HandleKeypressProps> {
+export class HandleKeypress extends Component<HandleKeypressProps> {
   handlePressIfKey = (event: KeyboardEvent): void => {
     const pressHandlers = this.props.handlers.filter(matchHandler(event))
 

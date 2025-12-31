@@ -1,27 +1,29 @@
-import * as React from 'react'
-import { useSelector, useDispatch } from 'react-redux'
+import { useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 
 import {
   ALIGN_CENTER,
   Box,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
 import { ToggleButton } from '/app/atoms/buttons'
 import {
-  updateSetting,
-  getRobotSettings,
   fetchSettings,
+  getRobotSettings,
+  updateSetting,
 } from '/app/redux/robot-settings'
-import type { State, Dispatch } from '/app/redux/types'
+
+import type { MouseEventHandler } from 'react'
 import type {
   RobotSettings,
   RobotSettingsField,
 } from '/app/redux/robot-settings/types'
+import type { Dispatch, State } from '/app/redux/types'
 
 interface RobotSettingsFeatureFlagsProps {
   robotName: string
@@ -50,7 +52,7 @@ export function RobotSettingsFeatureFlags({
 
   const dispatch = useDispatch<Dispatch>()
 
-  React.useEffect(() => {
+  useEffect(() => {
     dispatch(fetchSettings(robotName))
   }, [dispatch, robotName])
 
@@ -81,7 +83,7 @@ export function FeatureFlagToggle({
 
   if (id == null) return null
 
-  const handleClick: React.MouseEventHandler<Element> = () => {
+  const handleClick: MouseEventHandler<Element> = () => {
     dispatch(updateSetting(robotName, id, !value))
   }
 
@@ -98,7 +100,7 @@ export function FeatureFlagToggle({
         >
           {title}
         </LegacyStyledText>
-        <LegacyStyledText as="p">{description}</LegacyStyledText>
+        <LegacyStyledText forwardedAs="p">{description}</LegacyStyledText>
       </Box>
       <ToggleButton
         label={title}

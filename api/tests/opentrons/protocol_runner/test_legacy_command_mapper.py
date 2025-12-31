@@ -1,4 +1,5 @@
 """Tests for the PythonAndLegacyRunner's LegacyCommandMapper."""
+
 import inspect
 from datetime import datetime
 from typing import cast
@@ -6,6 +7,7 @@ from typing import cast
 from opentrons.protocol_engine.state.update_types import (
     LoadPipetteUpdate,
     LoadedLabwareUpdate,
+    LoadModuleUpdate,
     PipetteConfigUpdate,
     StateUpdate,
 )
@@ -21,12 +23,11 @@ from opentrons.protocol_api.core.legacy.load_info import (
     ModuleLoadInfo as LegacyModuleLoadInfo,
 )
 from opentrons.protocol_engine import (
-    DeckSlotLocation,
-    ModuleLocation,
     ModuleModel,
     ModuleDefinition,
     commands as pe_commands,
     actions as pe_actions,
+    types as pe_types,
 )
 from opentrons.protocol_engine.error_recovery_policy import ErrorRecoveryType
 from opentrons.protocol_engine.resources import (
@@ -40,7 +41,7 @@ from opentrons.protocol_runner.legacy_command_mapper import (
     LegacyContextCommandError,
     LegacyCommandMapper,
 )
-from opentrons_shared_data.labware.types import LabwareDefinition
+from opentrons_shared_data.labware.types import LabwareDefinition2
 from opentrons_shared_data.module.types import ModuleDefinitionV3
 from opentrons_shared_data.pipette.types import PipetteNameType
 from opentrons.types import DeckSlotName, Mount, MountType
@@ -117,7 +118,7 @@ def test_map_after_command() -> None:
 
     assert result == [
         pe_actions.SucceedCommandAction(
-            command=pe_commands.Comment.construct(
+            command=pe_commands.Comment.model_construct(
                 id="command.COMMENT-0",
                 key="command.COMMENT-0",
                 status=pe_commands.CommandStatus.SUCCEEDED,
@@ -240,7 +241,7 @@ def test_command_stack() -> None:
             command_id="command.COMMENT-1", started_at=matchers.IsA(datetime)
         ),
         pe_actions.SucceedCommandAction(
-            command=pe_commands.Comment.construct(
+            command=pe_commands.Comment.model_construct(
                 id="command.COMMENT-0",
                 key="command.COMMENT-0",
                 status=pe_commands.CommandStatus.SUCCEEDED,
@@ -266,7 +267,7 @@ def test_command_stack() -> None:
     ]
 
 
-def test_map_labware_load(minimal_labware_def: LabwareDefinition) -> None:
+def test_map_labware_load(minimal_labware_def: LabwareDefinition2) -> None:
     """It should correctly map a labware load."""
     input = LegacyLabwareLoadInfo(
         labware_definition=minimal_labware_def,
@@ -281,7 +282,7 @@ def test_map_labware_load(minimal_labware_def: LabwareDefinition) -> None:
 
     expected_id_and_key = "commands.LOAD_LABWARE-0"
     expected_params = pe_commands.LoadLabwareParams(
-        location=DeckSlotLocation(slotName=DeckSlotName.SLOT_1),
+        location=pe_types.DeckSlotLocation(slotName=DeckSlotName.SLOT_1),
         namespace="some_namespace",
         loadName="some_load_name",
         version=123,
@@ -302,7 +303,7 @@ def test_map_labware_load(minimal_labware_def: LabwareDefinition) -> None:
         started_at=matchers.IsA(datetime),
     )
     expected_succeed = pe_actions.SucceedCommandAction(
-        command=pe_commands.LoadLabware.construct(
+        command=pe_commands.LoadLabware.model_construct(
             id=expected_id_and_key,
             key=expected_id_and_key,
             params=expected_params,
@@ -310,12 +311,17 @@ def test_map_labware_load(minimal_labware_def: LabwareDefinition) -> None:
             createdAt=matchers.IsA(datetime),
             startedAt=matchers.IsA(datetime),
             completedAt=matchers.IsA(datetime),
-            result=pe_commands.LoadLabwareResult.construct(
+            result=pe_commands.LoadLabwareResult.model_construct(
                 labwareId=matchers.IsA(str),
                 # Trusting that the exact fields within in the labware definition
                 # get passed through correctly.
                 definition=matchers.Anything(),
                 offsetId="labware-offset-id-123",
+                locationSequence=[
+                    pe_types.OnAddressableAreaLocationSequenceComponent(
+                        addressableAreaName="1"
+                    )
+                ],
             ),
             notes=[],
         ),
@@ -324,7 +330,7 @@ def test_map_labware_load(minimal_labware_def: LabwareDefinition) -> None:
                 labware_id="labware-0",
                 definition=matchers.Anything(),
                 offset_id="labware-offset-id-123",
-                new_location=DeckSlotLocation(slotName=DeckSlotName.SLOT_1),
+                new_location=pe_types.DeckSlotLocation(slotName=DeckSlotName.SLOT_1),
                 display_name="My special labware",
             )
         ),
@@ -352,7 +358,7 @@ def test_map_instrument_load(decoy: Decoy) -> None:
     ).then_return(pipette_config)
 
     expected_id_and_key = "commands.LOAD_PIPETTE-0"
-    expected_params = pe_commands.LoadPipetteParams.construct(
+    expected_params = pe_commands.LoadPipetteParams.model_construct(
         pipetteName=PipetteNameType.P1000_SINGLE_GEN2, mount=MountType.LEFT
     )
     expected_queue = pe_actions.QueueCommandAction(
@@ -367,7 +373,7 @@ def test_map_instrument_load(decoy: Decoy) -> None:
         command_id=expected_id_and_key, started_at=matchers.IsA(datetime)
     )
     expected_succeed = pe_actions.SucceedCommandAction(
-        command=pe_commands.LoadPipette.construct(
+        command=pe_commands.LoadPipette.model_construct(
             id=expected_id_and_key,
             key=expected_id_and_key,
             status=pe_commands.CommandStatus.SUCCEEDED,
@@ -410,7 +416,7 @@ def test_map_module_load(
     module_data_provider: ModuleDataProvider,
 ) -> None:
     """It should correctly map a module load."""
-    test_definition = ModuleDefinition.parse_obj(minimal_module_def)
+    test_definition = ModuleDefinition.model_validate(minimal_module_def)
     input = LegacyModuleLoadInfo(
         requested_model=TemperatureModuleModel.TEMPERATURE_V1,
         loaded_model=TemperatureModuleModel.TEMPERATURE_V2,
@@ -423,9 +429,9 @@ def test_map_module_load(
     ).then_return(test_definition)
 
     expected_id_and_key = "commands.LOAD_MODULE-0"
-    expected_params = pe_commands.LoadModuleParams.construct(
+    expected_params = pe_commands.LoadModuleParams.model_construct(
         model=ModuleModel.TEMPERATURE_MODULE_V1,
-        location=DeckSlotLocation(slotName=DeckSlotName.SLOT_1),
+        location=pe_types.DeckSlotLocation(slotName=DeckSlotName.SLOT_1),
         moduleId=matchers.IsA(str),
     )
     expected_queue = pe_actions.QueueCommandAction(
@@ -440,7 +446,7 @@ def test_map_module_load(
         command_id=expected_id_and_key, started_at=matchers.IsA(datetime)
     )
     expected_succeed = pe_actions.SucceedCommandAction(
-        command=pe_commands.LoadModule.construct(
+        command=pe_commands.LoadModule.model_construct(
             id=expected_id_and_key,
             key=expected_id_and_key,
             status=pe_commands.CommandStatus.SUCCEEDED,
@@ -448,13 +454,21 @@ def test_map_module_load(
             startedAt=matchers.IsA(datetime),
             completedAt=matchers.IsA(datetime),
             params=expected_params,
-            result=pe_commands.LoadModuleResult.construct(
+            result=pe_commands.LoadModuleResult.model_construct(
                 moduleId=matchers.IsA(str),
                 serialNumber="module-serial",
-                definition=test_definition,
                 model=ModuleModel.TEMPERATURE_MODULE_V2,
             ),
             notes=[],
+        ),
+        state_update=StateUpdate(
+            loaded_module=LoadModuleUpdate(
+                module_id=matchers.IsA(str),
+                definition=test_definition,
+                slot_name=DeckSlotName.SLOT_1,
+                requested_model=ModuleModel.TEMPERATURE_MODULE_V1,
+                serial_number="module-serial",
+            )
         ),
     )
 
@@ -467,7 +481,7 @@ def test_map_module_load(
     assert result_succeed == expected_succeed
 
 
-def test_map_module_labware_load(minimal_labware_def: LabwareDefinition) -> None:
+def test_map_module_labware_load(minimal_labware_def: LabwareDefinition2) -> None:
     """It should correctly map a labware load on module."""
     load_input = LegacyLabwareLoadInfo(
         labware_definition=minimal_labware_def,
@@ -481,8 +495,8 @@ def test_map_module_labware_load(minimal_labware_def: LabwareDefinition) -> None
     )
 
     expected_id_and_key = "commands.LOAD_LABWARE-0"
-    expected_params = pe_commands.LoadLabwareParams.construct(
-        location=ModuleLocation(moduleId="module-123"),
+    expected_params = pe_commands.LoadLabwareParams.model_construct(
+        location=pe_types.ModuleLocation(moduleId="module-123"),
         namespace="some_namespace",
         loadName="some_load_name",
         version=123,
@@ -503,7 +517,7 @@ def test_map_module_labware_load(minimal_labware_def: LabwareDefinition) -> None
         started_at=matchers.IsA(datetime),
     )
     expected_succeed = pe_actions.SucceedCommandAction(
-        command=pe_commands.LoadLabware.construct(
+        command=pe_commands.LoadLabware.model_construct(
             id=expected_id_and_key,
             key=expected_id_and_key,
             params=expected_params,
@@ -511,12 +525,18 @@ def test_map_module_labware_load(minimal_labware_def: LabwareDefinition) -> None
             createdAt=matchers.IsA(datetime),
             startedAt=matchers.IsA(datetime),
             completedAt=matchers.IsA(datetime),
-            result=pe_commands.LoadLabwareResult.construct(
+            result=pe_commands.LoadLabwareResult.model_construct(
                 labwareId=matchers.IsA(str),
                 # Trusting that the exact fields within in the labware definition
                 # get passed through correctly.
                 definition=matchers.Anything(),
                 offsetId="labware-offset-id-123",
+                locationSequence=[
+                    pe_types.OnModuleLocationSequenceComponent(moduleId="module-123"),
+                    pe_types.OnAddressableAreaLocationSequenceComponent(
+                        addressableAreaName="1"
+                    ),
+                ],
             ),
             notes=[],
         ),
@@ -525,7 +545,7 @@ def test_map_module_labware_load(minimal_labware_def: LabwareDefinition) -> None
                 labware_id="labware-0",
                 definition=matchers.Anything(),
                 offset_id="labware-offset-id-123",
-                new_location=ModuleLocation(moduleId="module-123"),
+                new_location=pe_types.ModuleLocation(moduleId="module-123"),
                 display_name="My very special module labware",
             )
         ),
@@ -578,7 +598,7 @@ def test_map_pause() -> None:
             started_at=matchers.IsA(datetime),
         ),
         pe_actions.SucceedCommandAction(
-            command=pe_commands.WaitForResume.construct(
+            command=pe_commands.WaitForResume.model_construct(
                 id="command.PAUSE-0",
                 key="command.PAUSE-0",
                 status=pe_commands.CommandStatus.SUCCEEDED,

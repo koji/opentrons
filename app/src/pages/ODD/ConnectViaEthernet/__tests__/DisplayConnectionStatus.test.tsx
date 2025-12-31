@@ -1,11 +1,12 @@
-import type * as React from 'react'
-import { vi, it, describe, expect, beforeEach } from 'vitest'
 import { fireEvent, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
+
 import { DisplayConnectionStatus } from '../DisplayConnectionStatus'
 
+import type { ComponentProps } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
 const mockFunc = vi.fn()
@@ -18,16 +19,14 @@ vi.mock('react-router-dom', async importOriginal => {
   }
 })
 
-const render = (
-  props: React.ComponentProps<typeof DisplayConnectionStatus>
-) => {
+const render = (props: ComponentProps<typeof DisplayConnectionStatus>) => {
   return renderWithProviders(<DisplayConnectionStatus {...props} />, {
     i18nInstance: i18n,
   })
 }
 
 describe('DisplayConnectionStatus', () => {
-  let props: React.ComponentProps<typeof DisplayConnectionStatus>
+  let props: ComponentProps<typeof DisplayConnectionStatus>
 
   beforeEach(() => {
     props = {

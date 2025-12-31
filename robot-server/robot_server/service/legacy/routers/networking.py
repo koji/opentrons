@@ -1,11 +1,12 @@
 import logging
 import os
+import re
 import subprocess
 from typing import Annotated, Optional
 
 from starlette import status
 from starlette.responses import JSONResponse
-from fastapi import APIRouter, HTTPException, File, Path, UploadFile, Query
+from fastapi import APIRouter, HTTPException, File, Path, UploadFile, Query, Response
 
 from opentrons_shared_data.errors import ErrorCodes
 from opentrons.system import nmcli, wifi
@@ -90,18 +91,23 @@ async def get_wifi_networks(
                 "letting the system decide when to do a rescan."
             ),
         ),
-    ] = False
+    ] = False,
 ) -> WifiNetworks:
     networks = await nmcli.available_ssids(rescan)
     return WifiNetworks(list=[WifiNetworkFull(**n) for n in networks])
 
 
+def _massage_nmcli_error(error_string: str) -> str:
+    """Raises a better-formatted error message from an nmcli error string."""
+    if re.search("password.*802-11-wireless-security\\.psk.*not given", error_string):
+        return "Could not connect to network. Please double-check network credentials."
+    return error_string
+
+
 @router.post(
     path="/wifi/configure",
     summary="Configure the robot's Wi-Fi",
-    description=(
-        "Configures the wireless network interface to " "connect to a network"
-    ),
+    description=("Configures the wireless network interface to connect to a network"),
     status_code=status.HTTP_201_CREATED,
     response_model=WifiConfigurationResponse,
     responses={
@@ -129,7 +135,8 @@ async def post_wifi_configure(
 
     if not ok:
         raise LegacyErrorResponse(
-            message=message, errorCode=ErrorCodes.GENERAL_ERROR.value.code
+            message=_massage_nmcli_error(message),
+            errorCode=ErrorCodes.GENERAL_ERROR.value.code,
         ).as_error(status.HTTP_401_UNAUTHORIZED)
 
     return WifiConfigurationResponse(message=message, ssid=configuration.ssid)
@@ -142,7 +149,7 @@ async def post_wifi_configure(
     response_model=WifiKeyFiles,
     response_model_by_alias=True,
 )
-async def get_wifi_keys():
+async def get_wifi_keys() -> WifiKeyFiles:
     keys = [
         WifiKeyFile(
             uri=f"/wifi/keys/{key.directory}",
@@ -151,12 +158,7 @@ async def get_wifi_keys():
         )
         for key in wifi.list_keys()
     ]
-    # Why not create a WifiKeyFiles? Because validation fails when there's a
-    # pydantic model with attribute named keys. Deep in the guts of pydantic
-    # there's a call to `dict(model)` which raises an exception because `keys`
-    # is not callable, like the `keys` member of dict.
-    # A problem for another time.
-    return {"keys": keys}
+    return WifiKeyFiles(keys=keys)
 
 
 @router.post(
@@ -171,7 +173,10 @@ async def get_wifi_keys():
     status_code=status.HTTP_201_CREATED,
     response_model_exclude_unset=True,
 )
-async def post_wifi_key(key: UploadFile = File(...)):
+async def post_wifi_key(
+    response: Response,
+    key: UploadFile = File(...),
+) -> AddWifiKeyFileResponse:
     key_name = key.filename
     if not key_name:
         raise LegacyErrorResponse(
@@ -180,17 +185,18 @@ async def post_wifi_key(key: UploadFile = File(...)):
 
     add_key_result = wifi.add_key(key_name, key.file.read())
 
-    response = AddWifiKeyFileResponse(
+    response_body = AddWifiKeyFileResponse(
         uri=f"/wifi/keys/{add_key_result.key.directory}",
         id=add_key_result.key.directory,
         name=os.path.basename(add_key_result.key.file),
     )
     if add_key_result.created:
-        return response
+        response.status_code = status.HTTP_201_CREATED
+        return response_body
     else:
-        # We return a JSONResponse because we want the 200 status code.
-        response.message = "Key file already present"
-        return JSONResponse(content=response.dict())
+        response.status_code = status.HTTP_200_OK
+        response_body.message = "Key file already present"
+        return response_body
 
 
 @router.delete(
@@ -210,7 +216,7 @@ async def delete_wifi_key(
             description="The ID of key to delete, as determined by a previous"
             " call to GET /wifi/keys",
         ),
-    ]
+    ],
 ) -> V1BasicResponse:
     """Delete wifi key handler"""
     deleted_file = wifi.remove_key(key_uuid)
@@ -225,7 +231,7 @@ async def delete_wifi_key(
 @router.get(
     "/wifi/eap-options",
     summary="Get EAP options",
-    description="Get the supported EAP variants and their " "configuration parameters",
+    description="Get the supported EAP variants and their configuration parameters",
     response_model=EapOptions,
 )
 async def get_eap_options() -> EapOptions:
@@ -240,7 +246,7 @@ async def get_eap_options() -> EapOptions:
                     name=o.get("name"),  # type: ignore[arg-type]
                     displayName=o.get("displayName"),  # type: ignore[arg-type]
                     required=o.get("required"),  # type: ignore[arg-type]
-                    type=EapConfigOptionType(o.get("type")),
+                    type=EapConfigOptionType(o.get("type")),  # type: ignore[arg-type]
                 )
                 for o in m.args()
             ],
@@ -260,7 +266,7 @@ async def get_eap_options() -> EapOptions:
     responses={status.HTTP_200_OK: {"model": V1BasicResponse}},
     status_code=status.HTTP_207_MULTI_STATUS,
 )
-async def post_wifi_disconnect(wifi_ssid: WifiNetwork):
+async def post_wifi_disconnect(wifi_ssid: WifiNetwork) -> JSONResponse:
     ok, message = await nmcli.wifi_disconnect(wifi_ssid.ssid)
 
     result = V1BasicResponse(message=message)
@@ -274,4 +280,4 @@ async def post_wifi_disconnect(wifi_ssid: WifiNetwork):
         )
     else:
         stat = status.HTTP_500_INTERNAL_SERVER_ERROR
-    return JSONResponse(status_code=stat, content=result.dict())
+    return JSONResponse(status_code=stat, content=result.model_dump())

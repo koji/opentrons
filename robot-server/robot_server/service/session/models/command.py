@@ -16,14 +16,14 @@ If there are no data and result models, then add the CommandDefinition to
 5) If not using `CommandsEmptyData` then add specialized request and response
 types to `RequestTypes` and `ResponseTypes`.
 """
+
 from datetime import datetime
-from enum import Enum
 import typing
 
 from typing_extensions import Literal
 from pydantic import BaseModel, Field
-from pydantic.generics import GenericModel
 
+from opentrons_shared_data.util import StrEnum
 from opentrons.util.helpers import utc_now
 from opentrons.protocol_engine import commands
 
@@ -56,7 +56,7 @@ class SetHasCalibrationBlockRequestData(BaseModel):
     )
 
 
-class CommandStatus(str, Enum):
+class CommandStatus(StrEnum):
     """The command status."""
 
     executed = "executed"
@@ -70,7 +70,7 @@ ResponseDataT = typing.TypeVar("ResponseDataT")
 
 
 class SessionCommandRequest(
-    GenericModel, typing.Generic[CommandT, RequestDataT, ResponseDataT]
+    BaseModel, typing.Generic[CommandT, RequestDataT, ResponseDataT]
 ):
     """A session command request."""
 
@@ -101,7 +101,6 @@ class SessionCommandRequest(
 
 class SessionCommandResponse(
     DeprecatedResponseDataModel,
-    GenericModel,
     typing.Generic[CommandT, RequestDataT, ResponseDataT],
 ):
     """A session command response."""
@@ -110,8 +109,8 @@ class SessionCommandResponse(
     data: RequestDataT
     status: CommandStatus
     createdAt: datetime = Field(default_factory=utc_now)
-    startedAt: typing.Optional[datetime]
-    completedAt: typing.Optional[datetime]
+    startedAt: typing.Optional[datetime] = None
+    completedAt: typing.Optional[datetime] = None
     result: typing.Optional[ResponseDataT] = None
 
 

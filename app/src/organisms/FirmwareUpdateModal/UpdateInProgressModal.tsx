@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { css } from 'styled-components'
+
 import {
   ALIGN_CENTER,
   BORDERS,
@@ -7,12 +8,14 @@ import {
   DIRECTION_COLUMN,
   Flex,
   Icon,
+  LegacyStyledText,
   RESPONSIVENESS,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
+
 import { OddModal } from '/app/molecules/OddModal'
+
 import type { Subsystem } from '@opentrons/api-client'
 
 interface UpdateInProgressModalProps {
@@ -48,7 +51,7 @@ export function UpdateInProgressModal(
         gridGap={SPACING.spacing40}
       >
         <LegacyStyledText
-          as="h4"
+          forwardedAs="h4"
           marginBottom={SPACING.spacing4}
           fontWeight={TYPOGRAPHY.fontWeightBold}
         >

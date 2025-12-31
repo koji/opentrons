@@ -7,10 +7,10 @@ import {
   Flex,
   Icon,
   JUSTIFY_CENTER,
+  LegacyStyledText,
   POSITION_ABSOLUTE,
   POSITION_RELATIVE,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
@@ -45,7 +45,7 @@ export function TitleHeader({ title }: TitleHeaderProps): JSX.Element {
           <Icon name="back" size="3rem" />
         </Flex>
       </Btn>
-      <LegacyStyledText as="h2" fontWeight={TYPOGRAPHY.fontWeightBold}>
+      <LegacyStyledText forwardedAs="h2" fontWeight={TYPOGRAPHY.fontWeightBold}>
         {title}
       </LegacyStyledText>
     </Flex>

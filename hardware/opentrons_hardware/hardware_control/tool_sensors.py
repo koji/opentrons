@@ -1,4 +1,5 @@
 """Functions for commanding motion limited by tool sensors."""
+
 import asyncio
 from contextlib import AsyncExitStack
 from functools import partial
@@ -118,7 +119,7 @@ def _fix_pass_step_for_buffer(
             #   will be the same
             duration=float64(abs(distance[movers[0]] / speed[movers[0]])),
             present_nodes=tool_nodes,
-            stop_condition=MoveStopCondition.sensor_report,
+            stop_condition=MoveStopCondition.sync_line,
             sensor_type_pass=sensor_type,
             sensor_id_pass=sensor_id,
             sensor_binding_flags=binding_flags,
@@ -269,10 +270,11 @@ async def liquid_probe(
     threshold_pascals: float,
     plunger_impulse_time: float,
     num_baseline_reads: int,
+    z_offset_for_plunger_prep: float,
     sensor_id: SensorId = SensorId.S0,
     force_both_sensors: bool = False,
-    response_queue: Optional[
-        asyncio.Queue[Dict[SensorId, List[SensorDataType]]]
+    emplace_data: Optional[
+        Callable[[Dict[SensorId, List[SensorDataType]]], None]
     ] = None,
 ) -> Dict[NodeId, MotorPositionStatus]:
     """Move the mount and pipette simultaneously while reading from the pressure sensor."""
@@ -299,7 +301,7 @@ async def liquid_probe(
     )
     p_prep_distance = float(plunger_impulse_time * plunger_speed)
     p_pass_distance = float(max_p_distance - p_prep_distance)
-    max_z_distance = (p_pass_distance / plunger_speed) * mount_speed
+    max_z_distance = (p_pass_distance / abs(plunger_speed)) * mount_speed
 
     lower_plunger = create_step(
         distance={tool: float64(p_prep_distance)},
@@ -331,11 +333,12 @@ async def liquid_probe(
     )
     sensor_runner = MoveGroupRunner(move_groups=[[lower_plunger], [sensor_group]])
 
+    # Only raise the z a little so we don't do a huge slow travel
     raise_z = create_step(
-        distance={head_node: float64(max_z_distance)},
+        distance={head_node: float64(z_offset_for_plunger_prep)},
         velocity={head_node: float64(-1 * mount_speed)},
         acceleration={},
-        duration=float64(max_z_distance / mount_speed),
+        duration=float64(z_offset_for_plunger_prep / mount_speed),
         present_nodes=[head_node],
     )
 
@@ -360,12 +363,12 @@ async def liquid_probe(
         await finalize_logs(messenger, tool, listeners, pressure_sensors)
 
     # give response data to any consumer that wants it
-    if response_queue:
+    if emplace_data:
         for s_id in listeners.keys():
             data = listeners[s_id].get_data()
             if data:
                 for d in data:
-                    response_queue.put_nowait({s_id: data})
+                    emplace_data({s_id: data})
 
     return positions
 
@@ -456,6 +459,14 @@ async def capacitive_probe(
     async with AsyncExitStack() as binding_stack:
         for listener in listeners.values():
             await binding_stack.enter_async_context(listener)
+        for sensor in capacitive_sensors.values():
+            await binding_stack.enter_async_context(
+                sensor_driver.bind_output(
+                    can_messenger=messenger,
+                    sensor=sensor,
+                    binding=[SensorOutputBinding.sync],
+                )
+            )
         positions = await runner.run(can_messenger=messenger)
         await finalize_logs(messenger, tool, listeners, capacitive_sensors)
 
@@ -506,6 +517,36 @@ async def capacitive_pass(
                 break
 
     return list(_drain())
+
+
+async def touch_probe(
+    messenger: CanMessenger,
+    mover: NodeId,
+    distance: float,
+    speed: float,
+) -> MotorPositionStatus:
+    """Move the specified tool down until the probe triggers.
+
+    Moves down by the specified distance at the specified speed until the
+    probe triggers and returns the position afterward.
+
+    The direction is sgn(distance)*sgn(speed), so you can set the direction
+    either by negating speed or negating distance.
+    """
+    movers = [mover]
+    sensor_group = _build_pass_step(
+        movers=movers,
+        distance={mover: distance},
+        speed={mover: speed},
+        sensor_type=SensorType.UNUSED,
+        sensor_id=SensorId.UNUSED,
+        stop_condition=MoveStopCondition.sync_line,
+    )
+
+    runner = MoveGroupRunner(move_groups=[[sensor_group]])
+    positions = await runner.run(can_messenger=messenger)
+
+    return positions[mover]
 
 
 @asynccontextmanager

@@ -13,9 +13,12 @@ from tests.integration.robot_client import RobotClient, poll_until_all_analyses_
 from tests.integration.protocol_files import get_py_protocol, get_json_protocol
 
 
+pytestmark = pytest.mark.slow
+
+
 @pytest.mark.parametrize("protocol", [(get_py_protocol), (get_json_protocol)])
 async def test_protocols_and_analyses_persist(
-    protocol: Callable[[str], IO[bytes]]
+    protocol: Callable[[str], IO[bytes]],
 ) -> None:
     """Test protocol and analysis persistence.
 

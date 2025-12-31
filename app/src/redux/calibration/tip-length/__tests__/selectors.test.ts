@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
-import * as Selectors from '../selectors'
 import * as Fixtures from '../__fixtures__'
+import * as Selectors from '../selectors'
 
 import type { State } from '../../../types'
 
@@ -18,13 +18,13 @@ const mockState: State = {
 
 describe('getTipLengthCalibrations', () => {
   it('should find all tip length calibrations when they exist', () => {
-    expect(
-      Selectors.getTipLengthCalibrations(mockState, 'robot-name')
-    ).toEqual([
-      Fixtures.mockTipLengthCalibration1,
-      Fixtures.mockTipLengthCalibration2,
-      Fixtures.mockTipLengthCalibration3,
-    ])
+    expect(Selectors.getTipLengthCalibrations(mockState, 'robot-name')).toEqual(
+      [
+        Fixtures.mockTipLengthCalibration1,
+        Fixtures.mockTipLengthCalibration2,
+        Fixtures.mockTipLengthCalibration3,
+      ]
+    )
   })
   it('should not find calibrations from other robots', () => {
     expect(

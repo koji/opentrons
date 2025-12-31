@@ -1,20 +1,22 @@
-import type * as React from 'react'
-import { vi, it, describe, expect, beforeEach } from 'vitest'
 import { fireEvent, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { PipetteModelSpecs } from '@opentrons/shared-data'
-
-import { nestedTextMatcher, renderWithProviders } from '/app/__testing-utils__'
 import { LEFT } from '@opentrons/shared-data'
 import { fixtureP10Multi } from '@opentrons/shared-data/pipette/fixtures/name'
+
+import { nestedTextMatcher, renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 import { mockPipetteInfo } from '/app/redux/pipettes/__fixtures__'
-import { Instructions } from '../Instructions'
+
 import { CheckPipettesButton } from '../CheckPipettesButton'
+import { Instructions } from '../Instructions'
+
+import type { ComponentProps } from 'react'
+import type { PipetteModelSpecs } from '@opentrons/shared-data'
 
 vi.mock('../CheckPipettesButton')
 
-const render = (props: React.ComponentProps<typeof Instructions>) => {
+const render = (props: ComponentProps<typeof Instructions>) => {
   return renderWithProviders(<Instructions {...props} />, {
     i18nInstance: i18n,
   })[0]
@@ -29,7 +31,7 @@ const MOCK_ACTUAL_PIPETTE = {
 } as PipetteModelSpecs
 
 describe('Instructions', () => {
-  let props: React.ComponentProps<typeof Instructions>
+  let props: ComponentProps<typeof Instructions>
 
   beforeEach(() => {
     props = {

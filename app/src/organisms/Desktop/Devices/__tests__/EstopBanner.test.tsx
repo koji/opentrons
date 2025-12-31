@@ -1,16 +1,20 @@
-import type * as React from 'react'
 import { screen } from '@testing-library/react'
-import { describe, it, beforeEach } from 'vitest'
+import { beforeEach, describe, it } from 'vitest'
+
 import '@testing-library/jest-dom/vitest'
+
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
+
 import { EstopBanner } from '../EstopBanner'
 
-const render = (props: React.ComponentProps<typeof EstopBanner>) =>
+import type { ComponentProps } from 'react'
+
+const render = (props: ComponentProps<typeof EstopBanner>) =>
   renderWithProviders(<EstopBanner {...props} />, { i18nInstance: i18n })
 
 describe('EstopBanner', () => {
-  let props: React.ComponentProps<typeof EstopBanner>
+  let props: ComponentProps<typeof EstopBanner>
   beforeEach(() => {
     props = {
       status: 'physicallyEngaged',

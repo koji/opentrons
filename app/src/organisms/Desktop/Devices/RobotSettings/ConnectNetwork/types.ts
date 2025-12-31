@@ -1,17 +1,17 @@
+import type { ChangeEventHandler, FocusEventHandler } from 'react'
 import type { FieldError } from 'react-hook-form'
 import type {
-  WifiNetwork,
   EapOption,
   WifiKey,
+  WifiNetwork,
 } from '/app/redux/networking/types'
-
 import type {
   CONNECT,
   DISCONNECT,
-  JOIN_OTHER,
-  FIELD_TYPE_TEXT,
   FIELD_TYPE_KEY_FILE,
   FIELD_TYPE_SECURITY,
+  FIELD_TYPE_TEXT,
+  JOIN_OTHER,
 } from './constants'
 
 export type {
@@ -80,8 +80,8 @@ export type ConnectFormField =
 export type ConnectFormFieldProps = Readonly<{
   value: string | null
   error: string | null
-  onChange: React.ChangeEventHandler
-  onBlur: React.FocusEventHandler
+  onChange: ChangeEventHandler
+  onBlur: FocusEventHandler
   setValue: (value: string) => unknown
   setTouched: (touched: boolean) => unknown
 }>

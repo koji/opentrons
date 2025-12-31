@@ -1,32 +1,39 @@
 import { MemoryRouter } from 'react-router-dom'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, beforeEach, vi, afterEach, expect } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { when } from 'vitest-when'
+
+import { useHoverTooltip } from '@opentrons/components'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { useLPCSuccessToast } from '../../../hooks/useLPCSuccessToast'
-import { LabwarePositionCheck } from '/app/organisms/LabwarePositionCheck'
-import { getModuleTypesThatRequireExtraAttention } from '../../utils/getModuleTypesThatRequireExtraAttention'
 import { getIsLabwareOffsetCodeSnippetsOn } from '/app/redux/config'
-import { SetupLabwareList } from '../SetupLabwareList'
-import { SetupLabwareMap } from '../SetupLabwareMap'
-import { SetupLabware } from '..'
 import {
+  useLPCDisabledReason,
   useNotifyRunQuery,
   useRunCalibrationStatus,
   useRunHasStarted,
-  useLPCDisabledReason,
   useUnmatchedModulesForProtocol,
 } from '/app/resources/runs'
 
+import { SetupLabware } from '..'
+import { getModuleTypesThatRequireExtraAttention } from '../../utils/getModuleTypesThatRequireExtraAttention'
+import { SetupLabwareList } from '../SetupLabwareList'
+import { SetupLabwareMap } from '../SetupLabwareMap'
+
+vi.mock('@opentrons/components', async () => {
+  const actual = await vi.importActual('@opentrons/components')
+  return {
+    ...actual,
+    useHoverTooltip: vi.fn(),
+  }
+})
 vi.mock('../SetupLabwareList')
 vi.mock('../SetupLabwareMap')
-vi.mock('/app/organisms/LabwarePositionCheck')
+vi.mock('/app/organisms/LegacyLabwarePositionCheck')
 vi.mock('../../utils/getModuleTypesThatRequireExtraAttention')
 vi.mock('/app/organisms/RunTimeControl/hooks')
 vi.mock('/app/redux/config')
-vi.mock('../../../hooks/useLPCSuccessToast')
 vi.mock('/app/resources/runs')
 vi.mock('/app/redux-resources/robots')
 
@@ -59,9 +66,6 @@ describe('SetupLabware', () => {
       .calledWith(expect.anything())
       .thenReturn([])
 
-    vi.mocked(LabwarePositionCheck).mockReturnValue(
-      <div>mock Labware Position Check</div>
-    )
     when(vi.mocked(useUnmatchedModulesForProtocol))
       .calledWith(ROBOT_NAME, RUN_ID)
       .thenReturn({
@@ -69,16 +73,11 @@ describe('SetupLabware', () => {
         remainingAttachedModules: [],
       })
 
-    when(vi.mocked(useLPCSuccessToast))
-      .calledWith()
-      .thenReturn({ setIsShowingLPCSuccessToast: vi.fn() })
-
     when(vi.mocked(useRunCalibrationStatus))
       .calledWith(ROBOT_NAME, RUN_ID)
       .thenReturn({
         complete: true,
       })
-    when(vi.mocked(useRunHasStarted)).calledWith(RUN_ID).thenReturn(false)
     vi.mocked(getIsLabwareOffsetCodeSnippetsOn).mockReturnValue(false)
     vi.mocked(SetupLabwareMap).mockReturnValue(
       <div>mock setup labware map</div>
@@ -88,18 +87,33 @@ describe('SetupLabware', () => {
     )
     vi.mocked(useLPCDisabledReason).mockReturnValue(null)
     vi.mocked(useNotifyRunQuery).mockReturnValue({} as any)
+    vi.mocked(useHoverTooltip).mockReturnValue([{}, {}] as any)
+    vi.mocked(useRunHasStarted).mockReturnValue(false)
   })
 
   afterEach(() => {
     vi.resetAllMocks()
   })
 
-  it('should render the list view, clicking the toggle button will turn to map view', () => {
+  it('should render the map view, clicking the toggle button will turn to list view', () => {
     render()
-    screen.getByText('mock setup labware list')
-    screen.getByRole('button', { name: 'List View' })
-    const mapView = screen.getByRole('button', { name: 'Map View' })
-    fireEvent.click(mapView)
     screen.getByText('mock setup labware map')
+    screen.getByRole('button', { name: 'Map View' })
+    screen.getByRole('button', { name: 'Confirm placements' })
+    const listView = screen.getByRole('button', { name: 'List View' })
+    fireEvent.click(listView)
+    screen.getByText('mock setup labware list')
+  })
+
+  it('disables the confirmation button if the run has already started', () => {
+    vi.mocked(useRunHasStarted).mockReturnValue(true)
+
+    render()
+
+    const btn = screen.getByRole('button', {
+      name: 'Confirm placements',
+    })
+
+    expect(btn).toBeDisabled()
   })
 })

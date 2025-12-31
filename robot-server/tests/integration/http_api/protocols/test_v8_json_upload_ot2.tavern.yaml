@@ -88,6 +88,19 @@ stages:
             result: ok
             robotType: OT-2 Standard
             runTimeParameters: []
+            commandAnnotations:
+              - annotationType: custom
+                commandKeys:
+                  [
+                    1abc123,
+                    2abc123,
+                    3abc123,
+                    4abc123,
+                    5abc123,
+                    6abc123,
+                    7abc123,
+                  ]
+            commandPreconditions: { isCameraUsed: false }
             pipettes:
               - id: pipetteId
                 pipetteName: p10_single
@@ -166,7 +179,6 @@ stages:
                   moduleId: magneticModuleId
                 result:
                   moduleId: magneticModuleId
-                  definition: !anydict
                   model: magneticModuleV2
                   serialNumber: !anystr
                 notes: []
@@ -184,7 +196,6 @@ stages:
                   moduleId: temperatureModuleId
                 result:
                   moduleId: temperatureModuleId
-                  definition: !anydict
                   model: temperatureModuleV2
                   serialNumber: !anystr
                 notes: []
@@ -206,6 +217,15 @@ stages:
                 result:
                   labwareId: sourcePlateId
                   definition: !anydict
+                  locationSequence:
+                    - kind: onModule
+                      moduleId: temperatureModuleId
+                    - kind: onAddressableArea
+                      addressableAreaName: '1'
+                    - kind: onCutoutFixture
+                      cutoutId: cutout1
+                      possibleCutoutFixtureIds:
+                        - singleStandardSlot
                 notes: []
                 startedAt: !re_fullmatch "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d+(Z|([+-]\\d{2}:\\d{2}))"
                 completedAt: !re_fullmatch "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d+(Z|([+-]\\d{2}:\\d{2}))"
@@ -225,6 +245,15 @@ stages:
                 result:
                   labwareId: destPlateId
                   definition: !anydict
+                  locationSequence:
+                    - kind: onModule
+                      moduleId: magneticModuleId
+                    - kind: onAddressableArea
+                      addressableAreaName: '3'
+                    - kind: onCutoutFixture
+                      cutoutId: cutout3
+                      possibleCutoutFixtureIds:
+                        - singleStandardSlot
                 notes: []
                 startedAt: !re_fullmatch "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d+(Z|([+-]\\d{2}:\\d{2}))"
                 completedAt: !re_fullmatch "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d+(Z|([+-]\\d{2}:\\d{2}))"
@@ -244,6 +273,13 @@ stages:
                 result:
                   labwareId: tipRackId
                   definition: !anydict
+                  locationSequence:
+                    - kind: onAddressableArea
+                      addressableAreaName: '8'
+                    - kind: onCutoutFixture
+                      cutoutId: cutout8
+                      possibleCutoutFixtureIds:
+                        - singleStandardSlot
                 notes: []
                 startedAt: !re_fullmatch "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d+(Z|([+-]\\d{2}:\\d{2}))"
                 completedAt: !re_fullmatch "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d+(Z|([+-]\\d{2}:\\d{2}))"
@@ -263,6 +299,13 @@ stages:
                 result:
                   labwareId: fixedTrash
                   definition: !anydict
+                  locationSequence:
+                    - kind: onAddressableArea
+                      addressableAreaName: '12'
+                    - kind: onCutoutFixture
+                      cutoutId: cutout12
+                      possibleCutoutFixtureIds:
+                        - singleStandardSlot
                 notes: []
                 startedAt: !re_fullmatch "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d+(Z|([+-]\\d{2}:\\d{2}))"
                 completedAt: !re_fullmatch "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d+(Z|([+-]\\d{2}:\\d{2}))"
@@ -500,6 +543,7 @@ stages:
                       y: 0
                       z: 0
                   alternateDropLocation: false
+                  scrape_tips: false
                 result:
                   position: { 'x': 347.84000000000003, 'y': 325.06, 'z': 82.0 }
                 notes: []
@@ -626,6 +670,7 @@ stages:
                 displayName: Water
                 description: Liquid H2O
                 displayColor: '#7332a8'
+            liquidClasses: []
 
 ---
 test_name: Upload and analyze a JSONv8 protocol, with liquids

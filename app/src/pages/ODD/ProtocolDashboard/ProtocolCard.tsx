@@ -1,11 +1,11 @@
-import * as React from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import { useQueryClient } from 'react-query'
-import { formatDistance } from 'date-fns'
+import { useNavigate } from 'react-router-dom'
 import last from 'lodash/last'
 import { css } from 'styled-components'
 
+import { deleteProtocol, deleteRun, getProtocol } from '@opentrons/api-client'
 import {
   ALIGN_CENTER,
   ALIGN_END,
@@ -28,13 +28,15 @@ import {
   useMostRecentSuccessfulAnalysisAsDocumentQuery,
   useProtocolAnalysisAsDocumentQuery,
 } from '@opentrons/react-api-client'
-import { deleteProtocol, deleteRun, getProtocol } from '@opentrons/api-client'
 
 import { SmallButton } from '/app/atoms/buttons'
 import { OddModal } from '/app/molecules/OddModal'
-import { LongPressModal } from './LongPressModal'
+import { useUpdatedLastRunTime } from '/app/pages/ODD/ProtocolDashboard/hooks'
 import { formatTimeWithUtcLabel } from '/app/resources/runs'
 
+import { LongPressModal } from './LongPressModal'
+
+import type { Dispatch, SetStateAction } from 'react'
 import type { UseLongPressResult } from '@opentrons/components'
 import type { ProtocolResource } from '@opentrons/shared-data'
 import type { OddModalHeaderBaseProps } from '/app/molecules/OddModal/types'
@@ -43,7 +45,7 @@ const REFETCH_INTERVAL = 5000
 
 interface ProtocolCardProps {
   protocol: ProtocolResource
-  longPress: React.Dispatch<React.SetStateAction<boolean>>
+  longPress: Dispatch<SetStateAction<boolean>>
   setShowDeleteConfirmationModal: (showDeleteConfirmationModal: boolean) => void
   setTargetProtocolId: (targetProtocolId: string) => void
   lastRun?: string
@@ -60,29 +62,27 @@ export function ProtocolCard(props: ProtocolCardProps): JSX.Element {
     setIsRequiredCSV,
   } = props
   const navigate = useNavigate()
-  const [showIcon, setShowIcon] = React.useState<boolean>(false)
-  const [
-    showFailedAnalysisModal,
-    setShowFailedAnalysisModal,
-  ] = React.useState<boolean>(false)
+  const [showIcon, setShowIcon] = useState<boolean>(false)
+  const [showFailedAnalysisModal, setShowFailedAnalysisModal] =
+    useState<boolean>(false)
   const { t, i18n } = useTranslation(['protocol_info', 'branded'])
   const protocolName = protocol.metadata.protocolName ?? protocol.files[0].name
   const longpress = useLongPress()
   const queryClient = useQueryClient()
   const host = useHost()
+  const updatedLastRun = useUpdatedLastRunTime(lastRun)
 
   const { id: protocolId, analysisSummaries } = protocol
-  const {
-    data: mostRecentSuccessfulAnalysis,
-  } = useMostRecentSuccessfulAnalysisAsDocumentQuery(
-    protocolId,
-    analysisSummaries,
-    {
-      enabled: protocol != null,
-      refetchInterval: analysisData =>
-        analysisData == null ? REFETCH_INTERVAL : false,
-    }
-  )
+  const { data: mostRecentSuccessfulAnalysis } =
+    useMostRecentSuccessfulAnalysisAsDocumentQuery(
+      protocolId,
+      analysisSummaries,
+      {
+        enabled: protocol != null,
+        refetchInterval: analysisData =>
+          analysisData == null ? REFETCH_INTERVAL : false,
+      }
+    )
   const { data: mostRecentAnalysis } = useProtocolAnalysisAsDocumentQuery(
     protocolId,
     last(protocol.analysisSummaries)?.id ?? null,
@@ -121,7 +121,7 @@ export function ProtocolCard(props: ProtocolCardProps): JSX.Element {
     }
   }
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (longpress.isLongPressed) {
       longPress(true)
       setTargetProtocolId(protocol.id)
@@ -195,13 +195,8 @@ export function ProtocolCard(props: ProtocolCardProps): JSX.Element {
   if (isFailedAnalysis) protocolCardBackgroundColor = COLORS.red35
   if (isRequiredCSV) protocolCardBackgroundColor = COLORS.yellow35
 
-  const textWrap = (lastRun?: string): string => {
-    if (lastRun != null) {
-      lastRun = formatDistance(new Date(lastRun), new Date(), {
-        addSuffix: true,
-      }).replace('about ', '')
-    }
-    return lastRun === 'less than a minute ago' ? 'normal' : 'nowrap'
+  const textWrap = (updatedLastRun: string): string => {
+    return updatedLastRun === 'less than a minute ago' ? 'normal' : 'nowrap'
   }
 
   return (
@@ -225,7 +220,8 @@ export function ProtocolCard(props: ProtocolCardProps): JSX.Element {
           aria-label="Protocol is loading"
           spin
           size="2rem"
-          marginY={'-1.5rem'}
+          marginTop="-1.5rem"
+          marginBottom="-1.5rem"
           opacity={0.7}
         />
       ) : null}
@@ -246,7 +242,7 @@ export function ProtocolCard(props: ProtocolCardProps): JSX.Element {
           <Chip type="warning" text={t('requires_csv')} background={false} />
         ) : null}
         <LegacyStyledText
-          as="p"
+          forwardedAs="p"
           fontWeight={TYPOGRAPHY.fontWeightSemiBold}
           opacity={isPendingAnalysis ? 0.7 : 1}
         >
@@ -255,19 +251,15 @@ export function ProtocolCard(props: ProtocolCardProps): JSX.Element {
       </Flex>
       <Flex width="9.25rem">
         <LegacyStyledText
-          as="p"
+          forwardedAs="p"
           color={COLORS.grey60}
-          whiteSpace={textWrap(lastRun)}
+          whiteSpace={textWrap(updatedLastRun)}
         >
-          {lastRun != null
-            ? formatDistance(new Date(lastRun), new Date(), {
-                addSuffix: true,
-              }).replace('about ', '')
-            : t('no_history')}
+          {updatedLastRun}
         </LegacyStyledText>
       </Flex>
       <Flex width="12.5rem" whiteSpace={NO_WRAP}>
-        <LegacyStyledText as="p" color={COLORS.grey60}>
+        <LegacyStyledText forwardedAs="p" color={COLORS.grey60}>
           {formatTimeWithUtcLabel(protocol.createdAt)}
         </LegacyStyledText>
         {longpress.isLongPressed && !isFailedAnalysis && (
@@ -303,7 +295,7 @@ export function ProtocolCard(props: ProtocolCardProps): JSX.Element {
                   components={{
                     block: (
                       <LegacyStyledText
-                        as="p"
+                        forwardedAs="p"
                         css={css`
                           display: -webkit-box;
                           -webkit-box-orient: vertical;
@@ -318,7 +310,7 @@ export function ProtocolCard(props: ProtocolCardProps): JSX.Element {
                   }}
                 />
 
-                <LegacyStyledText as="p">
+                <LegacyStyledText forwardedAs="p">
                   {t('branded:delete_protocol_from_app')}
                 </LegacyStyledText>
               </Flex>

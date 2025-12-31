@@ -1,15 +1,17 @@
-import { Icon } from './Icon'
 import {
-  HEATERSHAKER_MODULE_TYPE,
-  TEMPERATURE_MODULE_TYPE,
-  MAGNETIC_MODULE_TYPE,
-  THERMOCYCLER_MODULE_TYPE,
-  MAGNETIC_BLOCK_TYPE,
   ABSORBANCE_READER_TYPE,
+  FLEX_STACKER_MODULE_TYPE,
+  HEATERSHAKER_MODULE_TYPE,
+  MAGNETIC_BLOCK_TYPE,
+  MAGNETIC_MODULE_TYPE,
+  TEMPERATURE_MODULE_TYPE,
+  THERMOCYCLER_MODULE_TYPE,
 } from '@opentrons/shared-data'
 
+import { withStyleProps } from '../hocs/withStyleProps'
+import { Icon } from './Icon'
+
 import type { ModuleType } from '@opentrons/shared-data'
-import type { StyleProps } from '../primitives/types'
 
 export type ModuleIconName =
   | 'ot-magnet-v2'
@@ -18,6 +20,7 @@ export type ModuleIconName =
   | 'ot-magnet-v2'
   | 'ot-thermocycler'
   | 'ot-absorbance'
+  | 'ot-flex-stacker'
 
 export const MODULE_ICON_NAME_BY_TYPE: {
   [type in ModuleType]: ModuleIconName
@@ -28,13 +31,14 @@ export const MODULE_ICON_NAME_BY_TYPE: {
   [MAGNETIC_MODULE_TYPE]: 'ot-magnet-v2',
   [THERMOCYCLER_MODULE_TYPE]: 'ot-thermocycler',
   [ABSORBANCE_READER_TYPE]: 'ot-absorbance',
+  [FLEX_STACKER_MODULE_TYPE]: 'ot-flex-stacker',
 }
 
-interface ModuleIconProps extends StyleProps {
+interface ModuleIconProps {
   moduleType: ModuleType
 }
 
-export function ModuleIcon(props: ModuleIconProps): JSX.Element {
+function ModuleIconComponent(props: ModuleIconProps): JSX.Element {
   const { moduleType, ...styleProps } = props
   const iconName = MODULE_ICON_NAME_BY_TYPE[moduleType]
 
@@ -46,3 +50,5 @@ export function ModuleIcon(props: ModuleIconProps): JSX.Element {
     />
   )
 }
+
+export const ModuleIcon = withStyleProps(ModuleIconComponent)

@@ -1,6 +1,16 @@
-import * as React from 'react'
+import { useState } from 'react'
+import { useSelector } from 'react-redux'
 import Keyboard from 'react-simple-keyboard'
-import { alphanumericKeyboardLayout, customDisplay } from '../constants'
+
+import { getAppLanguage } from '/app/redux/config'
+
+import {
+  alphanumericKeyboardLayout,
+  customDisplay,
+  layoutCandidates,
+} from '../constants'
+
+import type { MutableRefObject } from 'react'
 import type { KeyboardReactInterface } from 'react-simple-keyboard'
 
 import '../index.css'
@@ -9,7 +19,7 @@ import './index.css'
 // TODO (kk:04/05/2024) add debug to make debugging easy
 interface AlphanumericKeyboardProps {
   onChange: (input: string) => void
-  keyboardRef: React.MutableRefObject<KeyboardReactInterface | null>
+  keyboardRef: MutableRefObject<KeyboardReactInterface | null>
   debug?: boolean
 }
 
@@ -18,7 +28,8 @@ export function AlphanumericKeyboard({
   keyboardRef,
   debug = false, // If true, <ENTER> will input a \n
 }: AlphanumericKeyboardProps): JSX.Element {
-  const [layoutName, setLayoutName] = React.useState<string>('default')
+  const [layoutName, setLayoutName] = useState<string>('default')
+  const appLanguage = useSelector(getAppLanguage)
   const onKeyPress = (button: string): void => {
     if (button === '{ABC}') handleShift()
     if (button === '{numbers}') handleNumber()
@@ -42,11 +53,14 @@ export function AlphanumericKeyboard({
   return (
     <Keyboard
       keyboardRef={r => (keyboardRef.current = r)}
-      theme={'hg-theme-default oddTheme1 alphanumericKeyboard'}
+      theme="hg-theme-default oddTheme1 alphanumericKeyboard"
       onChange={onChange}
       onKeyPress={onKeyPress}
       layoutName={layoutName}
       layout={alphanumericKeyboardLayout}
+      layoutCandidates={
+        appLanguage != null ? layoutCandidates[appLanguage] : undefined
+      }
       display={customDisplay}
       mergeDisplay={true}
       useButtonTag={true}

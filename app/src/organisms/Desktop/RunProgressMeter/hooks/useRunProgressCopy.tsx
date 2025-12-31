@@ -1,18 +1,20 @@
 import { useMemo } from 'react'
-
-import {
-  RUN_STATUS_BLOCKED_BY_OPEN_DOOR,
-  RUN_STATUS_IDLE,
-} from '@opentrons/api-client'
-import type * as React from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { getCommandTextData } from '/app/local-resources/commands'
-import { getLabwareDefinitionsFromCommands } from '/app/local-resources/labware'
-import { LegacyStyledText } from '@opentrons/components'
-import { CommandText } from '/app/molecules/Command'
-import { TERMINAL_RUN_STATUSES } from '../constants'
+import { RUN_STATUS_IDLE } from '@opentrons/api-client'
+import {
+  CommandText,
+  getCommandTextData,
+  getLabwareDefinitionsFromCommands,
+} from '@opentrons/components'
 
+import {
+  isRunStatusNotStarted,
+  isTerminalRunStatus,
+} from '/app/local-resources/runs/utils'
+import { useModuleCommandAnalytics } from '/app/redux-resources/analytics/'
+
+import type { ReactNode } from 'react'
 import type { CommandDetail, RunStatus } from '@opentrons/api-client'
 import type {
   CompletedProtocolAnalysis,
@@ -21,12 +23,13 @@ import type {
 } from '@opentrons/shared-data'
 
 interface UseRunProgressResult {
-  currentStepContents: React.ReactNode
+  currentStepContents: ReactNode
   stepCountStr: string | null
   progressPercentage: number
 }
 
 interface UseRunProgressProps {
+  runId: string | null
   runStatus: RunStatus | null
   currentStepNumber: number | null
   totalStepCount: number | null
@@ -40,6 +43,7 @@ interface UseRunProgressProps {
 // TODO(jh, 08-05-24): Testing is sufficiently covered by RunProgressMeter, but we should migrate relevant tests to this
 // hook after devising a better way to test i18n outside of a component.
 export function useRunProgressCopy({
+  runId,
   runStatus,
   currentStepNumber,
   totalStepCount,
@@ -52,9 +56,7 @@ export function useRunProgressCopy({
   const { t } = useTranslation('run_details')
 
   const runHasNotBeenStarted =
-    (currentStepNumber === 0 &&
-      runStatus === RUN_STATUS_BLOCKED_BY_OPEN_DOOR) ||
-    runStatus === RUN_STATUS_IDLE
+    currentStepNumber === 0 && isRunStatusNotStarted(runStatus)
 
   const isValidRobotSideAnalysis = analysis != null
   const allRunDefs = useMemo(
@@ -66,13 +68,13 @@ export function useRunProgressCopy({
   )
 
   const currentStepContents = ((): JSX.Element | null => {
-    if (runHasNotBeenStarted) {
-      return <LegacyStyledText as="h2">{t('not_started_yet')}</LegacyStyledText>
+    if (isTerminalRunStatus(runStatus) || runHasNotBeenStarted) {
+      return null
     } else if (analysis != null && !hasRunDiverged) {
       return (
         <CommandText
           commandTextData={getCommandTextData(analysis)}
-          command={analysisCommands[(currentStepNumber as number) - 1]}
+          command={analysisCommands[currentStepNumber! - 1]}
           robotType={robotType}
           allRunDefs={allRunDefs}
         />
@@ -97,33 +99,40 @@ export function useRunProgressCopy({
 
   const progressPercentage = runHasNotBeenStarted
     ? 0
-    : ((currentStepNumber as number) / analysisCommands.length) * 100
+    : (currentStepNumber! / analysisCommands.length) * 100
 
   const stepCountStr = ((): string | null => {
-    if (runStatus == null) {
+    if (isTerminalRunStatus(runStatus) || runStatus === RUN_STATUS_IDLE) {
       return null
+    }
+    if (currentStepNumber == null) {
+      return `${t(`current_step`)}: ${t('na')}`
+    } else if (hasRunDiverged) {
+      return `${t(`current_step`)} ${t('na')}:`
     } else {
-      const isTerminalStatus = TERMINAL_RUN_STATUSES.includes(runStatus)
-      const stepType = isTerminalStatus ? t('final_step') : t('current_step')
-
-      if (runStatus === RUN_STATUS_IDLE) {
-        return `${stepType}:`
-      } else if (isTerminalStatus && currentStepNumber == null) {
-        return `${stepType}: N/A`
-      } else {
-        const getCountString = (): string => {
-          const current = currentStepNumber ?? '?'
-          const total = totalStepCount ?? '?'
-
-          return `${current}/${total}`
-        }
-
-        const countString = getCountString()
-
-        return `${stepType} ${countString}:`
+      const getCountString = (): string => {
+        const current = currentStepNumber ?? '?'
+        const total = totalStepCount ?? '?'
+        return `${current}/${total}`
       }
+
+      return `${t(`current_step`)} ${getCountString()}:`
     }
   })()
+  const { reportModuleCommand } = useModuleCommandAnalytics()
+
+  reportModuleCommand({
+    kind: 'protocolCommand',
+    analyticCommand: runCommandDetails?.data?.commandType ?? '',
+    result: {
+      status: runCommandDetails?.data?.status ?? undefined,
+      data: runCommandDetails?.data?.result,
+    },
+    errorDetails: runCommandDetails?.data?.error?.errorType ?? '',
+    params: runCommandDetails?.data?.params ?? undefined,
+    analysis,
+    runId,
+  })
 
   return {
     currentStepContents,

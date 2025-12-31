@@ -1,8 +1,10 @@
 import { useTranslation } from 'react-i18next'
 import round from 'lodash/round'
-import { Box, SPACING, getMeasurementDiagram } from '@opentrons/components'
-import { LabeledValue } from './StyledComponents/LabeledValue'
+
+import { Box, getMeasurementDiagram, SPACING } from '@opentrons/components'
+
 import { ExpandingTitle } from './StyledComponents/ExpandingTitle'
+import { LabeledValue } from './StyledComponents/LabeledValue'
 
 import type { LabwareParameters } from '@opentrons/shared-data'
 import type { LabwareWellGroupProperties } from '/app/local-resources/labware'
@@ -19,13 +21,8 @@ export interface WellDimensionsProps {
 
 export function WellDimensions(props: WellDimensionsProps): JSX.Element {
   const { t } = useTranslation('labware_details')
-  const {
-    labwareParams,
-    wellProperties,
-    wellLabel,
-    labelSuffix,
-    category,
-  } = props
+  const { labwareParams, wellProperties, wellLabel, labelSuffix, category } =
+    props
   const {
     shape,
     depth,

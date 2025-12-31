@@ -1,12 +1,13 @@
 import { useTranslation } from 'react-i18next'
+
 import {
   ALIGN_CENTER,
   DIRECTION_ROW,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   SPACING,
   TYPOGRAPHY,
-  LegacyStyledText,
 } from '@opentrons/components'
 
 export interface WellCountProps {
@@ -25,10 +26,13 @@ export function WellCount(props: WellCountProps): JSX.Element {
       alignItems={ALIGN_CENTER}
       marginBottom={SPACING.spacing16}
     >
-      <LegacyStyledText as="p" fontWeight={TYPOGRAPHY.fontWeightSemiBold}>
+      <LegacyStyledText
+        forwardedAs="p"
+        fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+      >
         {t(wellLabel)} {t('count')}
       </LegacyStyledText>
-      <LegacyStyledText as="p">{count}</LegacyStyledText>
+      <LegacyStyledText forwardedAs="p">{count}</LegacyStyledText>
     </Flex>
   )
 }

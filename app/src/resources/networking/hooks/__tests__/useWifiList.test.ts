@@ -1,11 +1,15 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { when } from 'vitest-when'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+
 import { SECURITY_WPA_EAP } from '@opentrons/api-client'
 import { useWifiQuery } from '@opentrons/react-api-client'
+
 import { useRobot } from '/app/redux-resources/robots'
+
 import { useWifiList } from '../useWifiList'
+
 import type { UseQueryResult } from 'react-query'
-import type { WifiNetwork, WifiListResponse } from '@opentrons/api-client'
+import type { WifiListResponse, WifiNetwork } from '@opentrons/api-client'
 
 vi.mock('@opentrons/react-api-client')
 vi.mock('/app/redux-resources/robots')
@@ -35,25 +39,25 @@ describe('useWifiList', () => {
   it('getWifiList returns wifiList from state', () => {
     when(useWifiQuery)
       .calledWith(expect.anything(), null)
-      .thenReturn(({
+      .thenReturn({
         data: { list: [mockWifiNetwork] },
-      } as unknown) as UseQueryResult<WifiListResponse>)
+      } as unknown as UseQueryResult<WifiListResponse>)
     const wifiList = useWifiList()
     expect(wifiList).toEqual([mockWifiNetwork])
   })
   it('getWifiList dedupes duplicate SSIDs', () => {
     when(useWifiQuery)
       .calledWith(expect.anything(), null)
-      .thenReturn(({
+      .thenReturn({
         data: { list: [mockWifiNetwork, mockWifiNetwork] },
-      } as unknown) as UseQueryResult<WifiListResponse>)
+      } as unknown as UseQueryResult<WifiListResponse>)
     const wifiList = useWifiList()
     expect(wifiList).toEqual([mockWifiNetwork])
   })
   it('getWifiList sorts by active then ssid', () => {
     when(useWifiQuery)
       .calledWith(expect.anything(), null)
-      .thenReturn(({
+      .thenReturn({
         data: {
           list: [
             { ...mockWifiNetwork, ssid: 'bbb' },
@@ -61,7 +65,7 @@ describe('useWifiList', () => {
             { ...mockWifiNetwork, active: true, ssid: 'zzz' },
           ],
         },
-      } as unknown) as UseQueryResult<WifiListResponse>)
+      } as unknown as UseQueryResult<WifiListResponse>)
     const wifiList = useWifiList()
     expect(wifiList).toEqual([
       { ...mockWifiNetwork, active: true, ssid: 'zzz' },
@@ -72,7 +76,7 @@ describe('useWifiList', () => {
   it('getWifiList sorts by active then ssid then dedupes', () => {
     when(useWifiQuery)
       .calledWith(expect.anything(), null)
-      .thenReturn(({
+      .thenReturn({
         data: {
           list: [
             { ...mockWifiNetwork, ssid: 'bbb' },
@@ -80,7 +84,7 @@ describe('useWifiList', () => {
             { ...mockWifiNetwork, active: true, ssid: 'aaa' },
           ],
         },
-      } as unknown) as UseQueryResult<WifiListResponse>)
+      } as unknown as UseQueryResult<WifiListResponse>)
     const wifiList = useWifiList()
     expect(wifiList).toEqual([
       { ...mockWifiNetwork, active: true, ssid: 'aaa' },

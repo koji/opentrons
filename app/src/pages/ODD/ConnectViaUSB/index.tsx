@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+
 import {
   ALIGN_CENTER,
   BORDERS,
@@ -10,14 +11,15 @@ import {
   Flex,
   Icon,
   JUSTIFY_CENTER,
+  LegacyStyledText,
   POSITION_ABSOLUTE,
   POSITION_RELATIVE,
   SPACING,
-  LegacyStyledText,
+  StepMeter,
   TYPOGRAPHY,
 } from '@opentrons/components'
 import { useConnectionsQuery } from '@opentrons/react-api-client'
-import { StepMeter } from '/app/atoms/StepMeter'
+
 import { MediumButton } from '/app/atoms/buttons'
 
 export function ConnectViaUSB(): JSX.Element {
@@ -62,7 +64,10 @@ export function ConnectViaUSB(): JSX.Element {
             </Flex>
           </Btn>
           <Flex>
-            <LegacyStyledText as="h2" fontWeight={TYPOGRAPHY.fontWeightBold}>
+            <LegacyStyledText
+              forwardedAs="h2"
+              fontWeight={TYPOGRAPHY.fontWeightBold}
+            >
               {t('usb')}
             </LegacyStyledText>
           </Flex>

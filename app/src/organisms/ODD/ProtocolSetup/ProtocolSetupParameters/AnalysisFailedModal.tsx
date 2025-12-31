@@ -1,12 +1,13 @@
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+
 import {
   BORDERS,
   COLORS,
   DIRECTION_COLUMN,
   Flex,
-  SPACING,
   LegacyStyledText,
+  SPACING,
 } from '@opentrons/components'
 import { useDismissCurrentRunMutation } from '@opentrons/react-api-client'
 
@@ -37,10 +38,8 @@ export function AnalysisFailedModal({
     hasExitIcon: true,
   }
 
-  const {
-    isLoading: isDismissing,
-    mutateAsync: dismissCurrentRunAsync,
-  } = useDismissCurrentRunMutation()
+  const { isLoading: isDismissing, mutateAsync: dismissCurrentRunAsync } =
+    useDismissCurrentRunMutation()
 
   const handleRestartSetup = (): void => {
     dismissCurrentRunAsync(runId).then(() => {
@@ -61,7 +60,7 @@ export function AnalysisFailedModal({
         width="100%"
       >
         <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing16}>
-          <LegacyStyledText as="p">
+          <LegacyStyledText forwardedAs="p">
             {t('with_the_chosen_value')}
           </LegacyStyledText>
           <Flex
@@ -72,12 +71,12 @@ export function AnalysisFailedModal({
             overflowY="auto"
           >
             {errors.map((error, index) => (
-              <LegacyStyledText key={index} as="p">
+              <LegacyStyledText key={index} forwardedAs="p">
                 {error}
               </LegacyStyledText>
             ))}
           </Flex>
-          <LegacyStyledText as="p">
+          <LegacyStyledText forwardedAs="p">
             {t('restart_setup_and_try')}
           </LegacyStyledText>
         </Flex>

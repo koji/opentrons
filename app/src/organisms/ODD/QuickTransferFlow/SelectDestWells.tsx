@@ -1,41 +1,49 @@
-import * as React from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import without from 'lodash/without'
+
 import {
   COLORS,
   Flex,
+  JUSTIFY_CENTER,
+  LegacyStyledText,
   POSITION_FIXED,
   SPACING,
-  LegacyStyledText,
-  JUSTIFY_CENTER,
 } from '@opentrons/components'
 import { getAllDefinitions } from '@opentrons/shared-data'
-import { ANALYTICS_QUICK_TRANSFER_WELL_SELECTION_DURATION } from '/app/redux/analytics'
 
-import { useTrackEventWithRobotSerial } from '/app/redux-resources/analytics'
 import { getTopPortalEl } from '/app/App/portal'
 import { OddModal } from '/app/molecules/OddModal'
 import { ChildNavigation } from '/app/organisms/ODD/ChildNavigation'
 import { useToaster } from '/app/organisms/ToasterOven'
 import { WellSelection } from '/app/organisms/WellSelection'
+import { useTrackEventWithRobotSerial } from '/app/redux-resources/analytics'
+import { ANALYTICS_QUICK_TRANSFER_WELL_SELECTION_DURATION } from '/app/redux/analytics'
+
 import {
   CIRCULAR_WELL_96_PLATE_DEFINITION_URI,
   RECTANGULAR_WELL_96_PLATE_DEFINITION_URI,
 } from './SelectSourceWells'
 
+import type {
+  ComponentProps,
+  Dispatch,
+  MouseEvent,
+  SetStateAction,
+} from 'react'
 import type { SmallButton } from '/app/atoms/buttons'
 import type { OddModalHeaderBaseProps } from '/app/molecules/OddModal/types'
 import type {
-  QuickTransferWizardState,
   QuickTransferWizardAction,
+  QuickTransferWizardState,
 } from './types'
 
 interface SelectDestWellsProps {
   onNext: () => void
   onBack: () => void
   state: QuickTransferWizardState
-  dispatch: React.Dispatch<QuickTransferWizardAction>
+  dispatch: Dispatch<QuickTransferWizardAction>
 }
 
 export function SelectDestWells(props: SelectDestWellsProps): JSX.Element {
@@ -53,12 +61,10 @@ export function SelectDestWells(props: SelectDestWellsProps): JSX.Element {
   const [
     showNumberWellsSelectedErrorModal,
     setShowNumberWellsSelectedErrorModal,
-  ] = React.useState(false)
-  const [selectedWells, setSelectedWells] = React.useState(destinationWellGroup)
-  const [
-    isNumberWellsSelectedError,
-    setIsNumberWellsSelectedError,
-  ] = React.useState(false)
+  ] = useState(false)
+  const [selectedWells, setSelectedWells] = useState(destinationWellGroup)
+  const [isNumberWellsSelectedError, setIsNumberWellsSelectedError] =
+    useState(false)
 
   const selectedWellCount = Object.keys(selectedWells).length
   const sourceWellCount = state.sourceWells?.length ?? 0
@@ -88,7 +94,7 @@ export function SelectDestWells(props: SelectDestWellsProps): JSX.Element {
   }
   const is384WellPlate = labwareDefinition?.parameters.format === '384Standard'
 
-  const [analyticsStartTime] = React.useState<Date>(new Date())
+  const [analyticsStartTime] = useState<Date>(new Date())
 
   const handleClickNext = (): void => {
     if (
@@ -118,7 +124,7 @@ export function SelectDestWells(props: SelectDestWellsProps): JSX.Element {
         }) as string,
         'error',
         {
-          closeButton: true,
+          buttonText: i18n.format(t('shared:close'), 'capitalize'),
           disableTimeout: true,
           displayType: 'odd',
           linkText: t('learn_more'),
@@ -130,10 +136,10 @@ export function SelectDestWells(props: SelectDestWellsProps): JSX.Element {
     }
   }
 
-  const resetButtonProps: React.ComponentProps<typeof SmallButton> = {
+  const resetButtonProps: ComponentProps<typeof SmallButton> = {
     buttonType: 'tertiaryLowLight',
     buttonText: t('shared:reset'),
-    onClick: (e: React.MouseEvent<HTMLButtonElement>) => {
+    onClick: (e: MouseEvent<HTMLButtonElement>) => {
       setIsNumberWellsSelectedError(false)
       setSelectedWells({})
       e.currentTarget.blur?.()
@@ -214,9 +220,7 @@ function NumberWellsSelectedErrorModal({
   selectionUnit,
   selectionUnits,
 }: {
-  setShowNumberWellsSelectedErrorModal: React.Dispatch<
-    React.SetStateAction<boolean>
-  >
+  setShowNumberWellsSelectedErrorModal: Dispatch<SetStateAction<boolean>>
   wellCount: number
   selectionUnit: string
   selectionUnits: string
@@ -239,7 +243,7 @@ function NumberWellsSelectedErrorModal({
         setShowNumberWellsSelectedErrorModal(false)
       }}
     >
-      <LegacyStyledText as="p">
+      <LegacyStyledText forwardedAs="p">
         {t('number_wells_selected_error_learn_more', {
           wellCount,
           selectionUnit,

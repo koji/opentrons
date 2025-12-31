@@ -1,5 +1,4 @@
 from __future__ import annotations
-from enum import Enum
 from dataclasses import dataclass
 from typing import (
     Dict,
@@ -11,12 +10,21 @@ from typing import (
     Awaitable,
     Union,
     Optional,
+    Protocol,
     cast,
     TYPE_CHECKING,
+    TypeGuard,
 )
 from typing_extensions import TypedDict
 from pathlib import Path
 
+from opentrons_shared_data.util import StrEnum
+
+from opentrons.drivers.flex_stacker.types import (
+    LimitSwitchStatus,
+    PlatformStatus,
+    StackerAxis,
+)
 from opentrons.drivers.rpi_drivers.types import USBPort
 
 if TYPE_CHECKING:
@@ -27,6 +35,7 @@ if TYPE_CHECKING:
         HeaterShakerModuleType,
         MagneticBlockType,
         AbsorbanceReaderType,
+        FlexStackerModuleType,
     )
 
 
@@ -37,6 +46,7 @@ class ThermocyclerStepBase(TypedDict):
 class ThermocyclerStep(ThermocyclerStepBase, total=False):
     hold_time_seconds: float
     hold_time_minutes: float
+    ramp_rate: Optional[float]
 
 
 class ThermocyclerCycle(TypedDict):
@@ -47,21 +57,140 @@ class ThermocyclerCycle(TypedDict):
 UploadFunction = Callable[[str, str, Dict[str, Any]], Awaitable[Tuple[bool, str]]]
 
 
-ModuleDisconnectedCallback = Optional[Callable[[str, str | None], None]]
+class ModuleDisconnectedCallback(Protocol):
+    """Protocol for the callback when the module should be disconnected."""
+
+    def __call__(self, model: str, port: str, serial: str | None) -> None: ...
+
+
+class ModuleErrorCallback(Protocol):
+    """Protocol for the callback when the module sees a hardware error."""
+
+    def __call__(
+        self,
+        exc: Exception,
+        model: str,
+        port: str,
+        serial: str | None,
+    ) -> None: ...
+
+
+class MagneticModuleData(TypedDict):
+    engaged: bool
+    height: float
+
+
+class TemperatureModuleData(TypedDict):
+    currentTemp: float
+    targetTemp: float | None
+
+
+class HeaterShakerData(TypedDict):
+    temperatureStatus: str
+    speedStatus: str
+    labwareLatchStatus: str
+    currentTemp: float
+    targetTemp: float | None
+    currentSpeed: int
+    targetSpeed: int | None
+    errorDetails: str | None
+
+
+class ThermocyclerData(TypedDict):
+    lid: str
+    lidTarget: float | None
+    lidTemp: float
+    lidTempStatus: str
+    currentTemp: float | None
+    targetTemp: float | None
+    holdTime: float | None
+    rampRate: float | None
+    currentCycleIndex: int | None
+    totalCycleCount: int | None
+    currentStepIndex: int | None
+    totalStepCount: int | None
+
+
+class AbsorbanceReaderData(TypedDict):
+    uptime: int
+    deviceStatus: str
+    lidStatus: str
+    platePresence: str
+    measureMode: str
+    sampleWavelengths: List[int]
+    referenceWavelength: int
+
+
+class FlexStackerData(TypedDict):
+    latchState: str
+    platformState: str
+    hopperDoorState: str
+    installDetected: bool
+    errorDetails: str | None
+
+
+ModuleData = Union[
+    Dict[Any, Any],  # This allows an empty dict as module data
+    MagneticModuleData,
+    TemperatureModuleData,
+    HeaterShakerData,
+    ThermocyclerData,
+    AbsorbanceReaderData,
+    FlexStackerData,
+]
+
+
+class ModuleDataValidator:
+    @classmethod
+    def is_magnetic_module_data(
+        cls, data: ModuleData | None
+    ) -> TypeGuard[MagneticModuleData]:
+        return data is not None and "engaged" in data.keys()
+
+    @classmethod
+    def is_temperature_module_data(
+        cls, data: ModuleData | None
+    ) -> TypeGuard[TemperatureModuleData]:
+        return data is not None and "targetTemp" in data.keys()
+
+    @classmethod
+    def is_heater_shaker_data(
+        cls, data: ModuleData | None
+    ) -> TypeGuard[HeaterShakerData]:
+        return data is not None and "labwareLatchStatus" in data.keys()
+
+    @classmethod
+    def is_thermocycler_data(
+        cls, data: ModuleData | None
+    ) -> TypeGuard[ThermocyclerData]:
+        return data is not None and "lid" in data.keys()
+
+    @classmethod
+    def is_absorbance_reader_data(
+        cls, data: ModuleData | None
+    ) -> TypeGuard[AbsorbanceReaderData]:
+        return data is not None and "uptime" in data.keys()
+
+    @classmethod
+    def is_flex_stacker_data(
+        cls, data: ModuleData | None
+    ) -> TypeGuard[FlexStackerData]:
+        return data is not None and "platformState" in data.keys()
 
 
 class LiveData(TypedDict):
     status: str
-    data: Dict[str, Union[float, str, bool, List[int], None]]
+    data: ModuleData | None
 
 
-class ModuleType(str, Enum):
+class ModuleType(StrEnum):
     THERMOCYCLER: ThermocyclerModuleType = "thermocyclerModuleType"
     TEMPERATURE: TemperatureModuleType = "temperatureModuleType"
     MAGNETIC: MagneticModuleType = "magneticModuleType"
     HEATER_SHAKER: HeaterShakerModuleType = "heaterShakerModuleType"
     MAGNETIC_BLOCK: MagneticBlockType = "magneticBlockType"
     ABSORBANCE_READER: AbsorbanceReaderType = "absorbanceReaderType"
+    FLEX_STACKER: FlexStackerModuleType = "flexStackerModuleType"
 
     @classmethod
     def from_model(cls, model: ModuleModel) -> ModuleType:
@@ -77,6 +206,8 @@ class ModuleType(str, Enum):
             return cls.MAGNETIC_BLOCK
         if isinstance(model, AbsorbanceReaderModel):
             return cls.ABSORBANCE_READER
+        if isinstance(model, FlexStackerModuleModel):
+            return cls.FLEX_STACKER
 
     @classmethod
     def to_module_fixture_id(cls, module_type: ModuleType) -> str:
@@ -91,37 +222,43 @@ class ModuleType(str, Enum):
             return "magneticBlockV1"
         if module_type == ModuleType.ABSORBANCE_READER:
             return "absorbanceReaderV1"
+        if module_type == ModuleType.FLEX_STACKER:
+            return "flexStackerModuleV1"
         else:
             raise ValueError(
                 f"Module Type {module_type} does not have a related fixture ID."
             )
 
 
-class MagneticModuleModel(str, Enum):
+class MagneticModuleModel(StrEnum):
     MAGNETIC_V1: str = "magneticModuleV1"
     MAGNETIC_V2: str = "magneticModuleV2"
 
 
-class TemperatureModuleModel(str, Enum):
+class TemperatureModuleModel(StrEnum):
     TEMPERATURE_V1: str = "temperatureModuleV1"
     TEMPERATURE_V2: str = "temperatureModuleV2"
 
 
-class ThermocyclerModuleModel(str, Enum):
+class ThermocyclerModuleModel(StrEnum):
     THERMOCYCLER_V1: str = "thermocyclerModuleV1"
     THERMOCYCLER_V2: str = "thermocyclerModuleV2"
 
 
-class HeaterShakerModuleModel(str, Enum):
+class HeaterShakerModuleModel(StrEnum):
     HEATER_SHAKER_V1: str = "heaterShakerModuleV1"
 
 
-class MagneticBlockModel(str, Enum):
+class MagneticBlockModel(StrEnum):
     MAGNETIC_BLOCK_V1: str = "magneticBlockV1"
 
 
-class AbsorbanceReaderModel(str, Enum):
+class AbsorbanceReaderModel(StrEnum):
     ABSORBANCE_READER_V1: str = "absorbanceReaderV1"
+
+
+class FlexStackerModuleModel(StrEnum):
+    FLEX_STACKER_V1: str = "flexStackerModuleV1"
 
 
 def module_model_from_string(model_string: str) -> ModuleModel:
@@ -132,6 +269,7 @@ def module_model_from_string(model_string: str) -> ModuleModel:
         HeaterShakerModuleModel,
         MagneticBlockModel,
         AbsorbanceReaderModel,
+        FlexStackerModuleModel,
     }:
         try:
             return cast(ModuleModel, model_enum(model_string))
@@ -184,15 +322,16 @@ ModuleModel = Union[
     HeaterShakerModuleModel,
     MagneticBlockModel,
     AbsorbanceReaderModel,
+    FlexStackerModuleModel,
 ]
 
 
-class MagneticStatus(str, Enum):
+class MagneticStatus(StrEnum):
     ENGAGED = "engaged"
     DISENGAGED = "disengaged"
 
 
-class TemperatureStatus(str, Enum):
+class TemperatureStatus(StrEnum):
     HOLDING = "holding at target"
     COOLING = "cooling"
     HEATING = "heating"
@@ -200,7 +339,7 @@ class TemperatureStatus(str, Enum):
     ERROR = "error"
 
 
-class SpeedStatus(str, Enum):
+class SpeedStatus(StrEnum):
     HOLDING = "holding at target"
     ACCELERATING = "speeding up"
     DECELERATING = "slowing down"
@@ -208,20 +347,89 @@ class SpeedStatus(str, Enum):
     ERROR = "error"
 
 
-class HeaterShakerStatus(str, Enum):
+class HeaterShakerStatus(StrEnum):
     IDLE = "idle"
     RUNNING = "running"
     ERROR = "error"
 
 
-class AbsorbanceReaderStatus(str, Enum):
+class AbsorbanceReaderStatus(StrEnum):
     IDLE = "idle"
     MEASURING = "measuring"
     ERROR = "error"
 
 
-class LidStatus(str, Enum):
+class LidStatus(StrEnum):
     ON = "on"
     OFF = "off"
     UNKNOWN = "unknown"
     ERROR = "error"
+
+
+class FlexStackerStatus(StrEnum):
+    IDLE = "idle"
+    DISPENSING = "dispensing"
+    STORING = "storing"
+    ERROR = "error"
+
+
+class PlatformState(StrEnum):
+    UNKNOWN = "unknown"
+    EXTENDED = "extended"
+    RETRACTED = "retracted"
+    MISSING = "missing"
+
+    @classmethod
+    def from_status(cls, status: PlatformStatus) -> "PlatformState":
+        """Get the state from the platform status."""
+        if status.E and not status.R:
+            return cls.EXTENDED
+        if status.R and not status.E:
+            return cls.RETRACTED
+        return cls.UNKNOWN
+
+
+class StackerAxisState(StrEnum):
+    UNKNOWN = "unknown"
+    EXTENDED = "extended"
+    RETRACTED = "retracted"
+
+    @classmethod
+    def from_status(
+        cls, status: LimitSwitchStatus, axis: StackerAxis
+    ) -> "StackerAxisState":
+        """Get the axis state from the limit switch status."""
+        match axis:
+            case StackerAxis.X:
+                if status.XE and not status.XR:
+                    return cls.EXTENDED
+                if status.XR and not status.XE:
+                    return cls.RETRACTED
+            case StackerAxis.Z:
+                if status.ZE and not status.ZR:
+                    return cls.EXTENDED
+                if status.ZR and not status.ZE:
+                    return cls.RETRACTED
+            case StackerAxis.L:
+                return cls.EXTENDED if status.LR else cls.RETRACTED
+        return cls.UNKNOWN
+
+
+class LatchState(StrEnum):
+    CLOSED = "closed"
+    OPENED = "opened"
+
+    @classmethod
+    def from_state(cls, state: StackerAxisState) -> "LatchState":
+        """Get the latch state from the axis state."""
+        return cls.CLOSED if state == StackerAxisState.EXTENDED else cls.OPENED
+
+
+class HopperDoorState(StrEnum):
+    CLOSED = "closed"
+    OPENED = "opened"
+
+    @classmethod
+    def from_state(cls, state: bool) -> "HopperDoorState":
+        """Get the hopper door state from the door state boolean."""
+        return cls.CLOSED if state else cls.OPENED

@@ -6,6 +6,159 @@ log][]. For a list of currently known issues, please see the [Opentrons issue tr
 
 By installing and using Opentrons software, you agree to the Opentrons End-User License Agreement (EULA). You can view the EULA at [opentrons.com/eula](https://opentrons.com/eula).
 
+## Opentrons App Changes in 8.8.0
+
+Welcome to the v8.8.0 release of the Opentrons App! This release includes concurrent module actions and other new features, and addresses several bugs.
+
+### New Features
+
+- Choose to run module actions like setting temperatures, setting shake speed, or running a Thermocycler Module profile without pausing other protocol steps until they're complete. You can run these concurrent module actions with multiple Temperature, Heater-Shaker, or Thermocycler Modules, or simultaneously perform pipetting actions.
+- Use the Flex and OT-2's cameras to capture images. Manage camera use, images, and live view from the Opentrons App:
+  - Enable or disable the camera. The camera can capture images of the deck during a protocol or take an image when an error occurs.
+  - Turn on a live view of the deck during your protocol run (Flex only).
+  - View, download, or delete images after a protocol run.
+- Choose to return tips to the tip rack in a quick transfer. The pipette will return tips to their original position in the tip rack, and you won't be able to pick up these tips again in the same protocol.
+
+### Bug Fixes
+
+- An attached pipette no longer descends to attach a calibration probe for Labware Position Check, creating more clearance on the deck.
+- Changed runtime parameters no longer revert to their default values.
+
+### Known Issues
+
+- Error recovery in the app or on the Flex touchscreen can't successfully resolve overpressure errors that occur while pipetting relative to the liquid meniscus. We recommend canceling the protocol when these errors occur.
+- Images captured in a protocol are not available during the run via USB. Use a different connection type (Wi-Fi or Ethernet), view the images on the touchscreen, or download the images after the run is complete.
+
+---
+
+## Opentrons App Changes in 8.7.0
+
+Welcome to the v8.7.0 release of the Opentrons App! This release adds support for Opentrons Tough Universal Lids, improves error recovery on the Opentrons App and Flex touchscreen, and addresses several bugs.
+
+### New Features
+
+Use Opentrons Tough Universal Lids on compatible well plates and reservoirs.
+
+### Improvements
+
+- Recover from Flex Stacker errors to resume your protocol:
+  - If you try to store labware in the Stacker, but the shuttle is empty.
+  - If the Stacker stalls when storing or retrieving labware.
+
+### Bug Fixes
+
+- Liquid colors now match across deck views on the Opentrons App and Flex touchscreen.
+- The run log now properly shows robot motor control actions for Flex 96-channel pipettes.
+- The API raises an error when the Flex Gripper fails to pick up a lid.
+- Deck views in error recovery now include labware loaded in a Flex Stacker.
+- Quick transfers no longer crash when adding an air gap or blow out after dispensing.
+
+## Opentrons App Changes in 8.6.0
+
+Welcome to the v8.6.0 release of the Opentrons App! This release adds support for the Flex Stacker Module, as well as other improvements.
+
+### New Features
+
+- Automate labware storage with the Flex Stacker Module. Store additional well plates, reservoirs, or Flex tip racks to move onto the deck during a protocol, increasing workflow throughput.
+
+### Improvements
+
+- Choose from three Opentrons-verified liquid classes to optimize liquid handling in quick transfers.
+- Easily tell your tip racks apart during run setup. Colored tip racks now appear in the app to match different tip volume ranges.
+- Improvements to Labware Position Check include new prompts to apply offsets before a protocol run.
+
+### Known Issues
+
+- Error recovery may fail when trying to store labware in the Stacker.
+
+---
+
+## Opentrons App Changes in 8.5.1
+
+Welcome to the v8.5.1 release of the Opentrons App!
+
+There are no changes to the Opentrons App in v8.5.1, but it is required for updating the robot software to improve some features.
+
+---
+
+## Opentrons App Changes in 8.5.0
+
+Welcome to the v8.5.0 release of the Opentrons App! This release features the ability to run protocols that use liquid classes to improve pipetting accuracy.
+
+### New Features
+
+- The app now supports running protocols that use liquid class features in the Python API, including Opentrons-verified and custom liquid class definitions.
+
+### Bug Fixes
+
+- Fixes errors (code 422) when performing Labware Position Check on an OT-2.
+- Error recovery now provides the correct options when a blowout causes an overpressure error.
+
+---
+
+## Opentrons App Changes in 8.4.1
+
+The 8.4.1 hotfix release fixes two issues:
+
+- Placing a Magnetic Block in slot C2 no longer prevents Labware Position Check from running.
+- Existing labware offsets are no longer doubled during Labware Position Check.
+- The app no longer crashes during run setup when using certain custom labware.
+
+---
+
+## Opentrons App Changes in 8.4.0
+
+Welcome to the v8.4.0 release of the Opentrons App! This release includes updates to labware offsets on the Flex, as well as other new features, improvements, and bug fixes.
+
+### New Features
+
+- Run Flex protocols with updated liquid handling commands, including pipetting relative to liquid meniscus.
+- Run protocols that use the Flex Gripper to remove lids from new tip racks on the deck.
+- Run protocols with stacked Opentrons Tough Auto-Sealing Lids.
+
+### Improvements
+
+- More flexible and reliable Labware Position Check workflow. Click **Labware offsets** during run setup to view, apply, and create labware offsets.
+  - Check individual labware, in any order.
+  - Create and apply default labware offsets to the same labware across your Flex deck.
+  - Save and reuse as many offsets as you need from previous runs.
+  - Better compatibility with protocols that have runtime parameters.
+- Error recovery now allows you to resume your Flex protocol when the door is opened or a second error occurs.
+
+### Bug Fixes
+
+- Error recovery no longer lets you select more tips than the pipette can pick up at once.
+
+---
+
+## Opentrons App Changes in 8.3.2
+
+Welcome to the v8.3.2 release of the Opentrons App!
+
+There are no changes to the Opentrons App in v8.3.2, but it is required for updating the robot software to improve some features.
+
+---
+
+## Opentrons App Changes in 8.3.1
+
+The 8.3.1 hotfix release includes a small fix to allow all robots to properly reboot after an upgrade to v8.3.0.
+
+---
+
+## Opentrons App Changes in 8.3.0
+
+Welcome to the v8.3.0 release of the Opentrons App! This release adds support for Mandarin in the app or Flex touchscreen and includes other beta features for our commercial partners.
+
+Note: The Mac and Linux versions of the Opentrons App now require macOS 10.16 and Ubuntu 20.04 or newer.
+
+### New Features
+
+- Change the app or Flex touchscreen language to Mandarin in Settings. This feature is only supported in app v8.3.0 or higher. If you need to downgrade your software version, first change the app language back to English in Settings.
+
+### Improved Features
+
+- Improvements to the Flex error recovery feature help protocols recover from detected stalls and collisions, saving you valuable time and resources.
+
 ---
 
 ## Opentrons App Changes in 8.2.0
@@ -29,6 +182,10 @@ Welcome to the v8.2.0 release of the Opentrons App! This release adds support fo
 ### Bug Fixes
 
 - Fixed an app crash when performing certain error recovery steps with Python API version 2.15 protocols.
+
+### Known Issues
+
+- If you attach an Absorbance Plate Reader to _any_ Flex on your local network, you must update all copies of the Opentrons App on the same network to at least v8.1.0.
 
 ---
 

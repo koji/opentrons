@@ -1,53 +1,43 @@
-import { vi, it, describe, expect, beforeEach, afterEach } from 'vitest'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { fireEvent, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { when } from 'vitest-when'
-import { Route, MemoryRouter, Routes } from 'react-router-dom'
 
 import {
   useCreateRunMutation,
   useHost,
-  useProtocolQuery,
   useProtocolAnalysisAsDocumentQuery,
+  useProtocolQuery,
 } from '@opentrons/react-api-client'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
+import { useScrollPosition } from '/app/local-resources/dom-utils'
+import { useOffsetCandidatesForAnalysis } from '/app/organisms/LegacyApplyHistoricOffsets/hooks/useOffsetCandidatesForAnalysis'
 import { useHardwareStatusText } from '/app/organisms/ODD/RobotDashboard/hooks'
-import { useOffsetCandidatesForAnalysis } from '/app/organisms/ApplyHistoricOffsets/hooks/useOffsetCandidatesForAnalysis'
-import { useMissingProtocolHardware } from '/app/transformations/commands'
-import { formatTimeWithUtcLabel } from '/app/resources/runs'
+import { useTrackEventWithRobotSerial } from '/app/redux-resources/analytics'
 import {
   ANALYTICS_QUICK_TRANSFER_DETAILS_PAGE,
   ANALYTICS_QUICK_TRANSFER_RUN_FROM_DETAILS,
 } from '/app/redux/analytics'
-import { useTrackEventWithRobotSerial } from '/app/redux-resources/analytics'
-import { DeleteTransferConfirmationModal } from '../../QuickTransferDashboard/DeleteTransferConfirmationModal'
+import { formatTimeWithUtcLabel } from '/app/resources/runs'
+import { useMissingProtocolHardware } from '/app/transformations/commands'
+
 import { QuickTransferDetails } from '..'
+import { DeleteTransferConfirmationModal } from '../../QuickTransferDashboard/DeleteTransferConfirmationModal'
 import { Deck } from '../Deck'
 import { Hardware } from '../Hardware'
 import { Labware } from '../Labware'
 
 import type { HostConfig } from '@opentrons/api-client'
 
-// Mock IntersectionObserver
-class IntersectionObserver {
-  observe = vi.fn()
-  disconnect = vi.fn()
-  unobserve = vi.fn()
-}
-
-Object.defineProperty(window, 'IntersectionObserver', {
-  writable: true,
-  configurable: true,
-  value: IntersectionObserver,
-})
 vi.mock('/app/organisms/ODD/ProtocolSetup/ProtocolSetupParameters')
 vi.mock('@opentrons/api-client')
 vi.mock('@opentrons/react-api-client')
 vi.mock('/app/organisms/ODD/RobotDashboard/hooks')
 vi.mock('/app/redux-resources/analytics')
 vi.mock(
-  '/app/organisms/ApplyHistoricOffsets/hooks/useOffsetCandidatesForAnalysis'
+  '/app/organisms/LegacyApplyHistoricOffsets/hooks/useOffsetCandidatesForAnalysis'
 )
 vi.mock('../../QuickTransferDashboard/DeleteTransferConfirmationModal')
 vi.mock('/app/transformations/commands')
@@ -55,6 +45,7 @@ vi.mock('../Deck')
 vi.mock('../Hardware')
 vi.mock('../Labware')
 vi.mock('/app/redux/config')
+vi.mock('/app/local-resources/dom-utils')
 
 const MOCK_HOST_CONFIG = {} as HostConfig
 const mockCreateRun = vi.fn((id: string) => {})
@@ -125,6 +116,10 @@ describe('ODDQuickTransferDetails', () => {
       },
     } as any)
     when(vi.mocked(useHost)).calledWith().thenReturn(MOCK_HOST_CONFIG)
+    vi.mocked(useScrollPosition).mockReturnValue({
+      isScrolled: false,
+      scrollRef: {} as any,
+    })
   })
   afterEach(() => {
     vi.resetAllMocks()
@@ -146,8 +141,7 @@ describe('ODDQuickTransferDetails', () => {
     expect(mockTrackEventWithRobotSerial).toHaveBeenCalledWith({
       name: ANALYTICS_QUICK_TRANSFER_DETAILS_PAGE,
       properties: {
-        name:
-          'Nextera XT DNA Library Prep Kit Protocol: Part 1/4 - Tagment Genomic DNA and Amplify Libraries',
+        name: 'Nextera XT DNA Library Prep Kit Protocol: Part 1/4 - Tagment Genomic DNA and Amplify Libraries',
       },
     })
   })
@@ -164,8 +158,7 @@ describe('ODDQuickTransferDetails', () => {
     expect(mockTrackEventWithRobotSerial).toHaveBeenCalledWith({
       name: ANALYTICS_QUICK_TRANSFER_RUN_FROM_DETAILS,
       properties: {
-        name:
-          'Nextera XT DNA Library Prep Kit Protocol: Part 1/4 - Tagment Genomic DNA and Amplify Libraries',
+        name: 'Nextera XT DNA Library Prep Kit Protocol: Part 1/4 - Tagment Genomic DNA and Amplify Libraries',
       },
     })
   })

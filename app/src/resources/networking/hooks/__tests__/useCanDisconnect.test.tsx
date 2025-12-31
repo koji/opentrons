@@ -1,29 +1,31 @@
-import type * as React from 'react'
-import { when } from 'vitest-when'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createStore } from 'redux'
 import { Provider } from 'react-redux'
-import { SECURITY_WPA_EAP } from '@opentrons/api-client'
 import { renderHook } from '@testing-library/react'
-import { getRobotApiVersionByName } from '/app/redux/discovery'
+import { legacy_createStore } from 'redux'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { when } from 'vitest-when'
+
+import { SECURITY_WPA_EAP } from '@opentrons/api-client'
 
 import { useIsFlex } from '/app/redux-resources/robots'
+import { getRobotApiVersionByName } from '/app/redux/discovery'
+
 import { useCanDisconnect } from '../useCanDisconnect'
 import { useWifiList } from '../useWifiList'
 
-import type { WifiNetwork } from '@opentrons/api-client'
 import type { Store } from 'redux'
+import type { FunctionComponent, ReactNode } from 'react'
+import type { WifiNetwork } from '@opentrons/api-client'
 import type { State } from '/app/redux/types'
 
 vi.mock('../useWifiList')
 vi.mock('/app/redux-resources/robots')
 vi.mock('/app/redux/discovery')
 
-const store: Store<State> = createStore(state => state, {})
+const store: Store<State> = legacy_createStore(state => state, {})
 
-const wrapper: React.FunctionComponent<{ children: React.ReactNode }> = ({
-  children,
-}) => <Provider store={store}>{children}</Provider>
+const wrapper: FunctionComponent<{ children: ReactNode }> = ({ children }) => (
+  <Provider store={store}>{children}</Provider>
+)
 
 const mockWifiNetwork: WifiNetwork = {
   ssid: 'linksys',

@@ -1,9 +1,9 @@
-import type * as React from 'react'
-import styled from 'styled-components'
 import { useTranslation } from 'react-i18next'
+import styled from 'styled-components'
+
 import {
-  COLORS,
   ALIGN_CENTER,
+  COLORS,
   DIRECTION_COLUMN,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
@@ -11,20 +11,22 @@ import {
   TYPOGRAPHY,
 } from '@opentrons/components'
 import { useInstrumentsQuery } from '@opentrons/react-api-client'
-import { ODDBackButton } from '/app/molecules/ODDBackButton'
-import { PipetteRecalibrationODDWarning } from '/app/organisms/ODD/PipetteRecalibrationODDWarning'
-import { getShowPipetteCalibrationWarning } from '/app/transformations/instruments'
-import { useMostRecentCompletedAnalysis } from '/app/resources/runs'
-import { ProtocolInstrumentMountItem } from '/app/organisms/ODD/InstrumentMountItem'
 
+import { ODDBackButton } from '/app/molecules/ODDBackButton'
+import { ProtocolInstrumentMountItem } from '/app/organisms/ODD/InstrumentMountItem'
+import { PipetteRecalibrationODDWarning } from '/app/organisms/ODD/PipetteRecalibrationODDWarning'
+import { isGripperInCommands } from '/app/resources/protocols/utils'
+import { useMostRecentCompletedAnalysis } from '/app/resources/runs'
+import { getShowPipetteCalibrationWarning } from '/app/transformations/instruments'
+
+import type { Dispatch, SetStateAction } from 'react'
 import type { GripperData, PipetteData } from '@opentrons/api-client'
 import type { GripperModel } from '@opentrons/shared-data'
 import type { SetupScreens } from '../types'
-import { isGripperInCommands } from '/app/resources/protocols/utils'
 
 export interface ProtocolSetupInstrumentsProps {
   runId: string
-  setSetupScreen: React.Dispatch<React.SetStateAction<SetupScreens>>
+  setSetupScreen: Dispatch<SetStateAction<SetupScreens>>
 }
 
 export function ProtocolSetupInstruments({
@@ -40,9 +42,9 @@ export function ProtocolSetupInstruments({
       ? isGripperInCommands(mostRecentAnalysis?.commands ?? [])
       : false
   const attachedGripperMatch = usesGripper
-    ? (attachedInstruments?.data ?? []).find(
+    ? ((attachedInstruments?.data ?? []).find(
         (i): i is GripperData => i.instrumentType === 'gripper' && i.ok
-      ) ?? null
+      ) ?? null)
     : null
 
   return (

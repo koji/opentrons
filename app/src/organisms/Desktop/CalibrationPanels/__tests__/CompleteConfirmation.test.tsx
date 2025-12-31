@@ -1,16 +1,17 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { vi, it, describe, expect } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 
 import { CompleteConfirmation } from '../CompleteConfirmation'
 
+import type { ComponentProps } from 'react'
+
 describe('CompleteConfirmation', () => {
   const mockCleanUpAndExit = vi.fn()
   const render = (
-    props: Partial<React.ComponentProps<typeof CompleteConfirmation>> = {}
+    props: Partial<ComponentProps<typeof CompleteConfirmation>> = {}
   ) => {
     const { proceed = mockCleanUpAndExit, flowName, body, visualAid } = props
     return renderWithProviders(

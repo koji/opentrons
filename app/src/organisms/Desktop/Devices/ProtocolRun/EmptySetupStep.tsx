@@ -1,19 +1,20 @@
-import type * as React from 'react'
 import {
   COLORS,
   DIRECTION_COLUMN,
-  Flex,
-  SPACING,
-  LegacyStyledText,
-  TYPOGRAPHY,
   DIRECTION_ROW,
+  Flex,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
+  SPACING,
+  TYPOGRAPHY,
 } from '@opentrons/components'
 
+import type { ReactNode } from 'react'
+
 interface EmptySetupStepProps {
-  title: React.ReactNode
+  title: ReactNode
   description: string
-  rightElement?: React.ReactNode
+  rightElement?: ReactNode
 }
 
 export function EmptySetupStep(props: EmptySetupStepProps): JSX.Element {
@@ -27,7 +28,7 @@ export function EmptySetupStep(props: EmptySetupStepProps): JSX.Element {
         >
           {title}
         </LegacyStyledText>
-        <LegacyStyledText as="p">{description}</LegacyStyledText>
+        <LegacyStyledText forwardedAs="p">{description}</LegacyStyledText>
       </Flex>
       {rightElement}
     </Flex>

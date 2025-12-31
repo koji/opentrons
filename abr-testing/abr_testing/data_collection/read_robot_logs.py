@@ -13,6 +13,8 @@ from typing import List, Dict, Any, Tuple, Set, Optional
 import time as t
 import json
 import requests
+from pathlib import Path
+import zipfile
 from abr_testing.tools import plate_reader
 
 
@@ -77,14 +79,20 @@ def command_time(command: Dict[str, str]) -> float:
 
 
 def count_command_in_run_data(
-    commands: List[Dict[str, Any]], command_of_interest: str, find_avg_time: bool
+    commands: List[Dict[str, Any]],
+    command_of_interest: str,
+    find_avg_time: bool,
+    module_id: Optional[str] = None,
 ) -> Tuple[int, float]:
     """Count number of times command occurs in a run."""
     total_command = 0
     total_time = 0.0
+    module_id_num = None
     for command in commands:
         command_type = command["commandType"]
-        if command_type == command_of_interest:
+        if module_id:
+            module_id_num = command["params"].get("moduleId")
+        if command_type == command_of_interest and module_id_num == module_id:
             total_command += 1
             if find_avg_time:
                 started_at = command.get("startedAt", "")
@@ -106,10 +114,23 @@ def count_command_in_run_data(
     return total_command, avg_time
 
 
+def count_image_capture(file: Dict[str, Any]) -> Dict[str, float]:
+    """Count image captures per protocol."""
+    commands = file.get("commands", "")
+    num_of_images, image_capture_time = count_command_in_run_data(
+        commands, "captureImage", True
+    )
+    return {
+        "Total Image Captures": num_of_images,
+        "Average Image Capture Time (sec)": image_capture_time,
+    }
+
+
 def identify_labware_ids(
     file_results: Dict[str, Any], labware_name: Optional[str]
 ) -> List[str]:
     """Determine what type of labware is being picked up."""
+    list_of_labware_ids: List[str] = []
     if labware_name:
         labwares = file_results.get("labware", "")
         list_of_labware_ids = []
@@ -133,7 +154,8 @@ def match_pipette_to_action(
     left_pipette_add = 0
     for command in commandTypes:
         command_type = command_dict["commandType"]
-        command_pipette = command_dict.get("pipetteId", "")
+        command_params = command_dict.get("params", "")
+        command_pipette = command_params.get("pipetteId", "")
         if command_type == command and command_pipette == right_pipette:
             right_pipette_add = 1
         elif command_type == command and command_pipette == left_pipette:
@@ -212,8 +234,89 @@ def instrument_commands(
     return pipette_dict
 
 
+def get_comment_result_by_string(file_results: Dict[str, Any], key_phrase: str) -> str:
+    """Get comment string based off ky phrase."""
+    commandData = file_results.get("commands", "")
+    result_str = command_str = ""
+    for command in commandData:
+        commandType = command["commandType"]
+        if commandType == "comment":
+            command_str = command["params"].get("message", "")
+        try:
+            result_str = command_str.split(key_phrase)[1]
+        except IndexError:
+            continue
+    return result_str
+
+
+def get_protocol_version_number(file_results: Dict[str, Any]) -> str:
+    """Get protocol version number."""
+    return get_comment_result_by_string(file_results, "Protocol Version: ")
+
+
+def get_liquid_waste_height(file_results: Dict[str, Any]) -> float:
+    """Find liquid waste height."""
+    result_str = get_comment_result_by_string(
+        file_results, "Liquid Waste Total Height: "
+    )
+    try:
+        height = float(result_str)
+    except ValueError:
+        height = 0.0
+    return height
+
+
+def liquid_height_commands(
+    file_results: Dict[str, Any], all_heights_list: List[List[Any]]
+) -> List[List[Any]]:
+    """Record found liquid heights during a protocol."""
+    commandData = file_results.get("commands", "")
+    robot = file_results.get("robot_name", "")
+    run_id = file_results.get("run_id", "")
+    list_of_heights = []
+    print(robot)
+    liquid_waste_height = 0.0
+    for command in commandData:
+        commandType = command["commandType"]
+        if commandType == "comment":
+            result = command["params"].get("message", "")
+            try:
+                result_str = "'" + result.split("result: {")[1] + "'"
+                entries = result_str.split(", (")
+                comment_time = command["completedAt"]
+                for entry in entries:
+                    height = float(entry.split(": ")[1].split("'")[0].split("}")[0])
+                    labware_type = str(
+                        entry.split(",")[0].replace("'", "").replace("(", "")
+                    )
+                    well_location = str(entry.split(", ")[1].split(" ")[0])
+                    slot_location = str(entry.split("slot ")[1].split(")")[0])
+                    labware_name = str(entry.split("of ")[1].split(" on")[0])
+                    if labware_name == "Liquid Waste":
+                        liquid_waste_height += height
+                    one_entry = {
+                        "Timestamp": comment_time,
+                        "Labware Name": labware_name,
+                        "Labware Type": labware_type,
+                        "Slot Location": slot_location,
+                        "Well Location": well_location,
+                        "All Heights (mm)": height,
+                    }
+                    list_of_heights.append(one_entry)
+            except (IndexError, ValueError):
+                continue
+    if len(list_of_heights) > 0:
+        all_heights_list[0].append(robot)
+        all_heights_list[1].append(run_id)
+        all_heights_list[2].append(list_of_heights)
+        all_heights_list[3].append(liquid_waste_height)
+    return all_heights_list
+
+
 def plate_reader_commands(
-    file_results: Dict[str, Any], hellma_plate_standards: List[Dict[str, Any]]
+    file_results: Dict[str, Any],
+    hellma_plate_standards: List[Dict[str, Any]],
+    orientation: bool,
 ) -> Dict[str, object]:
     """Plate Reader Command Counts."""
     commandData = file_results.get("commands", "")
@@ -242,38 +345,49 @@ def plate_reader_commands(
             read = "yes"
         elif read == "yes" and commandType == "comment":
             result = command["params"].get("message", "")
-            formatted_result = result.split("result: ")[1]
-            result_dict = eval(formatted_result)
-            result_dict_keys = list(result_dict.keys())
-            if len(result_dict_keys) > 1:
-                read_type = "multi"
-            else:
-                read_type = "single"
-            for wavelength in result_dict_keys:
-                one_wavelength_dict = result_dict.get(wavelength)
-                result_ndarray = plate_reader.convert_read_dictionary_to_array(
-                    one_wavelength_dict
-                )
-                for item in hellma_plate_standards:
-                    wavelength_of_interest = item["wavelength"]
-                    if str(wavelength) == str(wavelength_of_interest):
-                        error_cells = plate_reader.check_byonoy_data_accuracy(
-                            result_ndarray, item, False
+            if "result:" in result or "Result:" in result:
+                try:
+                    plate_name = result.split("result:")[0]
+                    formatted_result = result.split("result: ")[1]
+                except IndexError:
+                    plate_name = result.split("Result:")[0]
+                    formatted_result = result.split("Result: ")[1]
+                result_dict = eval(formatted_result)
+                result_dict_keys = list(result_dict.keys())
+                if len(result_dict_keys) > 1:
+                    read_type = "multi"
+                else:
+                    read_type = "single"
+                if "hellma_plate" in plate_name:
+                    for wavelength in result_dict_keys:
+                        one_wavelength_dict = result_dict.get(wavelength)
+                        result_ndarray = plate_reader.convert_read_dictionary_to_array(
+                            one_wavelength_dict
                         )
-                        if len(error_cells[0]) > 0:
-                            percent = (96 - len(error_cells)) / 96 * 100
-                            for cell in error_cells:
-                                print(
-                                    "FAIL: Cell " + str(cell) + " out of accuracy spec."
+                        for item in hellma_plate_standards:
+                            wavelength_of_interest = item["wavelength"]
+                            if str(wavelength) == str(wavelength_of_interest):
+                                error_cells = plate_reader.check_byonoy_data_accuracy(
+                                    result_ndarray, item, orientation
                                 )
-                        else:
-                            percent = 100
-                            print(
-                                f"PASS: {wavelength_of_interest} meet accuracy specification"
-                            )
-                        final_result[read_type, wavelength, read_num] = percent
-                        read_num += 1
-            read = "no"
+                                if len(error_cells[0]) > 0:
+                                    percent = (96 - len(error_cells)) / 96 * 100
+                                    for cell in error_cells:
+                                        print(
+                                            "FAIL: Cell "
+                                            + str(cell)
+                                            + " out of accuracy spec."
+                                        )
+                                else:
+                                    percent = 100
+                                    print(
+                                        f"PASS: {wavelength_of_interest} meet accuracy spec."
+                                    )
+                                final_result[read_type, wavelength, read_num] = percent
+                                read_num += 1
+                else:
+                    final_result = result_dict
+                read = "no"
     plate_dict = {
         "Plate Reader # of Reads": read_count,
         "Plate Reader Avg Read Time (sec)": avg_read_time,
@@ -283,6 +397,33 @@ def plate_reader_commands(
         "Plate Reader Result": final_result,
     }
     return plate_dict
+
+
+def flex_stacker_commands(file_results: Dict[str, Any]) -> Dict[str, float]:
+    """Get flex stacker retrieval counts from command data."""
+    commandData = file_results.get("commands", [])
+    module_info = file_results.get("modules", [])
+
+    stacker_dict: Dict[str, float] = {
+        "flexStackerModuleV1_D3_# of Retrievals": 0.0,
+        "flexStackerModuleV1_C3_# of Retrievals": 0.0,
+        "flexStackerModuleV1_B3_# of Retrievals": 0.0,
+        "flexStackerModuleV1_A3_# of Retrievals": 0.0,
+    }
+
+    for module in module_info:
+        if module.get("model") == "flexStackerModuleV1":
+            slot_name = module.get("location", {}).get("slotName", "")
+            model_key = f"flexStackerModuleV1_{slot_name}_# of Retrievals"
+            module_id = module.get("id")
+
+            if model_key in stacker_dict and module_id:
+                retrieve_count, _ = count_command_in_run_data(
+                    commandData, "flexStacker/retrieve", False, module_id
+                )
+                stacker_dict[model_key] = retrieve_count
+
+    return stacker_dict
 
 
 def hs_commands(file_results: Dict[str, Any]) -> Dict[str, float]:
@@ -341,8 +482,9 @@ def hs_commands(file_results: Dict[str, Any]) -> Dict[str, float]:
             )
     if temp_time is not None and deactivate_time is None:
         # If heater shaker module is not deactivated, protocol completedAt time stamp used.
+        default = commandData[len(commandData) - 1].get("completedAt")
         protocol_end = datetime.strptime(
-            file_results.get("completedAt", ""), "%Y-%m-%dT%H:%M:%S.%f%z"
+            file_results.get("completedAt", default), "%Y-%m-%dT%H:%M:%S.%f%z"
         )
         temp_duration = (protocol_end - temp_time).total_seconds()
         hs_temps[hs_temp] = hs_temps.get(hs_temp, 0.0) + temp_duration
@@ -389,8 +531,9 @@ def temperature_module_commands(file_results: Dict[str, Any]) -> Dict[str, Any]:
                 tm_temps[tm_temp] = tm_temps.get(tm_temp, 0.0) + temp_duration
     if temp_time is not None and deactivate_time is None:
         # If temperature module is not deactivated, protocol completedAt time stamp used.
+        default = commandData[len(commandData) - 1].get("completedAt")
         protocol_end = datetime.strptime(
-            file_results.get("completedAt", ""), "%Y-%m-%dT%H:%M:%S.%f%z"
+            file_results.get("completedAt", default), "%Y-%m-%dT%H:%M:%S.%f%z"
         )
         temp_duration = (protocol_end - temp_time).total_seconds()
         tm_temps[tm_temp] = tm_temps.get(tm_temp, 0.0) + temp_duration
@@ -405,7 +548,6 @@ def temperature_module_commands(file_results: Dict[str, Any]) -> Dict[str, Any]:
 
 def thermocycler_commands(file_results: Dict[str, Any]) -> Dict[str, float]:
     """Counts # of lid engagements, temp changes, and temp sustaining mins."""
-    # TODO: modify for cases that have more than 1 thermocycler.
     commandData = file_results.get("commands", "")
     lid_engagements: float = 0.0
     block_temp_changes: float = 0.0
@@ -473,15 +615,17 @@ def thermocycler_commands(file_results: Dict[str, Any]) -> Dict[str, float]:
                 block_temps[block_temp] = block_temps.get(block_temp, 0.0) + block_time
     if block_on_time is not None and block_off_time is None:
         # If thermocycler block not deactivated protocol completedAt time stamp used
+        default = commandData[len(commandData) - 1].get("completedAt")
         protocol_end = datetime.strptime(
-            file_results.get("completedAt", ""), "%Y-%m-%dT%H:%M:%S.%f%z"
+            file_results.get("completedAt", default), "%Y-%m-%dT%H:%M:%S.%f%z"
         )
         temp_duration = (protocol_end - block_on_time).total_seconds()
-        block_temps[block_temp] = block_temps.get(block_temp, 0.0) + temp_duration
+
     if lid_on_time is not None and lid_off_time is None:
         # If thermocycler lid not deactivated protocol completedAt time stamp used
+        default = commandData[len(commandData) - 1].get("completedAt")
         protocol_end = datetime.strptime(
-            file_results.get("completedAt", ""), "%Y-%m-%dT%H:%M:%S.%f%z"
+            file_results.get("completedAt", default), "%Y-%m-%dT%H:%M:%S.%f%z"
         )
         temp_duration = (protocol_end - lid_on_time).total_seconds()
         lid_temps[lid_temp] = block_temps.get(lid_temp, 0.0) + temp_duration
@@ -540,6 +684,11 @@ def get_error_info(file_results: Dict[str, Any]) -> Dict[str, Any]:
                     recoverable_errors.get(error_type, 0) + 1
                 )
     # Get run-ending error info
+    module_dict = {
+        "heatershaker": "heaterShakerModuleV1",
+        "thermocycler": "thermocyclerModuleV2",
+        "temperature module": "temperatureModuleV2",
+    }
     try:
         run_command_error = commands_of_run[-1]["error"]
         error_type = run_command_error.get("errorType", "")
@@ -549,6 +698,17 @@ def get_error_info(file_results: Dict[str, Any]) -> Dict[str, Any]:
         error_instrument = run_command_error.get("errorInfo", {}).get(
             "node", run_command_error.get("errorInfo", {}).get("port", "")
         )
+        if "gripper" in error_instrument:
+            # get gripper serial number
+            error_instrument = file_results["extension"]
+        else:
+            # get module serial number
+            for module in module_dict.keys():
+                if module in error_instrument:
+                    for module_list in file_results["modules"]:
+                        model = module_list["model"]
+                        if model == module_dict[module]:
+                            error_instrument = module_list["serialNumber"]
     except (IndexError, KeyError):
         try:
             error_details = file_results.get("errors", [{}])[0]
@@ -734,60 +894,92 @@ def get_calibration_offsets(
     return saved_file_path, calibration
 
 
-def get_logs(storage_directory: str, ip: str) -> List[str]:
-    """Get Robot logs."""
+def get_logs(storage_directory: str, ip: str) -> str:
+    """Get Robot logs and return a zip file path containing them."""
     log_types: List[Dict[str, Any]] = [
         {"log type": "api.log", "records": 10000},
         {"log type": "server.log", "records": 10000},
         {"log type": "serial.log", "records": 10000},
         {"log type": "touchscreen.log", "records": 10000},
     ]
-    all_paths = []
+    collected_files: List[str] = []
+    discovery_data_path = "/data/ODD/discovery.json"
+    if os.path.exists(discovery_data_path):
+        save_path = discovery_data_path
+    else:
+        save_dir = Path(f"{storage_directory}")
+        command = ["scp", "-r", f"root@{ip}:{discovery_data_path}", storage_directory]
+        try:
+            subprocess.run(command, check=True)  # type: ignore
+            save_path = os.path.join(save_dir, "discovery.json")
+        except subprocess.CalledProcessError as e:
+            print(f"Error during file transfer: {e}")
+    with open(save_path) as f:
+        discovery_data = json.load(f)
+    robot_name = discovery_data["robots"][0].get("name", "unknown")
+    sw_version = discovery_data["robots"][0]["health"].get("api_version", "unknown")
     for log_type in log_types:
         try:
-            log_type_name = log_type["log type"]
-            print(log_type_name)
-            log_records = int(log_type["records"])
-            print(log_records)
+            log_type_name: str = log_type["log type"]
+            log_records: int = int(log_type["records"])
             response = requests.get(
                 f"http://{ip}:31950/logs/{log_type_name}",
                 headers={"log_identifier": log_type_name},
                 params={"records": log_records},
             )
             response.raise_for_status()
-            log_data = response.text
-            log_name = ip + "_" + log_type_name.split(".")[0] + ".log"
-            file_path = os.path.join(storage_directory, log_name)
-            with open(file_path, mode="w", encoding="utf-8") as file:
-                file.write(log_data)
-        except RuntimeError:
-            print(f"Request exception. Did not save {log_type_name}")
+            log_data: str = response.text
+            log_name: str = f"{robot_name}_{log_type_name.split('.')[0]}.log"
+            file_path: str = os.path.join(storage_directory, log_name)
+            with open(file_path, mode="w", encoding="utf-8") as f:
+                f.write(log_data)
+            collected_files.append(file_path)
+        except Exception as e:
+            print(f"Failed to fetch {log_type['log type']}: {e}")
             continue
-        all_paths.append(file_path)
+
     # Get weston.log using scp
-    # Split the path into parts
-    parts = storage_directory.split(os.sep)
-    # Find the index of 'Users'
-    index = parts.index("Users")
-    user_name = parts[index + 1]
-    # Define the SCP command
-    scp_command = [
-        "scp",
-        "-r",
-        "-i",
-        f"C:\\Users\\{user_name}\\.ssh\\robot_key",
-        f"root@{ip}:/var/log/weston.log",
-        storage_directory,
-    ]
-    # Execute the SCP command
-    try:
-        subprocess.run(scp_command, check=True, capture_output=True, text=True)
-        file_path = os.path.join(storage_directory, "weston.log")
-        all_paths.append(file_path)
-    except subprocess.CalledProcessError as e:
-        print("Error during SCP command execution")
-        print("Return code:", e.returncode)
-        print("Output:", e.output)
-        print("Error output:", e.stderr)
-        subprocess.run(["scp", "weston.log", "root@10.14.19.40:/var/log/weston.log"])
-    return all_paths
+    collected_files = fetch_weston_log(
+        ip, storage_directory, collected_files, robot_name
+    )
+    timestamp = datetime.now().strftime("%Y-%m-%d")
+    # Create a ZIP archive with all collected files
+    zip_filename: str = os.path.join(
+        storage_directory, f"{robot_name}_{timestamp}_{sw_version}_logs.zip"
+    )
+    with zipfile.ZipFile(zip_filename, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for file_path in collected_files:
+            arcname: str = os.path.basename(file_path)  # ✅ always str
+            zipf.write(file_path, arcname=arcname)
+    for file_path in collected_files:
+        try:
+            os.remove(file_path)
+        except Exception as e:
+            print(f"Failed to delete {file_path}: {e}")
+
+    return zip_filename
+
+
+def fetch_weston_log(
+    ip: str, storage_directory: str, collected_files: list, robot_name: str
+) -> list[str]:
+    """Get weston log using scp or local copy, saved with robot name."""
+    local_log_path = Path("/var/log/weston.log")
+    destination_path = Path(storage_directory) / f"{robot_name}_weston.log"
+
+    if local_log_path.exists():
+        try:
+            with open(local_log_path, "rb") as src:
+                with open(destination_path, "wb") as dst:
+                    dst.write(src.read())
+            collected_files.append(str(destination_path))
+        except Exception as e:
+            print(f"Error copying local weston.log: {e}")
+    else:
+        remote_path = f"root@{ip}:/var/log/weston.log"
+        try:
+            subprocess.run(["scp", remote_path, str(destination_path)], check=True)
+            collected_files.append(str(destination_path))
+        except subprocess.CalledProcessError as e:
+            print(f"Error during file transfer: {e}")
+    return collected_files

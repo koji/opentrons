@@ -1,15 +1,16 @@
-import type * as React from 'react'
-
-import { css } from 'styled-components'
-import { CategorizedStepContent, TwoColumn } from '.'
-import type { CategorizedStepContentProps } from './CategorizedStepContent'
-import { StandInContent } from './story-utils/StandIn'
-import { Box, RESPONSIVENESS, BORDERS } from '@opentrons/components'
-import type { RunTimeCommand } from '@opentrons/shared-data'
 import { uniq } from 'lodash'
+import { css } from 'styled-components'
 
+import { BORDERS, Box, RESPONSIVENESS } from '@opentrons/components'
+
+import { CategorizedStepContent, TwoColumn } from '.'
 import * as Fixtures from '../Command/__fixtures__'
+import { StandInContent } from './story-utils/StandIn'
+
 import type { Meta, StoryObj } from '@storybook/react'
+import type * as React from 'react'
+import type { RunTimeCommand } from '@opentrons/shared-data'
+import type { CategorizedStepContentProps } from './CategorizedStepContent'
 
 type CommandType = RunTimeCommand['commandType']
 
@@ -36,11 +37,10 @@ function safeCommandOfType(type: CommandType, index: number): RunTimeCommand {
   return commands[index]
 }
 
-interface WrapperProps
-  extends Omit<
-    CategorizedStepContentProps,
-    'topCategoryCommand' | 'bottomCategoryCommands' | 'commandTextData'
-  > {
+interface WrapperProps extends Omit<
+  CategorizedStepContentProps,
+  'topCategoryCommand' | 'bottomCategoryCommands' | 'commandTextData'
+> {
   topCategoryCommand: CommandType | 'none'
   bottomCategoryCommand1: CommandType | 'none'
   bottomCategoryCommand2: CommandType | 'none'

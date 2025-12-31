@@ -1,16 +1,17 @@
 import { useMutation } from 'react-query'
+
 import { deleteCalibration } from '@opentrons/api-client'
+
 import { useHost } from '../api'
 
 import type {
-  UseMutationResult,
-  UseMutationOptions,
   UseMutateFunction,
+  UseMutationOptions,
+  UseMutationResult,
 } from 'react-query'
 import type {
-  HostConfig,
-  EmptyResponse,
   DeleteCalRequestParams,
+  EmptyResponse,
 } from '@opentrons/api-client'
 
 export type UseDeleteCalibrationMutationResult = UseMutationResult<
@@ -38,9 +39,7 @@ export function useDeleteCalibrationMutation(
 
   const mutation = useMutation<EmptyResponse, unknown, DeleteCalRequestParams>(
     (requestParams: DeleteCalRequestParams) =>
-      deleteCalibration(host as HostConfig, requestParams).then(
-        response => response.data
-      ),
+      deleteCalibration(host!, requestParams).then(response => response.data),
     options
   )
 

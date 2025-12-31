@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+
 import {
   ALIGN_CENTER,
   DIRECTION_COLUMN,
@@ -6,9 +7,9 @@ import {
   Flex,
   Icon,
   JUSTIFY_CENTER,
+  LegacyStyledText,
   Link,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
   WRAP,
 } from '@opentrons/components'
@@ -34,7 +35,7 @@ export function EmptyStateLinks(props: Props): JSX.Element | null {
     >
       <LegacyStyledText
         role="complementary"
-        as="p"
+        forwardedAs="p"
         fontWeight={TYPOGRAPHY.fontWeightSemiBold}
         marginBottom={SPACING.spacing8}
       >

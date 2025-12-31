@@ -1,6 +1,6 @@
-import { useDispatch } from 'react-redux'
-import { useTranslation } from 'react-i18next'
 import { useForm } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
+import { useDispatch } from 'react-redux'
 import styled from 'styled-components'
 
 import {
@@ -8,9 +8,9 @@ import {
   COLORS,
   DIRECTION_COLUMN,
   Flex,
+  LegacyStyledText,
   SIZE_2,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
@@ -145,7 +145,7 @@ export function ManualIpHostnameForm({
       </FlexForm>
       {formState.errors?.ip != null && (
         <LegacyStyledText
-          as="label"
+          forwardedAs="label"
           marginTop={SPACING.spacing4}
           color={COLORS.red50}
         >

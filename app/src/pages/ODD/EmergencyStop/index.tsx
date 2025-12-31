@@ -9,16 +9,15 @@ import {
   Flex,
   Icon,
   JUSTIFY_CENTER,
-  SPACING,
   LegacyStyledText,
+  SPACING,
+  StepMeter,
   TYPOGRAPHY,
 } from '@opentrons/components'
 import { useEstopQuery } from '@opentrons/react-api-client'
 
-import { MediumButton } from '/app/atoms/buttons'
-import { StepMeter } from '/app/atoms/StepMeter'
-
 import estopImg from '/app/assets/images/on-device-display/install_e_stop.png'
+import { MediumButton } from '/app/atoms/buttons'
 
 const ESTOP_STATUS_REFETCH_INTERVAL_MS = 10000
 
@@ -48,7 +47,10 @@ export function EmergencyStop(): JSX.Element {
           justifyContent={JUSTIFY_CENTER}
           alignItems={ALIGN_CENTER}
         >
-          <LegacyStyledText as="h2" fontWeight={TYPOGRAPHY.fontWeightBold}>
+          <LegacyStyledText
+            forwardedAs="h2"
+            fontWeight={TYPOGRAPHY.fontWeightBold}
+          >
             {t('install_e_stop')}
           </LegacyStyledText>
         </Flex>
@@ -75,7 +77,7 @@ export function EmergencyStop(): JSX.Element {
                   data-testid="EmergencyStop_connected_icon"
                 />
                 <LegacyStyledText
-                  as="h3"
+                  forwardedAs="h3"
                   fontWeight={TYPOGRAPHY.fontWeightSemiBold}
                 >
                   {t('e_stop_connected')}
@@ -85,7 +87,7 @@ export function EmergencyStop(): JSX.Element {
               <>
                 <img src={estopImg} height="116px" alt="E-stop button" />
                 <LegacyStyledText
-                  as="h3"
+                  forwardedAs="h3"
                   fontWeight={TYPOGRAPHY.fontWeightSemiBold}
                   color={COLORS.grey60}
                   textAlign={TYPOGRAPHY.textAlignCenter}

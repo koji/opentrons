@@ -1,16 +1,19 @@
-import type * as React from 'react'
-import { describe, beforeEach, afterEach, vi, expect, it } from 'vitest'
 import { fireEvent, screen } from '@testing-library/react'
-import '@testing-library/jest-dom/vitest'
-import { renderWithProviders } from '../../../testing/utils'
-import { Checkbox } from '..'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const render = (props: React.ComponentProps<typeof Checkbox>) => {
+import '@testing-library/jest-dom/vitest'
+
+import { Checkbox } from '..'
+import { renderWithProviders } from '../../../testing/utils'
+
+import type { ComponentProps } from 'react'
+
+const render = (props: ComponentProps<typeof Checkbox>) => {
   return renderWithProviders(<Checkbox {...props} />)[0]
 }
 
 describe('Checkbox', () => {
-  let props: React.ComponentProps<typeof Checkbox>
+  let props: ComponentProps<typeof Checkbox>
 
   beforeEach(() => {
     props = {

@@ -6,8 +6,8 @@ import {
   DIRECTION_ROW,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
-  SPACING,
   LegacyStyledText,
+  SPACING,
 } from '@opentrons/components'
 
 import { SmallButton } from '/app/atoms/buttons'
@@ -53,7 +53,7 @@ export function ResetValuesModal({
   return (
     <OddModal {...modalProps}>
       <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing32}>
-        <LegacyStyledText as="p">
+        <LegacyStyledText forwardedAs="p">
           {t('reset_parameter_values_body')}
         </LegacyStyledText>
         <Flex

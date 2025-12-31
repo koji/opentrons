@@ -1,15 +1,18 @@
 import { useTranslation } from 'react-i18next'
 import { useSelector } from 'react-redux'
-import { Box, COLORS, DIRECTION_COLUMN, Flex } from '@opentrons/components'
+
+import { DIRECTION_COLUMN, Divider, Flex, SPACING } from '@opentrons/components'
 import { FLEX_ROBOT_TYPE } from '@opentrons/shared-data'
-import { getRobotType } from '../../../../../../file-data/selectors'
-import { CheckboxStepFormField } from '../../../../../../molecules'
+
+import { CheckboxStepFormField } from '/protocol-designer/components/molecules'
+import { getRobotType } from '/protocol-designer/file-data/selectors'
 import {
   getAdditionalEquipment,
   getCurrentFormCanBeSaved,
-} from '../../../../../../step-forms/selectors'
-import { MoveLabwareField } from './MoveLabwareField'
+} from '/protocol-designer/step-forms/selectors'
+
 import { LabwareLocationField } from './LabwareLocationField'
+import { MoveLabwareField } from './MoveLabwareField'
 
 import type { StepFormProps } from '../../types'
 
@@ -24,31 +27,41 @@ export function MoveLabwareTools(props: StepFormProps): JSX.Element {
   )
 
   return (
-    <Flex flexDirection={DIRECTION_COLUMN}>
+    <Flex
+      flexDirection={DIRECTION_COLUMN}
+      gridGap={SPACING.spacing12}
+      paddingY={SPACING.spacing16}
+      height="100%"
+    >
       {robotType === FLEX_ROBOT_TYPE ? (
-        <CheckboxStepFormField
-          {...propsForFields.useGripper}
-          disabled={!isGripperAttached}
-          label={i18n.format(
-            t('form:step_edit_form.field.useGripper.label'),
-            'capitalize'
-          )}
-          tooltipContent={
-            !isGripperAttached
-              ? t('tooltip:step_fields.moveLabware.disabled.gripper_not_used')
-              : null
-          }
-        />
+        <>
+          <CheckboxStepFormField
+            {...propsForFields.useGripper}
+            disabled={!isGripperAttached}
+            label={i18n.format(
+              t('form:step_edit_form.field.useGripper.label'),
+              'capitalize'
+            )}
+            tooltipContent={
+              !isGripperAttached
+                ? t('tooltip:step_fields.moveLabware.disabled.gripper_not_used')
+                : null
+            }
+          />
+          <Divider marginY="0" />
+        </>
       ) : null}
-      <MoveLabwareField {...propsForFields.labware} />
-      <Box borderBottom={`1px solid ${COLORS.grey30}`} />
+      <MoveLabwareField
+        {...propsForFields.labware}
+        useGripper={propsForFields.useGripper.value === true}
+      />
+      <Divider marginY="0" />
       <LabwareLocationField
         {...propsForFields.newLocation}
         useGripper={propsForFields.useGripper.value === true}
         canSave={canSave}
         labware={String(propsForFields.labware.value)}
       />
-      <Box borderBottom={`1px solid ${COLORS.grey30}`} />
     </Flex>
   )
 }

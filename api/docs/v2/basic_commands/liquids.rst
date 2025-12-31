@@ -34,25 +34,75 @@ Now our pipette holds 300 µL.
 Aspirate by Well or Location
 ----------------------------
 
-The :py:meth:`~.InstrumentContext.aspirate` method includes a ``location`` parameter that accepts either a :py:class:`.Well` or a :py:class:`~.types.Location`. 
+The :py:meth:`~.InstrumentContext.aspirate` method includes the location parameters ``location`` and ``end_location``. Each accepts different location types:
 
-If you specify a well, like ``plate["A1"]``, the pipette will aspirate from a default position 1 mm above the bottom center of that well. To change the default clearance, first set the ``aspirate`` attribute of :py:obj:`.well_bottom_clearance`:: 
+- ``location`` accepts either a :py:class:`.Well` or a :py:class:`~.types.Location`.
+- ``end_location`` can only be used in combination with the ``location`` parameter. Both must be a  :py:class:`~.types.Location`. 
+
+.. versionchanged:: 2.27
+    Use the ``end_location`` parameter to specify multiple locations during an aspirate. 
+
+If you specify a single ``location`` like the well ``"A1"``, the pipette will aspirate from a default position 1 mm above the bottom center of that well. To change the default clearance, first set the ``aspirate`` attribute of :py:obj:`.well_bottom_clearance`:: 
 
     pipette.pick_up_tip
     pipette.well_bottom_clearance.aspirate = 2  # tip is 2 mm above well bottom
     pipette.aspirate(200, plate["A1"])
 
-You can also aspirate from a location along the center vertical axis within a well using the :py:meth:`.Well.top` and :py:meth:`.Well.bottom` methods. These methods move the pipette to a specified distance relative to the top or bottom center of a well::
+You can also aspirate from a :py:class:`~.types.Location` along the center vertical axis within a well using the :py:meth:`.Well.top` and :py:meth:`.Well.bottom` methods. These methods move the pipette to a specified distance relative to the top or bottom center of a well::
 
     pipette.pick_up_tip()
     depth = plate["A1"].bottom(z=2) # tip is 2 mm above well bottom
     pipette.aspirate(200, depth)
+
+
+Use the :py:meth:`.Well.meniscus` method to aspirate relative to the meniscus of liquid in a well with a Flex pipette. First, you'll need to determine the amount of liquid in your well one of two ways: 
+
+- Specify your starting liquid volume with :py:meth:`~.Labware.load_liquid`.
+- Measure the height of the liquid with :py:meth:`~.InstrumentContext.measure_liquid_height`.
+
+This example measures the liquid height in well A2 of a plate and then immediately aspirates below the meniscus:: 
+
+    pipette.pick_up_tip()
+    pipette.measure_liquid_height(plate["A2"])
+    pipette.aspirate(
+        volume=200, 
+        location=plate["A2"].meniscus(z=-1, target="end")
+        ) 
+    # aspirates at 1 mm below the liquid meniscus
+
+.. versionadded:: 2.23
+    Set ``target="start"`` or ``"end"`` to target the liquid meniscus during an aspirate. 
+
+To ensure the pipette stays submerged while aspirating, set ``target="end"`` for the aspirate or use multiple location parameters. For more, see :ref:`well-meniscus`. 
+
+.. note:: 
+    ``measure_liquid_height()`` works best with a new pipette tip each time. To save time and tips throughout your protocol, use ``Labware.load_liquid`` instead to specify starting liquid volumes.
+
+Use the ``location`` and ``end_location`` parameters in combination to direct the pipette to move to specific locations while aspirating::
+
+    pipette.pick_up_tip()
+    well_top = plate["A1"].top(z=-1)
+    depth = plate["A1"].bottom(z=2)
+    pipette.aspirate(
+        volume=200,
+        location=well_top,
+        end_location=depth
+    )
+
+Here, the pipette begins aspirating at 1 mm below the well top, and finishes aspirating at 2 mm above the well bottom. 
+
+.. note:: 
+    When you use both the ``location`` and ``end_location`` parameters, you can optionally specify a ``movement_delay`` to ensure the pipette waits a set amount of time in seconds before moving to the ``end_location``. This can be useful when pipetting viscous liquids. An additional 1 second ``movement_delay`` can help build up pressure in the tip before liquid starts to flow. 
+
+.. versionchanged:: 2.27
+    Use the ``end_location`` and ``movement_delay`` parameters when specifying multiple locations in a single aspirate. 
 
 See also:
 
 - :ref:`new-default-op-positions` for information about controlling pipette height for a particular pipette.
 - :ref:`position-relative-labware` for information about controlling pipette height from within a well.
 - :ref:`move-to` for information about moving a pipette to any reachable deck location.
+- :ref:`well-meniscus` for information about pipetting relative to the liquid meniscus as it changes during an aspirate. 
 
 Aspiration Flow Rates
 ---------------------
@@ -63,6 +113,17 @@ Flex and OT-2 pipettes aspirate at :ref:`default flow rates <new-plunger-flow-ra
     pipette.aspirate(200, plate["A1"], rate=2.0)
 
 .. versionadded:: 2.0
+
+
+You can also specify an absolute ``flow_rate`` to set the flow rate in µL/second::
+
+    pipette.aspirate(200, plate["A1"], flow_rate=50)
+
+.. versionchanged:: 2.24
+    Add the aspirate ``flow_rate`` parameter. 
+
+The ``rate`` and ``flow_rate`` parameters are mutually exclusive. If you specify both in the same command, the API will raise an error. 
+
 
 .. _new-dispense:
 
@@ -93,9 +154,15 @@ If the pipette doesn’t move, you can specify an additional dispense action wit
 Dispense by Well or Location
 ----------------------------
 
-The :py:meth:`~.InstrumentContext.dispense` method includes a ``location`` parameter that accepts either a :py:class:`.Well` or a :py:class:`~.types.Location`.
+The :py:meth:`~.InstrumentContext.dispense` method includes the ``location`` parameters ``location`` and ``end_location``. Each accepts different location types: 
 
-If you specify a well, like ``plate["B1"]``, the pipette will dispense from a default position 1 mm above the bottom center of that well. To change the default clearance, you would call :py:obj:`.well_bottom_clearance`::
+- ``location`` accepts either a :py:class:`.Well` or a :py:class:`~.types.Location`.
+- ``end_location`` can only be used in combination with the ``location`` parameter. Both must be a :py:class:`~.types.Location`. 
+
+.. versionchanged:: 2.27
+     Use the ``end_location`` parameter to specify multiple locations during a dispense. 
+
+If you specify a single ``location`` like the well ``"B1"``, the pipette will dispense from a default position 1 mm above the bottom center of that well. To change the default clearance, you would call :py:obj:`.well_bottom_clearance`::
 
     pipette.well_bottom_clearance.dispense=2 # tip is 2 mm above well bottom
     pipette.dispense(200, plate["B1"])
@@ -105,11 +172,52 @@ You can also dispense from a location along the center vertical axis within a we
     depth = plate["B1"].bottom(z=2) # tip is 2 mm above well bottom
     pipette.dispense(200, depth)
 
+
+Use the :py:meth:`.Well.meniscus` method to dispense at the meniscus of liquid in your well with a Flex pipette. First, you'll need to determine the amount of liquid in your well one of two ways: 
+
+- Specify your starting liquid volume with :py:meth:`~.Labware.load_liquid`.
+- Measure the height of liquid with :py:meth:`~.InstrumentContext.measure_liquid_height`.
+
+This example measures the liquid height in well B1 of a plate and then immediately dispenses below the meniscus:: 
+
+    pipette.measure_liquid_height(plate["B1"])
+    pipette.dispense(
+        volume=200, 
+        location=plate["B1"].meniscus(z=-1, target="start")
+        ) 
+    # dispenses at 1 mm below the liquid meniscus
+
+.. versionadded:: 2.23
+    Set ``target="start"`` or ``"end"`` to target the liquid meniscus during a dispense.
+
+To ensure the pipette begins the dispense at the liquid meniscus, set ``target="start"``. See :ref:`well-meniscus` for more details on pipetting relative to the liquid meniscus. 
+
+.. note::
+    ``measure_liquid_height()`` works best with a new pipette tip each time. To save time and tips throughout your protocol, use ``Labware.load_liquid`` instead to specify starting liquid volumes. 
+
+
+You can use the ``location`` and ``end_location`` parameters in combination to direct the pipette to move to specific locations while dispensing:: 
+
+    well_top = plate["B1"].top(z=-1)
+    depth = plate["B1"].bottom(z=2)
+    pipette.dispense(
+        volume=200,
+        location=depth,
+        end_location=well_top,
+        movement_delay=1
+    )
+
+Here, the pipette begins dispensing at 2 mm above the well bottom, and finishes dispensing at 1 mm below the well top. When you use both the ``location`` and ``end_location`` parameters, you can optionally specify a ``movement_delay`` to ensure the pipette waits a set amount of time, like 1 second, before moving to the ``end_location``. 
+
+.. versionchanged:: 2.27
+    Use the ``end_location`` and ``movement_delay`` parameters when specifying multiple locations in a single dispense.
+
 See also:
 
 - :ref:`new-default-op-positions` for information about controlling pipette height for a particular pipette.
 - :ref:`position-relative-labware` for formation about controlling pipette height from within a well.
 - :ref:`move-to` for information about moving a pipette to any reachable deck location.
+- :ref:`well-meniscus` for information about pipetting relative to the liquid meniscus as it changes during a dispense. 
 
 Dispense Flow Rates
 -------------------
@@ -120,19 +228,55 @@ Flex and OT-2 pipettes dispense at :ref:`default flow rates <new-plunger-flow-ra
 
 .. versionadded:: 2.0
 
+You can also specify an absolute ``flow_rate`` to set the flow rate in µL/second::
+
+    pipette.dispense(200, plate["B1"], flow_rate=50)
+
+.. versionchanged:: 2.24
+    Add the dispense ``flow_rate`` parameter. 
+
+The ``rate`` and ``flow_rate`` parameters are mutually exclusive. If you specify both in the same command, the API will raise an error.  
+
+
 .. _push-out-dispense:
 
 Push Out After Dispense
 -----------------------
 
-The optional ``push_out`` parameter of ``dispense()`` helps ensure all liquid leaves the tip. Use ``push_out`` for applications that require moving the pipette plunger lower than the default, without performing a full :ref:`blow out <blow-out>`.
+Dispensing all liquid from the tip usually requires an additional volume of air to ensure no droplets remain. In a push out after dispense, the pipette dispenses all liquid by returning the plunger to its aspirate start position. Then, without stopping, the plunger moves further down to dispense the additional push out volume. 
 
-For example, this dispense action moves the plunger the equivalent of an additional 5 µL beyond where it would stop if ``push_out`` was set to zero or omitted::
+Use the optional ``push_out`` parameter of ``dispense()`` for applications that require moving the pipette plunger lower than the default, without performing a full :ref:`blow out <blow-out>`.
 
+Flex pipettes include a push out of air by default for any dispense that completely empties the attached pipette tip. Both default and maximum push out volumes depend on your Flex pipette and tip combination. 
+
++----------------------------------+-----------+---------------------------+----------------------------+
+|              Pipette             |  Tip      |         Default           |          Maximum           |
+|                                  |           |         push out          |          push out          |
++==================================+===========+===========================+============================+ 
+| 50 µL (1- and 8-channel)         | 50 µL     | - Regular: 2 µL           | - Regular: 3.9 µL          | 
+|                                  |           | - Low-volume mode: 7 µL   | - Low-volume mode: 11.7 µL | 
++----------------------------------+-----------+---------------------------+---------+------------------+ 
+| 1000 µL (1-, 8-, and 96-channel) | 50 µL     |          7 µL             |         79.5 µL            | 
+|                                  +-----------+---------------------------+----------------------------+
+|                                  | 200 µL    |          5 µL             |         79.5 µL            | 
+|                                  +-----------+---------------------------+----------------------------+
+|                                  | 1000 µL   |          20 µL            |         79.5 µL            |
++----------------------------------+-----------+---------------------------+----------------------------+
+
+OT-2 pipettes do not include a push out by default. 
+
+You can change the push out volume for any :py:meth:`~.InstrumentContext.dispense` command. For this example dispense of all 100 µL of liquid in a 200 µL tip, the Flex 1-Channel 1000 µL pipette plunger will move the equivalent of 7 µL (an additional 2 µL more than the default) beyond the aspirate start position to push out any remaining liquid in the tip. 
+
+.. code-block:: python
+    
     pipette.pick_up_tip()
     pipette.aspirate(100, plate["A1"])
-    pipette.dispense(100, plate["B1"], push_out=5)
+    pipette.dispense(100, plate["B1"], push_out=7)
     pipette.drop_tip()
+
+Set ``push_out`` to override the default if you observe problems with dispensing. If liquid remains inside the tip after dispensing, set ``push_out`` higher. If no liquid remains, but contact dispenses create too many bubbles, set ``push_out`` lower. 
+
+To disable ``push_out`` during any dispense action, set ``push_out=0``. You can use this to avoid multiple ``push_out`` actions during a mix step. 
 
 .. versionadded:: 2.15
 
@@ -176,6 +320,8 @@ These optional location arguments give you control over where the tip will touch
 This example demonstrates touching the tip in a specific well::
 
     pipette.touch_tip(plate["B1"])
+
+.. versionadded:: 2.0
     
 This example uses an offset to set the touch tip location 2mm below the top of the current well::
 
@@ -183,14 +329,21 @@ This example uses an offset to set the touch tip location 2mm below the top of t
 
 This example moves the pipette 75% of well's total radius and 2 mm below the top of well::
 
-    pipette.touch_tip(plate["B1"], 
-                      radius=0.75,
-                      v_offset=-2)
+    pipette.touch_tip(plate["B1"], radius=0.75, v_offset=-2)
 
-The ``touch_tip`` feature allows the pipette to touch the edges of a well gently instead of crashing into them. It includes the ``radius`` argument. When ``radius=1`` the robot moves the centerline of the pipette’s plunger axis to the edge of a well. This means a pipette tip may sometimes touch the well wall too early, causing it to bend inwards. A smaller radius helps avoid premature wall collisions and a lower speed produces gentler motion. Different liquid droplets behave differently, so test out these parameters in a single well before performing a full protocol run.
+And this example uses ``mm_from edge`` to set the touch tip location 0 mm, or the edge of the current well::
+
+    pipette.touch_tip(plate["B1"], mm_from_edge=0)
+
+.. versionchanged:: 2.24
+    Add the ``mm_from_edge`` parameter.
+
+The ``touch_tip`` feature allows the pipette to touch the edges of a well gently instead of crashing into them. It includes the ``radius`` and ``mm_from_edge`` arguments. When ``radius=1`` or ``mm_from_edge=0``,the robot moves the centerline of the pipette’s plunger axis to the edge of a well. This means a pipette tip may sometimes touch the well wall too early, causing it to bend inwards. A smaller radius or larger ``mm_from_edge``, like 1 mm, help avoid premature wall collisions and a lower speed produces gentler motion. Different liquid droplets behave differently, so test out these parameters in a single well before performing a full protocol run.
+
+The ``radius`` and ``mm_from_edge`` arguments are mutually exclusive. If you specify both in the same command, the API will raise an error. 
 
 .. warning::
-    *Do not* set the ``radius`` value greater than ``1.0``. When ``radius`` is > ``1.0``, the robot will forcibly move the pipette tip across a well wall or edge. This type of aggressive movement can damage the pipette tip and the pipette.
+    *Do not* set the ``radius`` value greater than ``1.0`` or a negative ``mm_from_edge`` value. When ``radius`` is > ``1.0`` or ``mm_from_edge`` is < ``0.0``, the robot will forcibly move the pipette tip across a well wall or edge. This type of aggressive movement can damage the pipette tip and the pipette.
 
 Touch Speed
 -----------
@@ -207,10 +360,10 @@ This example uses the current well and sets the speed to 80 mm/s::
 
     pipette.touch_tip(speed=80)
 
-.. versionadded:: 2.0
-
 .. versionchanged:: 2.4
     Lowered minimum speed to 1 mm/s.
+
+
 
 .. _mix:
 
@@ -231,18 +384,61 @@ This example draws an amount equal to the pipette's maximum rated volume and mix
 
     pipette.mix(repetitions=3)
 
+Like an ``aspirate()`` or ``dispense()``, you can use optional arguments to specify the flow rate, a delay, or a push out after an aspirate or dispense in the mix. 
+
+This example draws 100 µL from the current well and mixes it three times, aspirating at 50 µL/sec and with a 5 second delay after each aspirate::
+
+    pipette.mix(
+        repetitions=3,
+        volume=100,
+        aspirate_flow_rate=50,
+        aspirate_delay=5
+    )
+
+And this example adds a push out of 10 µL after the final dispense in the mix::
+
+    pipette.mix(repetitions=3, volume=100, final_push_out=10)
+
 .. note::
 
     In API versions 2.2 and earlier, during a mix, the pipette moves up and out of the target well. In API versions 2.3 and later, the pipette does not move while mixing. 
 
 .. versionadded:: 2.0
+.. versionchanged:: 2.24
+    Adds the ``aspirate_flow_rate``, ``dispense_flow_rate``, ``aspirate_delay``, ``dispense_delay``, and ``final_push_out`` parameters. 
+
+.. _dynamic-mix:
+
+Dynamic Mix
+===========
+
+The :py:meth:`~.InstrumentContext.dynamic_mix` method lets you aspirate and dispense repeatedly in multiple locations. Like the :py:meth:`~.InstrumentContext.mix` method, it's designed to mix the contents of a well together using a single command rather than using multiple ``aspirate()`` and ``dispense()`` calls. Both methods includes argument that let you specify the number of times to mix, the volume (in µL) of liquid, and the well that contains the liquid you want to mix. :py:meth:`~.InstrumentContext.dynamic_mix` lets you additionally specify multiple aspirate and dispense locations:: 
+
+    depth = plate["A1"].bottom(z=2)
+    well_top = plate["A1"].top(z=-1)
+    pipette.dynamic_mix(
+        aspirate_start_location=depth,
+        aspirate_end_location=well_top,
+        dispense_start_location=well_top,
+        dispense_end_location=depth,
+        repetitions=3,
+        volume=100
+    )
+
+Like the :py:meth:`~.InstrumentContext.mix` method, you can use other optional arguments to customize your dynamic mix: 
+
+- specify the aspirate, dispense, or mix flow rate.
+- add a delay after an aspirate or dispense, or a ``movement_delay`` before moving to an ``end_location``.
+- include a push out after an aspirate or dispense in the mix.
+
+.. versionadded:: 2.27
 
 .. _air-gap:
 
 Air Gap
 =======
 
-The :py:meth:`.InstrumentContext.air_gap` method tells the pipette to draw in air before or after a liquid. Creating an air gap helps keep liquids from seeping out of a pipette after drawing it from a well. This method includes arguments that give you control over the amount of air to aspirate and the pipette's height (in mm) above the well. By default, the pipette moves 5 mm above a well before aspirating air. Calling :py:meth:`~.InstrumentContext.air_gap` with no arguments uses the entire remaining volume in the pipette.
+The :py:meth:`.InstrumentContext.air_gap` method tells the pipette to draw in air before or after a liquid. Creating an air gap helps keep liquids from seeping out of a pipette after drawing it from a well. This method includes arguments that give you control over the amount of air to aspirate and the position at the target well to add the air gap. By default, the pipette moves 5 mm above the center of a well before aspirating air. Calling :py:meth:`~.InstrumentContext.air_gap` with no arguments uses the entire remaining volume in the pipette.
 
 This example aspirates 200 µL of air 5 mm above the current well::
 
@@ -256,7 +452,25 @@ This example aspirates enough air to fill the remaining volume in a pipette::
 
     pipette.air_gap()
 
+Instead of moving to a distance above the target well, this example uses the ``in_place`` parameter to immediately add add an air gap after an aspirate or dispense. Here, the pipette aspirates 200 µL of air while still inside the target well:: 
+
+    pipette.air_gap(volume=200, in_place=True)
+
+Just like in an ``aspirate()`` or ``dispense()``, you can use the ``rate`` and ``flow_rate`` parameters to change the flow rate. 
+
+This example uses the ``rate`` parameter to aspirate 200 µL of air at twice the default flow rate:: 
+
+    pipette.air_gap(volume=200, rate=2.0)
+
+This example uses the ``flow_rate`` parameter to aspirate 200 µL of air at 50 µL/sec::
+
+    pipette.air_gap(volume=200, flow_rate=50)
+
+The ``rate`` and ``flow_rate`` parameters are mutually exclusive. If you choose to change the ``flow_rate``, specifying a ``rate`` will raise an error. 
+
 .. versionadded:: 2.0
+.. versionchanged:: 2.24
+    Add the ``in_place`` and ``flow_rate`` parameters. 
 
 .. _detect-liquid-presence:
 
@@ -297,3 +511,22 @@ The :py:meth:`.InstrumentContext.require_liquid_presence` method tells a Flex pi
 You can also require liquid presence for all aspirations performed with a given pipette. See :ref:`lpd`.
 
 .. versionadded:: 2.20
+
+.. _measure-liquids:
+
+Measure Liquids
+===============
+
+The :py:meth:`~.InstrumentContext.measure_liquid_height` method tells a Flex pipette to measure the height of liquid relative to the bottom of a well. When ``measure_liquid_height()`` finds an empty well, it raises and error and pauses the protocol to let you resolve the problem. 
+
+``measure_liquid_height()`` is a standalone method that records the height of liquid in a well during a protocol. You can use the liquid height to aspirate or dispense from, or move to, the liquid meniscus, either immediately after or later in your protocol.
+
+.. code-block:: python
+
+    pipette.pick_up_tip()
+    pipette.measure_liquid_height(plate["A1"])
+    pipette.aspirate(
+        volume=200, location=plate["A1"].meniscus(z=-1, target="end")
+    )  # aspirates from 1 mm below the liquid meniscus
+
+You don't have to aspirate after measuring liquid height, but you should always pick up a tip immediately prior to measuring the liquid height, and either aspirate or drop the tip immediately after. This ensures that the pipette uses a clean, dry tip to check for liquid, and prevents cross-contamination. 

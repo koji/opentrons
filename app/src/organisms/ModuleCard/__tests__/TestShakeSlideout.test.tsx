@@ -1,4 +1,3 @@
-import type * as React from 'react'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -8,16 +7,19 @@ import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 import { getIsHeaterShakerAttached } from '/app/redux/config'
 import { mockHeaterShaker } from '/app/redux/modules/__fixtures__'
+
 import { useLatchControls } from '../hooks'
-import { TestShakeSlideout } from '../TestShakeSlideout'
 import { ModuleSetupModal } from '../ModuleSetupModal'
+import { TestShakeSlideout } from '../TestShakeSlideout'
+
+import type { ComponentProps } from 'react'
 
 vi.mock('/app/redux/config')
 vi.mock('@opentrons/react-api-client')
 vi.mock('../hooks')
 vi.mock('../ModuleSetupModal')
 
-const render = (props: React.ComponentProps<typeof TestShakeSlideout>) => {
+const render = (props: ComponentProps<typeof TestShakeSlideout>) => {
   return renderWithProviders(<TestShakeSlideout {...props} />, {
     i18nInstance: i18n,
   })[0]
@@ -90,7 +92,7 @@ const mockMovingHeaterShaker = {
 } as any
 
 describe('TestShakeSlideout', () => {
-  let props: React.ComponentProps<typeof TestShakeSlideout>
+  let props: ComponentProps<typeof TestShakeSlideout>
   let mockCreateLiveCommand = vi.fn()
   const mockToggleLatch = vi.fn()
   beforeEach(() => {

@@ -1,18 +1,20 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
 import {
   useAllSessionsQuery,
   useCurrentAllSubsystemUpdatesQuery,
   useEstopQuery,
 } from '@opentrons/react-api-client'
-import { vi, it, expect, describe, beforeEach, afterEach } from 'vitest'
 
-import { useIsRobotBusy } from '../useIsRobotBusy'
 import { useIsFlex } from '/app/redux-resources/robots'
 import { useNotifyCurrentMaintenanceRun } from '/app/resources/maintenance_runs'
 import { useNotifyAllRunsQuery } from '/app/resources/runs'
 
-import type { UseQueryResult } from 'react-query'
-import type { Sessions, Runs } from '@opentrons/api-client'
+import { useIsRobotBusy } from '../useIsRobotBusy'
+
 import type { AxiosError } from 'axios'
+import type { UseQueryResult } from 'react-query'
+import type { Runs, Sessions } from '@opentrons/api-client'
 
 vi.mock('@opentrons/react-api-client')
 vi.mock('/app/redux-resources/robots')
@@ -80,7 +82,7 @@ describe('useIsRobotBusy', () => {
         },
       },
     } as any)
-    vi.mocked(useAllSessionsQuery).mockReturnValue(({
+    vi.mocked(useAllSessionsQuery).mockReturnValue({
       data: [
         {
           id: 'test',
@@ -91,7 +93,7 @@ describe('useIsRobotBusy', () => {
         },
       ],
       links: {},
-    } as unknown) as UseQueryResult<Sessions, Error>)
+    } as unknown as UseQueryResult<Sessions, Error>)
     const result = useIsRobotBusy()
     expect(result).toBe(false)
   })
@@ -104,7 +106,7 @@ describe('useIsRobotBusy', () => {
         },
       },
     } as any)
-    vi.mocked(useAllSessionsQuery).mockReturnValue(({
+    vi.mocked(useAllSessionsQuery).mockReturnValue({
       data: [
         {
           id: 'test',
@@ -115,7 +117,7 @@ describe('useIsRobotBusy', () => {
         },
       ],
       links: {},
-    } as unknown) as UseQueryResult<Sessions, Error>)
+    } as unknown as UseQueryResult<Sessions, Error>)
     const result = useIsRobotBusy()
     expect(result).toBe(false)
   })
@@ -129,7 +131,7 @@ describe('useIsRobotBusy', () => {
         },
       },
     } as any)
-    vi.mocked(useAllSessionsQuery).mockReturnValue(({
+    vi.mocked(useAllSessionsQuery).mockReturnValue({
       data: [
         {
           id: 'test',
@@ -140,7 +142,7 @@ describe('useIsRobotBusy', () => {
         },
       ],
       links: {},
-    } as unknown) as UseQueryResult<Sessions, Error>)
+    } as unknown as UseQueryResult<Sessions, Error>)
     const mockEngagedStatus = {
       data: {
         ...mockEstopStatus.data,
@@ -160,7 +162,7 @@ describe('useIsRobotBusy', () => {
         },
       },
     } as any)
-    vi.mocked(useAllSessionsQuery).mockReturnValue(({
+    vi.mocked(useAllSessionsQuery).mockReturnValue({
       data: [
         {
           id: 'test',
@@ -171,7 +173,7 @@ describe('useIsRobotBusy', () => {
         },
       ],
       links: {},
-    } as unknown) as UseQueryResult<Sessions, Error>)
+    } as unknown as UseQueryResult<Sessions, Error>)
     const mockEngagedStatus = {
       data: {
         ...mockEstopStatus.data,

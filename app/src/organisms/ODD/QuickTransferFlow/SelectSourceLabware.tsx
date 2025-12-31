@@ -1,34 +1,37 @@
-import * as React from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+
 import {
-  Flex,
-  SPACING,
+  ALIGN_CENTER,
+  COLORS,
   DIRECTION_COLUMN,
   DIRECTION_ROW,
-  COLORS,
+  Flex,
   POSITION_FIXED,
-  ALIGN_CENTER,
-  Tabs,
   RadioButton,
+  SPACING,
+  Tabs,
 } from '@opentrons/components'
 
 import { ChildNavigation } from '/app/organisms/ODD/ChildNavigation'
+
 import { getCompatibleLabwareByCategory } from './utils'
 
+import type { ComponentProps, Dispatch } from 'react'
 import type { LabwareDefinition2 } from '@opentrons/shared-data'
 import type { SmallButton } from '/app/atoms/buttons'
 import type { LabwareFilter } from '/app/local-resources/labware'
 import type {
-  QuickTransferWizardState,
   QuickTransferWizardAction,
+  QuickTransferWizardState,
 } from './types'
 
 interface SelectSourceLabwareProps {
   onNext: () => void
   onBack: () => void
-  exitButtonProps: React.ComponentProps<typeof SmallButton>
+  exitButtonProps: ComponentProps<typeof SmallButton>
   state: QuickTransferWizardState
-  dispatch: React.Dispatch<QuickTransferWizardAction>
+  dispatch: Dispatch<QuickTransferWizardAction>
 }
 
 export function SelectSourceLabware(
@@ -44,17 +47,15 @@ export function SelectSourceLabware(
   if (state.pipette?.channels === 1) {
     labwareDisplayCategoryFilters.push('tubeRack')
   }
-  const [selectedCategory, setSelectedCategory] = React.useState<LabwareFilter>(
-    'all'
-  )
+  const [selectedCategory, setSelectedCategory] = useState<LabwareFilter>('all')
 
-  const [selectedLabware, setSelectedLabware] = React.useState<
+  const [selectedLabware, setSelectedLabware] = useState<
     LabwareDefinition2 | undefined
   >(state.source)
 
   if (state.pipette == null) return null
 
-  const compatibleLabwareDefinitions = getCompatibleLabwareByCategory(
+  const compatibleLabwareDefinition2s = getCompatibleLabwareByCategory(
     state.pipette.channels,
     selectedCategory
   )
@@ -82,18 +83,18 @@ export function SelectSourceLabware(
       />
       <Flex
         flexDirection={DIRECTION_COLUMN}
-        padding={`${SPACING.spacing16} ${SPACING.spacing60} ${SPACING.spacing40} ${SPACING.spacing60}`}
+        padding={`${SPACING.spacing32} ${SPACING.spacing60} ${SPACING.spacing40} ${SPACING.spacing60}`}
         width="100%"
       >
         <Flex
           gridGap={SPACING.spacing8}
-          height={SPACING.spacing80}
+          height="5rem"
+          padding={`${SPACING.spacing24} 0 ${SPACING.spacing24}`}
           backgroundColor={COLORS.white}
           width="100%"
           flexDirection={DIRECTION_ROW}
           position={POSITION_FIXED}
           top={SPACING.spacing120}
-          marginBottom={SPACING.spacing24}
           alignItems={ALIGN_CENTER}
         >
           <Tabs
@@ -108,11 +109,11 @@ export function SelectSourceLabware(
           />
         </Flex>
         <Flex
-          gridGap={SPACING.spacing4}
+          gridGap={SPACING.spacing8}
           flexDirection={DIRECTION_COLUMN}
           marginTop="175px"
         >
-          {compatibleLabwareDefinitions?.map(definition => {
+          {compatibleLabwareDefinition2s?.map(definition => {
             return definition.metadata.displayName != null ? (
               <RadioButton
                 key={`${selectedCategory}-${definition.metadata.displayName}`}

@@ -1,12 +1,19 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, List, Union, overload
+from typing import TYPE_CHECKING, List, Sequence, Union, overload, Optional
 
 
-from .helpers import stringify_location, stringify_disposal_location, listify
+from .helpers import (
+    stringify_location,
+    stringify_disposal_location,
+    stringify_well_list,
+    listify,
+)
 from . import types as command_types
 
 from opentrons.types import Location
 from opentrons.protocol_api.disposal_locations import TrashBin, WasteChute
+from opentrons.protocol_api._liquid import LiquidClass
+from opentrons.protocol_api._nozzle_layout import NozzleLayout
 
 if TYPE_CHECKING:
     from opentrons.protocol_api import InstrumentContext
@@ -24,10 +31,21 @@ def aspirate(
     location: Location,
     flow_rate: float,
     rate: float,
+    end_location: Optional[Location],
 ) -> command_types.AspirateCommand:
     location_text = stringify_location(location)
-    template = "Aspirating {volume} uL from {location} at {flow} uL/sec"
-    text = template.format(volume=float(volume), location=location_text, flow=flow_rate)
+    end_location_text = (
+        f" while moving to {stringify_location(end_location)}"
+        if end_location is not None
+        else ""
+    )
+    template = "Aspirating {volume} uL from {location} at {flow} uL/sec{end}"
+    text = template.format(
+        volume=float(volume),
+        location=location_text,
+        flow=flow_rate,
+        end=end_location_text,
+    )
 
     return {
         "name": command_types.ASPIRATE,
@@ -37,6 +55,7 @@ def aspirate(
             "location": location,
             "rate": rate,
             "text": text,
+            "end_location": end_location,
         },
     }
 
@@ -47,10 +66,21 @@ def dispense(
     location: Location,
     flow_rate: float,
     rate: float,
+    end_location: Optional[Location],
 ) -> command_types.DispenseCommand:
     location_text = stringify_location(location)
-    template = "Dispensing {volume} uL into {location} at {flow} uL/sec"
-    text = template.format(volume=float(volume), location=location_text, flow=flow_rate)
+    end_location_text = (
+        f" while moving to {stringify_location(end_location)}"
+        if end_location is not None
+        else ""
+    )
+    template = "Dispensing {volume} uL into {location} at {flow} uL/sec{end}"
+    text = template.format(
+        volume=float(volume),
+        location=location_text,
+        flow=flow_rate,
+        end=end_location_text,
+    )
 
     return {
         "name": command_types.DISPENSE,
@@ -60,6 +90,7 @@ def dispense(
             "location": location,
             "rate": rate,
             "text": text,
+            "end_location": end_location,
         },
     }
 
@@ -162,17 +193,15 @@ def transfer(
 
 
 @overload
-def transform_volumes(volumes: Union[float, int]) -> float:
-    ...
+def transform_volumes(volumes: Union[float, int]) -> float: ...
 
 
 @overload
-def transform_volumes(volumes: List[float]) -> List[float]:
-    ...
+def transform_volumes(volumes: List[float]) -> List[float]: ...
 
 
 def transform_volumes(
-    volumes: Union[float, int, List[float]]
+    volumes: Union[float, int, List[float]],
 ) -> Union[float, List[float]]:
     if not isinstance(volumes, list):
         return float(volumes)
@@ -201,11 +230,40 @@ def mix(
     }
 
 
+def dynamic_mix(
+    instrument: InstrumentContext,
+    repetitions: int,
+    volume: float,
+    aspirate_start_location: Location,
+    aspirate_end_location: Union[Location, None],
+    dispense_start_location: Location,
+    dispense_end_location: Union[Location, None],
+    movement_delay: float,
+) -> command_types.DynamicMixCommand:
+    text = "Dynamically mixing {repetitions} times with a volume of {volume} ul".format(
+        repetitions=repetitions, volume=float(volume)
+    )
+    return {
+        "name": command_types.MIX,
+        "payload": {
+            "instrument": instrument,
+            "aspirate_start_location": aspirate_start_location,
+            "aspirate_end_location": aspirate_end_location,
+            "dispense_start_location": dispense_start_location,
+            "dispense_end_location": dispense_end_location,
+            "volume": volume,
+            "repetitions": repetitions,
+            "text": text,
+            "movement_delay": movement_delay,
+        },
+    }
+
+
 def blow_out(
-    instrument: InstrumentContext, location: Location
+    instrument: InstrumentContext, location: Location, flow_rate: float
 ) -> command_types.BlowOutCommand:
     location_text = stringify_location(location)
-    text = f"Blowing out at {location_text}"
+    text = f"Blowing out into {location_text} at {flow_rate} uL/sec"
 
     return {
         "name": command_types.BLOW_OUT,
@@ -214,10 +272,12 @@ def blow_out(
 
 
 def blow_out_in_disposal_location(
-    instrument: InstrumentContext, location: Union[TrashBin, WasteChute]
+    instrument: InstrumentContext,
+    location: Union[TrashBin, WasteChute],
+    flow_rate: float,
 ) -> command_types.BlowOutInDisposalLocationCommand:
     location_text = stringify_disposal_location(location)
-    text = f"Blowing out into {location_text}"
+    text = f"Blowing out into {location_text} at {flow_rate} uL/sec"
 
     return {
         "name": command_types.BLOW_OUT_IN_DISPOSAL_LOCATION,
@@ -234,9 +294,25 @@ def touch_tip(instrument: InstrumentContext) -> command_types.TouchTipCommand:
     }
 
 
-def air_gap() -> command_types.AirGapCommand:
-    text = "Air gap"
-    return {"name": command_types.AIR_GAP, "payload": {"text": text}}
+def air_gap(
+    instrument: InstrumentContext,
+    volume: float | None,
+    height: float | None,
+) -> command_types.AirGapCommand:
+    text = (
+        "Air gap"
+        + (f" of {volume} uL" if volume is not None else "")
+        + (f" at height {height}" if height is not None else "")
+    )
+    return {
+        "name": command_types.AIR_GAP,
+        "payload": {
+            "instrument": instrument,
+            "volume": volume,
+            "height": height,
+            "text": text,
+        },
+    }
 
 
 def return_tip() -> command_types.ReturnTipCommand:
@@ -298,4 +374,163 @@ def move_to_disposal_location(
     return {
         "name": command_types.MOVE_TO_DISPOSAL_LOCATION,
         "payload": {"instrument": instrument, "location": location, "text": text},
+    }
+
+
+def transfer_with_liquid_class(
+    instrument: InstrumentContext,
+    liquid_class: LiquidClass,
+    volume: float,
+    source: Union[Well, Sequence[Well], Sequence[Sequence[Well]]],
+    destination: Union[
+        Well, Sequence[Well], Sequence[Sequence[Well]], TrashBin, WasteChute
+    ],
+) -> command_types.TransferWithLiquidClassCommand:
+    if isinstance(destination, (TrashBin, WasteChute)):
+        destination_text = stringify_disposal_location(destination)
+    else:
+        destination_text = stringify_well_list(destination)
+    text = (
+        "Transferring "
+        + f"{volume} uL of {liquid_class.display_name} liquid class from "
+        + f"{stringify_well_list(source)} to {destination_text}"
+    )
+    return {
+        "name": command_types.TRANSFER_WITH_LIQUID_CLASS,
+        "payload": {
+            "instrument": instrument,
+            "liquid_class": liquid_class,
+            "volume": volume,
+            "source": source,
+            "destination": destination,
+            "text": text,
+        },
+    }
+
+
+def distribute_with_liquid_class(
+    instrument: InstrumentContext,
+    liquid_class: LiquidClass,
+    volume: float,
+    source: Union[Well, Sequence[Well], Sequence[Sequence[Well]]],
+    destination: Union[Well, Sequence[Well], Sequence[Sequence[Well]]],
+) -> command_types.DistributeWithLiquidClassCommand:
+    text = (
+        "Distributing "
+        + f"{volume} uL of {liquid_class.display_name} liquid class from "
+        + f"{stringify_well_list(source)} to {stringify_well_list(destination)}"
+    )
+    return {
+        "name": command_types.DISTRIBUTE_WITH_LIQUID_CLASS,
+        "payload": {
+            "instrument": instrument,
+            "liquid_class": liquid_class,
+            "volume": volume,
+            "source": source,
+            "destination": destination,
+            "text": text,
+        },
+    }
+
+
+def consolidate_with_liquid_class(
+    instrument: InstrumentContext,
+    liquid_class: LiquidClass,
+    volume: float,
+    source: Union[Well, Sequence[Well], Sequence[Sequence[Well]]],
+    destination: Union[
+        Well, Sequence[Well], Sequence[Sequence[Well]], TrashBin, WasteChute
+    ],
+) -> command_types.ConsolidateWithLiquidClassCommand:
+    if isinstance(destination, (TrashBin, WasteChute)):
+        destination_text = stringify_disposal_location(destination)
+    else:
+        destination_text = stringify_well_list(destination)
+    text = (
+        "Consolidating "
+        + f"{volume} uL of {liquid_class.display_name} liquid class from "
+        + f"{stringify_well_list(source)} to {destination_text}"
+    )
+    return {
+        "name": command_types.CONSOLIDATE_WITH_LIQUID_CLASS,
+        "payload": {
+            "instrument": instrument,
+            "liquid_class": liquid_class,
+            "volume": volume,
+            "source": source,
+            "destination": destination,
+            "text": text,
+        },
+    }
+
+
+def seal(
+    instrument: InstrumentContext,
+    location: Well,
+) -> command_types.SealCommand:
+    location_text = stringify_location(location)
+    text = f"Sealing to {location_text}"
+    return {
+        "name": command_types.SEAL,
+        "payload": {"instrument": instrument, "location": location, "text": text},
+    }
+
+
+def unseal(
+    instrument: InstrumentContext,
+    location: Well,
+) -> command_types.UnsealCommand:
+    location_text = stringify_location(location)
+    text = f"Unsealing from {location_text}"
+    return {
+        "name": command_types.UNSEAL,
+        "payload": {"instrument": instrument, "location": location, "text": text},
+    }
+
+
+def resin_tip_dispense(
+    instrument: InstrumentContext,
+    flow_rate: float | None,
+) -> command_types.PressurizeCommand:
+    if flow_rate is None:
+        flow_rate = 10  # The Protocol Engine default for Resin Tip Dispense
+    text = f"Pressurize pipette to dispense from resin tip at {flow_rate}uL/s."
+    return {
+        "name": command_types.PRESSURIZE,
+        "payload": {"instrument": instrument, "text": text},
+    }
+
+
+def configure_for_volume(
+    instrument: InstrumentContext,
+    volume: float,
+) -> command_types.ConfigureForVolumeCommand:
+    text = f"Configure pipette on {instrument.mount} mount to handle {volume} µL."
+    return {
+        "name": command_types.CONFIGURE_FOR_VOLUME,
+        "payload": {"instrument": instrument, "volume": volume, "text": text},
+    }
+
+
+def configure_nozzle_layout(
+    instrument: InstrumentContext,
+    style: NozzleLayout,
+    start: str | None,
+    end: str | None,
+) -> command_types.ConfigureNozzleLayoutCommand:
+    text = f"Configure pipette on {instrument.mount} mount to use {style} layout"
+    if start:
+        text += f" starting at nozzle {start}"
+    if end:
+        text += f" ending at nozzle {end}"
+    text += "."
+    return {
+        "name": command_types.CONFIGURE_NOZZLE_LAYOUT,
+        "payload": {
+            "instrument": instrument,
+            "style": style,
+            "start": start,
+            "end": end,
+            "text": text,
+        },
     }

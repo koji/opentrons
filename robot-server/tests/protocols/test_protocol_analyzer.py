@@ -1,4 +1,5 @@
 """Tests for the ProtocolAnalyzer."""
+
 import pytest
 from decoy import Decoy
 from datetime import datetime
@@ -93,7 +94,7 @@ async def test_load_orchestrator(
         analysis_store=analysis_store, protocol_resource=protocol_resource
     )
 
-    run_orchestrator = decoy.mock(cls=protocol_runner.RunOrchestrator)
+    run_orchestrator = decoy.mock(cls=simulating_runner.SimulatingRunOrchestrator)
     decoy.when(
         await simulating_runner.create_simulating_orchestrator(
             robot_type=robot_type,
@@ -165,7 +166,10 @@ async def test_analyze(
         displayName="Foo", variableName="Bar", default=True, value=False
     )
 
-    orchestrator = decoy.mock(cls=protocol_runner.RunOrchestrator)
+    command_annotation = pe_types.CustomCommandAnnotation(commandKeys=["abc", "xyz"])
+    command_preconditions = pe_types.CommandPreconditions(isCameraUsed=False)
+
+    orchestrator = decoy.mock(cls=simulating_runner.SimulatingRunOrchestrator)
     decoy.when(
         await simulating_runner.create_simulating_orchestrator(
             robot_type=robot_type,
@@ -178,7 +182,11 @@ async def test_analyze(
     await subject.load_orchestrator(
         run_time_param_values={"rtp_var": 123}, run_time_param_paths={}
     )
-    decoy.when(await orchestrator.run(deck_configuration=[],)).then_return(
+    decoy.when(
+        await orchestrator.run(
+            deck_configuration=[],
+        )
+    ).then_return(
         protocol_runner.RunResult(
             commands=[analysis_command],
             state_summary=StateSummary(
@@ -189,11 +197,14 @@ async def test_analyze(
                 modules=[],
                 labwareOffsets=[],
                 liquids=[],
+                liquidClasses=[],
                 wells=[],
                 files=[],
                 hasEverEnteredErrorRecovery=False,
             ),
             parameters=[bool_parameter],
+            command_annotations=[command_annotation],
+            command_preconditions=command_preconditions,
         )
     )
 
@@ -211,6 +222,9 @@ async def test_analyze(
             pipettes=[analysis_pipette],
             errors=[],
             liquids=[],
+            liquidClasses=[],
+            command_annotations=[command_annotation],
+            command_preconditions=command_preconditions,
         )
     )
 
@@ -240,7 +254,7 @@ async def test_analyze_updates_pending_on_error(
 
     raised_exception = Exception("You got me!!")
 
-    error_occurrence = pe_errors.ErrorOccurrence.construct(
+    error_occurrence = pe_errors.ErrorOccurrence.model_construct(
         id="internal-error",
         createdAt=datetime(year=2023, month=3, day=3),
         errorType="EnumeratedError",
@@ -252,7 +266,7 @@ async def test_analyze_updates_pending_on_error(
         message="You got me!!",
     )
 
-    orchestrator = decoy.mock(cls=protocol_runner.RunOrchestrator)
+    orchestrator = decoy.mock(cls=simulating_runner.SimulatingRunOrchestrator)
     decoy.when(
         await simulating_runner.create_simulating_orchestrator(
             robot_type=robot_type,
@@ -294,5 +308,7 @@ async def test_analyze_updates_pending_on_error(
             pipettes=[],
             errors=[error_occurrence],
             liquids=[],
+            liquidClasses=[],
+            command_annotations=[],
         ),
     )

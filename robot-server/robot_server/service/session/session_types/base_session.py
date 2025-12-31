@@ -5,7 +5,6 @@ from typing import Optional
 
 from robot_server.service.session.models.common import IdentifierType, create_identifier
 from robot_server.service.session.command_execution import (
-    CommandQueue,
     CommandExecutor,
     create_command,
 )
@@ -29,7 +28,7 @@ class BaseSession(ABC):
 
     def __init__(
         self, configuration: SessionConfiguration, instance_meta: SessionMetaData
-    ):
+    ) -> None:
         """
         Constructor
 
@@ -58,7 +57,7 @@ class BaseSession(ABC):
         """Get the response model"""
         ...
 
-    async def clean_up(self):
+    async def clean_up(self) -> None:
         """Called before session is deleted"""
         pass
 
@@ -85,11 +84,6 @@ class BaseSession(ABC):
         pass
 
     @property
-    @abstractmethod
-    def command_queue(self) -> CommandQueue:
-        pass
-
-    @property
     def meta(self) -> SessionMetaData:
         return self._instance_meta
 
@@ -99,6 +93,4 @@ class BaseSession(ABC):
         pass
 
     def __str__(self) -> str:
-        return (
-            f"Session(" f"session_type={self.session_type}," f"meta={self.meta}," f")"
-        )
+        return f"Session(session_type={self.session_type},meta={self.meta},)"

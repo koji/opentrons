@@ -1,4 +1,5 @@
 """Calibrate-pipette command for OT3 hardware. request, result, and implementation models."""
+
 from typing import Optional, Type
 from typing_extensions import Literal
 from pydantic import BaseModel, Field
@@ -54,9 +55,9 @@ class CalibratePipetteImplementation(
             self._hardware_api,
         )
         ot3_mount = OT3Mount.from_mount(params.mount)
-        assert (
-            ot3_mount is not OT3Mount.GRIPPER
-        ), "Expected a Pipette mount but Gripper mount was provided."
+        assert ot3_mount is not OT3Mount.GRIPPER, (
+            "Expected a Pipette mount but Gripper mount was provided."
+        )
 
         pipette_offset = await calibration.find_pipette_offset(
             hcapi=ot3_api, mount=ot3_mount, slot=5
@@ -65,8 +66,8 @@ class CalibratePipetteImplementation(
         await ot3_api.save_instrument_offset(mount=ot3_mount, delta=pipette_offset)
 
         return SuccessData(
-            public=CalibratePipetteResult.construct(
-                pipetteOffset=InstrumentOffsetVector.construct(
+            public=CalibratePipetteResult.model_construct(
+                pipetteOffset=InstrumentOffsetVector.model_construct(
                     x=pipette_offset.x, y=pipette_offset.y, z=pipette_offset.z
                 )
             ),
@@ -80,11 +81,11 @@ class CalibratePipette(
 
     commandType: CalibratePipetteCommandType = "calibration/calibratePipette"
     params: CalibratePipetteParams
-    result: Optional[CalibratePipetteResult]
+    result: Optional[CalibratePipetteResult] = None
 
-    _ImplementationCls: Type[
+    _ImplementationCls: Type[CalibratePipetteImplementation] = (
         CalibratePipetteImplementation
-    ] = CalibratePipetteImplementation
+    )
 
 
 class CalibratePipetteCreate(BaseCommandCreate[CalibratePipetteParams]):

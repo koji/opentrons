@@ -1,9 +1,9 @@
-import * as React from 'react'
-import { css } from 'styled-components'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
+import { useNavigate } from 'react-router-dom'
+import { css } from 'styled-components'
 
 import {
   BORDERS,
@@ -24,17 +24,20 @@ import {
 import { getTopPortalEl } from '/app/App/portal'
 import { Divider } from '/app/atoms/structure'
 import { ChooseProtocolSlideout } from '/app/organisms/Desktop/ChooseProtocolSlideout'
-import { DisconnectModal } from './RobotSettings/ConnectNetwork/DisconnectModal'
-import { handleUpdateBuildroot } from './RobotSettings/UpdateBuildroot'
-import { useIsRobotOnWrongVersionOfSoftware } from '/app/redux/robot-update'
-import { UNREACHABLE, CONNECTABLE, REACHABLE } from '/app/redux/discovery'
-import { checkShellUpdate } from '/app/redux/shell'
+import { useIsRobotBusy } from '/app/redux-resources/robots'
+import { CONNECTABLE, REACHABLE, UNREACHABLE } from '/app/redux/discovery'
 import { restartRobot } from '/app/redux/robot-admin'
 import { home, ROBOT } from '/app/redux/robot-controls'
-import { useIsRobotBusy } from '/app/redux-resources/robots'
-import { useCanDisconnect } from '/app/resources/networking/hooks'
+import { useIsRobotOnWrongVersionOfSoftware } from '/app/redux/robot-update'
+import { checkShellUpdate } from '/app/redux/shell'
 import { useIsEstopNotDisengaged } from '/app/resources/devices/hooks/useIsEstopNotDisengaged'
+import { useCanDisconnect } from '/app/resources/networking/hooks'
 import { useCurrentRunId } from '/app/resources/runs'
+
+import { DisconnectModal } from './RobotSettings/ConnectNetwork/DisconnectModal'
+import { handleUpdateBuildroot } from './RobotSettings/UpdateBuildroot'
+
+import type { MouseEvent, MouseEventHandler } from 'react'
 import type { DiscoveredRobot } from '/app/redux/discovery/types'
 import type { Dispatch } from '/app/redux/types'
 
@@ -61,25 +64,21 @@ export const RobotOverviewOverflowMenu = (
 
   const dispatch = useDispatch<Dispatch>()
 
-  const handleClickRestart: React.MouseEventHandler<HTMLButtonElement> = () => {
+  const handleClickRestart: MouseEventHandler<HTMLButtonElement> = () => {
     dispatch(restartRobot(robot.name))
   }
 
-  const handleClickHomeGantry: React.MouseEventHandler<HTMLButtonElement> = () => {
+  const handleClickHomeGantry: MouseEventHandler<HTMLButtonElement> = () => {
     dispatch(home(robot.name, ROBOT))
   }
 
-  const [
-    showChooseProtocolSlideout,
-    setShowChooseProtocolSlideout,
-  ] = React.useState<boolean>(false)
-  const [showDisconnectModal, setShowDisconnectModal] = React.useState<boolean>(
-    false
-  )
+  const [showChooseProtocolSlideout, setShowChooseProtocolSlideout] =
+    useState<boolean>(false)
+  const [showDisconnectModal, setShowDisconnectModal] = useState<boolean>(false)
 
   const canDisconnect = useCanDisconnect(robot.name)
 
-  const handleClickDisconnect: React.MouseEventHandler<HTMLButtonElement> = () => {
+  const handleClickDisconnect: MouseEventHandler<HTMLButtonElement> = () => {
     setShowDisconnectModal(true)
   }
 
@@ -87,7 +86,7 @@ export const RobotOverviewOverflowMenu = (
     dispatch(checkShellUpdate())
   })
 
-  const handleClickRun: React.MouseEventHandler<HTMLButtonElement> = () => {
+  const handleClickRun: MouseEventHandler<HTMLButtonElement> = () => {
     setShowChooseProtocolSlideout(true)
   }
 
@@ -125,7 +124,7 @@ export const RobotOverviewOverflowMenu = (
           top="2.25rem"
           right={0}
           flexDirection={DIRECTION_COLUMN}
-          onClick={(e: React.MouseEvent) => {
+          onClick={(e: MouseEvent) => {
             e.preventDefault()
             e.stopPropagation()
             setShowOverflowMenu(false)

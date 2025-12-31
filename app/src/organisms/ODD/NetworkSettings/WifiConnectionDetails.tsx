@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
@@ -12,15 +12,16 @@ import {
   Flex,
   Icon,
   JUSTIFY_CENTER,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
 import { MediumButton } from '/app/atoms/buttons'
 import { RobotSetupHeader } from '/app/organisms/ODD/RobotSetupHeader'
 import { getLocalRobot } from '/app/redux/discovery'
-import { getNetworkInterfaces, fetchStatus } from '/app/redux/networking'
+import { fetchStatus, getNetworkInterfaces } from '/app/redux/networking'
+
 import { NetworkDetailsModal } from '../RobotSettingsDashboard/NetworkSettings/NetworkDetailsModal'
 
 import type { WifiSecurityType } from '@opentrons/api-client'
@@ -50,10 +51,8 @@ export function WifiConnectionDetails({
   const subnetMask = wifi?.subnetMask != null ? wifi.subnetMask : noData
   const macAddress = wifi?.macAddress != null ? wifi.macAddress : noData
 
-  const [
-    showNetworkDetailsModal,
-    setShowNetworkDetailsModal,
-  ] = useState<boolean>(false)
+  const [showNetworkDetailsModal, setShowNetworkDetailsModal] =
+    useState<boolean>(false)
 
   useEffect(() => {
     dispatch(fetchStatus(robotName))
@@ -93,7 +92,7 @@ export function WifiConnectionDetails({
             />
             <MediumButton
               flex="1"
-              buttonText={i18n.format(t('continue'), 'capitalize')}
+              buttonText={i18n.format(t('shared:continue'), 'capitalize')}
               onClick={() => {
                 navigate('/robot-settings/update-robot-during-onboarding')
               }}
@@ -124,7 +123,10 @@ const DisplayConnectionStatus = ({
       justifyContent={JUSTIFY_CENTER}
     >
       <Icon size="3rem" name="ot-check" color={COLORS.green50} />
-      <LegacyStyledText as="h3" fontWeight={TYPOGRAPHY.fontWeightSemiBold}>
+      <LegacyStyledText
+        forwardedAs="h3"
+        fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+      >
         {t('successfully_connected_to_network', { ssid })}
       </LegacyStyledText>
     </Flex>

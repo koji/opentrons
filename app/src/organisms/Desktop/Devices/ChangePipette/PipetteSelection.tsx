@@ -1,16 +1,19 @@
-import type * as React from 'react'
 import { useTranslation } from 'react-i18next'
+
 import {
   DIRECTION_COLUMN,
   Flex,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
 import { OT3_PIPETTES } from '@opentrons/shared-data'
+
 import { PipetteSelect } from '/app/molecules/PipetteSelect'
 
-export type PipetteSelectionProps = React.ComponentProps<typeof PipetteSelect>
+import type { ComponentProps } from 'react'
+
+export type PipetteSelectionProps = ComponentProps<typeof PipetteSelect>
 
 export function PipetteSelection(props: PipetteSelectionProps): JSX.Element {
   const { t } = useTranslation('change_pipette')

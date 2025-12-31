@@ -1,25 +1,28 @@
 // set of functions that parse details out of a protocol record and its internals
 import reduce from 'lodash/reduce'
 
-import { DEFAULT_LIQUID_COLORS } from '../constants'
-import { getLabwareDefURI } from '..'
+import { DEFAULT_LIQUID_COLORS, MIXED_WELL_COLOR } from '../constants'
+import { getModuleType } from '../modules'
+import { getLabwareDefURI } from './getLabwareDefURI'
+import { getModuleDeckLabel } from './getModuleDeckLabel'
+import { locationIsOnLabware } from './symbolicPositionHelpers'
 
 import type {
+  LabwareLocation,
   LoadLabwareRunTimeCommand,
   LoadLiquidRunTimeCommand,
   LoadModuleRunTimeCommand,
   LoadPipetteRunTimeCommand,
   RunTimeCommand,
-  LabwareLocation,
 } from '../../command/types'
 import type { PipetteName } from '../pipettes'
 import type {
+  LabwareDefinition,
   Liquid,
   LoadedLabware,
   LoadedModule,
   LoadedPipette,
   ModuleModel,
-  LabwareDefinition2,
 } from '../types'
 
 interface PipetteNamesByMount {
@@ -146,17 +149,16 @@ export function getTopLabwareInfo(
   currentStackHeight: number = 0
 ): {
   topLabwareId: string
-  topLabwareDefinition?: LabwareDefinition2
+  topLabwareDefinition?: LabwareDefinition
   topLabwareDisplayName?: string
 } {
   const nestedCommand = loadLabwareCommands.find(
     command =>
       command.commandType === 'loadLabware' &&
-      command.params.location !== 'offDeck' &&
-      'labwareId' in command.params.location &&
+      locationIsOnLabware(command.params.location) &&
       command.params.location.labwareId === labwareId
   )
-  // prevent recurssion errors (like labware stacked on itself)
+  // prevent recursion errors (like labware stacked on itself)
   // by enforcing a max stack height
   if (nestedCommand == null || currentStackHeight > 5) {
     const loadCommand = loadLabwareCommands.find(
@@ -176,7 +178,7 @@ export function getTopLabwareInfo(
     }
   } else {
     return getTopLabwareInfo(
-      nestedCommand?.result?.labwareId as string,
+      nestedCommand?.result?.labwareId!,
       loadLabwareCommands,
       currentStackHeight + 1
     )
@@ -208,7 +210,7 @@ export function getLabwareStackCountAndLocation(
 
   const labwareLocation = loadLabwareCommand.params.location
 
-  if (labwareLocation !== 'offDeck' && 'labwareId' in labwareLocation) {
+  if (locationIsOnLabware(labwareLocation)) {
     const lowerLabwareCommand = loadLabwareCommands?.find(command =>
       command.result != null
         ? command.result?.labwareId === labwareLocation.labwareId
@@ -216,7 +218,7 @@ export function getLabwareStackCountAndLocation(
     )
     if (lowerLabwareCommand?.result?.labwareId == null) {
       console.warn(
-        `could not find the load labware command assosciated with thie labwareId: ${labwareLocation.labwareId}`
+        `could not find the load labware command associated with this labwareId: ${labwareLocation.labwareId}`
       )
       return { labwareLocation: 'offDeck', labwareQuantity: 0 }
     }
@@ -331,7 +333,13 @@ export function parseInitialLoadedModulesBySlot(
     loadModuleCommandsReversed,
     (acc, command) =>
       'slotName' in command.params.location
-        ? { ...acc, [command.params.location.slotName]: command }
+        ? {
+            ...acc,
+            [getModuleDeckLabel(
+              getModuleType(command.params.model),
+              command.params.location.slotName
+            )]: command,
+          }
         : acc,
     {}
   )
@@ -342,6 +350,7 @@ export interface LiquidsById {
     displayName: string
     description: string
     displayColor?: string
+    totalLiquids?: number
   }
 }
 
@@ -349,6 +358,7 @@ export interface LiquidsById {
 // it will always have a displayColor
 export interface ParsedLiquid extends Omit<Liquid, 'displayColor'> {
   displayColor: string
+  totalLiquids?: number
 }
 
 export function parseLiquidsInLoadOrder(
@@ -359,26 +369,69 @@ export function parseLiquidsInLoadOrder(
     (command): command is LoadLiquidRunTimeCommand =>
       command.commandType === 'loadLiquid'
   )
-  const loadedLiquids = liquids.map((liquid, index) => {
-    return {
-      ...liquid,
-      displayColor:
-        liquid.displayColor ??
-        DEFAULT_LIQUID_COLORS[index % DEFAULT_LIQUID_COLORS.length],
+
+  // Assign default colors to liquids
+  const loadedLiquids = liquids.map((liquid, index) => ({
+    ...liquid,
+    displayColor:
+      liquid.displayColor ??
+      DEFAULT_LIQUID_COLORS[index % DEFAULT_LIQUID_COLORS.length],
+  }))
+  const acc: ParsedLiquid[] = []
+  const seenLiquids = new Set<string>()
+  const wellToLiquids: Record<string, Record<string, Set<string>>> = {}
+
+  loadLiquidCommands.forEach(cmd => {
+    const liquidId = cmd.params.liquidId
+
+    // Add base liquids in load order
+    if (!seenLiquids.has(liquidId)) {
+      seenLiquids.add(liquidId)
+      const liquid = loadedLiquids.find(l => l.id === liquidId)
+      if (liquid) {
+        acc.push(liquid)
+      }
+    }
+
+    // Track well-to-liquid mapping for mixed liquids
+    const labwareId = cmd.params.labwareId
+    if (!wellToLiquids[labwareId]) wellToLiquids[labwareId] = {}
+
+    for (const well of Object.keys(cmd.params.volumeByWell)) {
+      if (!wellToLiquids[labwareId][well])
+        wellToLiquids[labwareId][well] = new Set()
+      wellToLiquids[labwareId][well].add(liquidId)
     }
   })
 
-  return reduce<LoadLiquidRunTimeCommand, ParsedLiquid[]>(
-    loadLiquidCommands,
-    (acc, command) => {
-      const liquid = loadedLiquids.find(
-        liquid => liquid.id === command.params.liquidId
-      )
-      if (liquid != null && !acc.some(item => item === liquid)) acc.push(liquid)
-      return acc
-    },
-    []
-  )
+  // Map to track unique mixed combinations
+  const mixedMap = new Map<string, ParsedLiquid>()
+
+  Object.values(wellToLiquids).forEach(wellMap => {
+    Object.values(wellMap).forEach(liquidIds => {
+      if (liquidIds.size > 1) {
+        const sortedIds = Array.from(liquidIds).sort()
+        const key = sortedIds.join('-')
+
+        if (!mixedMap.has(key)) {
+          const liquidNames = sortedIds.map(
+            id => loadedLiquids.find(l => l.id === id)?.displayName || id
+          )
+
+          const mixedId = `mixed-${sortedIds.join('-')}`
+          const totalLiquids = liquidNames.length
+          mixedMap.set(key, {
+            id: mixedId,
+            displayColor: MIXED_WELL_COLOR,
+            description: liquidNames.join(', '),
+            totalLiquids: totalLiquids,
+            displayName: null,
+          })
+        }
+      }
+    })
+  })
+  return [...acc, ...mixedMap.values()]
 }
 
 interface LabwareLiquidInfo {
@@ -387,14 +440,14 @@ interface LabwareLiquidInfo {
 }
 
 /** @deprecated instead use LabwareByLiquidId from components/src/hardware-sim/ProtocolDeck/types */
-export interface LabwareByLiquidId {
+interface DeprecatedLabwareByLiquidId {
   [liquidId: string]: LabwareLiquidInfo[]
 }
 
 /** @deprecated instead use getLabwareInfoByLiquidId from components/src/hardware-sim/ProtocolDeck/utils */
 export function parseLabwareInfoByLiquidId(
   commands: RunTimeCommand[]
-): LabwareByLiquidId {
+): DeprecatedLabwareByLiquidId {
   const loadLiquidCommands =
     commands.length !== 0
       ? commands.filter(
@@ -403,7 +456,7 @@ export function parseLabwareInfoByLiquidId(
         )
       : []
 
-  return reduce<LoadLiquidRunTimeCommand, LabwareByLiquidId>(
+  return reduce<LoadLiquidRunTimeCommand, DeprecatedLabwareByLiquidId>(
     loadLiquidCommands,
     (acc, command) => {
       if (!(command.params.liquidId in acc)) {

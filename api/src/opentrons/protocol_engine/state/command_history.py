@@ -1,4 +1,5 @@
 """Protocol Engine CommandStore sub-state."""
+
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Dict, List, Optional
@@ -24,6 +25,9 @@ class CommandHistory:
     _all_command_ids: List[str]
     """All command IDs, in insertion order."""
 
+    _all_failed_command_ids: List[str]
+    """All failed command IDs, in insertion order."""
+
     _all_command_ids_but_fixit_command_ids: List[str]
     """All command IDs besides fixit command intents, in insertion order."""
 
@@ -47,6 +51,7 @@ class CommandHistory:
 
     def __init__(self) -> None:
         self._all_command_ids = []
+        self._all_failed_command_ids = []
         self._all_command_ids_but_fixit_command_ids = []
         self._queued_command_ids = OrderedSet()
         self._queued_setup_command_ids = OrderedSet()
@@ -101,6 +106,13 @@ class CommandHistory:
             for command_id in self._all_command_ids
         ]
 
+    def get_all_failed_commands(self) -> List[Command]:
+        """Get all failed commands."""
+        return [
+            self._commands_by_id[command_id].command
+            for command_id in self._all_failed_command_ids
+        ]
+
     def get_filtered_command_ids(self, include_fixit_commands: bool) -> List[str]:
         """Get all fixit command IDs."""
         if include_fixit_commands:
@@ -115,7 +127,10 @@ class CommandHistory:
     def get_slice(
         self, start: int, stop: int, command_ids: Optional[list[str]] = None
     ) -> List[Command]:
-        """Get a list of commands between start and stop.""" """Get a list of commands between start and stop."""
+        (
+            """Get a list of commands between start and stop."""
+            """Get a list of commands between start and stop."""
+        )
         commands = self._all_command_ids[start:stop]
         selected_command_ids = (
             command_ids if command_ids is not None else self._all_command_ids
@@ -242,6 +257,20 @@ class CommandHistory:
         self._remove_queue_id(command.id)
         self._remove_setup_queue_id(command.id)
         self._set_most_recently_completed_command_id(command.id)
+        self._all_failed_command_ids.append(command.id)
+
+    # TODO(jh, 08-01-25) Although protocol engine is garbage collected, command history persists in memory between protocol runs.
+    # Explicitly clearing all history before dereferencing protocol engine and the run's run orchestrator eliminates
+    # memory accumulation. Investigate further.
+    def clear(self) -> None:
+        """Clear state."""
+        self._commands_by_id.clear()
+        self._all_command_ids.clear()
+        self._all_failed_command_ids.clear()
+        self._all_command_ids_but_fixit_command_ids.clear()
+        self._queued_command_ids.clear()
+        self._queued_setup_command_ids.clear()
+        self._queued_fixit_command_ids.clear()
 
     def _add(self, command_id: str, command_entry: CommandEntry) -> None:
         """Create or update a command entry."""

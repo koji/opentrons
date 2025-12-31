@@ -1,4 +1,5 @@
 """A Protocol-Engine-friendly wrapper for opentrons.motion_planning.deck_conflict."""
+
 from __future__ import annotations
 import itertools
 import logging
@@ -24,7 +25,10 @@ from opentrons.protocol_engine import (
     ModuleLocation,
     OnLabwareLocation,
     AddressableAreaLocation,
+    InStackerHopperLocation,
+    WASTE_CHUTE_LOCATION,
     OFF_DECK_LOCATION,
+    SYSTEM_LOCATION,
 )
 from opentrons.protocol_engine.errors.exceptions import LabwareNotLoadedOnModuleError
 from opentrons.types import DeckSlotName, StagingSlotName, Point
@@ -173,14 +177,61 @@ def check(
     for existing_location, existing_item in itertools.chain(
         mapped_existing_labware, mapped_existing_modules, mapped_disposal_locations
     ):
-        assert existing_location not in existing_items
-        existing_items[existing_location] = existing_item
+        if existing_location not in existing_items:
+            existing_items[existing_location] = existing_item
+        else:
+            existing_items[existing_location] = _check_pair_compatibility(
+                existing_items[existing_location], existing_item, existing_location
+            )
 
     wrapped_deck_conflict.check(
         existing_items=existing_items,
         new_item=new_item,
         new_location=new_location,
         robot_type=engine_state.config.robot_type,
+    )
+
+
+def _check_pair_compatibility(
+    item1: wrapped_deck_conflict.DeckItem,
+    item2: wrapped_deck_conflict.DeckItem,
+    location: Union[DeckSlotName, StagingSlotName],
+) -> wrapped_deck_conflict.DeckItem:
+    # if this is a stacker and something that can also "go" where a stacker "goes" (like a labware or magblock)
+    # then we build a combo; otherwise, we raise an error. this error in theory should never happen because to
+    # have the configuration that causes the error, it has to have passed the wrapped deck conflict checking,
+    # so there would be a bug in there, which is of course impossible.
+
+    def _check_pair_compat_once(
+        item1: wrapped_deck_conflict.DeckItem, item2: wrapped_deck_conflict.DeckItem
+    ) -> bool:
+        if isinstance(item1, wrapped_deck_conflict.FlexStackerModule) and isinstance(
+            item2,
+            (wrapped_deck_conflict.MagneticBlockModule, wrapped_deck_conflict.Labware),
+        ):
+            return True
+        return False
+
+    if _check_pair_compat_once(item1, item2) or _check_pair_compat_once(item2, item1):
+        not_stacker = (
+            item1
+            if not isinstance(item1, wrapped_deck_conflict.FlexStackerModule)
+            else item2
+        )
+        # type-only assertion: trash bins are not alowed in _check_pair_compat_once and
+        # so we would never get here
+        assert not isinstance(not_stacker, wrapped_deck_conflict.TrashBin)
+        return wrapped_deck_conflict.FlexStackerModuleKindaButSomethingElseReally(
+            name_for_errors=not_stacker.name_for_errors,
+            highest_z_including_labware=(
+                not_stacker.highest_z
+                if isinstance(not_stacker, wrapped_deck_conflict.Labware)
+                else not_stacker.highest_z_including_labware
+            ),
+            original_item=not_stacker,
+        )
+    raise wrapped_deck_conflict.DeckConflictError(
+        f"{item1.name_for_errors} and {item2.name_for_errors} cannot both be loaded in {location}"
     )
 
 
@@ -191,7 +242,6 @@ def _map_labware(
     Tuple[Union[DeckSlotName, StagingSlotName], wrapped_deck_conflict.DeckItem]
 ]:
     location_from_engine = engine_state.labware.get_location(labware_id=labware_id)
-
     if isinstance(location_from_engine, AddressableAreaLocation):
         # This will be guaranteed to be either deck slot name or staging slot name
         slot: Union[DeckSlotName, StagingSlotName]
@@ -245,10 +295,16 @@ def _map_labware(
         # TODO(jbl 2023-06-08) check if we need to do any logic here or if this is correct
         return None
 
-    elif location_from_engine == OFF_DECK_LOCATION:
+    elif (
+        location_from_engine == OFF_DECK_LOCATION
+        or location_from_engine == SYSTEM_LOCATION
+        or isinstance(location_from_engine, InStackerHopperLocation)
+        or location_from_engine == WASTE_CHUTE_LOCATION
+    ):
         # This labware is off-deck. Exclude it from conflict checking.
         # todo(mm, 2023-02-23): Move this logic into wrapped_deck_conflict.
         return None
+    return None
 
 
 def _map_module(
@@ -294,6 +350,14 @@ def _map_module(
                 # Python Protocol API >=v2.14 never allows loading a Thermocycler in
                 # its semi configuration.
                 is_semi_configuration=False,
+            ),
+        )
+    elif module_type == ModuleType.FLEX_STACKER:
+        return (
+            mapped_location,
+            wrapped_deck_conflict.FlexStackerModule(
+                name_for_errors=name_for_errors,
+                highest_z_including_labware=highest_z_including_labware,
             ),
         )
     else:

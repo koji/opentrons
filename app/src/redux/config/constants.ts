@@ -9,6 +9,9 @@ export const DEV_INTERNAL_FLAGS: DevInternalFlag[] = [
   'enableLocalization',
   'enableSearch',
   'reactQueryDevtools',
+  'reactScan',
+  'camera',
+  'quickTransferProtocolContentsLog',
 ]
 
 // action type constants

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { css } from 'styled-components'
+
 import {
   ALIGN_CENTER,
   COLORS,
@@ -7,9 +8,9 @@ import {
   Flex,
   Icon,
   JUSTIFY_CENTER,
+  LegacyStyledText,
   RESPONSIVENESS,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
 import {
@@ -17,6 +18,7 @@ import {
   useSubsystemUpdateQuery,
   useUpdateSubsystemMutation,
 } from '@opentrons/react-api-client'
+
 import type { BadGripper, BadPipette, Subsystem } from '@opentrons/api-client'
 
 interface FirmwareUpdateModalProps {
@@ -66,19 +68,12 @@ const SPINNER_STYLE = css`
 export const FirmwareUpdateModal = (
   props: FirmwareUpdateModalProps
 ): JSX.Element => {
-  const {
-    proceed,
-    proceedDescription,
-    subsystem,
-    description,
-    isOnDevice,
-  } = props
+  const { proceed, proceedDescription, subsystem, description, isOnDevice } =
+    props
   const [updateId, setUpdateId] = useState<string | null>(null)
   const [firmwareText, setFirmwareText] = useState<string | null>(null)
-  const {
-    data: attachedInstruments,
-    refetch: refetchInstruments,
-  } = useInstrumentsQuery({ refetchInterval: 5000 })
+  const { data: attachedInstruments, refetch: refetchInstruments } =
+    useInstrumentsQuery({ refetchInterval: 5000 })
   const { updateSubsystem } = useUpdateSubsystemMutation({
     onSuccess: data => {
       setUpdateId(data.data.id)

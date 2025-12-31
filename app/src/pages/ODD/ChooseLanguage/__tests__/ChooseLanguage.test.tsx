@@ -1,10 +1,13 @@
-import { vi, it, describe, expect } from 'vitest'
-import { fireEvent, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import { fireEvent, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { updateConfigValue } from '/app/redux/config'
+import { useTrackEventWithRobotSerial } from '/app/redux-resources/analytics'
+import { ANALYTICS_LANGUAGE_UPDATED_ODD_UNBOXING_FLOW } from '/app/redux/analytics'
+import { getAppLanguage, updateConfigValue } from '/app/redux/config'
+
 import { ChooseLanguage } from '..'
 
 import type { NavigateFunction } from 'react-router-dom'
@@ -18,6 +21,9 @@ vi.mock('react-router-dom', async importOriginal => {
   }
 })
 vi.mock('/app/redux/config')
+vi.mock('/app/redux-resources/analytics')
+
+const mockTrackEvent = vi.fn()
 
 const render = () => {
   return renderWithProviders(
@@ -31,6 +37,12 @@ const render = () => {
 }
 
 describe('ChooseLanguage', () => {
+  beforeEach(() => {
+    vi.mocked(useTrackEventWithRobotSerial).mockReturnValue({
+      trackEventWithRobotSerial: mockTrackEvent,
+    })
+    vi.mocked(getAppLanguage).mockReturnValue('en-US')
+  })
   it('should render text, language options, and continue button', () => {
     render()
     screen.getByText('Choose your language')
@@ -54,6 +66,12 @@ describe('ChooseLanguage', () => {
   it('should call mockNavigate when tapping continue', () => {
     render()
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(mockTrackEvent).toHaveBeenCalledWith({
+      name: ANALYTICS_LANGUAGE_UPDATED_ODD_UNBOXING_FLOW,
+      properties: {
+        language: 'en-US',
+      },
+    })
     expect(mockNavigate).toHaveBeenCalledWith('/welcome')
   })
 })

@@ -1,4 +1,5 @@
-import { useTranslation, Trans } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
+
 import {
   ALIGN_CENTER,
   BORDERS,
@@ -6,13 +7,14 @@ import {
   DIRECTION_COLUMN,
   Flex,
   Icon,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
+
 import { SmallButton } from '/app/atoms/buttons'
-import { OddModal } from '/app/molecules/OddModal'
 import { usePipetteModelSpecs } from '/app/local-resources/instruments'
+import { OddModal } from '/app/molecules/OddModal'
 
 import type { InstrumentData, PipetteData } from '@opentrons/api-client'
 import type { OddModalHeaderBaseProps } from '/app/molecules/OddModal/types'
@@ -44,7 +46,7 @@ export function UpdateResultsModal(
   if (instrument?.ok) {
     instrumentName =
       instrument?.instrumentType === 'pipette'
-        ? pipetteDisplayName ?? 'pipette'
+        ? (pipetteDisplayName ?? 'pipette')
         : 'Flex Gripper'
   }
   return (
@@ -52,7 +54,7 @@ export function UpdateResultsModal(
       {!isSuccess ? (
         <OddModal header={updateFailedHeader}>
           <Flex flexDirection={DIRECTION_COLUMN}>
-            <LegacyStyledText as="p" marginBottom={SPACING.spacing32}>
+            <LegacyStyledText forwardedAs="p" marginBottom={SPACING.spacing32}>
               {t('branded:firmware_update_download_logs')}
             </LegacyStyledText>
             <SmallButton
@@ -92,13 +94,16 @@ export function UpdateResultsModal(
                 marginBottom={SPACING.spacing16}
               />
               <LegacyStyledText
-                as="h4"
+                forwardedAs="h4"
                 marginBottom={SPACING.spacing4}
                 fontWeight={TYPOGRAPHY.fontWeightBold}
               >
                 {t('successful_update')}
               </LegacyStyledText>
-              <LegacyStyledText as="p" textAlign={TYPOGRAPHY.textAlignCenter}>
+              <LegacyStyledText
+                forwardedAs="p"
+                textAlign={TYPOGRAPHY.textAlignCenter}
+              >
                 <Trans
                   t={t}
                   i18nKey="ready_to_use"

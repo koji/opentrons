@@ -1,15 +1,16 @@
-import type * as React from 'react'
 import {
-  Box,
-  Text,
   BORDER_SOLID_LIGHT,
+  Box,
   FONT_WEIGHT_SEMIBOLD,
   SPACING,
+  Text,
 } from '@opentrons/components'
+
+import type { ReactNode } from 'react'
 
 export interface TipLengthCalibrationInfoBoxProps {
   title: string
-  children: React.ReactNode
+  children: ReactNode
 }
 
 export function TipLengthCalibrationInfoBox(

@@ -12,6 +12,7 @@
     "deck/**/*.json",
     "labware/**/*.json",
     "liquid/**/*.json",
+    "liquid-class/**/*.json",
     "command/**/*.json",
     "commandAnnotation/**/*.json",
     "gripper/**/*.json",
@@ -19,7 +20,8 @@
     "pipette/**/*.json",
     "protocol/**/*.json",
     "errors/**/*.json",
-    "build/**/*.json"
+    "build/**/*.json",
+    "robot/**/*.json"
   ],
   "exclude": ["**/*.ts"]
 }

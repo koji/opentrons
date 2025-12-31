@@ -1,4 +1,5 @@
 """Provides an interface for alerting notification publishers to events and related lifecycle utilities."""
+
 import asyncio
 from logging import getLogger
 from fastapi import Depends
@@ -18,14 +19,16 @@ LOG = getLogger(__name__)
 class PublisherNotifier:
     """An interface that invokes notification callbacks whenever a generic notify event occurs."""
 
-    def __init__(self, change_notifier: Union[ChangeNotifier, ChangeNotifier_ts]):
+    def __init__(
+        self, change_notifier: Union[ChangeNotifier, ChangeNotifier_ts]
+    ) -> None:
         self._change_notifier = change_notifier
         self._notifier: Optional[asyncio.Task[None]] = None
         self._callbacks: List[Callable[[], Awaitable[None]]] = []
 
     def register_publish_callbacks(
         self, callbacks: List[Callable[[], Awaitable[None]]]
-    ):
+    ) -> None:
         """Extend the list of callbacks with a given list of callbacks."""
         self._callbacks.extend(callbacks)
 
@@ -49,12 +52,12 @@ class PublisherNotifier:
                         await callback()
                     except BaseException:
                         LOG.exception(
-                            f'PublisherNotifier: exception in callback {getattr(callback, "__name__", "<unknown>")}'
+                            f"PublisherNotifier: exception in callback {getattr(callback, '__name__', '<unknown>')}"
                         )
         except asyncio.exceptions.CancelledError:
-            LOG.warning("PublisherNotifuer task cancelled.")
+            LOG.warning("PublisherNotifier task cancelled.")
         except BaseException:
-            LOG.exception("PublisherNotifer notify task failed")
+            LOG.exception("PublisherNotifier notify task failed")
 
 
 _pe_publisher_notifier_accessor: AppStateAccessor[PublisherNotifier] = AppStateAccessor[

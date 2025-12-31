@@ -1,6 +1,6 @@
-import { css } from 'styled-components'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { css } from 'styled-components'
 
 import {
   ALIGN_CENTER,
@@ -20,18 +20,22 @@ import {
   StyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
-import {
-  isTimeFormatMinutesSeconds,
-  temperatureRangeFieldValue,
-} from '../../../../../../steplist/fieldLevel/errors'
+
+import { LINK_BUTTON_STYLE } from '/protocol-designer/components/atoms'
 import {
   maskToFloat,
   maskToInteger,
   maskToTime,
-} from '../../../../../../steplist/fieldLevel/processing'
-import { uuid } from '../../../../../../utils'
-import { getTimeFromString, getStepIndex } from './utils'
+} from '/protocol-designer/steplist/fieldLevel/processing'
+import {
+  enterValueWithinRange,
+  isTimeFormatMinutesSeconds,
+} from '/protocol-designer/steplist/fieldLevel/thermocyclerFieldErrors'
+import { uuid } from '/protocol-designer/utils'
 
+import { getStepIndex, getTimeFromString } from './utils'
+
+import type { ChangeEvent, Dispatch, SetStateAction } from 'react'
 import type { ThermocyclerStepTypeGeneral } from './ThermocyclerProfileModal'
 import type { ThermocyclerStepType } from './ThermocyclerStep'
 
@@ -56,12 +60,12 @@ interface CycleStepType {
 
 interface ThermocyclerCycleProps {
   steps: ThermocyclerStepTypeGeneral[]
-  setSteps: React.Dispatch<React.SetStateAction<ThermocyclerStepTypeGeneral[]>>
-  setShowCreateNewCycle: React.Dispatch<React.SetStateAction<boolean>>
+  setSteps: Dispatch<SetStateAction<ThermocyclerStepTypeGeneral[]>>
+  setShowCreateNewCycle: Dispatch<SetStateAction<boolean>>
   step?: ThermocyclerCycleType
   backgroundColor?: string
   readOnly?: boolean
-  setIsInEdit: React.Dispatch<React.SetStateAction<boolean>>
+  setIsInEdit: Dispatch<SetStateAction<boolean>>
 }
 
 export function ThermocyclerCycle(props: ThermocyclerCycleProps): JSX.Element {
@@ -74,7 +78,7 @@ export function ThermocyclerCycle(props: ThermocyclerCycleProps): JSX.Element {
     setIsInEdit,
     readOnly = true,
   } = props
-  const { i18n, t } = useTranslation(['application', 'form'])
+  const { i18n, t } = useTranslation(['application', 'form', 'protocol_steps'])
   const [hover, setHover] = useState<boolean>(false)
   const [showEdit, setShowEditCurrentCycle] = useState<boolean>(!readOnly)
 
@@ -235,7 +239,7 @@ export function ThermocyclerCycle(props: ThermocyclerCycleProps): JSX.Element {
 
   const header = showEdit ? (
     <Flex
-      padding={`${SPACING.spacing12} ${SPACING.spacing16}`}
+      padding={SPACING.spacing12}
       justifyContent={JUSTIFY_SPACE_BETWEEN}
       width="100%"
     >
@@ -260,6 +264,8 @@ export function ThermocyclerCycle(props: ThermocyclerCycleProps): JSX.Element {
           onClick={handleDeleteCycle}
           whiteSpace={NO_WRAP}
           textDecoration={TYPOGRAPHY.textDecorationUnderline}
+          padding={SPACING.spacing4}
+          css={LINK_BUTTON_STYLE}
         >
           <StyledText desktopStyle="bodyDefaultRegular">
             {i18n.format(
@@ -268,7 +274,11 @@ export function ThermocyclerCycle(props: ThermocyclerCycleProps): JSX.Element {
             )}
           </StyledText>
         </Btn>
-        <PrimaryButton onClick={handleSaveCycle} disabled={isStepStateError}>
+        <PrimaryButton
+          onClick={handleSaveCycle}
+          disabled={isStepStateError}
+          borderRadius={BORDERS.borderRadiusFull}
+        >
           <StyledText desktopStyle="bodyDefaultRegular">
             {i18n.format(t('save'), 'capitalize')}
           </StyledText>
@@ -277,7 +287,7 @@ export function ThermocyclerCycle(props: ThermocyclerCycleProps): JSX.Element {
     </Flex>
   ) : (
     <Flex
-      padding={`${SPACING.spacing12} ${SPACING.spacing16}`}
+      padding={SPACING.spacing12}
       justifyContent={JUSTIFY_SPACE_BETWEEN}
       width="100%"
       backgroundColor={backgroundColor}
@@ -307,21 +317,32 @@ export function ThermocyclerCycle(props: ThermocyclerCycleProps): JSX.Element {
           )}
         </StyledText>
       </Flex>
-      <Flex gridGap={SPACING.spacing8}>
-        {hover ? (
-          <Btn
-            whiteSpace={NO_WRAP}
-            textDecoration={TYPOGRAPHY.textDecorationUnderline}
-            onClick={() => {
-              setShowEditCurrentCycle(true)
-              setIsInEdit(true)
-            }}
-          >
-            <StyledText desktopStyle="bodyDefaultRegular">
-              {i18n.format(t('edit'), 'capitalize')}
-            </StyledText>
-          </Btn>
-        ) : null}
+      <Flex
+        gridGap={SPACING.spacing8}
+        css={css`
+          box-sizing: border-box;
+        `}
+      >
+        <Btn
+          whiteSpace={NO_WRAP}
+          textDecoration={TYPOGRAPHY.textDecorationUnderline}
+          onClick={() => {
+            setShowEditCurrentCycle(true)
+            setIsInEdit(true)
+          }}
+          padding={SPACING.spacing4}
+          css={[
+            LINK_BUTTON_STYLE,
+            css`
+              visibility: ${hover ? 'visible' : 'hidden'};
+              opacity: ${hover ? 1 : 0};
+            `,
+          ]}
+        >
+          <StyledText desktopStyle="bodyDefaultRegular">
+            {i18n.format(t('edit'), 'capitalize')}
+          </StyledText>
+        </Btn>
         <Flex
           css={css`
             &:hover {
@@ -364,6 +385,7 @@ export function ThermocyclerCycle(props: ThermocyclerCycleProps): JSX.Element {
               backgroundColor={COLORS.grey10}
               padding={SPACING.spacing12}
               borderRadius={BORDERS.borderRadius4}
+              data-testid={`cycleStep-${cycleStepIndex}`}
             >
               <Flex
                 flexDirection={DIRECTION_COLUMN}
@@ -376,7 +398,7 @@ export function ThermocyclerCycle(props: ThermocyclerCycleProps): JSX.Element {
                     'capitalize'
                   )}
                   value={stepState.name.value}
-                  onChange={(e: React.ChangeEvent<any>) => {
+                  onChange={(e: ChangeEvent<any>) => {
                     handleValueUpdate(
                       cycleStepId,
                       'name',
@@ -399,12 +421,12 @@ export function ThermocyclerCycle(props: ThermocyclerCycleProps): JSX.Element {
                   )}
                   units={t('units.degrees')}
                   value={stepState.temp.value}
-                  onChange={(e: React.ChangeEvent<any>) => {
+                  onChange={(e: ChangeEvent<any>) => {
                     handleValueUpdate(
                       cycleStepId,
                       'temp',
                       maskToFloat(e.target.value),
-                      temperatureRangeFieldValue(4, 96)
+                      enterValueWithinRange(4, 99)
                     )
                   }}
                   onBlur={() => {
@@ -419,6 +441,9 @@ export function ThermocyclerCycle(props: ThermocyclerCycleProps): JSX.Element {
                       },
                     })
                   }}
+                  caption={t(
+                    'protocol_steps:captions_for_fields.blockTargetTemp'
+                  )}
                   error={
                     stepState.temp.wasAccessed ? stepState.temp.error : null
                   }
@@ -436,7 +461,7 @@ export function ThermocyclerCycle(props: ThermocyclerCycleProps): JSX.Element {
                   )}
                   units={t('units.time')}
                   value={stepState.time.value}
-                  onChange={(e: React.ChangeEvent<any>) => {
+                  onChange={(e: ChangeEvent<any>) => {
                     handleValueUpdate(
                       cycleStepId,
                       'time',
@@ -484,6 +509,7 @@ export function ThermocyclerCycle(props: ThermocyclerCycleProps): JSX.Element {
               backgroundColor={COLORS.grey10}
               padding={SPACING.spacing12}
               borderRadius={BORDERS.borderRadius4}
+              data-testid={`cycleStep-${cycleStepIndex}`}
             >
               <StyledText
                 desktopStyle="bodyDefaultRegular"
@@ -508,6 +534,8 @@ export function ThermocyclerCycle(props: ThermocyclerCycleProps): JSX.Element {
             onClick={handleAddCycleStep}
             whiteSpace={NO_WRAP}
             textDecoration={TYPOGRAPHY.textDecorationUnderline}
+            padding={SPACING.spacing4}
+            css={LINK_BUTTON_STYLE}
           >
             <StyledText desktopStyle="bodyDefaultRegular">
               {i18n.format(
@@ -540,6 +568,7 @@ export function ThermocyclerCycle(props: ThermocyclerCycleProps): JSX.Element {
       flexDirection={DIRECTION_COLUMN}
       backgroundColor={backgroundColor}
       borderRadius={BORDERS.borderRadius4}
+      data-testid="thermocyclerCycle"
     >
       {header}
       {bodyContent}

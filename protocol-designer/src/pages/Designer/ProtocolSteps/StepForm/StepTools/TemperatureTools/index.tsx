@@ -1,117 +1,100 @@
-import * as React from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSelector } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
+
 import {
-  Box,
   COLORS,
   DIRECTION_COLUMN,
+  Divider,
   Flex,
-  ListItem,
-  RadioButton,
   SPACING,
   StyledText,
 } from '@opentrons/components'
-import {
-  getTemperatureLabwareOptions,
-  getTemperatureModuleIds,
-} from '../../../../../../ui/modules/selectors'
+import { TEMPERATURE_MODULE_TYPE } from '@opentrons/shared-data'
+
 import {
   DropdownStepFormField,
-  InputStepFormField,
-} from '../../../../../../molecules'
+  ToggleExpandStepFormField,
+} from '/protocol-designer/components/molecules'
+import { getEnableConcurrentModuleActions } from '/protocol-designer/feature-flags/selectors'
+import { getTemperatureLabwareOptions } from '/protocol-designer/ui/modules/selectors'
+import { hoverSelection } from '/protocol-designer/ui/steps/actions/actions'
+
+import { usePriorModuleState } from '../../hooks/usePriorModuleState'
+import { PriorTemperatureState } from './PriorTemperatureState'
+
 import type { StepFormProps } from '../../types'
 
 export function TemperatureTools(props: StepFormProps): JSX.Element {
   const { propsForFields, formData } = props
   const { t } = useTranslation(['application', 'form', 'protocol_steps'])
   const moduleLabwareOptions = useSelector(getTemperatureLabwareOptions)
-  const temperatureModuleIds = useSelector(getTemperatureModuleIds)
-  const { setTemperature, moduleId } = formData
-
-  React.useEffect(() => {
-    if (moduleLabwareOptions.length === 1) {
-      propsForFields.moduleId.updateValue(moduleLabwareOptions[0].value)
-    }
-  }, [])
+  const enableConcurrentModuleActions = useSelector(
+    getEnableConcurrentModuleActions
+  )
+  const priorState = usePriorModuleState(
+    propsForFields.moduleId.value as string | null,
+    TEMPERATURE_MODULE_TYPE
+  )
+  const dispatch = useDispatch()
 
   return (
-    <Flex flexDirection={DIRECTION_COLUMN}>
-      {moduleLabwareOptions.length > 1 ? (
-        <DropdownStepFormField
-          {...propsForFields.moduleId}
-          options={moduleLabwareOptions}
-          title={t('protocol_steps:module')}
-        />
-      ) : (
-        <Flex
-          flexDirection={DIRECTION_COLUMN}
-          padding={SPACING.spacing12}
-          gridGap={SPACING.spacing8}
-        >
-          <StyledText desktopStyle="bodyDefaultRegular" color={COLORS.grey60}>
-            {t('protocol_steps:module')}
-          </StyledText>
-          <ListItem type="noActive">
-            <Flex padding={SPACING.spacing12}>
-              <StyledText desktopStyle="bodyDefaultRegular">
-                {moduleLabwareOptions[0].name}
-              </StyledText>
-            </Flex>
-          </ListItem>
-        </Flex>
+    <Flex
+      flexDirection={DIRECTION_COLUMN}
+      gridGap={SPACING.spacing12}
+      paddingY={SPACING.spacing16}
+    >
+      <DropdownStepFormField
+        {...propsForFields.moduleId}
+        tooltipContent={null}
+        width="100%"
+        options={moduleLabwareOptions}
+        title={t('protocol_steps:module')}
+        onEnter={(id: string) => {
+          dispatch(hoverSelection({ id, text: t('select') }))
+        }}
+        onExit={() => {
+          dispatch(hoverSelection({ id: null, text: null }))
+        }}
+      />
+      <Divider marginY={0} />
+      {enableConcurrentModuleActions && priorState != null && (
+        <>
+          <Flex
+            flexDirection={DIRECTION_COLUMN}
+            gridGap={SPACING.spacing8}
+            paddingX={SPACING.spacing16}
+          >
+            <StyledText
+              desktopStyle="bodyDefaultSemiBold"
+              color={COLORS.black90}
+            >
+              {t('protocol_steps:prior_state')}
+            </StyledText>
+            <PriorTemperatureState priorState={priorState} />
+          </Flex>
+          <Divider marginY={0} />
+        </>
       )}
-      <Box borderBottom={`1px solid ${COLORS.grey30}`} />
-      {temperatureModuleIds != null
-        ? temperatureModuleIds.map(id =>
-            id === moduleId ? (
-              <Flex
-                key={id}
-                flexDirection={DIRECTION_COLUMN}
-                gridGap={SPACING.spacing4}
-              >
-                <Flex padding={`${SPACING.spacing16} ${SPACING.spacing16} 0`}>
-                  <RadioButton
-                    width="100%"
-                    largeDesktopBorderRadius
-                    onChange={(e: React.ChangeEvent<any>) => {
-                      propsForFields.setTemperature.updateValue(
-                        e.currentTarget.value
-                      )
-                    }}
-                    buttonLabel={t(
-                      'form:step_edit_form.field.setTemperature.options.true'
-                    )}
-                    buttonValue="true"
-                    isSelected={propsForFields.setTemperature.value === 'true'}
-                  />
-                </Flex>
-                {setTemperature === 'true' && (
-                  <InputStepFormField
-                    {...propsForFields.targetTemperature}
-                    title={'Temperature'}
-                    units={t('units.degrees')}
-                  />
-                )}
-                <Flex padding={`0 ${SPACING.spacing16}`} width="100%">
-                  <RadioButton
-                    width="100%"
-                    largeDesktopBorderRadius
-                    onChange={(e: React.ChangeEvent<any>) => {
-                      propsForFields.setTemperature.updateValue(
-                        e.currentTarget.value
-                      )
-                    }}
-                    buttonLabel={t(
-                      'form:step_edit_form.field.setTemperature.options.false'
-                    )}
-                    buttonValue="false"
-                    isSelected={propsForFields.setTemperature.value === 'false'}
-                  />
-                </Flex>
-              </Flex>
-            ) : null
-          )
-        : null}
+      <Flex
+        flexDirection={DIRECTION_COLUMN}
+        gridGap={SPACING.spacing4}
+        padding={`0 ${SPACING.spacing16}`}
+      >
+        <StyledText desktopStyle="bodyDefaultSemiBold">
+          {t('form:step_edit_form.temperature.state')}
+        </StyledText>
+        <ToggleExpandStepFormField
+          {...propsForFields.targetTemperature}
+          toggleValue={propsForFields.setTemperature.value}
+          toggleUpdateValue={propsForFields.setTemperature.updateValue}
+          title={t('form:step_edit_form.heat_or_cool')}
+          fieldTitle={t('form:step_edit_form.field.temperature.setTemperature')}
+          units={t('units.degrees')}
+          isSelected={formData.setTemperature === 'true'}
+          onLabel={t('form:step_edit_form.field.temperature.toggleOn')}
+          offLabel={t('form:step_edit_form.field.temperature.toggleOff')}
+        />
+      </Flex>
     </Flex>
   )
 }

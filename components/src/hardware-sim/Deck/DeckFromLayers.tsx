@@ -1,19 +1,22 @@
 import { OT2_ROBOT_TYPE } from '@opentrons/shared-data'
+
+import { ALL_OT2_DECK_LAYERS } from './constants'
 import {
+  CalibrationMarkings,
+  DoorStops,
   FixedBase,
   FixedTrash,
-  DoorStops,
   MetalFrame,
   RemovableDeckOutline,
-  SlotRidges,
-  SlotNumbers,
-  CalibrationMarkings,
   RemovalHandle,
   ScrewHoles,
+  SlotNumbers,
+  SlotRidges,
 } from './OT2Layers'
-import { ALL_OT2_DECK_LAYERS } from './constants'
 
 import type { RobotType } from '@opentrons/shared-data'
+
+export * from './OT2Layers'
 
 export interface DeckFromLayersProps {
   robotType: RobotType
@@ -21,7 +24,7 @@ export interface DeckFromLayersProps {
 }
 
 const OT2_LAYER_MAP: {
-  [layer in typeof ALL_OT2_DECK_LAYERS[number]]: () => JSX.Element
+  [layer in (typeof ALL_OT2_DECK_LAYERS)[number]]: () => JSX.Element
 } = {
   fixedBase: () => <FixedBase />,
   fixedTrash: () => <FixedTrash />,

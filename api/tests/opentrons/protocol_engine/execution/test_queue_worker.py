@@ -1,4 +1,5 @@
 """Tests for the command QueueWorker in opentrons.protocol_engine."""
+
 from typing import Generator, AsyncGenerator, Callable
 
 import pytest
@@ -102,13 +103,13 @@ async def test_cancel(
     """It should stop pulling jobs if it is cancelled."""
     subject.start()
     subject.cancel()
-
     await subject.join()
 
     decoy.verify(
         await command_executor.execute(command_id=matchers.Anything()),
         times=0,
     )
+    decoy.verify(command_executor.cancel_tasks("Engine cancelled"), times=1)
 
 
 async def test_cancel_noops_if_joined(
@@ -121,6 +122,7 @@ async def test_cancel_noops_if_joined(
     subject.start()
     await subject.join()
     subject.cancel()
+    decoy.verify(command_executor.cancel_tasks("Engine commands complete"), times=1)
 
 
 async def test_unhandled_exception_breaks_loop(
@@ -138,6 +140,7 @@ async def test_unhandled_exception_breaks_loop(
 
     with pytest.raises(RuntimeError, match="oh no"):
         await subject.join()
+    decoy.verify(command_executor.cancel_tasks("Engine failed"), times=1)
 
 
 async def test_engine_stopped_exception_breaks_loop_gracefully(
@@ -153,3 +156,4 @@ async def test_engine_stopped_exception_breaks_loop_gracefully(
 
     subject.start()
     await subject.join()
+    decoy.verify(command_executor.cancel_tasks("Engine commands complete"), times=1)

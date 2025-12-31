@@ -1,33 +1,25 @@
-import type * as React from 'react'
-import { vi, describe, beforeEach, expect, it } from 'vitest'
 import { fireEvent, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithProviders } from '/app/__testing-utils__'
-import { getDeckDefinitions } from '@opentrons/shared-data'
-
 import { i18n } from '/app/i18n'
+import {
+  CalibrationError,
+  useCalibrationError,
+} from '/app/organisms/Desktop/CalibrationError'
 import * as Sessions from '/app/redux/sessions'
 import { mockDeckCalibrationSessionAttributes } from '/app/redux/sessions/__fixtures__'
-import { CalibrateDeck } from '../index'
-import {
-  useCalibrationError,
-  CalibrationError,
-} from '/app/organisms/Desktop/CalibrationError'
 
-import type { DeckCalibrationStep } from '/app/redux/sessions/types'
+import { CalibrateDeck } from '../index'
+
+import type { ComponentProps, ComponentType } from 'react'
 import type { DispatchRequestsType } from '/app/redux/robot-api'
+import type { DeckCalibrationStep } from '/app/redux/sessions/types'
 
 vi.mock('/app/redux/sessions/selectors')
 vi.mock('/app/redux/robot-api/selectors')
 vi.mock('/app/redux/config')
 vi.mock('/app/organisms/Desktop/CalibrationError')
-vi.mock('@opentrons/shared-data', async importOriginal => {
-  const actual = await importOriginal<typeof getDeckDefinitions>()
-  return {
-    ...actual,
-    getDeckDefinitions: vi.fn(),
-  }
-})
 
 interface CalibrateDeckSpec {
   heading: string
@@ -41,14 +33,14 @@ describe('CalibrateDeck', () => {
     ...mockDeckCalibrationSessionAttributes,
   }
   const render = (
-    props: Partial<React.ComponentProps<typeof CalibrateDeck>> = {}
+    props: Partial<ComponentProps<typeof CalibrateDeck>> = {}
   ) => {
     const {
       showSpinner = false,
       isJogging = false,
       session = mockDeckCalSession,
     } = props
-    return renderWithProviders<React.ComponentType<typeof CalibrateDeck>>(
+    return renderWithProviders<ComponentType<typeof CalibrateDeck>>(
       <CalibrateDeck
         robotName="robot-name"
         session={session}
@@ -90,7 +82,6 @@ describe('CalibrateDeck', () => {
 
   beforeEach(() => {
     dispatchRequests = vi.fn()
-    vi.mocked(getDeckDefinitions).mockReturnValue({})
     vi.mocked(useCalibrationError).mockReturnValue(null)
     vi.mocked(CalibrationError).mockReturnValue(
       <div>MOCK_CALIBRATION_ERROR</div>

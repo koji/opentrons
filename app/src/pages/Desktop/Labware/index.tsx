@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useDispatch } from 'react-redux'
 import startCase from 'lodash/startCase'
 import { css } from 'styled-components'
-import { useDispatch } from 'react-redux'
 
 import {
   ALIGN_CENTER,
@@ -30,24 +30,26 @@ import {
   useOnClickOutside,
 } from '@opentrons/components'
 import { LabwareCreator } from '@opentrons/labware-library'
-import {
-  useTrackEvent,
-  ANALYTICS_OPEN_LABWARE_CREATOR_FROM_BOTTOM_OF_LABWARE_LIBRARY_LIST,
-} from '/app/redux/analytics'
-import { addCustomLabwareFileFromCreator } from '/app/redux/custom-labware'
-import { LabwareCard } from '/app/organisms/Desktop/Labware/LabwareCard'
+
+import { useAllLabware } from '/app/local-resources/labware'
 import { AddCustomLabwareSlideout } from '/app/organisms/Desktop/Labware/AddCustomLabwareSlideout'
+import { LabwareCard } from '/app/organisms/Desktop/Labware/LabwareCard'
 import { LabwareDetails } from '/app/organisms/Desktop/Labware/LabwareDetails'
 import { useToaster } from '/app/organisms/ToasterOven'
+import {
+  ANALYTICS_OPEN_LABWARE_CREATOR_FROM_BOTTOM_OF_LABWARE_LIBRARY_LIST,
+  useTrackEvent,
+} from '/app/redux/analytics'
 import { useFeatureFlag } from '/app/redux/config'
+import { addCustomLabwareFileFromCreator } from '/app/redux/custom-labware'
+
 import { useLabwareFailure, useNewLabwareName } from './hooks'
-import { useAllLabware } from '/app/local-resources/labware'
 
 import type { DropdownOption } from '@opentrons/components'
 import type {
+  LabwareDefAndDate,
   LabwareFilter,
   LabwareSort,
-  LabwareDefAndDate,
 } from '/app/local-resources/labware'
 
 const LABWARE_CREATOR_HREF = 'https://labware.opentrons.com/create/'
@@ -63,6 +65,7 @@ const labwareDisplayCategoryFilters: LabwareFilter[] = [
   'wellPlate',
 ]
 
+// note: we've decided not to translate these categories
 const FILTER_OPTIONS: DropdownOption[] = labwareDisplayCategoryFilters.map(
   category => ({
     name: startCase(category),
@@ -101,10 +104,8 @@ export function Labware(): JSX.Element {
   const { newLabwareName, clearLabwareName } = useNewLabwareName()
   const [showAddLabwareSlideout, setShowAddLabwareSlideout] = useState(false)
 
-  const [
-    currentLabwareDef,
-    setCurrentLabwareDef,
-  ] = useState<null | LabwareDefAndDate>(null)
+  const [currentLabwareDef, setCurrentLabwareDef] =
+    useState<null | LabwareDefAndDate>(null)
 
   const sortOverflowWrapperRef = useOnClickOutside<HTMLDivElement>({
     onClickOutside: () => {
@@ -153,7 +154,7 @@ export function Labware(): JSX.Element {
           paddingBottom={SPACING.spacing24}
         >
           <LegacyStyledText
-            as="h1"
+            forwardedAs="h1"
             textTransform={TYPOGRAPHY.textTransformCapitalize}
           >
             {t('labware')}
@@ -271,7 +272,7 @@ export function Labware(): JSX.Element {
           marginTop={SPACING.spacing32}
         >
           <LegacyStyledText
-            as="p"
+            forwardedAs="p"
             color={COLORS.black90}
             fontWeight={TYPOGRAPHY.fontWeightSemiBold}
           >

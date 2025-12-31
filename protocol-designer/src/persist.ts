@@ -1,14 +1,19 @@
 import get from 'lodash/get'
 
 import { dismissedHintsPersist } from './tutorial/reducers'
+
 import type { Store } from 'redux'
 import type { DismissedHintReducerState } from './tutorial/reducers'
+
 export interface RehydratePersistedAction {
   type: 'REHYDRATE_PERSISTED'
   payload: {
     'tutorial.dismissedHints'?: Record<string, any>
     'featureFlags.flags'?: Record<string, any>
-    'analytics.hasOptedIn'?: boolean | null
+    'analytics.hasOptedIn'?: {
+      hasOptedIn: boolean
+      appVersion?: string
+    }
   }
 }
 export const getLocalStorageItem = (path: string): unknown => {

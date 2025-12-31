@@ -1,16 +1,17 @@
-import type * as React from 'react'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { when } from 'vitest-when'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { i18n } from '/app/i18n'
+
 import { renderWithProviders } from '/app/__testing-utils__'
-import { ModuleWizardFlows } from '/app/organisms/ModuleWizardFlows'
-import { useChainLiveCommands, useRunStatuses } from '/app/resources/runs'
+import { i18n } from '/app/i18n'
+import { handleModuleWizardFlows } from '/app/organisms/ModuleWizardFlows'
 import { mockThermocyclerGen2 } from '/app/redux/modules/__fixtures__'
 import { useIsEstopNotDisengaged } from '/app/resources/devices/hooks/useIsEstopNotDisengaged'
+import { useRunStatuses } from '/app/resources/runs'
 
 import { ModuleCalibrationOverflowMenu } from '../ModuleCalibrationOverflowMenu'
 
+import type { ComponentProps } from 'react'
 import type { Mount } from '@opentrons/components'
 
 vi.mock('@opentrons/react-api-client')
@@ -87,7 +88,7 @@ const mockTCHeating = {
 } as any
 
 const render = (
-  props: React.ComponentProps<typeof ModuleCalibrationOverflowMenu>
+  props: ComponentProps<typeof ModuleCalibrationOverflowMenu>
 ) => {
   return renderWithProviders(<ModuleCalibrationOverflowMenu {...props} />, {
     i18nInstance: i18n,
@@ -97,29 +98,22 @@ const render = (
 const ROBOT_NAME = 'mockRobot'
 
 describe('ModuleCalibrationOverflowMenu', () => {
-  let props: React.ComponentProps<typeof ModuleCalibrationOverflowMenu>
-  let mockChainLiveCommands = vi.fn()
+  let props: ComponentProps<typeof ModuleCalibrationOverflowMenu>
 
   beforeEach(() => {
     props = {
       isCalibrated: false,
       attachedModule: mockThermocyclerGen2,
-      updateRobotStatus: vi.fn(),
       formattedPipetteOffsetCalibrations: mockPipetteOffsetCalibrations,
       robotName: ROBOT_NAME,
+      isRobotBusy: false,
     }
-    mockChainLiveCommands = vi.fn()
-    mockChainLiveCommands.mockResolvedValue(null)
-    vi.mocked(ModuleWizardFlows).mockReturnValue(<div>module wizard flows</div>)
     vi.mocked(useRunStatuses).mockReturnValue({
       isRunRunning: false,
       isRunStill: false,
       isRunIdle: false,
       isRunTerminal: false,
     })
-    vi.mocked(useChainLiveCommands).mockReturnValue({
-      chainLiveCommands: mockChainLiveCommands,
-    } as any)
     when(useIsEstopNotDisengaged).calledWith(ROBOT_NAME).thenReturn(false)
   })
 
@@ -140,9 +134,7 @@ describe('ModuleCalibrationOverflowMenu', () => {
     render(props)
     fireEvent.click(screen.getByLabelText('ModuleCalibrationOverflowMenu'))
     fireEvent.click(screen.getByText('Calibrate module'))
-    await waitFor(() => {
-      screen.getByText('module wizard flows')
-    })
+    expect(vi.mocked(handleModuleWizardFlows)).toHaveBeenCalled()
   })
 
   it('should have a disabled button when heater shaker is hot', () => {
@@ -163,38 +155,7 @@ describe('ModuleCalibrationOverflowMenu', () => {
     render(props)
     fireEvent.click(screen.getByLabelText('ModuleCalibrationOverflowMenu'))
     fireEvent.click(screen.getByText('Calibrate module'))
-    await waitFor(() => {
-      expect(mockChainLiveCommands).toHaveBeenCalledWith(
-        [
-          {
-            commandType: 'heaterShaker/closeLabwareLatch',
-            params: {
-              moduleId: mockMovingHeaterShaker.id,
-            },
-          },
-          {
-            commandType: 'heaterShaker/deactivateHeater',
-            params: {
-              moduleId: mockMovingHeaterShaker.id,
-            },
-          },
-          {
-            commandType: 'heaterShaker/deactivateShaker',
-            params: {
-              moduleId: mockMovingHeaterShaker.id,
-            },
-          },
-          {
-            commandType: 'heaterShaker/openLabwareLatch',
-            params: {
-              moduleId: mockMovingHeaterShaker.id,
-            },
-          },
-        ],
-        false
-      )
-    })
-    screen.getByText('module wizard flows')
+    expect(vi.mocked(handleModuleWizardFlows)).toHaveBeenCalled()
   })
 
   it('should call a mock function when clicking calibrate button for heated temp module', async () => {
@@ -205,20 +166,7 @@ describe('ModuleCalibrationOverflowMenu', () => {
     render(props)
     fireEvent.click(screen.getByLabelText('ModuleCalibrationOverflowMenu'))
     fireEvent.click(screen.getByText('Calibrate module'))
-    await waitFor(() => {
-      expect(mockChainLiveCommands).toHaveBeenCalledWith(
-        [
-          {
-            commandType: 'temperatureModule/deactivate',
-            params: {
-              moduleId: mockTemperatureModuleHeating.id,
-            },
-          },
-        ],
-        false
-      )
-    })
-    screen.getByText('module wizard flows')
+    expect(vi.mocked(handleModuleWizardFlows)).toHaveBeenCalled()
   })
 
   it('should call a mock function when clicking calibrate button for heated TC module with lid closed', async () => {
@@ -229,32 +177,7 @@ describe('ModuleCalibrationOverflowMenu', () => {
     render(props)
     fireEvent.click(screen.getByLabelText('ModuleCalibrationOverflowMenu'))
     fireEvent.click(screen.getByText('Calibrate module'))
-    await waitFor(() => {
-      expect(mockChainLiveCommands).toHaveBeenCalledWith(
-        [
-          {
-            commandType: 'thermocycler/deactivateLid',
-            params: {
-              moduleId: mockTCHeating.id,
-            },
-          },
-          {
-            commandType: 'thermocycler/deactivateBlock',
-            params: {
-              moduleId: mockTCHeating.id,
-            },
-          },
-          {
-            commandType: 'thermocycler/openLid',
-            params: {
-              moduleId: mockTCHeating.id,
-            },
-          },
-        ],
-        false
-      )
-    })
-    screen.getByText('module wizard flows')
+    expect(vi.mocked(handleModuleWizardFlows)).toHaveBeenCalled()
   })
 
   it('should be disabled when not calibrated module and pipette is not attached', () => {

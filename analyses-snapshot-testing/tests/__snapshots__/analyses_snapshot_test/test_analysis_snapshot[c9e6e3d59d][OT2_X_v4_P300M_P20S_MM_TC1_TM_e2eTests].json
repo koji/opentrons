@@ -1,4 +1,8 @@
 {
+  "commandAnnotations": [],
+  "commandPreconditions": {
+    "isCameraUsed": false
+  },
   "commands": [
     {
       "commandType": "home",
@@ -61,203 +65,6 @@
         "moduleId": "UUID"
       },
       "result": {
-        "definition": {
-          "calibrationPoint": {
-            "x": 124.875,
-            "y": 2.75,
-            "z": 82.25
-          },
-          "compatibleWith": [],
-          "dimensions": {
-            "bareOverallHeight": 110.152,
-            "overLabwareHeight": 4.052
-          },
-          "displayName": "Magnetic Module GEN2",
-          "gripperOffsets": {},
-          "labwareOffset": {
-            "x": -1.175,
-            "y": -0.125,
-            "z": 82.25
-          },
-          "model": "magneticModuleV2",
-          "moduleType": "magneticModuleType",
-          "otSharedSchema": "module/schemas/2",
-          "quirks": [],
-          "slotTransforms": {
-            "ot2_short_trash": {
-              "3": {
-                "labwareOffset": [
-                  [
-                    -1,
-                    0,
-                    0,
-                    0.3
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ]
-                ]
-              },
-              "6": {
-                "labwareOffset": [
-                  [
-                    -1,
-                    0,
-                    0,
-                    0.3
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ]
-                ]
-              },
-              "9": {
-                "labwareOffset": [
-                  [
-                    -1,
-                    0,
-                    0,
-                    0.3
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ]
-                ]
-              }
-            },
-            "ot2_standard": {
-              "3": {
-                "labwareOffset": [
-                  [
-                    -1,
-                    0,
-                    0,
-                    0.25
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ]
-                ]
-              },
-              "6": {
-                "labwareOffset": [
-                  [
-                    -1,
-                    0,
-                    0,
-                    0.25
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ]
-                ]
-              },
-              "9": {
-                "labwareOffset": [
-                  [
-                    -1,
-                    0,
-                    0,
-                    0.25
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ]
-                ]
-              }
-            }
-          }
-        },
         "model": "magneticModuleV2",
         "moduleId": "UUID",
         "serialNumber": "UUID"
@@ -280,444 +87,6 @@
         "moduleId": "UUID"
       },
       "result": {
-        "definition": {
-          "calibrationPoint": {
-            "x": 11.7,
-            "y": 8.75,
-            "z": 80.09
-          },
-          "compatibleWith": [
-            "temperatureModuleV1"
-          ],
-          "dimensions": {
-            "bareOverallHeight": 84.0,
-            "overLabwareHeight": 0.0
-          },
-          "displayName": "Temperature Module GEN2",
-          "gripperOffsets": {
-            "default": {
-              "dropOffset": {
-                "x": 0.0,
-                "y": 0.0,
-                "z": 1.0
-              },
-              "pickUpOffset": {
-                "x": 0.0,
-                "y": 0.0,
-                "z": 0.0
-              }
-            }
-          },
-          "labwareOffset": {
-            "x": -1.45,
-            "y": -0.15,
-            "z": 80.09
-          },
-          "model": "temperatureModuleV2",
-          "moduleType": "temperatureModuleType",
-          "otSharedSchema": "module/schemas/2",
-          "quirks": [],
-          "slotTransforms": {
-            "ot2_short_trash": {
-              "3": {
-                "labwareOffset": [
-                  [
-                    -1,
-                    -0.15,
-                    0,
-                    0
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ]
-                ]
-              },
-              "6": {
-                "labwareOffset": [
-                  [
-                    -1,
-                    -0.15,
-                    0,
-                    0
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ]
-                ]
-              },
-              "9": {
-                "labwareOffset": [
-                  [
-                    -1,
-                    -0.15,
-                    0,
-                    0
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ]
-                ]
-              }
-            },
-            "ot2_standard": {
-              "3": {
-                "labwareOffset": [
-                  [
-                    -1,
-                    -0.3,
-                    0,
-                    0
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ]
-                ]
-              },
-              "6": {
-                "labwareOffset": [
-                  [
-                    -1,
-                    -0.3,
-                    0,
-                    0
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ]
-                ]
-              },
-              "9": {
-                "labwareOffset": [
-                  [
-                    -1,
-                    -0.3,
-                    0,
-                    0
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ]
-                ]
-              }
-            },
-            "ot3_standard": {
-              "A1": {
-                "labwareOffset": [
-                  [
-                    -71.09,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0.15,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    1,
-                    1.45
-                  ]
-                ]
-              },
-              "A3": {
-                "labwareOffset": [
-                  [
-                    -71.09,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0.15,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    1,
-                    1.45
-                  ]
-                ]
-              },
-              "B1": {
-                "labwareOffset": [
-                  [
-                    -71.09,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0.15,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    1,
-                    1.45
-                  ]
-                ]
-              },
-              "B3": {
-                "labwareOffset": [
-                  [
-                    -71.09,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0.15,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    1,
-                    1.45
-                  ]
-                ]
-              },
-              "C1": {
-                "labwareOffset": [
-                  [
-                    -71.09,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0.15,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    1,
-                    1.45
-                  ]
-                ]
-              },
-              "C3": {
-                "labwareOffset": [
-                  [
-                    -71.09,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0.15,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    1,
-                    1.45
-                  ]
-                ]
-              },
-              "D1": {
-                "labwareOffset": [
-                  [
-                    -71.09,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0.15,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    1,
-                    1.45
-                  ]
-                ]
-              },
-              "D3": {
-                "labwareOffset": [
-                  [
-                    -71.09,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0.15,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    1,
-                    1.45
-                  ]
-                ]
-              }
-            }
-          }
-        },
         "model": "temperatureModuleV2",
         "moduleId": "UUID",
         "serialNumber": "UUID"
@@ -740,33 +109,6 @@
         "moduleId": "UUID"
       },
       "result": {
-        "definition": {
-          "calibrationPoint": {
-            "x": 14.4,
-            "y": 64.93,
-            "z": 97.8
-          },
-          "compatibleWith": [
-            "thermocyclerModuleV1"
-          ],
-          "dimensions": {
-            "bareOverallHeight": 98.0,
-            "lidHeight": 37.7,
-            "overLabwareHeight": 0.0
-          },
-          "displayName": "Thermocycler Module GEN1",
-          "gripperOffsets": {},
-          "labwareOffset": {
-            "x": 0.0,
-            "y": 82.56,
-            "z": 97.8
-          },
-          "model": "thermocyclerModuleV1",
-          "moduleType": "thermocyclerModuleType",
-          "otSharedSchema": "module/schemas/2",
-          "quirks": [],
-          "slotTransforms": {}
-        },
         "model": "thermocyclerModuleV1",
         "moduleId": "UUID",
         "serialNumber": "UUID"
@@ -855,7 +197,13 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "12",
+            "kind": "onAddressableArea"
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -2008,7 +1356,13 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "2",
+            "kind": "onAddressableArea"
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -3161,7 +2515,13 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "4",
+            "kind": "onAddressableArea"
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -3254,7 +2614,13 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "5",
+            "kind": "onAddressableArea"
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -3501,7 +2867,13 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "6",
+            "kind": "onAddressableArea"
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -4657,7 +4029,17 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "kind": "onModule",
+            "moduleId": "UUID"
+          },
+          {
+            "addressableAreaName": "1",
+            "kind": "onAddressableArea"
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -5821,7 +5203,17 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "kind": "onModule",
+            "moduleId": "UUID"
+          },
+          {
+            "addressableAreaName": "3",
+            "kind": "onAddressableArea"
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -6974,7 +6366,13 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "9",
+            "kind": "onAddressableArea"
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -6991,9 +6389,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -7005,9 +6403,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.099999999999994,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -7032,7 +6430,7 @@
             "errorInfo": {
               "args": "('Cannot aspirate more than pipette max volume',)",
               "class": "AssertionError",
-              "traceback": "  File \"/usr/local/lib/python3.10/site-packages/opentrons/legacy_commands/publisher.py\", line N, in publish_context\n    yield\n\n  File \"/usr/local/lib/python3.10/site-packages/opentrons/protocol_api/instrument_context.py\", line N, in aspirate\n    self._core.aspirate(\n\n  File \"/usr/local/lib/python3.10/site-packages/opentrons/protocol_api/core/legacy_simulator/legacy_instrument_core.py\", line N, in aspirate\n    new_volume <= self._pipette_dict[\"working_volume\"]\n"
+              "traceback": "  File \"<PATH>\", line N, in publish_context\n    yield\n\n  File \"<PATH>\", line N, in aspirate\n    self._core.aspirate(\n\n  File \"<PATH>\", line N, in aspirate\n    assert new_volume <= self._pipette_dict[\"working_volume\"], (\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"
             },
             "errorType": "PythonException",
             "id": "UUID",
@@ -7051,9 +6449,9 @@
         "volume": 1000.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -7086,7 +6484,7 @@
           "errorInfo": {
             "args": "('Cannot aspirate more than pipette max volume',)",
             "class": "AssertionError",
-            "traceback": "  File \"/usr/local/lib/python3.10/site-packages/opentrons/protocol_runner/task_queue.py\", line N, in _run\n    await self._run_func()\n\n  File \"/usr/local/lib/python3.10/site-packages/opentrons/protocol_runner/task_queue.py\", line N, in _do_run\n    await func(*args, **kwargs)\n\n  File \"/usr/local/lib/python3.10/site-packages/opentrons/protocol_runner/protocol_runner.py\", line N, in run_func\n    await self._protocol_executor.execute(\n\n  File \"/usr/local/lib/python3.10/site-packages/opentrons/protocol_runner/python_protocol_wrappers.py\", line N, in execute\n    await to_thread.run_sync(\n\n  File \"/usr/local/lib/python3.10/site-packages/anyio/to_thread.py\", line N, in run_sync\n    return await get_asynclib().run_sync_in_worker_thread(\n\n  File \"/usr/local/lib/python3.10/site-packages/anyio/_backends/_asyncio.py\", line N, in run_sync_in_worker_thread\n    return await future\n\n  File \"/usr/local/lib/python3.10/site-packages/anyio/_backends/_asyncio.py\", line N, in run\n    result = context.run(func, *args)\n\n  File \"/usr/local/lib/python3.10/site-packages/opentrons/protocols/execution/execute.py\", line N, in run_protocol\n    execute_json_v4.dispatch_json(\n\n  File \"/usr/local/lib/python3.10/site-packages/opentrons/protocols/execution/execute_json_v4.py\", line N, in dispatch_json\n    pipette_command_map[command_type](  # type: ignore\n\n  File \"/usr/local/lib/python3.10/site-packages/opentrons/protocols/execution/execute_json_v3.py\", line N, in _aspirate\n    pipette.aspirate(volume, location)\n\n  File \"/usr/local/lib/python3.10/site-packages/opentrons/protocols/api_support/util.py\", line N, in _check_version_wrapper\n    return decorated_obj(*args, **kwargs)\n\n  File \"/usr/local/lib/python3.10/site-packages/opentrons/protocol_api/instrument_context.py\", line N, in aspirate\n    self._core.aspirate(\n\n  File \"/usr/local/lib/python3.10/site-packages/opentrons/protocol_api/core/legacy_simulator/legacy_instrument_core.py\", line N, in aspirate\n    new_volume <= self._pipette_dict[\"working_volume\"]\n"
+            "traceback": "  File \"<PATH>\", line N, in _run\n    await self._run_func()\n\n  File \"<PATH>\", line N, in _do_run\n    await func(*args, **kwargs)\n\n  File \"<PATH>\", line N, in run_func\n    await self._protocol_executor.execute(\n\n  File \"<PATH>\", line N, in execute\n    await to_thread.run_sync(\n\n  File \"<PATH>\", line N, in run_sync\n    return await get_async_backend().run_sync_in_worker_thread(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"<PATH>\", line N, in run_sync_in_worker_thread\n    return await future\n           ^^^^^^^^^^^^\n\n  File \"<PATH>\", line N, in run\n    result = context.run(func, *args)\n             ^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"<PATH>\", line N, in run_protocol\n    execute_json_v4.dispatch_json(\n\n  File \"<PATH>\", line N, in dispatch_json\n    pipette_command_map[command_type](  # type: ignore\n\n  File \"<PATH>\", line N, in _aspirate\n    pipette.aspirate(volume, location)\n\n  File \"<PATH>\", line N, in _check_version_wrapper\n    return decorated_obj(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"<PATH>\", line N, in aspirate\n    self._core.aspirate(\n\n  File \"<PATH>\", line N, in aspirate\n    assert new_volume <= self._pipette_dict[\"working_volume\"], (\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"
           },
           "errorType": "PythonException",
           "id": "UUID",
@@ -7096,12 +6494,7 @@
       ]
     }
   ],
-  "files": [
-    {
-      "name": "OT2_X_v4_P300M_P20S_MM_TC1_TM_e2eTests.json",
-      "role": "main"
-    }
-  ],
+  "files": [],
   "labware": [
     {
       "definitionUri": "opentrons/opentrons_1_trash_1100ml_fixed/1",
@@ -7184,6 +6577,7 @@
       }
     }
   ],
+  "liquidClasses": [],
   "liquids": [],
   "metadata": {
     "author": "NN MM",

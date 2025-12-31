@@ -1,41 +1,56 @@
-import { useState, useEffect, useLayoutEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { css } from 'styled-components'
 
 import { CURSOR_POINTER, StyledText } from '@opentrons/components'
 
-import { RecoveryError } from './RecoveryError'
+import { RECOVERY_MAP } from './constants'
 import { RecoveryDoorOpen } from './RecoveryDoorOpen'
+import { RecoveryError } from './RecoveryError'
+import { RecoveryInProgress } from './RecoveryInProgress'
 import {
-  SelectRecoveryOption,
-  RetryStep,
   CancelRun,
-  RetryNewTips,
-  ManageTips,
-  FillWellAndSkip,
-  RetrySameTips,
-  SkipStepSameTips,
-  SkipStepNewTips,
+  FillWellAndRetryNewTips,
+  FillWellAndRetrySameTips,
+  HomeAndRetry,
   IgnoreErrorSkipStep,
+  ManageTips,
   ManualMoveLwAndSkip,
   ManualReplaceLwAndRetry,
+  RetryNewTips,
+  RetrySameTips,
+  RetryStep,
+  SelectRecoveryOption,
+  SkipStepNewTips,
+  SkipStepSameTips,
+  StackerHopperEmptyRetry,
+  StackerHopperEmptySkip,
+  StackerSelectErrorFlow,
+  StackerShuttleEmptyRetry,
+  StackerShuttleEmptySkip,
+  StackerShuttleEmptyStoreRetry,
+  StackerShuttleEmptyStoreSkip,
+  StackerShuttleMissing,
+  StackerStalledRetry,
+  StackerStalledSkip,
+  StackerStalledStoreRetry,
+  StackerStalledStoreSkip,
 } from './RecoveryOptions'
+import { ShuttleFullRetry } from './RecoveryOptions/ShuttleFullRetry'
+import { ShuttleFullSkip } from './RecoveryOptions/ShuttleFullSkip'
 import {
-  useErrorDetailsModal,
   ErrorDetailsModal,
-  RecoveryInterventionModal,
   RecoveryDoorOpenSpecial,
+  RecoveryInterventionModal,
+  useErrorDetailsModal,
 } from './shared'
-import { RecoveryInProgress } from './RecoveryInProgress'
 import { getErrorKind } from './utils'
-import { RECOVERY_MAP } from './constants'
-import { useHomeGripper } from './hooks'
 
-import type { LabwareDefinition2, RobotType } from '@opentrons/shared-data'
-import type { RecoveryRoute, RouteStep, RecoveryContentProps } from './types'
-import type { ErrorRecoveryFlowsProps } from '.'
+import type { LabwareDefinition, RobotType } from '@opentrons/shared-data'
 import type { UseRecoveryAnalyticsResult } from '/app/redux-resources/analytics'
+import type { ErrorRecoveryFlowsProps } from '.'
 import type { ERUtilsResults, useRetainedFailedCommandBySource } from './hooks'
+import type { RecoveryContentProps, RecoveryRoute, RouteStep } from './types'
 
 export interface UseERWizardResult {
   hasLaunchedRecovery: boolean
@@ -70,29 +85,18 @@ export type ErrorRecoveryWizardProps = ErrorRecoveryFlowsProps &
     isOnDevice: boolean
     analytics: UseRecoveryAnalyticsResult<RecoveryRoute, RouteStep>
     failedCommand: ReturnType<typeof useRetainedFailedCommandBySource>
-    allRunDefs: LabwareDefinition2[]
+    allRunDefs: LabwareDefinition[]
   }
 
 export function ErrorRecoveryWizard(
   props: ErrorRecoveryWizardProps
 ): JSX.Element {
-  const {
-    hasLaunchedRecovery,
-    failedCommand,
-    recoveryCommands,
-    routeUpdateActions,
-  } = props
-  const errorKind = getErrorKind(failedCommand?.byRunRecord ?? null)
-
-  useInitialPipetteHome({
-    hasLaunchedRecovery,
-    recoveryCommands,
-    routeUpdateActions,
-  })
-
-  useHomeGripper(props)
-
-  return <ErrorRecoveryComponent errorKind={errorKind} {...props} />
+  return (
+    <ErrorRecoveryComponent
+      errorKind={getErrorKind(props.failedCommand)}
+      {...props}
+    />
+  )
 }
 
 export function ErrorRecoveryComponent(
@@ -119,10 +123,7 @@ export function ErrorRecoveryComponent(
   const buildTitleHeading = (): JSX.Element => {
     const titleText = hasLaunchedRecovery ? t('recovery_mode') : t('cancel_run')
     return (
-      <StyledText
-        oddStyle="level4HeaderBold"
-        desktopStyle="headingSmallRegular"
-      >
+      <StyledText oddStyle="level4HeaderBold" desktopStyle="bodyLargeSemiBold">
         {titleText}
       </StyledText>
     )
@@ -208,8 +209,12 @@ export function ErrorRecoveryContent(props: RecoveryContentProps): JSX.Element {
     return <RetrySameTips {...props} />
   }
 
-  const buildFillWellAndSkip = (): JSX.Element => {
-    return <FillWellAndSkip {...props} />
+  const buildFillWellAndRetrySameTips = (): JSX.Element => {
+    return <FillWellAndRetrySameTips {...props} />
+  }
+
+  const buildFillWellAndRetryNewTips = (): JSX.Element => {
+    return <FillWellAndRetryNewTips {...props} />
   }
 
   const buildSkipStepSameTips = (): JSX.Element => {
@@ -240,6 +245,53 @@ export function ErrorRecoveryContent(props: RecoveryContentProps): JSX.Element {
     return <RecoveryDoorOpenSpecial {...props} />
   }
 
+  const buildHomeAndRetry = (): JSX.Element => {
+    return <HomeAndRetry {...props} />
+  }
+
+  const buildStackerHopperEmptyRetry = (): JSX.Element => {
+    return <StackerHopperEmptyRetry {...props} />
+  }
+  const buildStackerHopperEmptySkip = (): JSX.Element => {
+    return <StackerHopperEmptySkip {...props} />
+  }
+  const buildStackerShuttleEmptyStoreRetry = (): JSX.Element => {
+    return <StackerShuttleEmptyStoreRetry {...props} />
+  }
+  const buildStackerShuttleEmptyStoreSkip = (): JSX.Element => {
+    return <StackerShuttleEmptyStoreSkip {...props} />
+  }
+  const buildStackerShuttleEmptyRetry = (): JSX.Element => {
+    return <StackerShuttleEmptyRetry {...props} />
+  }
+  const buildStackerShuttleEmptySkip = (): JSX.Element => {
+    return <StackerShuttleEmptySkip {...props} />
+  }
+  const buildStackerShuttleMissing = (): JSX.Element => {
+    return <StackerShuttleMissing {...props} />
+  }
+  const buildShuttleFullRetry = (): JSX.Element => {
+    return <ShuttleFullRetry {...props} />
+  }
+  const buildShuttleFullSkip = (): JSX.Element => {
+    return <ShuttleFullSkip {...props} />
+  }
+  const buildStackerStalledRetry = (): JSX.Element => {
+    return <StackerStalledRetry {...props} />
+  }
+  const buildStackerStalledSkip = (): JSX.Element => {
+    return <StackerStalledSkip {...props} />
+  }
+  const buildStackerSelectErrorFlow = (): JSX.Element => {
+    return <StackerSelectErrorFlow {...props} />
+  }
+  const buildStackerStalledStoreRetry = (): JSX.Element => {
+    return <StackerStalledStoreRetry {...props} />
+  }
+  const buildStackerStalledStoreSkip = (): JSX.Element => {
+    return <StackerStalledStoreSkip {...props} />
+  }
+
   switch (props.recoveryMap.route) {
     case RECOVERY_MAP.OPTION_SELECTION.ROUTE:
       return buildSelectRecoveryOption()
@@ -255,8 +307,10 @@ export function ErrorRecoveryContent(props: RecoveryContentProps): JSX.Element {
       return buildRetryNewTips()
     case RECOVERY_MAP.RETRY_SAME_TIPS.ROUTE:
       return buildRetrySameTips()
-    case RECOVERY_MAP.MANUAL_FILL_AND_SKIP.ROUTE:
-      return buildFillWellAndSkip()
+    case RECOVERY_MAP.MANUAL_FILL_AND_RETRY_SAME_TIPS.ROUTE:
+      return buildFillWellAndRetrySameTips()
+    case RECOVERY_MAP.MANUAL_FILL_AND_RETRY_NEW_TIPS.ROUTE:
+      return buildFillWellAndRetryNewTips()
     case RECOVERY_MAP.SKIP_STEP_WITH_SAME_TIPS.ROUTE:
       return buildSkipStepSameTips()
     case RECOVERY_MAP.SKIP_STEP_WITH_NEW_TIPS.ROUTE:
@@ -267,6 +321,34 @@ export function ErrorRecoveryContent(props: RecoveryContentProps): JSX.Element {
       return buildManualMoveLwAndSkip()
     case RECOVERY_MAP.MANUAL_REPLACE_AND_RETRY.ROUTE:
       return buildManualReplaceLwAndRetry()
+    case RECOVERY_MAP.STACKER_HOPPER_OR_SHUTTLE_EMPTY.ROUTE:
+      return buildStackerSelectErrorFlow()
+    case RECOVERY_MAP.STACKER_HOPPER_EMPTY_RETRY.ROUTE:
+      return buildStackerHopperEmptyRetry()
+    case RECOVERY_MAP.STACKER_HOPPER_EMPTY_SKIP.ROUTE:
+      return buildStackerHopperEmptySkip()
+    case RECOVERY_MAP.SHUTTLE_FULL_RETRY.ROUTE:
+      return buildShuttleFullRetry()
+    case RECOVERY_MAP.SHUTTLE_FULL_SKIP.ROUTE:
+      return buildShuttleFullSkip()
+    case RECOVERY_MAP.STACKER_STALLED_RETRY.ROUTE:
+      return buildStackerStalledRetry()
+    case RECOVERY_MAP.STACKER_STALLED_SKIP.ROUTE:
+      return buildStackerStalledSkip()
+    case RECOVERY_MAP.STACKER_STALLED_STORE_RETRY.ROUTE:
+      return buildStackerStalledStoreRetry()
+    case RECOVERY_MAP.STACKER_STALLED_STORE_SKIP.ROUTE:
+      return buildStackerStalledStoreSkip()
+    case RECOVERY_MAP.STACKER_SHUTTLE_MISSING_RETRY.ROUTE:
+      return buildStackerShuttleMissing()
+    case RECOVERY_MAP.STACKER_SHUTTLE_EMPTY_RETRY.ROUTE:
+      return buildStackerShuttleEmptyRetry()
+    case RECOVERY_MAP.STACKER_SHUTTLE_EMPTY_SKIP.ROUTE:
+      return buildStackerShuttleEmptySkip()
+    case RECOVERY_MAP.STACKER_SHUTTLE_EMPTY_STORE_RETRY.ROUTE:
+      return buildStackerShuttleEmptyStoreRetry()
+    case RECOVERY_MAP.STACKER_SHUTTLE_EMPTY_STORE_SKIP.ROUTE:
+      return buildStackerShuttleEmptyStoreSkip()
     case RECOVERY_MAP.ROBOT_DOOR_OPEN_SPECIAL.ROUTE:
       return buildRecoveryDoorOpenSpecial()
     case RECOVERY_MAP.ROBOT_IN_MOTION.ROUTE:
@@ -276,33 +358,14 @@ export function ErrorRecoveryContent(props: RecoveryContentProps): JSX.Element {
     case RECOVERY_MAP.ROBOT_PICKING_UP_TIPS.ROUTE:
     case RECOVERY_MAP.ROBOT_SKIPPING_STEP.ROUTE:
     case RECOVERY_MAP.ROBOT_RELEASING_LABWARE.ROUTE:
+    case RECOVERY_MAP.STACKER_RELEASING_LABWARE_LATCH.ROUTE:
       return buildRecoveryInProgress()
     case RECOVERY_MAP.ROBOT_DOOR_OPEN.ROUTE:
       return buildManuallyRouteToDoorOpen()
+    case RECOVERY_MAP.HOME_AND_RETRY.ROUTE:
+      return buildHomeAndRetry()
     default:
+      console.error('route: ' + props.recoveryMap.route + 'was not found')
       return buildSelectRecoveryOption()
   }
-}
-interface UseInitialPipetteHomeParams {
-  hasLaunchedRecovery: ErrorRecoveryWizardProps['hasLaunchedRecovery']
-  recoveryCommands: ErrorRecoveryWizardProps['recoveryCommands']
-  routeUpdateActions: ErrorRecoveryWizardProps['routeUpdateActions']
-}
-// Home the Z-axis of all attached pipettes on Error Recovery launch.
-export function useInitialPipetteHome({
-  hasLaunchedRecovery,
-  recoveryCommands,
-  routeUpdateActions,
-}: UseInitialPipetteHomeParams): void {
-  const { homePipetteZAxes } = recoveryCommands
-  const { handleMotionRouting } = routeUpdateActions
-
-  // Synchronously set the recovery route to "robot in motion" before initial render to prevent screen flicker on ER launch.
-  useLayoutEffect(() => {
-    if (hasLaunchedRecovery) {
-      void handleMotionRouting(true)
-        .then(() => homePipetteZAxes())
-        .finally(() => handleMotionRouting(false))
-    }
-  }, [hasLaunchedRecovery])
 }

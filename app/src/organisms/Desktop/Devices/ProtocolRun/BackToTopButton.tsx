@@ -1,17 +1,19 @@
-import type * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { useRobot } from '/app/redux-resources/robots'
-import { getRobotSerialNumber } from '/app/redux/discovery'
+
 import { SecondaryButton } from '@opentrons/components'
 
+import { useRobot } from '/app/redux-resources/robots'
 import {
-  useTrackEvent,
   ANALYTICS_PROTOCOL_PROCEED_TO_RUN,
+  useTrackEvent,
 } from '/app/redux/analytics'
+import { getRobotSerialNumber } from '/app/redux/discovery'
+
+import type { RefObject } from 'react'
 
 interface BackToTopButtonProps {
-  protocolRunHeaderRef: React.RefObject<HTMLDivElement> | null
+  protocolRunHeaderRef: RefObject<HTMLDivElement> | null
   robotName: string
   runId: string
   sourceLocation: string

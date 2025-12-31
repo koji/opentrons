@@ -1,22 +1,26 @@
-import type * as React from 'react'
 import '@testing-library/jest-dom/vitest'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+
 import { fireEvent, screen } from '@testing-library/react'
-import { i18n } from '/app/i18n'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { renderWithProviders } from '/app/__testing-utils__'
+import { i18n } from '/app/i18n'
 import { getIsOnDevice } from '/app/redux/config'
+
 import { GenericWizardTile } from '..'
+
+import type { ComponentProps } from 'react'
 
 vi.mock('/app/redux/config')
 
-const render = (props: React.ComponentProps<typeof GenericWizardTile>) => {
+const render = (props: ComponentProps<typeof GenericWizardTile>) => {
   return renderWithProviders(<GenericWizardTile {...props} />, {
     i18nInstance: i18n,
   })[0]
 }
 
 describe('GenericWizardTile', () => {
-  let props: React.ComponentProps<typeof GenericWizardTile>
+  let props: ComponentProps<typeof GenericWizardTile>
 
   beforeEach(() => {
     props = {

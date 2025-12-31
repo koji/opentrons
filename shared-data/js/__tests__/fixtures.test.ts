@@ -1,0 +1,543 @@
+import { useTranslation } from 'react-i18next'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import {
+  FAKE_STAGING_SLOT_WITH_MAG_BLOCK_FIXTURE,
+  FAKE_WASTE_CHUTE_WITH_EMPTY_SLOT_FIXTURE,
+  FLEX_STACKER_V1_FIXTURE,
+  FLEX_STACKER_WITH_MAG_BLOCK_FIXTURE,
+  FLEX_STACKER_WITH_WASTE_CHUTE_ADAPTER_COVERED_FIXTURE,
+  FLEX_STACKER_WITH_WASTE_CHUTE_ADAPTER_NO_COVER_FIXTURE,
+  HEATERSHAKER_MODULE_V1_FIXTURE,
+  MAGNETIC_BLOCK_V1_FIXTURE,
+  STAGING_AREA_SLOT_WITH_MAGNETIC_BLOCK_V1_FIXTURE,
+  TEMPERATURE_MODULE_V2_FIXTURE,
+  THERMOCYCLER_MODULE_V2,
+  WASTE_CHUTE_RIGHT_ADAPTER_COVERED_FIXTURE,
+  WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE,
+} from '..'
+import {
+  getAAComboFixtureDisplayName,
+  getCutoutConfigReplacmentForModule,
+  getFixtureDisplayName,
+  getFlexStackerD3Compatibility,
+  getVisualSlotIdForAA,
+  getWasteChuteComboFixture,
+  isFixtureInUsbModules,
+  isModuleAllowedOnAA,
+  replaceCutoutFixtureWithComboFixture,
+} from '../fixtures'
+import { getDeckDefFromRobotType } from '../helpers'
+
+import type { Mock } from 'vitest'
+import type { CutoutConfig, DeckConfiguration } from '..'
+
+vi.mock('react-i18next', () => ({
+  useTranslation: vi.fn(),
+  initReactI18next: vi.fn(),
+}))
+
+const deckDef = getDeckDefFromRobotType('OT-3 Standard')
+
+describe('replaceCutoutFixtureWithComboFixture', () => {
+  it('Should replace flexStackerModuleV1 to a mag block/stacker combo fixture', () => {
+    const result = replaceCutoutFixtureWithComboFixture(
+      [
+        {
+          cutoutFixtureId: 'flexStackerModuleV1',
+          cutoutId: 'cutoutD3',
+          addressableAreaId: 'flexStackerModuleV1D4',
+        },
+        {
+          cutoutFixtureId: 'stagingAreaRightSlot',
+          cutoutId: 'cutoutA3',
+          addressableAreaId: 'fakeA4',
+        },
+      ],
+      [
+        {
+          cutoutFixtureId: 'magneticBlockV1',
+          cutoutId: 'cutoutD3',
+          addressableAreaId: 'magneticBlockV1D3',
+        },
+      ],
+      'cutoutD3'
+    )
+    expect(result).toEqual([
+      {
+        addressableAreaId: 'flexStackerModuleV1D4',
+        cutoutFixtureId: 'flexStackerModuleV1WithMagneticBlockV1',
+        cutoutId: 'cutoutD3',
+        opentronsModuleSerialNumber: undefined,
+      },
+      {
+        cutoutFixtureId: 'stagingAreaRightSlot',
+        cutoutId: 'cutoutA3',
+        opentronsModuleSerialNumber: undefined,
+      },
+    ])
+  })
+
+  it('Should replace a waste chute fixture into a combo fixture', () => {
+    const result = replaceCutoutFixtureWithComboFixture(
+      [
+        {
+          cutoutFixtureId: 'flexStackerModuleV1',
+          cutoutId: 'cutoutD3',
+          addressableAreaId: 'flexStackerModuleV1D4',
+          opentronsModuleSerialNumber: '123',
+        },
+      ],
+      [
+        {
+          cutoutFixtureId: WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE,
+          cutoutId: 'cutoutD3',
+          addressableAreaId: '96ChannelWasteChute',
+        },
+      ],
+      'cutoutD3'
+    )
+    expect(result).toEqual([
+      {
+        cutoutFixtureId: 'flexStackerModuleV1WithWasteChuteRightAdapterNoCover',
+        cutoutId: 'cutoutD3',
+        opentronsModuleSerialNumber: '123',
+      },
+    ])
+  })
+
+  it('Should not replace fixture', () => {
+    const result = replaceCutoutFixtureWithComboFixture(
+      [
+        {
+          cutoutFixtureId: 'flexStackerModuleV1',
+          cutoutId: 'cutoutD3',
+          addressableAreaId: 'flexStackerModuleV1D4',
+          opentronsModuleSerialNumber: '123',
+        },
+      ],
+      [],
+      'cutoutD3'
+    )
+
+    expect(result).toEqual([
+      {
+        cutoutFixtureId: 'flexStackerModuleV1',
+        cutoutId: 'cutoutD3',
+        opentronsModuleSerialNumber: '123',
+      },
+    ])
+  })
+})
+
+describe('getVisualSlotIdForAA', () => {
+  it('should get vs name for single right slot', () => {
+    const result = getVisualSlotIdForAA(
+      'cutoutA3',
+      FAKE_STAGING_SLOT_WITH_MAG_BLOCK_FIXTURE,
+      'magneticBlockV1A3'
+    )
+    expect(result).toEqual('VSA3')
+  })
+
+  it('should return vs name for single center slot', () => {
+    const result = getVisualSlotIdForAA(
+      'cutoutD1',
+      TEMPERATURE_MODULE_V2_FIXTURE,
+      'temperatureModuleV2D1'
+    )
+    expect(result).toEqual('VSD1')
+  })
+
+  it('should get vs id for mag block in D2', () => {
+    const result = getVisualSlotIdForAA(
+      'cutoutD2',
+      MAGNETIC_BLOCK_V1_FIXTURE,
+      'magneticBlockV1D2'
+    )
+    expect(result).toEqual('VSD2')
+  })
+})
+
+describe('getAAFixtureDisplayName', () => {
+  let t: Mock
+
+  beforeEach(() => {
+    t = vi.fn(key => key)
+
+    vi.mocked(useTranslation).mockReturnValue({ t } as any)
+  })
+  it('Should return flex stacker name when using combo fixtures and aa for stacker', () => {
+    const name = getAAComboFixtureDisplayName(
+      FLEX_STACKER_WITH_WASTE_CHUTE_ADAPTER_NO_COVER_FIXTURE,
+      'flexStackerModuleV1D4',
+      deckDef,
+      t,
+      ''
+    )
+    expect(name).toEqual('deck_configuration:module_in_port')
+  })
+
+  it('Should return mag block name when using combo fixtures with mag block', () => {
+    const name = getAAComboFixtureDisplayName(
+      FLEX_STACKER_WITH_MAG_BLOCK_FIXTURE,
+      'magneticBlockV1D3',
+      deckDef,
+      t,
+      'deck_configuration'
+    )
+    expect(name).toEqual('deck_configuration:magnetic_block')
+  })
+
+  it('Should return mag block name when using combo fixtures with mag block', () => {
+    const name = getAAComboFixtureDisplayName(
+      FLEX_STACKER_WITH_MAG_BLOCK_FIXTURE,
+      'magneticBlockV1D3',
+      deckDef,
+      t,
+      'deck_configuration'
+    )
+    expect(name).toEqual('deck_configuration:magnetic_block')
+  })
+
+  it('Should return waste chute name when using waste chute fixture', () => {
+    const name = getAAComboFixtureDisplayName(
+      FAKE_WASTE_CHUTE_WITH_EMPTY_SLOT_FIXTURE,
+      '96ChannelWasteChute',
+      deckDef,
+      t,
+      'deck_configuration'
+    )
+    expect(name).toEqual('deck_configuration:waste_chute')
+  })
+
+  it('Should return null when not a combo fixture', () => {
+    const name = getAAComboFixtureDisplayName(
+      MAGNETIC_BLOCK_V1_FIXTURE,
+      'magneticBlockV1D3',
+      deckDef,
+      t,
+      'deck_configuration'
+    )
+    expect(name).toBe(null)
+  })
+})
+
+describe('isFixtureInModules', () => {
+  it('should return true for flex stacker fixture', () => {
+    const result = isFixtureInUsbModules(FLEX_STACKER_V1_FIXTURE)
+    expect(result).toEqual(true)
+
+    const resultWithMag = isFixtureInUsbModules(
+      FLEX_STACKER_WITH_MAG_BLOCK_FIXTURE
+    )
+    expect(resultWithMag).toEqual(true)
+  })
+
+  it('should return true for temp fixture', () => {
+    const result = isFixtureInUsbModules(TEMPERATURE_MODULE_V2_FIXTURE)
+    expect(result).toEqual(true)
+  })
+
+  it('should return false for mag block fixture', () => {
+    const result = isFixtureInUsbModules(MAGNETIC_BLOCK_V1_FIXTURE)
+    expect(result).toEqual(false)
+  })
+})
+
+describe('isModuleAllowedOnAA', () => {
+  it('should return false for flexStackerModuleV1D4 and D3', () => {
+    const vs = isModuleAllowedOnAA('cutoutD3', 'D3', 'flexStackerModuleV1')
+    expect(vs).toEqual(false)
+  })
+
+  it('should return true for flexStackerModuleV1D4 and fakeD4', () => {
+    const vs = isModuleAllowedOnAA('cutoutD3', 'fakeD4', 'flexStackerModuleV1')
+    expect(vs).toEqual(true)
+  })
+
+  it('should return true for no module input and fakeD4', () => {
+    const vs = isModuleAllowedOnAA('cutoutD3', 'fakeD4', 'temperatureModuleV2')
+    expect(vs).toEqual(false)
+  })
+
+  it('should return true for tempModule on D3', () => {
+    const vs = isModuleAllowedOnAA('cutoutD3', 'D3', 'temperatureModuleV2')
+    expect(vs).toEqual(true)
+  })
+
+  it('should return true for thermocycler on A1', () => {
+    const vs = isModuleAllowedOnAA('cutoutA1', 'A1', THERMOCYCLER_MODULE_V2)
+    expect(vs).toEqual(true)
+  })
+
+  it('should return true for thermocycler on B1', () => {
+    const vs = isModuleAllowedOnAA('cutoutB1', 'B1', THERMOCYCLER_MODULE_V2)
+    expect(vs).toEqual(true)
+  })
+
+  it('should return false for thermocycler on A3', () => {
+    const vs = isModuleAllowedOnAA('cutoutA3', 'A3', THERMOCYCLER_MODULE_V2)
+    expect(vs).toEqual(false)
+  })
+})
+
+describe('getCutoutConfigReplacmentForModule', () => {
+  const mockStacker: CutoutConfig = {
+    cutoutId: 'cutoutD3',
+    cutoutFixtureId: FLEX_STACKER_V1_FIXTURE,
+    opentronsModuleSerialNumber: 'fsm123',
+  }
+
+  const mockDeckConfig: DeckConfiguration = [mockStacker]
+  it('should get temp module replacment fixture', () => {
+    expect(
+      getCutoutConfigReplacmentForModule(
+        'cutoutD3',
+        'temperatureModuleV2',
+        'temperatureModuleV2',
+        mockDeckConfig
+      )
+    ).toStrictEqual('temperatureModuleV2')
+  })
+
+  it('should get flex module replacment fixture', () => {
+    expect(
+      getCutoutConfigReplacmentForModule(
+        'cutoutC3',
+        'flexStackerModuleV1',
+        'flexStackerModuleV1',
+        mockDeckConfig
+      )
+    ).toStrictEqual('flexStackerModuleV1')
+  })
+})
+
+describe('getFixtureDisplayName', () => {
+  let t: Mock
+
+  beforeEach(() => {
+    t = vi.fn(key => key)
+
+    vi.mocked(useTranslation).mockReturnValue({ t } as any)
+  })
+
+  it('should get fixture display name for flex stacker with mag block', () => {
+    const result = getFixtureDisplayName(t, FLEX_STACKER_WITH_MAG_BLOCK_FIXTURE)
+    expect(result).toEqual('deck_configuration:module_with_mag_block')
+  })
+
+  it('should get fixture display name for flex stacker with waste chute', () => {
+    const result = getFixtureDisplayName(
+      t,
+      FLEX_STACKER_WITH_WASTE_CHUTE_ADAPTER_NO_COVER_FIXTURE
+    )
+    expect(result).toEqual('deck_configuration:module_with_waste_chute')
+  })
+
+  it('should get fixture display name for flex stacker with waste chute', () => {
+    const result = getFixtureDisplayName(
+      t,
+      FLEX_STACKER_WITH_WASTE_CHUTE_ADAPTER_COVERED_FIXTURE
+    )
+    expect(result).toEqual(
+      'deck_configuration:module_with_waste_chute_and_cover'
+    )
+  })
+
+  it('should get fixture display name for waste chute', () => {
+    const result = getFixtureDisplayName(
+      t,
+      WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE
+    )
+    expect(result).toEqual('deck_configuration:waste_chute')
+  })
+
+  it('should get fixture display name for heater shaker in port', () => {
+    const result = getFixtureDisplayName(
+      t,
+      HEATERSHAKER_MODULE_V1_FIXTURE,
+      'test-123'
+    )
+    expect(result).toEqual('deck_configuration:module_in_port')
+  })
+
+  it('should get fixture display name for mag block with staging area slot', () => {
+    const result = getFixtureDisplayName(
+      t,
+      STAGING_AREA_SLOT_WITH_MAGNETIC_BLOCK_V1_FIXTURE
+    )
+    expect(result).toEqual('deck_configuration:module_with_staging_area')
+  })
+})
+
+describe('getWasteChuteComboFixture', () => {
+  it('Should get a covered waste chute', () => {
+    const result = getWasteChuteComboFixture(
+      {
+        addressableAreaId: 'flexStackerModuleV1D4',
+        cutoutFixtureId: FLEX_STACKER_V1_FIXTURE,
+        cutoutId: 'cutoutD3',
+        opentronsModuleSerialNumber: '123',
+      },
+      [
+        {
+          cutoutId: 'cutoutD3',
+          cutoutFixtureId: WASTE_CHUTE_RIGHT_ADAPTER_COVERED_FIXTURE,
+          addressableAreaId: '1ChannelWasteChute',
+        },
+      ]
+    )
+    expect(result).toEqual({
+      cutoutFixtureId: FLEX_STACKER_WITH_WASTE_CHUTE_ADAPTER_COVERED_FIXTURE,
+      cutoutId: 'cutoutD3',
+      opentronsModuleSerialNumber: '123',
+    })
+  })
+
+  it('Should get a none covered waste chute', () => {
+    const result = getWasteChuteComboFixture(
+      {
+        addressableAreaId: 'flexStackerModuleV1D4',
+        cutoutFixtureId: FLEX_STACKER_V1_FIXTURE,
+        cutoutId: 'cutoutD3',
+        opentronsModuleSerialNumber: '123',
+      },
+      [
+        {
+          cutoutId: 'cutoutD3',
+          cutoutFixtureId: WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE,
+          addressableAreaId: '1ChannelWasteChute',
+        },
+      ]
+    )
+    expect(result).toEqual({
+      cutoutFixtureId: FLEX_STACKER_WITH_WASTE_CHUTE_ADAPTER_NO_COVER_FIXTURE,
+      cutoutId: 'cutoutD3',
+      opentronsModuleSerialNumber: '123',
+    })
+  })
+
+  it('Should get a none covered waste chute', () => {
+    const result = getWasteChuteComboFixture(
+      {
+        addressableAreaId: 'flexStackerModuleV1D4',
+        cutoutFixtureId: FLEX_STACKER_V1_FIXTURE,
+        cutoutId: 'cutoutD3',
+        opentronsModuleSerialNumber: '123',
+      },
+      [
+        {
+          cutoutId: 'cutoutD3',
+          cutoutFixtureId: FAKE_WASTE_CHUTE_WITH_EMPTY_SLOT_FIXTURE,
+          addressableAreaId: '1ChannelWasteChute',
+        },
+      ]
+    )
+    expect(result).toEqual({
+      cutoutFixtureId: FLEX_STACKER_WITH_WASTE_CHUTE_ADAPTER_NO_COVER_FIXTURE,
+      cutoutId: 'cutoutD3',
+      opentronsModuleSerialNumber: '123',
+    })
+  })
+
+  it('Should get a none covered waste chute when stacker is on deck', () => {
+    const result = getWasteChuteComboFixture(
+      {
+        addressableAreaId: '1ChannelWasteChute',
+        cutoutFixtureId: WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE,
+        cutoutId: 'cutoutD3',
+      },
+      [
+        {
+          cutoutId: 'cutoutD3',
+          cutoutFixtureId: FLEX_STACKER_V1_FIXTURE,
+          addressableAreaId: 'flexStackerModuleV1D4',
+          opentronsModuleSerialNumber: '123',
+        },
+      ]
+    )
+    expect(result).toEqual({
+      cutoutFixtureId: FLEX_STACKER_WITH_WASTE_CHUTE_ADAPTER_NO_COVER_FIXTURE,
+      cutoutId: 'cutoutD3',
+      opentronsModuleSerialNumber: '123',
+    })
+  })
+
+  it('Should get a covered waste chute when stacker is on deck', () => {
+    const result = getWasteChuteComboFixture(
+      {
+        addressableAreaId: '1ChannelWasteChute',
+        cutoutFixtureId: WASTE_CHUTE_RIGHT_ADAPTER_COVERED_FIXTURE,
+        cutoutId: 'cutoutD3',
+      },
+      [
+        {
+          cutoutId: 'cutoutD3',
+          cutoutFixtureId: FLEX_STACKER_V1_FIXTURE,
+          addressableAreaId: 'flexStackerModuleV1D4',
+          opentronsModuleSerialNumber: '123',
+        },
+      ]
+    )
+    expect(result).toEqual({
+      cutoutFixtureId: FLEX_STACKER_WITH_WASTE_CHUTE_ADAPTER_COVERED_FIXTURE,
+      cutoutId: 'cutoutD3',
+      opentronsModuleSerialNumber: '123',
+    })
+  })
+})
+
+describe('getFlexStackerD3Compatibility', () => {
+  it('should return a conflict and flex stacker fixture', () => {
+    const result = getFlexStackerD3Compatibility([
+      {
+        cutoutId: 'cutoutD3',
+        cutoutFixtureId: FLEX_STACKER_WITH_WASTE_CHUTE_ADAPTER_COVERED_FIXTURE,
+        requiredAddressableAreas: [
+          'flexStackerModuleV1D4',
+          'gripperWasteChute',
+        ],
+        compatibleCutoutFixtureIds: [
+          FLEX_STACKER_WITH_WASTE_CHUTE_ADAPTER_NO_COVER_FIXTURE,
+        ],
+      },
+    ])
+    expect(result).toEqual({
+      comboFixtureId: FLEX_STACKER_WITH_WASTE_CHUTE_ADAPTER_NO_COVER_FIXTURE,
+      comboFixtureConflict: true,
+    })
+  })
+
+  it('should return a conflict and flex stacker fixture', () => {
+    const result = getFlexStackerD3Compatibility([
+      {
+        cutoutId: 'cutoutD3',
+        cutoutFixtureId: FLEX_STACKER_V1_FIXTURE,
+        requiredAddressableAreas: [
+          'flexStackerModuleV1D4',
+          '1ChannelWasteChute',
+        ],
+        compatibleCutoutFixtureIds: [
+          FLEX_STACKER_WITH_WASTE_CHUTE_ADAPTER_COVERED_FIXTURE,
+        ],
+      },
+    ])
+    expect(result).toEqual({
+      comboFixtureId: FLEX_STACKER_WITH_WASTE_CHUTE_ADAPTER_COVERED_FIXTURE,
+      comboFixtureConflict: true,
+    })
+  })
+
+  it('should return a null for no conflict with waste chute', () => {
+    const result = getFlexStackerD3Compatibility([
+      {
+        cutoutId: 'cutoutD3',
+        cutoutFixtureId: FLEX_STACKER_V1_FIXTURE,
+        requiredAddressableAreas: ['flexStackerModuleV1D4', 'D3'],
+        compatibleCutoutFixtureIds: [FLEX_STACKER_V1_FIXTURE],
+      },
+    ])
+    expect(result).toBeNull()
+  })
+})

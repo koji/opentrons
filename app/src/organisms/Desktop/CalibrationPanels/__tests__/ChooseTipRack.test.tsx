@@ -1,24 +1,25 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { vi, it, describe, expect, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { usePipettesQuery } from '@opentrons/react-api-client'
 import { LEFT } from '@opentrons/shared-data'
 
 import { renderWithProviders } from '/app/__testing-utils__'
-import { i18n } from '/app/i18n'
-import { mockAttachedPipette } from '/app/redux/pipettes/__fixtures__'
-import { mockDeckCalTipRack } from '/app/redux/sessions/__fixtures__'
-import { mockTipRackDefinition } from '/app/redux/custom-labware/__fixtures__'
 import { Select } from '/app/atoms/SelectField/Select'
+import { i18n } from '/app/i18n'
 import {
   getCalibrationForPipette,
-  getTipLengthForPipetteAndTiprack,
   getTipLengthCalibrations,
+  getTipLengthForPipetteAndTiprack,
 } from '/app/redux/calibration'
 import { getCustomTipRackDefinitions } from '/app/redux/custom-labware'
+import { mockTipRackDefinition } from '/app/redux/custom-labware/__fixtures__'
+import { mockAttachedPipette } from '/app/redux/pipettes/__fixtures__'
+import { mockDeckCalTipRack } from '/app/redux/sessions/__fixtures__'
+
 import { ChooseTipRack } from '../ChooseTipRack'
 
+import type { ComponentProps } from 'react'
 import type { AttachedPipettesByMount } from '/app/redux/pipettes/types'
 
 vi.mock('@opentrons/react-api-client')
@@ -32,14 +33,14 @@ const mockAttachedPipettes: AttachedPipettesByMount = {
   right: null,
 } as any
 
-const render = (props: React.ComponentProps<typeof ChooseTipRack>) => {
+const render = (props: ComponentProps<typeof ChooseTipRack>) => {
   return renderWithProviders(<ChooseTipRack {...props} />, {
     i18nInstance: i18n,
   })[0]
 }
 
 describe('ChooseTipRack', () => {
-  let props: React.ComponentProps<typeof ChooseTipRack>
+  let props: ComponentProps<typeof ChooseTipRack>
 
   beforeEach(() => {
     vi.mocked(Select).mockReturnValue(<div>mock select</div>)

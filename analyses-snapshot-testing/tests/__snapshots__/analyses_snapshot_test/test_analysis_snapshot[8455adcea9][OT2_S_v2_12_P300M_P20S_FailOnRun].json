@@ -1,4 +1,8 @@
 {
+  "commandAnnotations": [],
+  "commandPreconditions": {
+    "isCameraUsed": false
+  },
   "commands": [
     {
       "commandType": "home",
@@ -1160,7 +1164,13 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "1",
+            "kind": "onAddressableArea"
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -2313,7 +2323,13 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "2",
+            "kind": "onAddressableArea"
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -2594,7 +2610,13 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "3",
+            "kind": "onAddressableArea"
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -2623,12 +2645,7 @@
   },
   "createdAt": "TIMESTAMP",
   "errors": [],
-  "files": [
-    {
-      "name": "OT2_S_v2_12_P300M_P20S_FailOnRun.py",
-      "role": "main"
-    }
-  ],
+  "files": [],
   "labware": [
     {
       "definitionUri": "opentrons/opentrons_1_trash_1100ml_fixed/1",
@@ -2666,6 +2683,7 @@
       }
     }
   ],
+  "liquidClasses": [],
   "liquids": [],
   "metadata": {
     "apiLevel": "2.12",

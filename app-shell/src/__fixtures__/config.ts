@@ -25,6 +25,9 @@ import type {
   ConfigV23,
   ConfigV24,
   ConfigV25,
+  ConfigV26,
+  ConfigV27,
+  ConfigV28,
 } from '@opentrons/app/src/redux/config/types'
 
 export const MOCK_CONFIG_V0: ConfigV0 = {
@@ -262,8 +265,7 @@ export const MOCK_CONFIG_V20: ConfigV20 = {
   version: 20,
   robotSystemUpdate: {
     manifestUrls: {
-      OT2:
-        'https://opentrons-buildroot-ci.s3.us-east-2.amazonaws.com/releases.json',
+      OT2: 'https://opentrons-buildroot-ci.s3.us-east-2.amazonaws.com/releases.json',
     },
   },
 }
@@ -310,5 +312,28 @@ export const MOCK_CONFIG_V25: ConfigV25 = {
   language: {
     appLanguage: null,
     systemLanguage: null,
+  },
+}
+
+export const MOCK_CONFIG_V26: ConfigV26 = {
+  ...MOCK_CONFIG_V25,
+  version: 26,
+}
+
+export const MOCK_CONFIG_V27: ConfigV27 = {
+  ...MOCK_CONFIG_V26,
+  version: 27,
+  ui: {
+    ...MOCK_CONFIG_V26.ui,
+    minWidth: 601,
+  },
+}
+
+export const MOCK_CONFIG_V28: ConfigV28 = {
+  ...MOCK_CONFIG_V27,
+  version: 28,
+  ui: {
+    ...MOCK_CONFIG_V27.ui,
+    minHeight: 600,
   },
 }

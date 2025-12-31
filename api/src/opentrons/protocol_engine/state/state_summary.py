@@ -1,4 +1,5 @@
 """Public protocol run data models."""
+
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
@@ -11,8 +12,11 @@ from ..types import (
     LoadedModule,
     LoadedPipette,
     Liquid,
+    LiquidClassRecordWithId,
     WellInfoSummary,
+    TaskSummary,
 )
+from ..resources.camera_provider import CameraSettings
 
 
 class StateSummary(BaseModel):
@@ -27,8 +31,11 @@ class StateSummary(BaseModel):
     pipettes: List[LoadedPipette]
     modules: List[LoadedModule]
     labwareOffsets: List[LabwareOffset]
-    startedAt: Optional[datetime]
-    completedAt: Optional[datetime]
+    startedAt: Optional[datetime] = None
+    completedAt: Optional[datetime] = None
     liquids: List[Liquid] = Field(default_factory=list)
     wells: List[WellInfoSummary] = Field(default_factory=list)
     files: List[str] = Field(default_factory=list)
+    liquidClasses: List[LiquidClassRecordWithId] = Field(default_factory=list)
+    tasks: List[TaskSummary] = Field(default_factory=list)
+    cameraSettings: Optional[CameraSettings] = None

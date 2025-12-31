@@ -8,6 +8,135 @@ By installing and using Opentrons software, you agree to the Opentrons End-User 
 
 ---
 
+## Opentrons Robot Software Changes in 8.8.0
+
+Welcome to the v8.8.0 release of the Opentrons robot software! This release includes concurrent module actions, dynamic liquid tracking at the meniscus, and other new features.  
+
+### New Features
+
+- Use new concurrent commands for the Heater-Shaker, Temperature, and Thermocycler Modules. These commands can control multiple modules and complete pipetting actions simultaneously. 
+-  Dynamic liquid tracking lets you aspirate, dispense, or mix at the liquid meniscus. Flex pipettes can track the liquid meniscus as its position changes during a pipetting action. 
+- Capture images of the Flex or OT-2 deck during a protocol. 
+- Choose where your Flex pipette will select a new tip when performing a transfer with a liquid class.
+
+---
+
+## Opentrons Robot Software Changes in 8.7.0
+
+Welcome to the v8.7.0 release of the Opentrons robot software! This release adds improvements and bug fixes.
+
+### New Features
+
+Use Opentrons Tough Universal Lids on compatible well plates and reservoirs.
+
+### Improvements
+
+Transfer aqueous, viscous, or volatile liquids with the Opentrons Flex 96-Channel Pipette (1–200 µL) to apply optimized, liquid class transfer behavior to volumes as low as 1 µL.
+
+### Bug Fixes
+
+- Default pipette flow rates are correctly applied in all liquid transfers. Use `configure_for_volume()` to clear customized pipette flow rates.
+- The API no longer raises an error when partial tip pickup occurs in a slot adjacent to a loaded Flex Stacker Module.
+
+## Opentrons Robot Software Changes in 8.6.0
+
+Welcome to the v8.6.0 release of the Opentrons robot software! This release adds support for the Flex Stacker Module, along with other new features and improvements.
+
+### New Features
+
+- Automate labware storage with the Flex Stacker Module. Use new commands like `retrieve()` and `store()` to move well plates, reservoirs, or Flex tip racks to and from the Stacker during a protocol.
+- This release adds support for the Opentrons Flex 96-Channel Pipette (1–200 µL) to transfer as little as 1 µL in a protocol.
+- Control individual robot motors, like the gantry, extension mount, or gripper, with new commands.
+
+### Known Limitations
+
+- The Opentrons Flex 96-Channel Pipette (1–200 µL) does not yet support liquid classes. Use legacy liquid-handling commands from the Python Protocol API.
+- The Flex Gripper can't currently sense if it has failed to pick up a labware lid.
+- Certain partial tip pickup actions adjacent to a Flex Stacker raise an error, even though no collision would occur.
+- Certain robot motor control commands don't appear properly in the run log. The commands are still functional.
+
+---
+
+## Opentrons Robot Software Changes in 8.5.1
+
+The 8.5.1 hotfix release fixes these bugs:
+
+- Corrected behavior when performing multi-dispense actions using a custom or modified liquid class.
+- Fixed a problem where certain quick transfers (specifically ones that attempt to blow out over the waste chute) could not be run.
+- Air-gapping after a dispense when using a liquid class now uses the correct volume.
+- Fixed a problem where distributing with a liquid class would sometimes fail to blow out the disposal volume.
+
+---
+
+## Opentrons Robot Software Changes in 8.5.0
+
+Welcome to the v8.5.0 release of the Opentrons robot software! This release features the ability to pipette more accurately by using liquid classes in your protocols.
+
+### New Features
+
+- Use Opentrons-verified liquid classes (aqueous, viscous, and volatile) in the Python Protocol API to automatically adjust submerge speed, flow rate, touch tip, air gap, and more.
+- Customize and create your own liquid classes for even more control.
+
+### Improvements
+
+- Several Python API methods have new parameters that add capabilities available in Protocol Designer.
+
+### Bug Fixes
+
+- The Absorbance Plate Reader no longer reports measurements below 0.
+
+---
+
+## Opentrons Robot Software Changes in 8.4.1
+
+There are no changes to the robot software in v8.4.1, but it is required for running protocols in v8.4.1 of the Opentrons App.
+
+---
+
+## Opentrons Robot Software Changes in 8.4.0
+
+Welcome to the v8.4.0 release of the Opentrons robot software! This release includes updated liquid handling commands for pipetting relative to a liquid meniscus, and other new features, improvements, and bug fixes.
+
+### New Features
+
+- Use new `transfer_liquid`, `distribute_liquid`, and `consolidate_liquid` commands on Flex to optimize liquid handling based on Opentrons-verified liquid classes.
+- Stack multiple Opentrons Tough Auto-Sealing Lids on the deck.
+- Move Opentrons Tough Auto-Sealing Lids or remove tip rack lids with the Flex Gripper.
+- Aspirate or dispense in a well based on the liquid meniscus.
+
+### Improvements
+
+- Improved tip drop motions for Flex 1-channel and 8-channel pipettes correctly drop and return attached tips to the tip rack.
+
+### Bug Fixes
+
+- The API raises an error if the Absorbance Plate Reader fails to initialize before reading a plate inside the module.
+
+---
+
+## Opentrons Robot Software Changes in 8.3.2
+
+The 8.3.2 hotfix release fixes a bug where protocol commands could time out, especially when running many long protocols.
+
+---
+
+## Opentrons Robot Software Changes in 8.3.1
+
+The 8.3.1 hotfix release contains two bug fixes:
+
+- Exported data from the Absorbance Plate Reader no longer contains invalid values.
+- A small fix allows all robots to properly reboot after an upgrade to v8.3.0.
+
+## Opentrons Robot Software Changes in 8.3.0
+
+Welcome to the v8.3.0 release of the Opentrons robot software! This release includes improvements to error recovery on the Flex, as well as beta features for our commercial partners.
+
+### Improved Features
+
+- Improvements to the Flex error recovery feature help protocols recover from detected stalls and collisions, saving you valuable time and resources.
+
+---
+
 ## Opentrons Robot Software Changes in 8.2.0
 
 Welcome to the v8.2.0 release of the Opentrons robot software! This release adds support for the Opentrons Absorbance Plate Reader Module.
@@ -23,6 +152,10 @@ Welcome to the v8.2.0 release of the Opentrons robot software! This release adds
 ### Bug Fixes
 
 - Error recovery no longer causes an `AssertionError` when a Python protocol changes the pipette speed.
+
+### Known Issues
+
+- You can't downgrade the robot software with an Absorbance Plate Reader attached. Disconnect the module first if you need to downgrade.
 
 ---
 
@@ -111,7 +244,7 @@ Welcome to the v7.3.0 release of the Opentrons robot software!
 ### Bug Fixes
 
 - Fixed an edge case where capitalizing part of a labware load name could cause unexpected behavior or collisions.
-- Fixed Python packages installed  on the OT-2 with `pip` not being found by `import` statements.
+- Fixed Python packages installed on the OT-2 with `pip` not being found by `import` statements.
 
 ---
 
@@ -147,7 +280,7 @@ Welcome to the v7.2.1 release of the Opentrons robot software!
 
 Welcome to the v7.2.0 release of the Opentrons robot software!
 
-This update may take longer than usual if your robot has a lot of long protocols and runs stored on it. Allow *approximately 20 minutes* for your robot to restart. This delay will only happen once.
+This update may take longer than usual if your robot has a lot of long protocols and runs stored on it. Allow _approximately 20 minutes_ for your robot to restart. This delay will only happen once.
 
 If you don't care about preserving your labware offsets and run history, you can avoid the delay by clearing your runs and protocols before starting this update. Go to **Robot Settings** > **Device Reset** and select **Clear protocol run history**.
 
@@ -282,12 +415,12 @@ Some protocols can't be simulated with the `opentrons_simulate` command-line too
 Welcome to the v6.3.1 release of the OT-2 software! This hotfix release addresses a few problems.
 
 ### Improved Features
+
 - Changed the Thermocycler GEN2 plate ejection behavior to prevent plates from getting stuck after PCR cycles or being ejected too forcefully.
 
 ### Bug Fixes
 
-- Specifying Python API version 2.14 no longer prevents ``set_block_temperature`` from executing a hold time.
-
+- Specifying Python API version 2.14 no longer prevents `set_block_temperature` from executing a hold time.
 
 ---
 
@@ -313,6 +446,7 @@ Some protocols can't be simulated with the `opentrons_simulate` command-line too
 - Python protocols specifying an `apiLevel` of 2.14
 
 ---
+
 ## OT-2 Software Changes in 6.2.1
 
 Welcome to the v6.2.1 release of the OT-2 software! This hotfix release addresses a few problems.

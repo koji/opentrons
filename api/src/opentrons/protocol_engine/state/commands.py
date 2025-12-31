@@ -1,10 +1,11 @@
 """Protocol engine commands sub-state."""
+
 from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Tuple
 from typing_extensions import assert_never
 
 from opentrons_shared_data.errors import EnumeratedError, ErrorCodes, PythonException
@@ -19,6 +20,12 @@ from opentrons.protocol_engine.actions.actions import (
 )
 from opentrons.protocol_engine.commands.unsafe.unsafe_ungrip_labware import (
     UnsafeUngripLabwareCommandType,
+)
+from opentrons.protocol_engine.commands.unsafe.unsafe_stacker_close_latch import (
+    UnsafeFlexStackerCloseLatchCommandType,
+)
+from opentrons.protocol_engine.commands.unsafe.unsafe_stacker_open_latch import (
+    UnsafeFlexStackerOpenLatchCommandType,
 )
 from opentrons.protocol_engine.error_recovery_policy import (
     ErrorRecoveryPolicy,
@@ -228,14 +235,14 @@ class CommandState:
     This value can be used to generate future hashes.
     """
 
-    failed_command_errors: List[ErrorOccurrence]
-    """List of command errors that occurred during run execution."""
-
     has_entered_error_recovery: bool
     """Whether the run has entered error recovery."""
 
-    stopped_by_estop: bool
-    """If this is set to True, the engine was stopped by an estop event."""
+    stopped_by_async_error: bool
+    """If this is set to True, the engine was stopped by an async event."""
+
+    is_stopping_because_of_async_error: bool
+    """If this is set to True, the engine was stopped by an asynch event and hasn't finished stopping."""
 
     error_recovery_policy: ErrorRecoveryPolicy
     """See `CommandView.get_error_recovery_policy()`."""
@@ -268,13 +275,13 @@ class CommandStore(HasState[CommandState], HandlesActions):
             run_completed_at=None,
             run_started_at=None,
             latest_protocol_command_hash=None,
-            stopped_by_estop=False,
-            failed_command_errors=[],
+            stopped_by_async_error=False,
+            is_stopping_because_of_async_error=False,
             error_recovery_policy=error_recovery_policy,
             has_entered_error_recovery=False,
         )
 
-    def handle_action(self, action: Action) -> None:
+    def handle_action(self, action: Action) -> None:  # noqa: C901
         """Modify state in reaction to an action."""
         match action:
             case QueueCommandAction():
@@ -304,11 +311,15 @@ class CommandStore(HasState[CommandState], HandlesActions):
             case _:
                 pass
 
+    def clear_history(self) -> None:
+        """Clears CommandHistory state."""
+        self._state.command_history.clear()
+
     def _handle_queue_command_action(self, action: QueueCommandAction) -> None:
         # TODO(mc, 2021-06-22): mypy has trouble with this automatic
         # request > command mapping, figure out how to type precisely
         # (or wait for a future mypy version that can figure it out).
-        queued_command = action.request._CommandCls.construct(
+        queued_command = action.request._CommandCls.model_construct(
             id=action.command_id,
             key=(
                 action.request.key
@@ -330,7 +341,7 @@ class CommandStore(HasState[CommandState], HandlesActions):
     def _handle_run_command_action(self, action: RunCommandAction) -> None:
         prev_entry = self._state.command_history.get(action.command_id)
 
-        running_command = prev_entry.command.copy(
+        running_command = prev_entry.command.model_copy(
             update={
                 "status": CommandStatus.RUNNING,
                 "startedAt": action.started_at,
@@ -343,7 +354,9 @@ class CommandStore(HasState[CommandState], HandlesActions):
         succeeded_command = action.command
         self._state.command_history.set_command_succeeded(succeeded_command)
 
-    def _handle_fail_command_action(self, action: FailCommandAction) -> None:
+    def _handle_fail_command_action(  # noqa: C901
+        self, action: FailCommandAction
+    ) -> None:
         prev_entry = self.state.command_history.get(action.command_id)
 
         if isinstance(action.error, EnumeratedError):  # The error was undefined.
@@ -366,13 +379,18 @@ class CommandStore(HasState[CommandState], HandlesActions):
             notes=action.notes,
         )
         self._state.failed_command = self._state.command_history.get(action.command_id)
-        self._state.failed_command_errors.append(public_error_occurrence)
 
         if (
             prev_entry.command.intent in (CommandIntent.PROTOCOL, None)
             and action.type == ErrorRecoveryType.WAIT_FOR_RECOVERY
         ):
-            self._state.queue_status = QueueStatus.AWAITING_RECOVERY
+            if (
+                self._state.queue_status == QueueStatus.PAUSED
+                or self._state.is_door_blocking
+            ):
+                self._state.queue_status = QueueStatus.AWAITING_RECOVERY_PAUSED
+            else:
+                self._state.queue_status = QueueStatus.AWAITING_RECOVERY
             self._state.recovery_target = _RecoveryTargetInfo(
                 command_id=action.command_id,
                 state_update_if_false_positive=state_update_if_false_positive,
@@ -387,9 +405,15 @@ class CommandStore(HasState[CommandState], HandlesActions):
                 self._state.command_history.get_setup_queue_ids()
             )
         elif prev_entry.command.intent == CommandIntent.FIXIT:
-            other_command_ids_to_fail = list(
-                self._state.command_history.get_fixit_queue_ids()
-            )
+            if (
+                action.type == ErrorRecoveryType.CONTINUE_WITH_ERROR
+                or action.type == ErrorRecoveryType.ASSUME_FALSE_POSITIVE_AND_CONTINUE
+            ):
+                other_command_ids_to_fail = []
+            else:
+                other_command_ids_to_fail = list(
+                    self._state.command_history.get_fixit_queue_ids()
+                )
         elif (
             prev_entry.command.intent == CommandIntent.PROTOCOL
             or prev_entry.command.intent is None
@@ -452,8 +476,9 @@ class CommandStore(HasState[CommandState], HandlesActions):
             self._state.recovery_target = None
             self._state.queue_status = QueueStatus.PAUSED
 
-            if action.from_estop:
-                self._state.stopped_by_estop = True
+            if action.from_asynchronous_error:
+                self._state.stopped_by_async_error = True
+                self._state.is_stopping_because_of_async_error = True
                 self._state.run_result = RunResult.FAILED
             else:
                 self._state.run_result = RunResult.STOPPED
@@ -479,14 +504,29 @@ class CommandStore(HasState[CommandState], HandlesActions):
                     action.error_details.error,
                 )
         else:
-            # HACK(sf): There needs to be a better way to set
-            # an estop error than this else clause
-            if self._state.stopped_by_estop and action.error_details:
+            # HACK(sf): There needs to be a better way to handle async errors than this logic
+            # which is way too nonlocal. The idea here is that
+            # (1) there's an async error that calls one of the engine async error handlers,
+            # which emits a stop action and then tells the orchestrator to call finish
+            # (2) calling stop normally would lock out the run error field (since the idea is that
+            # stop happens in the handler of the error that stops the run, and thus the failed
+            # command has already set the run error), but here either the command didn't fail or
+            # the command failed with an error that isn't relevant or is duplicative, so we want
+            # to override that
+            # (3) but we don't want to override it twice, because some other error handler might
+            # tell us to finish with the cancelled error that happens because a command was cancelled
+            # in reaction to (2)
+            # So we set and clear this stopped_by_async_error and it's awful. Let's figure out a better
+            # way.
+
+            if self._state.is_stopping_because_of_async_error and action.error_details:
                 self._state.run_error = self._map_run_exception_to_error_occurrence(
                     action.error_details.error_id,
                     action.error_details.created_at,
                     action.error_details.error,
                 )
+                self._state.is_stopping_because_of_async_error = False
+                self._state.stopped_by_async_error = True
 
     def _handle_hardware_stopped_action(self, action: HardwareStoppedAction) -> None:
         self._state.queue_status = QueueStatus.PAUSED
@@ -496,10 +536,13 @@ class CommandStore(HasState[CommandState], HandlesActions):
         )
 
         if action.finish_error_details:
-            self._state.finish_error = self._map_finish_exception_to_error_occurrence(
-                action.finish_error_details.error_id,
-                action.finish_error_details.created_at,
-                action.finish_error_details.error,
+            self._state.finish_error = (
+                self._state.finish_error
+                or self._map_finish_exception_to_error_occurrence(
+                    action.finish_error_details.error_id,
+                    action.finish_error_details.created_at,
+                    action.finish_error_details.error,
+                )
             )
 
     def _handle_door_change_action(self, action: DoorChangeAction) -> None:
@@ -511,7 +554,10 @@ class CommandStore(HasState[CommandState], HandlesActions):
                         pass
                     case QueueStatus.RUNNING | QueueStatus.PAUSED:
                         self._state.queue_status = QueueStatus.PAUSED
-                    case QueueStatus.AWAITING_RECOVERY | QueueStatus.AWAITING_RECOVERY_PAUSED:
+                    case (
+                        QueueStatus.AWAITING_RECOVERY
+                        | QueueStatus.AWAITING_RECOVERY_PAUSED
+                    ):
                         self._state.queue_status = QueueStatus.AWAITING_RECOVERY_PAUSED
             elif action.door_state == DoorState.CLOSED:
                 self._state.is_door_blocking = False
@@ -530,7 +576,7 @@ class CommandStore(HasState[CommandState], HandlesActions):
         notes: Optional[List[CommandNote]],
     ) -> None:
         prev_entry = self._state.command_history.get(command_id)
-        failed_command = prev_entry.command.copy(
+        failed_command = prev_entry.command.model_copy(
             update={
                 "completedAt": failed_at,
                 "status": CommandStatus.FAILED,
@@ -584,7 +630,7 @@ class CommandStore(HasState[CommandState], HandlesActions):
             )
 
 
-class CommandView(HasState[CommandState]):
+class CommandView:
     """Read-only command state view."""
 
     _state: CommandState
@@ -612,49 +658,35 @@ class CommandView(HasState[CommandState]):
         """Get a subset of commands around a given cursor.
 
         If the cursor is omitted, a cursor will be selected automatically
-        based on the currently running or most recently executed command.
+        based on the currently running or most recently executed command,
+        and the slice of commands returned is the previous `length` commands
+        inclusive of the currently running or most recently executed command.
         """
         command_ids = self._state.command_history.get_filtered_command_ids(
             include_fixit_commands=include_fixit_commands
         )
-        running_command = self._state.command_history.get_running_command()
-        queued_command_ids = self._state.command_history.get_queue_ids()
         total_length = len(command_ids)
 
-        # TODO(mm, 2024-05-17): This looks like it's attempting to do the same thing
-        # as self.get_current(), but in a different way. Can we unify them?
         if cursor is None:
-            if running_command is not None:
-                cursor = running_command.index
-            elif len(queued_command_ids) > 0:
-                # Get the most recently executed command,
-                # which we can find just before the first queued command.
-                cursor = (
-                    self._state.command_history.get(queued_command_ids.head()).index - 1
-                )
-            elif (
-                self._state.run_result
-                and self._state.run_result == RunResult.FAILED
-                and self._state.failed_command
-            ):
-                # Currently, if the run fails, we mark all the commands we didn't
-                # reach as failed. This makes command status alone insufficient to
-                # find the most recent command that actually executed, so we need to
-                # store that separately.
-                cursor = self._state.failed_command.index
+            current_pointer = self.get_current()
+
+            if current_pointer is not None:
+                cursor = current_pointer.index
             else:
-                cursor = total_length - length
+                cursor = total_length - 1
+
+            cursor = max(cursor - length + 1, 0)
 
         # start is inclusive, stop is exclusive
-        actual_cursor = max(0, min(cursor, total_length - 1))
-        stop = min(total_length, actual_cursor + length)
+        start = max(0, min(cursor, total_length - 1))
+        stop = min(total_length, start + length)
         commands = self._state.command_history.get_slice(
-            start=actual_cursor, stop=stop, command_ids=command_ids
+            start=start, stop=stop, command_ids=command_ids
         )
 
         return CommandSlice(
             commands=commands,
-            cursor=actual_cursor,
+            cursor=start,
             total_length=total_length,
         )
 
@@ -684,7 +716,7 @@ class CommandView(HasState[CommandState]):
         finish_error = self._state.finish_error
 
         if run_error and finish_error:
-            combined_error = ErrorOccurrence.construct(
+            combined_error = ErrorOccurrence(
                 id=finish_error.id,
                 createdAt=finish_error.createdAt,
                 errorType="RunAndFinishFailed",
@@ -706,7 +738,12 @@ class CommandView(HasState[CommandState]):
 
     def get_all_errors(self) -> List[ErrorOccurrence]:
         """Get the run's full error list, if there was none, returns an empty list."""
-        return self._state.failed_command_errors
+        failed_commands = self._state.command_history.get_all_failed_commands()
+        return [
+            command_error.error
+            for command_error in failed_commands
+            if command_error.error is not None
+        ]
 
     def get_has_entered_recovery_mode(self) -> bool:
         """Get whether the run has entered recovery mode."""
@@ -916,7 +953,7 @@ class CommandView(HasState[CommandState]):
         fatal error of the overall run coming from anywhere in the Python script,
         including in between commands.
         """
-        failed_command = self.state.failed_command
+        failed_command = self._state.failed_command
         if (
             failed_command
             and failed_command.command.error
@@ -932,11 +969,15 @@ class CommandView(HasState[CommandState]):
 
         The command ID is assumed to point to a failed command.
         """
-        return self.state.command_error_recovery_types[command_id]
+        return self._state.command_error_recovery_types[command_id]
 
     def get_is_stopped(self) -> bool:
         """Get whether an engine stop has completed."""
         return self._state.run_completed_at is not None
+
+    def get_is_stopped_by_async_error(self) -> bool:
+        """Return whether the engine was stopped specifically by an E-stop."""
+        return self._state.stopped_by_async_error
 
     def has_been_played(self) -> bool:
         """Get whether engine has started."""
@@ -1131,8 +1172,16 @@ class CommandView(HasState[CommandState]):
         # is probably a mistake in the caller's logic.
         assert fixit_command.intent == CommandIntent.FIXIT
 
-        # This type annotation is to make sure the string constant stays in sync and isn't typo'd.
-        required_command_type: UnsafeUngripLabwareCommandType = "unsafe/ungripLabware"
+        # These type annotations are to make sure the string constants stay in sync and aren't typo'd.
+        allowed_command_types: Tuple[
+            UnsafeUngripLabwareCommandType,
+            UnsafeFlexStackerCloseLatchCommandType,
+            UnsafeFlexStackerOpenLatchCommandType,
+        ] = (
+            "unsafe/ungripLabware",
+            "unsafe/flexStacker/closeLatch",
+            "unsafe/flexStacker/openLatch",
+        )
         # todo(mm, 2024-10-04): Instead of allowlisting command types, maybe we should
         # add a `mayRunWithDoorOpen: bool` field to command requests.
-        return fixit_command.commandType == required_command_type
+        return fixit_command.commandType in allowed_command_types

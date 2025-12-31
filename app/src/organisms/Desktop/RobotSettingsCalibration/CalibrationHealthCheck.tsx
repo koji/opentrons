@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useSelector } from 'react-redux'
 import { useTranslation } from 'react-i18next'
+import { useSelector } from 'react-redux'
 
 import {
   ALIGN_CENTER,
@@ -18,21 +18,21 @@ import {
 
 import { getTopPortalEl } from '/app/App/portal'
 import { TertiaryButton } from '/app/atoms/buttons'
-import { AskForCalibrationBlockModal } from '../CalibrateTipLength/AskForCalibrationBlockModal'
 import {
-  useTrackEvent,
   ANALYTICS_CALIBRATION_HEALTH_CHECK_BUTTON_CLICKED,
+  useTrackEvent,
 } from '/app/redux/analytics'
 import * as Calibration from '/app/redux/calibration'
 import * as Config from '/app/redux/config'
 import * as Pipettes from '/app/redux/pipettes'
 import * as Sessions from '/app/redux/sessions'
-import { useRunStatuses } from '/app/resources/runs'
-import {
-  useAttachedPipettes,
-  useAttachedPipetteCalibrations,
-} from '/app/resources/instruments'
 import { useDeckCalibrationStatus } from '/app/resources/calibration'
+import {
+  useAttachedPipetteCalibrations,
+  useAttachedPipettes,
+} from '/app/resources/instruments'
+
+import { AskForCalibrationBlockModal } from '../CalibrateTipLength/AskForCalibrationBlockModal'
 
 import type {
   AttachedPipettesByMount,
@@ -45,6 +45,7 @@ interface CalibrationHealthCheckProps {
   dispatchRequests: DispatchRequestsType
   isPending: boolean
   robotName: string
+  isRobotBusy: boolean
 }
 
 const attachedPipetteCalPresent: (
@@ -63,6 +64,7 @@ export function CalibrationHealthCheck({
   dispatchRequests,
   isPending,
   robotName,
+  isRobotBusy,
 }: CalibrationHealthCheckProps): JSX.Element {
   const { t } = useTranslation([
     'device_settings',
@@ -80,8 +82,6 @@ export function CalibrationHealthCheck({
   const attachedPipettes = useAttachedPipettes()
   const attachedPipetteCalibrations = useAttachedPipetteCalibrations()
 
-  const { isRunRunning: isRunning } = useRunStatuses()
-
   const pipetteCalPresent = attachedPipetteCalPresent(
     attachedPipettes,
     attachedPipetteCalibrations
@@ -93,16 +93,18 @@ export function CalibrationHealthCheck({
   const configHasCalibrationBlock = useSelector(Config.getHasCalibrationBlock)
 
   const healthCheckIsPossible =
-    !([
-      Calibration.DECK_CAL_STATUS_SINGULARITY,
-      Calibration.DECK_CAL_STATUS_BAD_CALIBRATION,
-      Calibration.DECK_CAL_STATUS_IDENTITY,
-    ] as Array<typeof deckCalibrationStatus>).includes(deckCalibrationStatus) &&
+    !(
+      [
+        Calibration.DECK_CAL_STATUS_SINGULARITY,
+        Calibration.DECK_CAL_STATUS_BAD_CALIBRATION,
+        Calibration.DECK_CAL_STATUS_IDENTITY,
+      ] as Array<typeof deckCalibrationStatus>
+    ).includes(deckCalibrationStatus) &&
     pipetteCalPresent &&
     pipettePresent
 
   const calCheckButtonDisabled = healthCheckIsPossible
-    ? Boolean(buttonDisabledReason) || isPending || isRunning
+    ? Boolean(buttonDisabledReason) || isPending || isRobotBusy
     : true
 
   const handleHealthCheck = (
@@ -142,10 +144,13 @@ export function CalibrationHealthCheck({
       justifyContent={JUSTIFY_SPACE_BETWEEN}
     >
       <Flex gridGap={SPACING.spacing8} flexDirection={DIRECTION_COLUMN}>
-        <LegacyStyledText as="h3" fontWeight={TYPOGRAPHY.fontWeightSemiBold}>
+        <LegacyStyledText
+          forwardedAs="h3"
+          fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+        >
           {t('calibration_health_check_title')}
         </LegacyStyledText>
-        <LegacyStyledText as="p">
+        <LegacyStyledText forwardedAs="p">
           {t('calibration_health_check_description')}
         </LegacyStyledText>
       </Flex>

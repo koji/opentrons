@@ -2,14 +2,14 @@ import { useTranslation } from 'react-i18next'
 import { css } from 'styled-components'
 
 import {
-  Flex,
-  DIRECTION_ROW,
-  JUSTIFY_SPACE_BETWEEN,
-  TYPOGRAPHY,
-  COLORS,
   BORDERS,
-  SPACING,
+  COLORS,
+  DIRECTION_ROW,
+  Flex,
+  JUSTIFY_SPACE_BETWEEN,
   LegacyStyledText,
+  SPACING,
+  TYPOGRAPHY,
 } from '@opentrons/components'
 
 import { RenderResult } from './RenderResult'
@@ -36,8 +36,8 @@ export function CalibrationResult({
     return calType === 'deck'
       ? 'deck_calibration'
       : calType === 'pipetteOffset'
-      ? 'pipette_offset_title'
-      : 'tip_length'
+        ? 'pipette_offset_title'
+        : 'tip_length'
   }
   return (
     <Flex

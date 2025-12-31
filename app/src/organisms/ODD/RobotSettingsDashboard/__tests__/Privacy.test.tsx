@@ -1,6 +1,5 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { vi, describe, beforeEach, afterEach, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
@@ -9,17 +8,19 @@ import { getRobotSettings } from '/app/redux/robot-settings'
 
 import { Privacy } from '../Privacy'
 
+import type { ComponentProps } from 'react'
+
 vi.mock('/app/redux/analytics')
 vi.mock('/app/redux/robot-settings')
 
-const render = (props: React.ComponentProps<typeof Privacy>) => {
+const render = (props: ComponentProps<typeof Privacy>) => {
   return renderWithProviders(<Privacy {...props} />, {
     i18nInstance: i18n,
   })
 }
 
 describe('Privacy', () => {
-  let props: React.ComponentProps<typeof Privacy>
+  let props: ComponentProps<typeof Privacy>
   beforeEach(() => {
     props = {
       robotName: 'Otie',

@@ -1,11 +1,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import {
-  getModuleDisplayName,
-  HEATERSHAKER_MODULE_TYPE,
-  THERMOCYCLER_MODULE_TYPE,
-} from '@opentrons/shared-data'
+
 import {
   ALIGN_START,
   Banner,
@@ -13,13 +9,19 @@ import {
   DIRECTION_COLUMN,
   DIRECTION_ROW,
   Flex,
-  Modal,
   JUSTIFY_FLEX_END,
+  LegacyStyledText,
+  Modal,
   PrimaryButton,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
+import {
+  getModuleDisplayName,
+  HEATERSHAKER_MODULE_TYPE,
+  THERMOCYCLER_MODULE_TYPE,
+} from '@opentrons/shared-data'
+
 import { getTopPortalEl } from '/app/App/portal'
 
 import type { AttachedModule } from '/app/redux/modules/types'
@@ -60,7 +62,7 @@ export function ErrorInfo(props: ErrorInfoProps): JSX.Element | null {
         {t('module_error')}
 
         <Flex flexDirection={DIRECTION_ROW}>
-          <LegacyStyledText as="p" marginRight={SPACING.spacing4}>
+          <LegacyStyledText forwardedAs="p" marginRight={SPACING.spacing4}>
             {t('view')}
           </LegacyStyledText>
           <Btn
@@ -72,7 +74,7 @@ export function ErrorInfo(props: ErrorInfoProps): JSX.Element | null {
             aria-label="view_error_details"
           >
             <LegacyStyledText
-              as="p"
+              forwardedAs="p"
               textDecoration={TYPOGRAPHY.textDecorationUnderline}
             >
               {t('error_details')}
@@ -93,9 +95,14 @@ export function ErrorInfo(props: ErrorInfoProps): JSX.Element | null {
             >
               <Flex flexDirection={DIRECTION_COLUMN}>
                 {errorDetails != null ? (
-                  <LegacyStyledText as="p">{errorDetails}</LegacyStyledText>
+                  <LegacyStyledText forwardedAs="p">
+                    {errorDetails}
+                  </LegacyStyledText>
                 ) : null}
-                <LegacyStyledText as="p" marginBottom={SPACING.spacing16}>
+                <LegacyStyledText
+                  forwardedAs="p"
+                  marginBottom={SPACING.spacing16}
+                >
                   {t('branded:module_error_contact_support')}
                 </LegacyStyledText>
               </Flex>

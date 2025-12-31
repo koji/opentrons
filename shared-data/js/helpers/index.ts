@@ -1,12 +1,20 @@
 import uniq from 'lodash/uniq'
 
-import { OPENTRONS_LABWARE_NAMESPACE } from '../constants'
 import standardOt2DeckDef from '../../deck/definitions/5/ot2_standard.json'
 import standardFlexDeckDef from '../../deck/definitions/5/ot3_standard.json'
+import standardOt2RobotDef from '../../robot/definitions/1/ot2.json'
+import standardFlexRobotDef from '../../robot/definitions/1/ot3.json'
+import { FLEX_ROBOT_TYPE, OPENTRONS_LABWARE_NAMESPACE } from '../constants'
+import { getAllLiquidClassDefs } from '../liquidClasses'
+import { getSchema2Dimensions } from './positionMath'
+
+import type { AddressableAreaName, CutoutId } from '../../deck/types/schemaV5'
 import type {
   DeckDefinition,
-  LabwareDefinition2,
+  LabwareDefinition,
+  LiquidClass,
   ModuleModel,
+  RobotDefinition,
   RobotType,
   ThermalAdapterName,
 } from '../types'
@@ -24,42 +32,77 @@ export * from './parseProtocolData'
 export * from './volume'
 export * from './wellSets'
 export * from './getAreFlexSlotsAdjacent'
+export * from './getMmFromBottom'
 export * from './getModuleVizDims'
-export * from './getVectorDifference'
-export * from './getVectorSum'
+export * from './vectorMath'
+export * from './matrixMath'
 export * from './getLoadedLabwareDefinitionsByUri'
 export * from './getFixedTrashLabwareDefinition'
 export * from './getOccludedSlotCountForModule'
+export * from './getFlexStackerHardwareProps'
 export * from './labwareInference'
+export * from './linearInterpolate'
+export * from './liquidClasses'
 export * from './getAddressableAreasInProtocol'
 export * from './getFlexSurroundingSlots'
+export * from './getOt2SurroundingSlots'
 export * from './getSimplestFlexDeckConfig'
 export * from './formatRunTimeParameterDefaultValue'
 export * from './formatRunTimeParameterValue'
 export * from './formatRunTimeParameterMinMax'
 export * from './orderRuntimeParameterRangeOptions'
 export * from './sortRunTimeParameters'
+export * from './parseAddressableArea'
+export * from './validateCustomLabwareHelper'
+export * from './getWellRangeForLiquidLabwarePair'
+export * from './positionMath'
+export * from './pairsFromArray'
+export * from './getMaxPushOutVolume'
+export * from './getLabwareDefinitionsByURIForProtocol'
+export * from './getLabwareDefURI'
+export * from './getLabwareInfoByLiquidId'
+export * from './getLiquidsByIdForLabware'
+export * from './getStackedItemsOnStartingDeck'
+export * from './getStandardDeckViewLayerBlockList'
+export * from './getWellFillFromLabwareId'
+export * from './getModuleDeckLabel'
+export * from './deckConfig'
+export * from './testHelpers'
+export * from './symbolicPositionHelpers'
+export * from './slotHovers'
+export * from './deckConfiguration'
 
-export const getLabwareDefIsStandard = (def: LabwareDefinition2): boolean =>
+export const getLabwareDefIsStandard = (def: LabwareDefinition): boolean =>
   def?.namespace === OPENTRONS_LABWARE_NAMESPACE
 
-export const getLabwareDefURI = (def: LabwareDefinition2): string =>
-  constructLabwareDefURI(
-    def.namespace,
-    def.parameters.loadName,
-    String(def.version)
-  )
+export interface URIDetails {
+  loadName: string
+  namespace: string
+  version: number
+}
+export const splitLabwareDefURI = (uri: string): URIDetails => {
+  const parts = uri.split('/')
 
-export const constructLabwareDefURI = (
-  namespace: string,
-  loadName: string,
-  version: string
-): string => `${namespace}/${loadName}/${version}`
+  if (parts.length !== 3) {
+    console.error(
+      `Error: Invalid URI format. Expected 3 parts, got ${parts.length}`
+    )
+    return { loadName: '', namespace: '', version: -1 }
+  } else {
+    const [namespace, loadName, versionStr] = parts
+
+    return {
+      namespace,
+      loadName,
+      version: Number(versionStr),
+    }
+  }
+}
 
 // Load names of "retired" labware
 // TODO(mc, 2019-12-3): how should this correspond to LABWAREV2_DO_NOT_LIST?
 // see shared-data/js/getLabware.js
-const RETIRED_LABWARE = [
+export const RETIRED_LABWARE = [
   'geb_96_tiprack_10ul',
   'geb_96_tiprack_1000ul',
   'opentrons_1_trash_850ml_fixed',
@@ -74,10 +117,16 @@ const RETIRED_LABWARE = [
   // Replaced by opentrons_96_wellplate_200ul_pcr_full_skirt
   // https://opentrons.atlassian.net/browse/RLAB-230
   'armadillo_96_wellplate_200ul_pcr_full_skirt',
+  // adapter/labware combo defs
+  'opentrons_universal_flat_adapter_corning_384_wellplate_112ul_flat',
+  'opentrons_96_pcr_adapter_nest_wellplate_100ul_pcr_full_skirt',
+  'opentrons_96_flat_bottom_adapter_nest_wellplate_200ul_flat',
+  'opentrons_96_deep_well_adapter_nest_wellplate_2ml_deep',
+  'opentrons_96_pcr_adapter_armadillo_wellplate_200ul',
 ]
 
 export const getLabwareDisplayName = (
-  labwareDef: LabwareDefinition2
+  labwareDef: LabwareDefinition
 ): string => {
   const { displayName } = labwareDef.metadata
 
@@ -91,12 +140,10 @@ export const getLabwareDisplayName = (
   return displayName
 }
 
-export const getTiprackVolume = (labwareDef: LabwareDefinition2): number => {
+export const getTiprackVolume = (labwareDef: LabwareDefinition): number => {
   console.assert(
     labwareDef.parameters.isTiprack,
-    `getTiprackVolume expected a tiprack labware ${getLabwareDefURI(
-      labwareDef
-    )}, but 'isTiprack' isn't true`
+    `getTiprackVolume expected a tiprack labware ${labwareDef.parameters.loadName}, but 'isTiprack' isn't true`
   )
   // NOTE: Ian 2019-04-16 assuming all tips are the same volume across the rack
   const volume = labwareDef.wells.A1.totalLiquidVolume
@@ -108,7 +155,7 @@ export const getTiprackVolume = (labwareDef: LabwareDefinition2): number => {
 }
 
 export function getLabwareHasQuirk(
-  labwareDef: LabwareDefinition2,
+  labwareDef: LabwareDefinition,
   quirk: string
 ): boolean {
   const quirks = labwareDef.parameters.quirks
@@ -185,7 +232,7 @@ export function splitWellsOnColumn(sortedArray: string[]): string[][] {
 }
 
 export const getWellDepth = (
-  labwareDef: LabwareDefinition2,
+  labwareDef: LabwareDefinition,
   well: string
 ): number => labwareDef.wells[well].depth
 
@@ -193,7 +240,7 @@ export const getWellDepth = (
 // Assumes all wells have same offset because multi-offset not yet supported.
 // TODO: Ian 2019-07-13 return {[string: well]: offset} to support multi-offset
 export const getWellsDepth = (
-  labwareDef: LabwareDefinition2,
+  labwareDef: LabwareDefinition,
   wells: string[]
 ): number => {
   const offsets = wells.map(well => getWellDepth(labwareDef, well))
@@ -202,19 +249,21 @@ export const getWellsDepth = (
     console.warn(
       `expected wells ${JSON.stringify(
         wells
-      )} to all have same offset, but they were different. Labware def is ${getLabwareDefURI(
-        labwareDef
-      )}`
+      )} to all have same offset, but they were different. Labware def is ${
+        labwareDef.parameters.loadName
+      }`
     )
   }
 
   return offsets[0]
 }
 
+type XYPlaneDimension = 'x' | 'y'
+
 export const getWellDimension = (
-  labwareDef: LabwareDefinition2,
+  labwareDef: LabwareDefinition,
   wells: string[],
-  position: 'x' | 'y'
+  position: XYPlaneDimension
 ): number => {
   const offsets = wells.map(well => {
     const labwareWell = labwareDef.wells[well]
@@ -226,6 +275,19 @@ export const getWellDimension = (
     }
   })
   return offsets[0]
+}
+
+export const getMinXYDimension = (
+  labwareDef: LabwareDefinition,
+  wells: string[]
+): number | null => {
+  return (
+    Math.min(
+      ...['x', 'y'].map(dim =>
+        getWellDimension(labwareDef, wells, dim as XYPlaneDimension)
+      )
+    ) ?? null
+  )
 }
 
 export const getSlotHasMatingSurfaceUnitVector = (
@@ -321,9 +383,9 @@ export const getAreSlotsAdjacent = (
   getAreSlotsVerticallyAdjacent(slotNameA, slotNameB)
 
 export const getIsLabwareAboveHeight = (
-  labwareDef: LabwareDefinition2,
+  labwareDef: LabwareDefinition,
   height: number
-): boolean => labwareDef.dimensions.zDimension > height
+): boolean => getSchema2Dimensions(labwareDef).zDimension > height
 
 export const getAdapterName = (labwareLoadname: string): ThermalAdapterName => {
   let adapterName: ThermalAdapterName = 'Universal Flat Adapter'
@@ -372,4 +434,47 @@ export const getDeckDefFromRobotType = (
   return robotType === 'OT-3 Standard'
     ? standardFlexDeckDef
     : standardOt2DeckDef
+}
+
+export const getCutoutIdFromAddressableArea = (
+  addressableAreaName: string,
+  deckDefinition: DeckDefinition
+): CutoutId | null => {
+  /**
+   * Given an addressable area name, returns the cutout ID associated with it, or null if there is none
+   */
+
+  for (const cutoutFixture of deckDefinition.cutoutFixtures) {
+    for (const [cutoutId, providedAreas] of Object.entries(
+      cutoutFixture.providesAddressableAreas
+    ) as Array<[CutoutId, AddressableAreaName[]]>) {
+      if (providedAreas.includes(addressableAreaName as AddressableAreaName)) {
+        return cutoutId
+      }
+    }
+  }
+
+  console.error(
+    `${addressableAreaName} is not provided by any cutout fixtures in deck definition ${deckDefinition.otId}`
+  )
+
+  return null
+}
+
+export const getSortedLiquidClassDefs = (): Record<string, LiquidClass> => {
+  const liquidClassDefs = getAllLiquidClassDefs()
+  return Object.fromEntries(
+    Object.entries(liquidClassDefs).sort(([, valueA], [, valueB]) =>
+      valueA.displayName.localeCompare(valueB.displayName)
+    )
+  )
+}
+
+// hard-coding in V1 robot definitions following pattern with deck definitions
+export const getRobotDefFromRobotType = (
+  robotType: RobotType
+): RobotDefinition => {
+  return (
+    robotType === FLEX_ROBOT_TYPE ? standardFlexRobotDef : standardOt2RobotDef
+  ) as RobotDefinition
 }

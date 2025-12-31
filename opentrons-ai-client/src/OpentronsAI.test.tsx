@@ -1,24 +1,26 @@
-import { screen } from '@testing-library/react'
-import { describe, it, vi, beforeEach } from 'vitest'
 import * as auth0 from '@auth0/auth0-react'
+import { screen } from '@testing-library/react'
+import { beforeEach, describe, it, vi } from 'vitest'
+
+import { Footer } from '/ai-client/components/molecules/Footer'
+import { Header } from '/ai-client/components/molecules/Header'
+import { HeaderWithMeter } from '/ai-client/components/molecules/HeaderWithMeter'
+import { Loading } from '/ai-client/components/molecules/Loading'
+
 import { renderWithProviders } from './__testing-utils__'
 import { i18n } from './i18n'
-import { Loading } from './molecules/Loading'
 import { OpentronsAI } from './OpentronsAI'
 import { Landing } from './pages/Landing'
-import { useGetAccessToken } from './resources/hooks'
-import { Header } from './molecules/Header'
-import { Footer } from './molecules/Footer'
-import { HeaderWithMeter } from './molecules/HeaderWithMeter'
 import { headerWithMeterAtom } from './resources/atoms'
+import { useGetAccessToken } from './resources/hooks'
 
 vi.mock('@auth0/auth0-react')
 
 vi.mock('./pages/Landing')
-vi.mock('./molecules/Header')
-vi.mock('./molecules/HeaderWithMeter')
-vi.mock('./molecules/Footer')
-vi.mock('./molecules/Loading')
+vi.mock('/ai-client/components/molecules/Header')
+vi.mock('/ai-client/components/molecules/HeaderWithMeter')
+vi.mock('/ai-client/components/molecules/Footer')
+vi.mock('/ai-client/components/molecules/Loading')
 vi.mock('./resources/hooks/useGetAccessToken')
 vi.mock('./analytics/mixpanel')
 

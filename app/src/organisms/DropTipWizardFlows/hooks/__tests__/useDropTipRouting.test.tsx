@@ -1,9 +1,9 @@
-import { describe, it, expect, vi } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
+import { act, renderHook } from '@testing-library/react'
 import head from 'lodash/head'
+import { describe, expect, it, vi } from 'vitest'
 
-import { getInitialRouteAndStep, useDropTipRouting } from '../useDropTipRouting'
 import { DT_ROUTES } from '../../constants'
+import { getInitialRouteAndStep, useDropTipRouting } from '../useDropTipRouting'
 
 describe('useDropTipRouting', () => {
   it('should initialize with the correct default values', () => {
@@ -143,5 +143,16 @@ describe('getInitialRouteAndStep', () => {
 
     expect(initialRoute).toBe(DT_ROUTES.DROP_TIP)
     expect(initialStep).toBe(DT_ROUTES.DROP_TIP[2])
+  })
+
+  it('should return the overridden route and first step when fixitUtils.routeOverride.route is provided but routeOverride.step is not provided', () => {
+    const fixitUtils = {
+      routeOverride: { route: DT_ROUTES.DROP_TIP, step: null },
+    } as any
+
+    const [initialRoute, initialStep] = getInitialRouteAndStep(fixitUtils)
+
+    expect(initialRoute).toBe(DT_ROUTES.DROP_TIP)
+    expect(initialStep).toBe(DT_ROUTES.DROP_TIP[0])
   })
 })

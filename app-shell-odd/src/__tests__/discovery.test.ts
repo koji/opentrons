@@ -1,12 +1,13 @@
 // tests for the app-shell's discovery module
 import { app } from 'electron'
 import Store from 'electron-store'
-import { vi, it, expect, describe, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import * as DiscoveryClient from '@opentrons/discovery-client'
-import { startDiscovery, finishDiscovery } from '../actions'
-import { registerDiscovery } from '../discovery'
+
+import { finishDiscovery, startDiscovery } from '../actions'
 import * as Cfg from '../config'
+import { registerDiscovery } from '../discovery'
 
 vi.mock('electron')
 vi.mock('electron-store')
@@ -61,9 +62,9 @@ describe('app-shell/discovery', () => {
         onDidAnyChange: mockOnDidChange,
       } as any
     })
-    vi.mocked(Cfg.getFullConfig).mockReturnValue(({
+    vi.mocked(Cfg.getFullConfig).mockReturnValue({
       discovery: { disableCache: false, candidates: [] },
-    } as unknown) as Cfg.Config)
+    } as unknown as Cfg.Config)
 
     vi.mocked(Cfg.getOverrides).mockReturnValue({})
     vi.mocked(DiscoveryClient.createDiscoveryClient).mockReturnValue(mockClient)
@@ -342,12 +343,12 @@ describe('app-shell/discovery', () => {
 
     it('does not update services from store when caching disabled', () => {
       // cache has been disabled
-      vi.mocked(Cfg.getFullConfig).mockReturnValue(({
+      vi.mocked(Cfg.getFullConfig).mockReturnValue({
         discovery: {
           candidates: [],
           disableCache: true,
         },
-      } as unknown) as Cfg.Config)
+      } as unknown as Cfg.Config)
 
       // discovery.json contains 1 entry
       mockGet.mockImplementation((key: string) => {
@@ -367,12 +368,12 @@ describe('app-shell/discovery', () => {
 
     it('should clear cache and suspend caching when caching becomes disabled', () => {
       // Cache enabled initially
-      vi.mocked(Cfg.getFullConfig).mockReturnValue(({
+      vi.mocked(Cfg.getFullConfig).mockReturnValue({
         discovery: {
           candidates: [],
           disableCache: false,
         },
-      } as unknown) as Cfg.Config)
+      } as unknown as Cfg.Config)
 
       // discovery.json contains 1 entry
       mockGet.mockImplementation((key: string) => {
@@ -401,9 +402,9 @@ describe('app-shell/discovery', () => {
 
   describe('manual addresses', () => {
     it('loads candidates from config on client initialization', () => {
-      vi.mocked(Cfg.getFullConfig).mockReturnValue(({
+      vi.mocked(Cfg.getFullConfig).mockReturnValue({
         discovery: { cacheDisabled: false, candidates: ['1.2.3.4'] },
-      } as unknown) as Cfg.Config)
+      } as unknown as Cfg.Config)
 
       registerDiscovery(dispatch)
 
@@ -418,9 +419,9 @@ describe('app-shell/discovery', () => {
 
     // ensures config override works with only one candidate specified
     it('candidates in config can be single string value', () => {
-      vi.mocked(Cfg.getFullConfig).mockReturnValue(({
+      vi.mocked(Cfg.getFullConfig).mockReturnValue({
         discovery: { cacheDisabled: false, candidates: '1.2.3.4' },
-      } as unknown) as Cfg.Config)
+      } as unknown as Cfg.Config)
 
       registerDiscovery(dispatch)
 

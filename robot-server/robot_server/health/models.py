@@ -1,8 +1,20 @@
 """HTTP request and response models for /health endpoints."""
+
 import typing
 from pydantic import BaseModel, Field
 from opentrons_shared_data.deck.types import RobotModel
 from robot_server.service.json_api import BaseResponseBody
+
+
+class DiskDetails(BaseModel):
+    """System disk usage details."""
+
+    systemAvailableMb: float = Field(
+        ..., description="The system's available disk space in MB."
+    )
+    imagesDirectorySizeMb: float = Field(
+        ..., description="The system's images directory disk size in MB."
+    )
 
 
 class HealthLinks(BaseModel):
@@ -16,7 +28,7 @@ class HealthLinks(BaseModel):
             " or refer to the OpenAPI specification of the `/logs` endpoint, instead."
         ),
         examples=["/logs/api.log"],
-        deprecated=True,
+        json_schema_extra={"deprecated": True},
     )
     serialLog: str = Field(
         ...,
@@ -26,7 +38,7 @@ class HealthLinks(BaseModel):
             " or refer to the OpenAPI specification of the `/logs` endpoint, instead."
         ),
         examples=["/logs/serial.log"],
-        deprecated=True,
+        json_schema_extra={"deprecated": True},
     )
     serverLog: str = Field(
         ...,
@@ -36,10 +48,10 @@ class HealthLinks(BaseModel):
             " or refer to the OpenAPI specification of the `/logs` endpoint, instead."
         ),
         examples=["/logs/server.log"],
-        deprecated=True,
+        json_schema_extra={"deprecated": True},
     )
     oddLog: typing.Optional[str] = Field(
-        None,
+        default=None,
         description=(
             "The path to the on-device display app logs endpoint"
             " (only present on the Opentrons Flex)."
@@ -47,7 +59,7 @@ class HealthLinks(BaseModel):
             " or refer to the OpenAPI specification of the `/logs` endpoint, instead."
         ),
         examples=["/logs/touchscreen.log"],
-        deprecated=True,
+        json_schema_extra={"deprecated": True},
     )
     apiSpec: str = Field(
         ...,
@@ -103,21 +115,24 @@ class Health(BaseResponseBody):
         ...,
         description="The system's maximum supported Protocol API version, "
         "in the format `[major_version, minor_version]`",
-        min_items=2,
-        max_items=2,
+        min_length=2,
+        max_length=2,
         examples=[[2, 8]],
     )
     minimum_protocol_api_version: typing.List[int] = Field(
         ...,
         description="The system's minimum supported Protocol API version, "
         "in the format `[major_version, minor_version]`",
-        min_items=2,
-        max_items=2,
+        min_length=2,
+        max_length=2,
         examples=[[2, 0]],
     )
     robot_serial: typing.Optional[str] = Field(
         default=None,
         description="The robot serial number. Should be used if present; if not present, use result of /server/update/health.",
         examples=["OT2CEP20190604A02"],
+    )
+    disk_details: DiskDetails = Field(
+        ..., description="Information concerning the system's disk."
     )
     links: HealthLinks

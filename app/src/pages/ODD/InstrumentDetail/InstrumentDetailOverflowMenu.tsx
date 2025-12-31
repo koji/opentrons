@@ -1,7 +1,7 @@
-import * as React from 'react'
-import NiceModal, { useModal } from '@ebay/nice-modal-react'
-import { useTranslation } from 'react-i18next'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
+import NiceModal, { useModal } from '@ebay/nice-modal-react'
 
 import {
   ALIGN_CENTER,
@@ -14,22 +14,23 @@ import {
   SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
-import {
-  SINGLE_MOUNT_PIPETTES,
-  NINETY_SIX_CHANNEL,
-} from '@opentrons/shared-data'
 import { ApiHostProvider } from '@opentrons/react-api-client'
+import {
+  NINETY_SIX_CHANNEL,
+  SINGLE_MOUNT_PIPETTES,
+} from '@opentrons/shared-data'
 
-import { PipetteWizardFlows } from '/app/organisms/PipetteWizardFlows'
-import { GripperWizardFlows } from '/app/organisms/GripperWizardFlows'
-import { FLOWS } from '/app/organisms/PipetteWizardFlows/constants'
-import { GRIPPER_FLOW_TYPES } from '/app/organisms/GripperWizardFlows/constants'
 import { getTopPortalEl } from '/app/App/portal'
+import { GripperWizardFlows } from '/app/organisms/GripperWizardFlows'
+import { GRIPPER_FLOW_TYPES } from '/app/organisms/GripperWizardFlows/constants'
+import { PipetteWizardFlows } from '/app/organisms/PipetteWizardFlows'
+import { FLOWS } from '/app/organisms/PipetteWizardFlows/constants'
 
+import type { ComponentProps, MouseEventHandler } from 'react'
 import type {
-  PipetteData,
   GripperData,
   HostConfig,
+  PipetteData,
 } from '@opentrons/api-client'
 
 interface InstrumentDetailsOverflowMenuProps {
@@ -55,13 +56,13 @@ const InstrumentDetailsOverflowMenu = NiceModal.create(
     const { instrument, host, enableDTWiz } = props
     const { t } = useTranslation('robot_controls')
     const modal = useModal()
-    const [wizardProps, setWizardProps] = React.useState<
-      | React.ComponentProps<typeof GripperWizardFlows>
-      | React.ComponentProps<typeof PipetteWizardFlows>
+    const [wizardProps, setWizardProps] = useState<
+      | ComponentProps<typeof GripperWizardFlows>
+      | ComponentProps<typeof PipetteWizardFlows>
       | null
     >(null)
     const sharedGripperWizardProps: Pick<
-      React.ComponentProps<typeof GripperWizardFlows>,
+      ComponentProps<typeof GripperWizardFlows>,
       'attachedGripper' | 'closeFlow'
     > = {
       attachedGripper: instrument,
@@ -75,7 +76,7 @@ const InstrumentDetailsOverflowMenu = NiceModal.create(
       instrument.mount !== 'extension' &&
       instrument.data?.channels === 96
 
-    const handleRecalibrate: React.MouseEventHandler = () => {
+    const handleRecalibrate: MouseEventHandler = () => {
       if (instrument?.ok) {
         setWizardProps(
           instrument.mount === 'extension'
@@ -117,7 +118,7 @@ const InstrumentDetailsOverflowMenu = NiceModal.create(
                     aria-label="restart_icon"
                   />
                   <LegacyStyledText
-                    as="h4"
+                    forwardedAs="h4"
                     fontWeight={TYPOGRAPHY.fontWeightSemiBold}
                     marginLeft={SPACING.spacing12}
                   >
@@ -135,7 +136,7 @@ const InstrumentDetailsOverflowMenu = NiceModal.create(
                     size="2.5rem"
                   />
                   <LegacyStyledText
-                    as="h4"
+                    forwardedAs="h4"
                     fontWeight={TYPOGRAPHY.fontWeightSemiBold}
                     marginLeft={SPACING.spacing12}
                   >

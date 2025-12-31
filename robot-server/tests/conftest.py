@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import json
 import os
 import pathlib
@@ -23,6 +24,7 @@ from opentrons.calibration_storage import (
     helpers,
     save_robot_deck_attitude,
 )
+from server_utils.fastapi_utils.app_state import AppState, get_app_state
 
 # NOTE(FS 10-24-2023), the fixtures using these functions currently ONLY
 # get pulled in by OT-2 server tests. If this ever changes, we need to
@@ -44,6 +46,12 @@ from robot_server.persistence.database import sql_engine_ctx
 from robot_server.persistence.tables import metadata
 from robot_server.persistence.fastapi_dependencies import get_sql_engine
 from robot_server.health.router import ComponentVersions, get_versions
+from robot_server.runs.run_data_manager import RunDataManager
+from robot_server.runs.dependencies import get_run_data_manager
+from robot_server.service.notifications.notification_client import (
+    NotificationClient,
+    _notification_client_accessor,
+)
 
 test_router = routing.APIRouter()
 
@@ -106,6 +114,11 @@ def hardware() -> MagicMock:
 
 
 @pytest.fixture
+def run_data() -> MagicMock:
+    return MagicMock(spec=RunDataManager)
+
+
+@pytest.fixture
 def versions() -> MagicMock:
     m = MagicMock(spec=get_versions)
     m.return_value = ComponentVersions(
@@ -160,11 +173,56 @@ def _override_ot2_hardware_with_mock(hardware: MagicMock) -> Iterator[None]:
 
 
 @pytest.fixture
+def _override_run_data_manager_with_mock(run_data: MagicMock) -> Iterator[None]:
+    async def get_run_data_manager_override() -> RunDataManager:
+        """Override for the get_run_data_manager FastAPI dependency."""
+        return run_data
+
+    app.dependency_overrides[get_run_data_manager] = get_run_data_manager_override
+    yield
+    del app.dependency_overrides[get_run_data_manager]
+
+
+@pytest.fixture
+def _override_app_state_with_notification_client(decoy: Decoy) -> Iterator[None]:
+    """Override app_state to include a mocked notification client."""
+    mock_app_state = AppState()
+    mock_notification_client = decoy.mock(cls=NotificationClient)
+
+    _notification_client_accessor.set_on(mock_app_state, mock_notification_client)
+
+    async def get_app_state_override() -> AppState:
+        """Override for get_app_state."""
+        return mock_app_state
+
+    app.dependency_overrides[get_app_state] = get_app_state_override
+    yield
+    del app.dependency_overrides[get_app_state]
+
+
+@pytest.fixture
 def api_client(
     _override_hardware_with_mock: None,
     _override_sql_engine_with_mock: None,
     _override_version_with_mock: None,
     _override_ot2_hardware_with_mock: None,
+    _override_app_state_with_notification_client: None,
+) -> TestClient:
+    client = TestClient(app)
+    client.headers.update(
+        {API_VERSION_HEADER: cast(str, LATEST_API_VERSION_HEADER_VALUE)}
+    )
+    return client
+
+
+@pytest.fixture
+def api_client_camera_overrides(
+    _override_hardware_with_mock: None,
+    _override_sql_engine_with_mock: None,
+    _override_version_with_mock: None,
+    _override_ot2_hardware_with_mock: None,
+    _override_run_data_manager_with_mock: None,
+    _override_app_state_with_notification_client: None,
 ) -> TestClient:
     client = TestClient(app)
     client.headers.update(
@@ -239,6 +297,7 @@ def set_up_tip_length_temp_directory(server_temp_directory: str) -> None:
     attached_pip_list = ["123", "321"]
     tip_length_list = [30.5, 31.5]
     definition = labware.get_labware_definition("opentrons_96_filtertiprack_200ul")
+    assert definition["schemaVersion"] == 2  # Required by create_tip_length_data().
     for pip, tip_len in zip(attached_pip_list, tip_length_list):
         cal_data = create_tip_length_data(definition, tip_len)
         save_tip_length_calibration(pip, cal_data)
@@ -332,13 +391,19 @@ def minimal_labware_def() -> LabwareDefinition:
 @pytest.fixture
 def custom_tiprack_def() -> LabwareDefinition:
     return {
-        "metadata": {"displayName": "minimal labware"},
+        "metadata": {
+            "displayName": "minimal labware",
+            "displayCategory": "tipRack",
+            "displayVolumeUnits": "µL",
+        },
         "cornerOffsetFromSlot": {"x": 10, "y": 10, "z": 5},
         "parameters": {
             "isTiprack": True,
             "tipLength": 55.3,
             "tipOverlap": 2.8,
             "loadName": "minimal_labware_def",
+            "format": "96Standard",
+            "isMagneticModuleCompatible": False,
         },
         "ordering": [["A1"], ["A2"]],
         "wells": {
@@ -394,7 +459,35 @@ def clear_custom_tiprack_def_dir() -> Iterator[None]:
 @pytest.fixture
 def sql_engine(tmp_path: Path) -> Generator[SQLEngine, None, None]:
     """Return a set-up database to back the store."""
-    db_file_path = tmp_path / "test.db"
+    with make_sql_engine(tmp_path) as engine:
+        yield engine
+
+
+@contextmanager
+def make_sql_engine(parent_dir: Path) -> Generator[SQLEngine, None, None]:
+    """Like sql_engine, but not a pytest fixture."""
+    db_file_path = parent_dir / "test.db"
     with sql_engine_ctx(db_file_path) as engine:
         metadata.create_all(engine)
         yield engine
+
+
+def datetime_to_zulu_iso8601(dt: datetime) -> str:
+    """Serialize a datetime to an ISO8601 string.
+
+    If the timezone is UTC, represent that with "Z", which matches what Pydantic does,
+    instead instead of with "+00:00", which is Python's default.
+
+    e.g. "2024-12-10T19:40:55.984327Z" vs. "2024-12-10T19:40:55.984327+00:00".
+    """
+    return dt.isoformat().replace("+00:00", "Z")
+
+
+# todo(mm, 2024-12-10):
+# In Python 3.11+, we can replace this with just datetime.fromisoformat().
+def zulu_iso8601_to_datetime(iso8601_str: str) -> datetime:
+    """Parse an ISO8601 datetime string with a "Z" timezone.
+
+    See `datetime_to_zulu_iso8601()`.
+    """
+    return datetime.fromisoformat(iso8601_str.replace("Z", "+00:00"))

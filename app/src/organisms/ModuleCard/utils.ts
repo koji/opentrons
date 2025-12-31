@@ -1,22 +1,21 @@
-import { useState, useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import last from 'lodash/last'
 
-import { useDispatchApiRequest } from '/app/redux/robot-api'
-import { updateModule } from '/app/redux/modules'
-
+import flexStacker from '/app/assets/images/flex_stacker_no_labware.png'
+import heaterShakerModule from '/app/assets/images/heater_shaker_module_transparent.png'
 import magneticModule from '/app/assets/images/magnetic_module_gen_2_transparent.png'
+import absorbanceReader from '/app/assets/images/opentrons_plate_reader.png'
 import temperatureModule from '/app/assets/images/temp_deck_gen_2_transparent.png'
 import thermoModuleGen1Closed from '/app/assets/images/thermocycler_closed.png'
-import thermoModuleGen1Opened from '/app/assets/images/thermocycler_open_transparent.png'
-import heaterShakerModule from '/app/assets/images/heater_shaker_module_transparent.png'
 import thermoModuleGen2Closed from '/app/assets/images/thermocycler_gen_2_closed.png'
 import thermoModuleGen2Opened from '/app/assets/images/thermocycler_gen_2_opened.png'
-import absorbanceReader from '/app/assets/images/opentrons_plate_reader.png'
+import thermoModuleGen1Opened from '/app/assets/images/thermocycler_open_transparent.png'
+import { updateModule } from '/app/redux/modules'
+import { useDispatchApiRequest } from '/app/redux/robot-api'
 
 import type { AttachedModule } from '/app/redux/modules/types'
 
 export function getModuleCardImage(attachedModule: AttachedModule): string {
-  //  TODO(jr, 9/22/22): add images for V1 of magneticModule and temperatureModule
   switch (attachedModule.moduleModel) {
     case 'magneticModuleV1':
     case 'magneticModuleV2':
@@ -40,6 +39,8 @@ export function getModuleCardImage(attachedModule: AttachedModule): string {
       }
     case 'absorbanceReaderV1':
       return absorbanceReader
+    case 'flexStackerModuleV1':
+      return flexStacker
     //  this should never be reached
     default:
       return 'unknown module model, this is an error'
@@ -52,13 +53,11 @@ type GetLatestRequestIdType = (moduleId: string) => string | null
 
 export function useModuleApiRequests(): [
   GetLatestRequestIdType,
-  HandleModuleApiRequestsType
+  HandleModuleApiRequestsType,
 ] {
   const [dispatchApiRequest] = useDispatchApiRequest()
-  const [
-    requestIdsBySerial,
-    setRequestIdsBySerial,
-  ] = useState<RequestIdsBySerialNumber>({})
+  const [requestIdsBySerial, setRequestIdsBySerial] =
+    useState<RequestIdsBySerialNumber>({})
 
   const handleModuleApiRequests = (
     robotName: string,

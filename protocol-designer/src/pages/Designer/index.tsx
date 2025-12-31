@@ -1,34 +1,23 @@
-import { useState, useEffect } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
+
 import {
-  ALIGN_CENTER,
-  ALIGN_END,
-  Btn,
-  COLORS,
-  DIRECTION_COLUMN,
   Flex,
   INFO_TOAST,
-  Icon,
-  JUSTIFY_SPACE_BETWEEN,
-  SPACING,
-  SecondaryButton,
-  Tabs,
-  ToggleGroup,
+  OVERFLOW_HIDDEN,
   useOnClickOutside,
 } from '@opentrons/components'
-import { selectTerminalItem } from '../../ui/steps/actions/actions'
-import { useKitchen } from '../../organisms/Kitchen/hooks'
-import { getDeckSetupForActiveItem } from '../../top-selectors/labware-locations'
+
+import { NAV_BAR_HEIGHT_REM } from '../../components/atoms/constants'
+import { DefineLiquidsModal } from '../../components/organisms'
+import { useKitchen } from '../../components/organisms/Kitchen/useKitchen'
+import { LiquidsOverflowMenu } from '../../components/organisms/LiquidsOverflowMenu'
+import { getFileMetadata } from '../../file-data/selectors'
 import { generateNewProtocol } from '../../labware-ingred/actions'
-import { DefineLiquidsModal, ProtocolMetadataNav } from '../../organisms'
-import { selectDesignerTab } from '../../file-data/actions'
-import { getDesignerTab, getFileMetadata } from '../../file-data/selectors'
-import { DeckSetupContainer } from './DeckSetup'
 import { selectors } from '../../labware-ingred/selectors'
-import { OffDeck } from './Offdeck'
-import { LiquidsOverflowMenu } from './LiquidsOverflowMenu'
+import { getDeckSetupForActiveItem } from '../../top-selectors/labware-locations'
 import { ProtocolSteps } from './ProtocolSteps'
 
 import type { CutoutId } from '@opentrons/shared-data'
@@ -45,7 +34,7 @@ export function Designer(): JSX.Element {
     'protocol_steps',
     'shared',
   ])
-  const { bakeToast, makeSnackbar } = useKitchen()
+  const { bakeToast } = useKitchen()
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const fileMetadata = useSelector(getFileMetadata)
@@ -54,38 +43,9 @@ export function Designer(): JSX.Element {
   const isNewProtocol = useSelector(selectors.getIsNewProtocol)
   const [liquidOverflowMenu, showLiquidOverflowMenu] = useState<boolean>(false)
   const [showDefineLiquidModal, setDefineLiquidModal] = useState<boolean>(false)
-  const tab = useSelector(getDesignerTab)
-  const leftString = t('onDeck')
-  const rightString = t('offDeck')
-
-  const [deckView, setDeckView] = useState<
-    typeof leftString | typeof rightString
-  >(leftString)
+  const [targetWidth, setTargetWidth] = useState<number>(235)
 
   const { modules, additionalEquipmentOnDeck } = deckSetup
-
-  const hasTrashEntity = Object.values(additionalEquipmentOnDeck).some(
-    ae => ae.name === 'trashBin' || ae.name === 'wasteChute'
-  )
-
-  const startingDeckTab = {
-    text: t('protocol_starting_deck'),
-    isActive: tab === 'startingDeck',
-    onClick: () => {
-      dispatch(selectDesignerTab({ tab: 'startingDeck' }))
-    },
-  }
-  const protocolStepTab = {
-    text: t('protocol_steps:protocol_steps'),
-    isActive: tab === 'protocolSteps',
-    onClick: () => {
-      if (hasTrashEntity) {
-        dispatch(selectDesignerTab({ tab: 'protocolSteps' }))
-      } else {
-        makeSnackbar(t('trash_required') as string)
-      }
-    },
-  }
 
   const hasHardware =
     (modules != null && Object.values(modules).length > 0) ||
@@ -120,20 +80,6 @@ export function Designer(): JSX.Element {
     },
   })
 
-  const deckViewItems =
-    deckView === leftString ? (
-      <DeckSetupContainer tab={tab} />
-    ) : (
-      <OffDeck tab={tab} />
-    )
-
-  useEffect(() => {
-    if (tab === 'startingDeck') {
-      //  ensure that the starting deck page is always showing the initial deck setup
-      dispatch(selectTerminalItem('__initial_setup__'))
-    }
-  }, [tab])
-
   return (
     <>
       {showDefineLiquidModal ? (
@@ -153,77 +99,22 @@ export function Designer(): JSX.Element {
             showLiquidOverflowMenu(false)
             setDefineLiquidModal(true)
           }}
+          targetWidth={targetWidth}
         />
       ) : null}
-      <Flex flexDirection={DIRECTION_COLUMN}>
-        <Flex
-          justifyContent={JUSTIFY_SPACE_BETWEEN}
-          padding={SPACING.spacing12}
-        >
-          {zoomIn.slot != null ? null : (
-            <Tabs tabs={[startingDeckTab, protocolStepTab]} />
-          )}
-          <ProtocolMetadataNav
-            isAddingHardwareOrLabware={
-              zoomIn.slot != null && zoomIn.cutout != null
-            }
-          />
-          <Flex gridGap={SPACING.spacing8} alignItems={ALIGN_CENTER}>
-            <Btn
-              alignItems={ALIGN_CENTER}
-              onClick={() => {
-                showLiquidOverflowMenu(true)
-              }}
-            >
-              <Icon size="1.5rem" name="water-drop" data-testid="water-drop" />
-            </Btn>
-            <SecondaryButton
-              onClick={() => {
-                if (hasTrashEntity) {
-                  navigate('/overview')
-                  dispatch(selectTerminalItem('__initial_setup__'))
-                } else {
-                  makeSnackbar(t('trash_required') as string)
-                }
-              }}
-            >
-              {t('shared:done')}
-            </SecondaryButton>
-          </Flex>
-        </Flex>
-        {tab === 'startingDeck' ? (
-          <Flex
-            flexDirection={DIRECTION_COLUMN}
-            backgroundColor={
-              tab === 'startingDeck' && deckView === rightString
-                ? COLORS.white
-                : COLORS.grey10
-            }
-            padding={zoomIn.slot != null ? '0' : SPACING.spacing80}
-            height="calc(100vh - 64px)"
-          >
-            <Flex flexDirection={DIRECTION_COLUMN}>
-              {zoomIn.slot == null ? (
-                <Flex alignSelf={ALIGN_END}>
-                  <ToggleGroup
-                    selectedValue={deckView}
-                    leftText={leftString}
-                    rightText={rightString}
-                    leftClick={() => {
-                      setDeckView(leftString)
-                    }}
-                    rightClick={() => {
-                      setDeckView(rightString)
-                    }}
-                  />
-                </Flex>
-              ) : null}
-              {deckViewItems}
-            </Flex>
-          </Flex>
-        ) : (
-          <ProtocolSteps />
-        )}
+      <Flex
+        height="100%"
+        maxHeight={`calc(100vh - ${NAV_BAR_HEIGHT_REM}rem )`}
+        width="100%"
+        overflowY={OVERFLOW_HIDDEN}
+      >
+        <ProtocolSteps
+          zoomedInSlot={zoomIn.slot}
+          showLiquidOverflowMenu={showLiquidOverflowMenu}
+          targetWidth={targetWidth}
+          setTargetWidth={setTargetWidth}
+          showDefineLiquidModal={showDefineLiquidModal}
+        />
       </Flex>
     </>
   )

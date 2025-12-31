@@ -1,14 +1,13 @@
-import type * as React from 'react'
-import { act, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, it, beforeEach, vi, expect, afterEach } from 'vitest'
+import { act, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 import { ChooseRobotToRunProtocolSlideout } from '/app/organisms/Desktop/ChooseRobotToRunProtocolSlideout'
 import {
-  useTrackEvent,
   ANALYTICS_PROTOCOL_PROCEED_TO_RUN,
+  useTrackEvent,
 } from '/app/redux/analytics'
 import { getValidCustomLabwareFiles } from '/app/redux/custom-labware/selectors'
 import {
@@ -17,16 +16,18 @@ import {
   getScanning,
   getUnreachableRobots,
 } from '/app/redux/discovery'
-import { getIsProtocolAnalysisInProgress } from '/app/redux/protocol-storage/selectors'
 import {
   mockConnectableRobot,
   mockReachableRobot,
   mockUnreachableRobot,
 } from '/app/redux/discovery/__fixtures__'
 import { storedProtocolData } from '/app/redux/protocol-storage/__fixtures__'
+import { getIsProtocolAnalysisInProgress } from '/app/redux/protocol-storage/selectors'
+
 import { ProtocolDetails } from '..'
 
 import type { Mock } from 'vitest'
+import type { ComponentProps } from 'react'
 import type { ProtocolAnalysisOutput } from '@opentrons/shared-data'
 
 vi.mock('/app/redux/analytics')
@@ -37,11 +38,13 @@ vi.mock('/app/organisms/Desktop/ChooseRobotToRunProtocolSlideout')
 vi.mock('/app/organisms/Desktop/SendProtocolToFlexSlideout')
 
 const render = (
-  props: Partial<React.ComponentProps<typeof ProtocolDetails>> = {}
+  props: Partial<ComponentProps<typeof ProtocolDetails>> = {}
 ) => {
   return renderWithProviders(
     <MemoryRouter>
-      <ProtocolDetails {...{ ...storedProtocolData, ...props }} />
+      <ProtocolDetails
+        {...{ ...storedProtocolData, ...props, groupedCommands: null }}
+      />
     </MemoryRouter>,
     {
       i18nInstance: i18n,
@@ -55,7 +58,8 @@ const author = 'Otie'
 const createdAt = '2022-05-04T18:33:48.916159+00:00'
 const description = 'fake protocol description'
 
-const mockMostRecentAnalysis: ProtocolAnalysisOutput = storedProtocolData.mostRecentAnalysis as ProtocolAnalysisOutput
+const mockMostRecentAnalysis: ProtocolAnalysisOutput =
+  storedProtocolData.mostRecentAnalysis!
 
 let mockTrackEvent: Mock
 
@@ -184,6 +188,23 @@ describe('ProtocolDetails', () => {
     })
     screen.getByRole('heading', { name: 'creation method' })
     screen.getByText('Protocol Designer 6.0')
+  })
+  it('renders the protocol creation method for py protocol made in PD', () => {
+    render({
+      mostRecentAnalysis: {
+        ...mockMostRecentAnalysis,
+        createdAt,
+        metadata: {
+          ...mockMostRecentAnalysis.metadata,
+          protocolDesigner: '8.11.22',
+        },
+        config: {
+          ...mockMostRecentAnalysis.config,
+        },
+      },
+    })
+    screen.getByRole('heading', { name: 'creation method' })
+    screen.getByText('Protocol Designer 8.0')
   })
   it('renders the last analyzed date', () => {
     render({

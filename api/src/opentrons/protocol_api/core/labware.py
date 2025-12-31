@@ -1,19 +1,24 @@
 """The interface that implements InstrumentContext."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Generic, List, NamedTuple, Optional, TypeVar
+from typing import Any, Generic, List, NamedTuple, Optional, TypeVar, Dict
 
 from opentrons_shared_data.labware.types import (
     LabwareUri,
-    LabwareParameters as LabwareParametersDict,
+    LabwareParameters2,
+    LabwareParameters3,
     LabwareDefinition as LabwareDefinitionDict,
 )
 
-from opentrons.types import DeckSlotName, Point
-from opentrons.hardware_control.nozzle_manager import NozzleMap
+from opentrons.types import DeckSlotName, Point, NozzleMapInterface
+from .._liquid import Liquid
 
 from .well import WellCoreType
+
+
+_LabwareParametersDict = LabwareParameters2 | LabwareParameters3
 
 
 class LabwareLoadParams(NamedTuple):
@@ -54,8 +59,7 @@ class AbstractLabware(ABC, Generic[WellCoreType]):
         """
 
     @abstractmethod
-    def get_load_params(self) -> LabwareLoadParams:
-        ...
+    def get_load_params(self) -> LabwareLoadParams: ...
 
     @abstractmethod
     def get_display_name(self) -> str:
@@ -66,28 +70,24 @@ class AbstractLabware(ABC, Generic[WellCoreType]):
         """Get the user-specified display name of the labware, if set."""
 
     @abstractmethod
-    def get_name(self) -> str:
-        ...
+    def get_name(self) -> str: ...
 
     @abstractmethod
     def get_definition(self) -> LabwareDefinitionDict:
         """Get the labware's definition as a plain dictionary."""
 
     @abstractmethod
-    def get_parameters(self) -> LabwareParametersDict:
+    def get_parameters(self) -> _LabwareParametersDict:
         """Get the labware's definition's `parameters` field as a plain dictionary."""
 
     @abstractmethod
-    def get_quirks(self) -> List[str]:
-        ...
+    def get_quirks(self) -> List[str]: ...
 
     @abstractmethod
-    def set_calibration(self, delta: Point) -> None:
-        ...
+    def set_calibration(self, delta: Point) -> None: ...
 
     @abstractmethod
-    def get_calibrated_offset(self) -> Point:
-        ...
+    def get_calibrated_offset(self) -> Point: ...
 
     @abstractmethod
     def is_tip_rack(self) -> bool:
@@ -98,23 +98,25 @@ class AbstractLabware(ABC, Generic[WellCoreType]):
         """Whether the labware is an adapter."""
 
     @abstractmethod
+    def is_lid(self) -> bool:
+        """Whether the labware is a lid."""
+
+    @abstractmethod
     def is_fixed_trash(self) -> bool:
         """Whether the labware is a fixed trash."""
 
     @abstractmethod
-    def get_tip_length(self) -> float:
-        ...
+    def get_tip_length(self) -> float: ...
 
     @abstractmethod
-    def reset_tips(self) -> None:
-        ...
+    def reset_tips(self) -> None: ...
 
     @abstractmethod
     def get_next_tip(
         self,
         num_tips: int,
         starting_tip: Optional[WellCoreType],
-        nozzle_map: Optional[NozzleMap],
+        nozzle_map: Optional[NozzleMapInterface],
     ) -> Optional[str]:
         """Get the name of the next available tip(s) in the rack, if available."""
 
@@ -129,6 +131,14 @@ class AbstractLabware(ABC, Generic[WellCoreType]):
     @abstractmethod
     def get_deck_slot(self) -> Optional[DeckSlotName]:
         """Get the deck slot the labware or its parent is in, if any."""
+
+    @abstractmethod
+    def load_liquid(self, volumes: Dict[str, float], liquid: Liquid) -> None:
+        """Load liquid into wells of the labware."""
+
+    @abstractmethod
+    def load_empty(self, wells: List[str]) -> None:
+        """Mark wells of the labware as empty."""
 
 
 LabwareCoreType = TypeVar("LabwareCoreType", bound=AbstractLabware[Any])

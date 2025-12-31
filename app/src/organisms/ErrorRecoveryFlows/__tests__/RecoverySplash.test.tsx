@@ -1,36 +1,37 @@
-import type * as React from 'react'
-import { MemoryRouter } from 'react-router-dom'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, screen, waitFor, renderHook } from '@testing-library/react'
-import { createStore } from 'redux'
 import { QueryClient, QueryClientProvider } from 'react-query'
 import { Provider } from 'react-redux'
+import { MemoryRouter } from 'react-router-dom'
+import { fireEvent, renderHook, screen, waitFor } from '@testing-library/react'
+import { legacy_createStore } from 'redux'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
-  RUN_STATUS_AWAITING_RECOVERY_BLOCKED_BY_OPEN_DOOR,
   RUN_STATUS_AWAITING_RECOVERY,
+  RUN_STATUS_AWAITING_RECOVERY_BLOCKED_BY_OPEN_DOOR,
   RUN_STATUS_AWAITING_RECOVERY_PAUSED,
 } from '@opentrons/api-client'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { mockRecoveryContentProps } from '../__fixtures__'
 import { getIsOnDevice } from '/app/redux/config'
-import { useRecoverySplash, RecoverySplash } from '../RecoverySplash'
-import { StepInfo } from '../shared'
+
+import { mockRecoveryContentProps } from '../__fixtures__'
 import { useToaster } from '../../ToasterOven'
+import { RecoverySplash, useRecoverySplash } from '../RecoverySplash'
+import { StepInfo } from '../shared'
 import { clickButtonLabeled } from './util'
 
 import type { Store } from 'redux'
+import type { ComponentProps, FunctionComponent, ReactNode } from 'react'
 
 vi.mock('/app/redux/config')
 vi.mock('../shared')
 vi.mock('../../ToasterOven')
 
-const store: Store<any> = createStore(vi.fn(), {})
+const store: Store<any> = legacy_createStore(vi.fn(), {})
 
 describe('useRunPausedSplash', () => {
-  let wrapper: React.FunctionComponent<{ children: React.ReactNode }>
+  let wrapper: FunctionComponent<{ children: ReactNode }>
   beforeEach(() => {
     vi.mocked(getIsOnDevice).mockReturnValue(true)
     const queryClient = new QueryClient()
@@ -65,7 +66,7 @@ describe('useRunPausedSplash', () => {
   })
 })
 
-const render = (props: React.ComponentProps<typeof RecoverySplash>) => {
+const render = (props: ComponentProps<typeof RecoverySplash>) => {
   return renderWithProviders(
     <MemoryRouter>
       <RecoverySplash {...props} />
@@ -77,14 +78,17 @@ const render = (props: React.ComponentProps<typeof RecoverySplash>) => {
 }
 
 describe('RecoverySplash', () => {
-  let props: React.ComponentProps<typeof RecoverySplash>
+  let props: ComponentProps<typeof RecoverySplash>
   const mockToggleERWiz = vi.fn(() => Promise.resolve())
   const mockProceedToRouteAndStep = vi.fn()
+  const mockHandleMotionRouting = vi.fn(() => Promise.resolve())
   const mockRouteUpdateActions = {
     proceedToRouteAndStep: mockProceedToRouteAndStep,
+    handleMotionRouting: mockHandleMotionRouting,
   } as any
   const mockMakeToast = vi.fn()
   const mockResumeRecovery = vi.fn()
+  const mockHomePipetteZAxes = vi.fn(() => Promise.resolve())
 
   beforeEach(() => {
     props = {
@@ -96,6 +100,7 @@ describe('RecoverySplash', () => {
         resumeRecovery: mockResumeRecovery,
       } as any,
       resumePausedRecovery: true,
+      recoveryCommands: { homePipetteZAxes: mockHomePipetteZAxes } as any,
     }
 
     vi.mocked(StepInfo).mockReturnValue(<div>MOCK STEP INFO</div>)
@@ -132,7 +137,7 @@ describe('RecoverySplash', () => {
     render(props)
 
     const primaryBtn = screen.getByRole('button', {
-      name: 'Launch Recovery Mode',
+      name: 'Launch recovery mode',
     })
     const secondaryBtn = screen.getByRole('button', { name: 'Cancel run' })
 
@@ -162,6 +167,13 @@ describe('RecoverySplash', () => {
     await waitFor(() => {
       expect(mockToggleERWiz).toHaveBeenCalledWith(true, true)
     })
+
+    expect(mockHandleMotionRouting).toHaveBeenNthCalledWith(1, true)
+    expect(mockHandleMotionRouting).toHaveBeenNthCalledWith(2, false)
+
+    await waitFor(() => {
+      expect(props.recoveryCommands.homePipetteZAxes).toHaveBeenCalled()
+    })
   })
 
   it('should render a door open toast if the door is open', () => {
@@ -172,7 +184,7 @@ describe('RecoverySplash', () => {
 
     render(props)
 
-    clickButtonLabeled('Launch Recovery Mode')
+    clickButtonLabeled('Launch recovery mode')
 
     expect(mockMakeToast).toHaveBeenCalled()
   })

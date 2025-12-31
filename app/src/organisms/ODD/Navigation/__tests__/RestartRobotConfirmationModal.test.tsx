@@ -1,18 +1,20 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 import { restartRobot } from '/app/redux/robot-admin'
+
 import { RestartRobotConfirmationModal } from '../RestartRobotConfirmationModal'
+
+import type { ComponentProps } from 'react'
 
 vi.mock('/app/redux/robot-admin')
 
 const mockFunc = vi.fn()
 
 const render = (
-  props: React.ComponentProps<typeof RestartRobotConfirmationModal>
+  props: ComponentProps<typeof RestartRobotConfirmationModal>
 ) => {
   return renderWithProviders(<RestartRobotConfirmationModal {...props} />, {
     i18nInstance: i18n,
@@ -20,7 +22,7 @@ const render = (
 }
 
 describe('RestartRobotConfirmationModal', () => {
-  let props: React.ComponentProps<typeof RestartRobotConfirmationModal>
+  let props: ComponentProps<typeof RestartRobotConfirmationModal>
 
   beforeEach(() => {
     props = {

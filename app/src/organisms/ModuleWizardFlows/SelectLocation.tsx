@@ -1,37 +1,54 @@
-import isEqual from 'lodash/isEqual'
 import { useTranslation } from 'react-i18next'
+import isEqual from 'lodash/isEqual'
 import { css } from 'styled-components'
+
+import {
+  DeckConfigurator,
+  InlineNotification,
+  RESPONSIVENESS,
+  StyledText,
+  TYPOGRAPHY,
+} from '@opentrons/components'
 import { useUpdateDeckConfigurationMutation } from '@opentrons/react-api-client'
 import {
-  getModuleDisplayName,
-  getDeckDefFromRobotType,
+  COMBO_FIXTURES,
+  FAKE_FIXTURE_IDS,
+  FLEX_MODULE_AA_TYPE_BY_MODEL,
   FLEX_ROBOT_TYPE,
+  FLEX_STACKER_MODULE_TYPE,
+  getAAByAAId,
+  getAAForModuleFixture,
+  getAAWithFakesFromCutoutFixtureId,
+  getCutoutConfigReplacmentForModule,
   getCutoutFixturesForModuleModel,
-  SINGLE_CENTER_SLOT_FIXTURE,
+  getDeckDefFromRobotType,
+  getFixtureIdByCutoutIdFromModuleAnchorCutoutId,
+  getModuleDisplayName,
+  getReplacementFixtureForFakeFixture,
+  getReplacementFixtureForFixtureRemoval,
+  replaceCutoutFixtureForFixtureRemoval,
+  replaceFixtureToFakeFixtureAndTransformCutoutFixturesToAA,
   SINGLE_CENTER_CUTOUTS,
+  SINGLE_CENTER_SLOT_FIXTURE,
   SINGLE_LEFT_SLOT_FIXTURE,
   SINGLE_RIGHT_CUTOUTS,
   SINGLE_RIGHT_SLOT_FIXTURE,
-  getFixtureIdByCutoutIdFromModuleAnchorCutoutId,
   SINGLE_SLOT_FIXTURES,
 } from '@opentrons/shared-data'
-import {
-  Banner,
-  DeckConfigurator,
-  RESPONSIVENESS,
-  SIZE_1,
-  SPACING,
-  LegacyStyledText,
-  TYPOGRAPHY,
-} from '@opentrons/components'
+
+import { useModuleUSBPort } from '/app/local-resources/modules'
 import { GenericWizardTile } from '/app/molecules/GenericWizardTile'
-import type { ModuleCalibrationWizardStepProps } from './types'
+
+import { getFixtureIdByCutoutIdForModule } from './getFixtureIdByCutoutId'
+
+import type { CreateMaintenanceRunType } from '@opentrons/react-api-client'
 import type {
-  CutoutConfig,
-  DeckConfiguration,
-  CutoutFixtureId,
+  AreaType,
+  CutoutFixtureIdsWithFakes,
   CutoutId,
+  DeckConfiguration,
 } from '@opentrons/shared-data'
+import type { ModuleSetupWizardMaybePipetteStepProps } from './types'
 
 export const BODY_STYLE = css`
   ${TYPOGRAPHY.pRegular};
@@ -41,42 +58,51 @@ export const BODY_STYLE = css`
     line-height: 1.75rem;
   }
 `
-interface SelectLocationProps extends ModuleCalibrationWizardStepProps {
-  availableSlotNames: string[]
-  occupiedCutouts: CutoutConfig[]
+export interface SelectLocationProps extends ModuleSetupWizardMaybePipetteStepProps {
   deckConfig: DeckConfiguration
-  configuredFixtureIdByCutoutId: { [cutoutId in CutoutId]?: CutoutFixtureId }
+  createMaintenanceRun: CreateMaintenanceRunType
   isLoadedInRun: boolean
 }
-export const SelectLocation = (
-  props: SelectLocationProps
-): JSX.Element | null => {
+export function SelectLocation(props: SelectLocationProps): JSX.Element {
   const {
     proceed,
     attachedModule,
     deckConfig,
-    configuredFixtureIdByCutoutId,
     isLoadedInRun,
+    createMaintenanceRun,
+    maintenanceRunId,
+    setErrorMessage,
   } = props
+
+  const configuredFixtureIdByCutoutId = getFixtureIdByCutoutIdForModule(
+    attachedModule,
+    deckConfig
+  )
+
+  const deckConfigWithAA =
+    replaceFixtureToFakeFixtureAndTransformCutoutFixturesToAA(deckConfig)
+
   const { t } = useTranslation('module_wizard_flows')
   const moduleName = getModuleDisplayName(attachedModule.moduleModel)
+  const { parseModuleUSBPort } = useModuleUSBPort()
+
+  const isFlexStacker = attachedModule.moduleType === FLEX_STACKER_MODULE_TYPE
+
   const handleOnClick = (): void => {
-    proceed()
+    if (maintenanceRunId == null) {
+      createMaintenanceRun({})
+        .catch(error => {
+          setErrorMessage(error.message as string)
+        })
+        .then(proceed)
+    } else {
+      proceed()
+    }
   }
   const { updateDeckConfiguration } = useUpdateDeckConfigurationMutation()
   const deckDef = getDeckDefFromRobotType(FLEX_ROBOT_TYPE)
   const cutoutConfig = deckConfig.find(
     cc => cc.opentronsModuleSerialNumber === attachedModule.serialNumber
-  )
-  const bodyText = (
-    <>
-      <LegacyStyledText css={BODY_STYLE}>
-        {t('select_the_slot', { module: moduleName })}
-      </LegacyStyledText>
-      <Banner type="warning" size={SIZE_1} marginY={SPACING.spacing4}>
-        {t('module_secured')}
-      </Banner>
-    </>
   )
 
   const moduleFixtures = getCutoutFixturesForModuleModel(
@@ -87,7 +113,8 @@ export const SelectLocation = (
     (acc, { mayMountTo }) => [...acc, ...mayMountTo],
     []
   )
-  const editableCutoutIds = deckConfig.reduce<CutoutId[]>(
+
+  const editableCutoutIds = deckConfigWithAA.reduce<CutoutId[]>(
     (acc, { cutoutId, cutoutFixtureId, opentronsModuleSerialNumber }) => {
       const isCurrentConfiguration =
         Object.values(configuredFixtureIdByCutoutId).includes(
@@ -98,7 +125,9 @@ export const SelectLocation = (
         !isLoadedInRun &&
         mayMountToCutoutIds.includes(cutoutId) &&
         (isCurrentConfiguration ||
-          SINGLE_SLOT_FIXTURES.includes(cutoutFixtureId))
+          SINGLE_SLOT_FIXTURES.includes(cutoutFixtureId) ||
+          // fake fixtures include mag block next to an empty staging slot and a waste chute next to an empty staging slot
+          FAKE_FIXTURE_IDS.includes(cutoutFixtureId))
       ) {
         return [...acc, cutoutId]
       }
@@ -108,57 +137,113 @@ export const SelectLocation = (
   )
 
   const handleAddFixture = (anchorCutoutId: CutoutId): void => {
-    const selectedFixtureIdByCutoutIds = getFixtureIdByCutoutIdFromModuleAnchorCutoutId(
-      anchorCutoutId,
-      moduleFixtures
-    )
+    const selectedFixtureIdByCutoutIds =
+      getFixtureIdByCutoutIdFromModuleAnchorCutoutId(
+        anchorCutoutId,
+        moduleFixtures
+      )
     if (!isEqual(selectedFixtureIdByCutoutIds, configuredFixtureIdByCutoutId)) {
-      updateDeckConfiguration(
-        deckConfig.map(cc => {
-          if (cc.cutoutId in configuredFixtureIdByCutoutId) {
-            let replacementFixtureId: CutoutFixtureId = SINGLE_LEFT_SLOT_FIXTURE
-            if (SINGLE_CENTER_CUTOUTS.includes(cc.cutoutId)) {
-              replacementFixtureId = SINGLE_CENTER_SLOT_FIXTURE
-            } else if (SINGLE_RIGHT_CUTOUTS.includes(cc.cutoutId)) {
-              replacementFixtureId = SINGLE_RIGHT_SLOT_FIXTURE
-            }
+      const updatedDeckConfig = deckConfig.map(cc => {
+        if (cc.cutoutId in configuredFixtureIdByCutoutId) {
+          if (SINGLE_CENTER_CUTOUTS.includes(cc.cutoutId)) {
             return {
               ...cc,
-              cutoutFixtureId: replacementFixtureId,
+              cutoutFixtureId: SINGLE_CENTER_SLOT_FIXTURE,
               opentronsModuleSerialNumber: undefined,
             }
-          } else if (cc.cutoutId in selectedFixtureIdByCutoutIds) {
+          } else if (COMBO_FIXTURES.includes(cc.cutoutFixtureId)) {
+            const aaForSelectedFixture = getAAWithFakesFromCutoutFixtureId(
+              Object.keys(selectedFixtureIdByCutoutIds)[0] as CutoutId,
+              selectedFixtureIdByCutoutIds[
+                Object.keys(selectedFixtureIdByCutoutIds)[0] as CutoutId
+              ] ?? cc.cutoutFixtureId,
+              deckDef
+            )
+            const filteredAAForSelectedFixture = aaForSelectedFixture?.find(
+              aa => {
+                const aaAreaType = getAAByAAId(aa, deckDef).areaType
+                return (
+                  Object.values(FLEX_MODULE_AA_TYPE_BY_MODEL).includes(
+                    aaAreaType as AreaType
+                  ) && aaAreaType !== 'magneticBlock'
+                )
+              }
+            )
+            if (filteredAAForSelectedFixture == null) {
+              return cc
+            }
+
+            const fixtureReplacement = replaceCutoutFixtureForFixtureRemoval(
+              cc.cutoutFixtureId,
+              cc.cutoutId,
+              filteredAAForSelectedFixture
+            )
             return {
               ...cc,
-              cutoutFixtureId:
-                selectedFixtureIdByCutoutIds[cc.cutoutId] ?? cc.cutoutFixtureId,
-              opentronsModuleSerialNumber: attachedModule.serialNumber,
+              cutoutFixtureId: getReplacementFixtureForFakeFixture(
+                fixtureReplacement as CutoutFixtureIdsWithFakes
+              ),
+              opentronsModuleSerialNumber: undefined,
             }
-          } else {
-            return cc
+          } else if (SINGLE_RIGHT_CUTOUTS.includes(cc.cutoutId)) {
+            return {
+              ...cc,
+              cutoutFixtureId: SINGLE_RIGHT_SLOT_FIXTURE,
+              opentronsModuleSerialNumber: undefined,
+            }
           }
-        })
-      )
+          return {
+            ...cc,
+            cutoutFixtureId: SINGLE_LEFT_SLOT_FIXTURE,
+            opentronsModuleSerialNumber: undefined,
+          }
+        } else if (cc.cutoutId in selectedFixtureIdByCutoutIds) {
+          const fixtureReplacement = getCutoutConfigReplacmentForModule(
+            anchorCutoutId,
+            selectedFixtureIdByCutoutIds[cc.cutoutId] ?? cc.cutoutFixtureId,
+            attachedModule.moduleModel,
+            deckConfig
+          )
+          return {
+            ...cc,
+            cutoutFixtureId: fixtureReplacement,
+            opentronsModuleSerialNumber: attachedModule.serialNumber,
+          }
+        } else {
+          return cc
+        }
+      })
+      updateDeckConfiguration(updatedDeckConfig)
     }
   }
 
   const handleRemoveFixture = (anchorCutoutId: CutoutId): void => {
-    const removedFixtureIdByCutoutIds = getFixtureIdByCutoutIdFromModuleAnchorCutoutId(
-      anchorCutoutId,
-      moduleFixtures
-    )
+    const removedFixtureIdByCutoutIds =
+      getFixtureIdByCutoutIdFromModuleAnchorCutoutId(
+        anchorCutoutId,
+        moduleFixtures
+      )
     updateDeckConfiguration(
       deckConfig.map(cc => {
         if (cc.cutoutId in removedFixtureIdByCutoutIds) {
-          let replacementFixtureId: CutoutFixtureId = SINGLE_LEFT_SLOT_FIXTURE
-          if (SINGLE_CENTER_CUTOUTS.includes(cc.cutoutId)) {
-            replacementFixtureId = SINGLE_CENTER_SLOT_FIXTURE
-          } else if (SINGLE_RIGHT_CUTOUTS.includes(cc.cutoutId)) {
-            replacementFixtureId = SINGLE_RIGHT_SLOT_FIXTURE
-          }
+          const fixtureInPlace = deckConfigWithAA.find(
+            dc => dc.cutoutId === anchorCutoutId
+          )
+          const removedDefaultFixture =
+            removedFixtureIdByCutoutIds[cc.cutoutId]! // we know there is a match by the condition
+          const aa = getAAForModuleFixture(
+            anchorCutoutId,
+            removedDefaultFixture,
+            attachedModule.moduleModel
+          )
+          const replacment = getReplacementFixtureForFixtureRemoval(
+            fixtureInPlace?.cutoutFixtureId ?? removedDefaultFixture,
+            anchorCutoutId,
+            aa
+          )
           return {
             ...cc,
-            cutoutFixtureId: replacementFixtureId,
+            cutoutFixtureId: replacment,
             opentronsModuleSerialNumber: undefined,
           }
         } else {
@@ -177,6 +262,7 @@ export const SelectLocation = (
           handleClickAdd={handleAddFixture}
           handleClickRemove={handleRemoveFixture}
           editableCutoutIds={editableCutoutIds}
+          moduleModel={attachedModule.moduleModel}
           selectedCutoutId={
             deckConfig.find(
               ({ cutoutId, opentronsModuleSerialNumber }) =>
@@ -187,7 +273,25 @@ export const SelectLocation = (
           height="250px"
         />
       }
-      bodyText={bodyText}
+      bodyText={
+        <>
+          <StyledText css={BODY_STYLE}>
+            {t('select_the_slot', {
+              module: moduleName,
+              port: parseModuleUSBPort(attachedModule),
+            })}
+            {isFlexStacker ? null : ` ${t('location_must_be_correct')}`}
+          </StyledText>
+          {isFlexStacker ? (
+            <InlineNotification
+              type="neutral"
+              message={t('look_for_pulsing_lights')}
+            />
+          ) : (
+            <InlineNotification type="alert" message={t('module_secured')} />
+          )}
+        </>
+      }
       proceedButtonText={t('confirm_location')}
       proceed={handleOnClick}
       proceedIsDisabled={cutoutConfig == null}

@@ -4,8 +4,8 @@ import {
   DIRECTION_ROW,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
-  SPACING,
   LegacyStyledText,
+  SPACING,
 } from '@opentrons/components'
 
 export interface LabeledValueProps {
@@ -21,10 +21,10 @@ export function LabeledValue({ label, value }: LabeledValueProps): JSX.Element {
       alignItems={ALIGN_CENTER}
       paddingY={SPACING.spacing8}
     >
-      <LegacyStyledText as="h6" color={COLORS.grey60}>
+      <LegacyStyledText forwardedAs="h6" color={COLORS.grey60}>
         {label}
       </LegacyStyledText>
-      <LegacyStyledText as="p">{value}</LegacyStyledText>
+      <LegacyStyledText forwardedAs="p">{value}</LegacyStyledText>
     </Flex>
   )
 }

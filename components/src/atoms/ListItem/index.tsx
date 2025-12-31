@@ -1,20 +1,31 @@
-import type * as React from 'react'
 import { css } from 'styled-components'
-import { Flex } from '../../primitives'
-import { RESPONSIVENESS, SPACING } from '../../ui-style-constants'
+
 import { BORDERS, COLORS } from '../../helix-design-system'
+import { Flex } from '../../primitives'
 import { FLEX_MAX_CONTENT } from '../../styles'
+import { RESPONSIVENESS, SPACING } from '../../ui-style-constants'
+
+import type { ReactNode } from 'react'
 import type { StyleProps } from '../../primitives'
 
 export * from './ListItemChildren'
 
-export type ListItemType = 'error' | 'noActive' | 'success' | 'warning'
+export type ListItemType =
+  | 'error'
+  | 'default'
+  | 'success'
+  | 'warning'
+  | 'unavailable'
+  | 'defaultOnColor'
+  | 'successOnColor'
+  | 'warningOnColor'
+  | 'errorOnColor'
 
 interface ListItemProps extends StyleProps {
   /** ListItem state type */
   type: ListItemType
   /** ListItem contents */
-  children: React.ReactNode
+  children: ReactNode
   onClick?: () => void
   onMouseEnter?: () => void
   onMouseLeave?: () => void
@@ -22,19 +33,35 @@ interface ListItemProps extends StyleProps {
 
 const LISTITEM_PROPS_BY_TYPE: Record<
   ListItemType,
-  { backgroundColor: string }
+  { backgroundColor: string; color?: string }
 > = {
   error: {
-    backgroundColor: COLORS.red35,
+    backgroundColor: COLORS.red30,
   },
-  noActive: {
-    backgroundColor: COLORS.grey30,
+  default: {
+    backgroundColor: COLORS.grey20,
   },
   success: {
-    backgroundColor: COLORS.green35,
+    backgroundColor: COLORS.green30,
   },
   warning: {
-    backgroundColor: COLORS.yellow35,
+    backgroundColor: COLORS.yellow30,
+  },
+  unavailable: {
+    backgroundColor: COLORS.grey20,
+    color: COLORS.grey40,
+  },
+  defaultOnColor: {
+    backgroundColor: COLORS.white,
+  },
+  successOnColor: {
+    backgroundColor: COLORS.green20,
+  },
+  warningOnColor: {
+    backgroundColor: COLORS.yellow20,
+  },
+  errorOnColor: {
+    backgroundColor: COLORS.red20,
   },
 }
 
@@ -42,18 +69,13 @@ const LISTITEM_PROPS_BY_TYPE: Record<
   ListItem is used in ODD and helix
 **/
 export function ListItem(props: ListItemProps): JSX.Element {
-  const {
-    type,
-    children,
-    onClick,
-    onMouseEnter,
-    onMouseLeave,
-    ...styleProps
-  } = props
+  const { type, children, onClick, onMouseEnter, onMouseLeave, ...styleProps } =
+    props
   const listItemProps = LISTITEM_PROPS_BY_TYPE[type]
 
   const LIST_ITEM_STYLE = css`
-    background-color: ${listItemProps.backgroundColor};
+    background-color: ${props.backgroundColor ?? listItemProps.backgroundColor};
+    color: ${listItemProps.color ?? COLORS.black90};
     width: 100%;
     height: ${FLEX_MAX_CONTENT};
     border-radius: ${BORDERS.borderRadius4};

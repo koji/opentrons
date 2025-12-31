@@ -1,12 +1,17 @@
 """ProtocolEngine-based Labware core implementations."""
-from typing import List, Optional, cast
+
+from typing import List, Optional, cast, Dict
 
 from opentrons_shared_data.labware.types import (
-    LabwareParameters as LabwareParametersDict,
+    LabwareParameters2 as LabwareParameters2Dict,
+    LabwareParameters3 as LabwareParameters3Dict,
     LabwareDefinition as LabwareDefinitionDict,
 )
 
-from opentrons_shared_data.labware.labware_definition import LabwareRole
+from opentrons_shared_data.labware.labware_definition import (
+    LabwareRole,
+    LabwareDefinition,
+)
 
 from opentrons.protocol_engine import commands as cmd
 from opentrons.protocol_engine.errors import (
@@ -18,13 +23,18 @@ from opentrons.protocol_engine.clients import SyncClient as ProtocolEngineClient
 from opentrons.protocol_engine.types import (
     LabwareOffsetCreate,
     LabwareOffsetVector,
+    TipRackWellState,
 )
-from opentrons.types import DeckSlotName, Point
-from opentrons.hardware_control.nozzle_manager import NozzleMap
+from opentrons.types import DeckSlotName, NozzleMapInterface, Point, StagingSlotName
 
 
+from ..._liquid import Liquid
 from ..labware import AbstractLabware, LabwareLoadParams
+
 from .well import WellCore
+
+
+_LabwareParametersDict = LabwareParameters2Dict | LabwareParameters3Dict
 
 
 class LabwareCore(AbstractLabware[WellCore]):
@@ -90,12 +100,14 @@ class LabwareCore(AbstractLabware[WellCore]):
 
     def get_definition(self) -> LabwareDefinitionDict:
         """Get the labware's definition as a plain dictionary."""
-        return cast(LabwareDefinitionDict, self._definition.dict(exclude_none=True))
-
-    def get_parameters(self) -> LabwareParametersDict:
         return cast(
-            LabwareParametersDict,
-            self._definition.parameters.dict(exclude_none=True),
+            LabwareDefinitionDict, self._definition.model_dump(exclude_none=True)
+        )
+
+    def get_parameters(self) -> _LabwareParametersDict:
+        return cast(
+            _LabwareParametersDict,
+            self._definition.parameters.model_dump(exclude_none=True),
         )
 
     def get_quirks(self) -> List[str]:
@@ -116,9 +128,9 @@ class LabwareCore(AbstractLabware[WellCore]):
                 details={"kind": "labware-not-in-slot"},
             )
 
-        request = LabwareOffsetCreate.construct(
+        request = LabwareOffsetCreate.model_construct(
             definitionUri=self.get_uri(),
-            location=offset_location,
+            locationSequence=offset_location,
             vector=LabwareOffsetVector(x=delta.x, y=delta.y, z=delta.z),
         )
         self._engine_client.add_labware_offset(request)
@@ -139,6 +151,10 @@ class LabwareCore(AbstractLabware[WellCore]):
         """Whether the labware is an adapter."""
         return LabwareRole.adapter in self._definition.allowedRoles
 
+    def is_lid(self) -> bool:
+        """Whether the labware is a lid."""
+        return LabwareRole.lid in self._definition.allowedRoles
+
     def is_fixed_trash(self) -> bool:
         """Whether the labware is a fixed trash."""
         return self._engine_client.state.labware.is_fixed_trash(
@@ -150,7 +166,13 @@ class LabwareCore(AbstractLabware[WellCore]):
 
     def reset_tips(self) -> None:
         if self.is_tip_rack():
-            self._engine_client.reset_tips(labware_id=self.labware_id)
+            self._engine_client.execute_command(
+                cmd.SetTipStateParams(
+                    labwareId=self._labware_id,
+                    wellNames=list(self._definition.wells),
+                    tipWellState=TipRackWellState.CLEAN,
+                )
+            )
         else:
             raise TypeError(f"{self.get_display_name()} is not a tip rack.")
 
@@ -158,7 +180,7 @@ class LabwareCore(AbstractLabware[WellCore]):
         self,
         num_tips: int,
         starting_tip: Optional[WellCore],
-        nozzle_map: Optional[NozzleMap],
+        nozzle_map: Optional[NozzleMapInterface],
     ) -> Optional[str]:
         return self._engine_client.state.tips.get_next_tip(
             labware_id=self._labware_id,
@@ -186,12 +208,38 @@ class LabwareCore(AbstractLabware[WellCore]):
     def get_deck_slot(self) -> Optional[DeckSlotName]:
         """Get the deck slot the labware is in, if on deck."""
         try:
-            return self._engine_client.state.geometry.get_ancestor_slot_name(
+            ancestor = self._engine_client.state.geometry.get_ancestor_slot_name(
                 self.labware_id
             )
+            if isinstance(ancestor, StagingSlotName):
+                # The only use case for get_deck_slot is with a legacy OT-2 function which resolves to a numerical deck slot, so we can ignore staging area slots for now
+                return None
+            return ancestor
         except (
             LabwareNotOnDeckError,
             ModuleNotOnDeckError,
             LocationIsStagingSlotError,
         ):
             return None
+
+    def load_liquid(self, volumes: Dict[str, float], liquid: Liquid) -> None:
+        """Load liquid into wells of the labware."""
+        self._engine_client.execute_command(
+            cmd.LoadLiquidParams(
+                labwareId=self._labware_id, liquidId=liquid._id, volumeByWell=volumes
+            )
+        )
+
+    def load_empty(self, wells: List[str]) -> None:
+        """Mark wells of the labware as empty."""
+        self._engine_client.execute_command(
+            cmd.LoadLiquidParams(
+                labwareId=self._labware_id,
+                liquidId="EMPTY",
+                volumeByWell={well: 0.0 for well in wells},
+            )
+        )
+
+    def get_engine_definition(self) -> LabwareDefinition:
+        """Get the engine-side definition object rather than the dict."""
+        return self._definition

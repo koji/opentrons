@@ -1,42 +1,53 @@
 import { useTranslation } from 'react-i18next'
-import styled from 'styled-components'
 import { useDispatch, useSelector } from 'react-redux'
 
 import {
-  ALIGN_CENTER,
   BORDERS,
   COLORS,
   DIRECTION_COLUMN,
   Divider,
   Flex,
+  MenuItem,
   NO_WRAP,
   POSITION_ABSOLUTE,
-  SPACING,
 } from '@opentrons/components'
-import { actions as stepsActions } from '../../../../ui/steps'
-import {
-  hoverOnStep,
-  toggleViewSubstep,
-} from '../../../../ui/steps/actions/actions'
+
 import {
   getBatchEditFormHasUnsavedChanges,
   getCurrentFormHasUnsavedChanges,
   getSavedStepForms,
   getUnsavedForm,
-} from '../../../../step-forms/selectors'
+} from '/protocol-designer/step-forms/selectors'
+import { actions as stepsActions } from '/protocol-designer/ui/steps'
+import {
+  hoverOnStep,
+  toggleViewSubstep,
+} from '/protocol-designer/ui/steps/actions/actions'
+
+import { analyticsEvent } from '../../../../analytics/actions'
+import { OPEN_STEP_DETAILS_EVENT } from '../../../../analytics/constants'
+import { OVERFLOW_MENU_POSITION_ADJUSTMENT } from '../../../../constants'
+
 import type { ThunkDispatch } from 'redux-thunk'
-import type { BaseState } from '../../../../types'
-import type { StepIdType } from '../../../../form-types'
+import type {
+  Dispatch,
+  MouseEvent,
+  MutableRefObject,
+  SetStateAction,
+} from 'react'
+import type { AnalyticsEvent } from '/protocol-designer/analytics/mixpanel'
+import type { BaseState } from '/protocol-designer/types'
 
 interface StepOverflowMenuProps {
   stepId: string
-  menuRootRef: React.MutableRefObject<HTMLDivElement | null>
+  menuRootRef: MutableRefObject<HTMLDivElement | null>
   top: number
-  setStepOverflowMenu: React.Dispatch<React.SetStateAction<boolean>>
+  setOpenedOverflowMenuId: Dispatch<SetStateAction<string | null>>
   handleEdit: () => void
   confirmDelete: () => void
   confirmMultiDelete: () => void
   multiSelectItemIds: string[] | null
+  sidebarWidth: number // adjust the position of the overflow menu
 }
 
 export function StepOverflowMenu(props: StepOverflowMenuProps): JSX.Element {
@@ -44,11 +55,12 @@ export function StepOverflowMenu(props: StepOverflowMenuProps): JSX.Element {
     stepId,
     menuRootRef,
     top,
-    setStepOverflowMenu,
+    setOpenedOverflowMenuId,
     handleEdit,
     confirmDelete,
     confirmMultiDelete,
     multiSelectItemIds,
+    sidebarWidth,
   } = props
   const { t } = useTranslation('protocol_steps')
   const singleEditFormHasUnsavedChanges = useSelector(
@@ -60,24 +72,17 @@ export function StepOverflowMenu(props: StepOverflowMenuProps): JSX.Element {
   const dispatch = useDispatch<ThunkDispatch<BaseState, any, any>>()
   const formData = useSelector(getUnsavedForm)
   const savedStepFormData = useSelector(getSavedStepForms)[stepId]
+
   const isPipetteStep =
     savedStepFormData.stepType === 'moveLiquid' ||
     savedStepFormData.stepType === 'mix'
-  const isThermocyclerProfile = savedStepFormData.stepType === 'thermocycler'
+  const isThermocyclerProfile =
+    savedStepFormData.stepType === 'thermocycler' &&
+    savedStepFormData.thermocyclerFormType === 'thermocyclerProfile'
 
-  const duplicateStep = (
-    stepId: StepIdType
-  ): ReturnType<typeof stepsActions.duplicateStep> =>
-    dispatch(stepsActions.duplicateStep(stepId))
-
-  const duplicateMultipleSteps = (): void => {
-    if (multiSelectItemIds) {
-      dispatch(stepsActions.duplicateMultipleSteps(multiSelectItemIds))
-    } else {
-      console.warn(
-        'something went wrong, you cannot duplicate multiple steps if none are selected'
-      )
-    }
+  const selectViewDetailsEvent: AnalyticsEvent = {
+    name: OPEN_STEP_DETAILS_EVENT,
+    properties: {},
   }
 
   return (
@@ -86,99 +91,78 @@ export function StepOverflowMenu(props: StepOverflowMenuProps): JSX.Element {
         ref={menuRootRef}
         zIndex={12}
         top={top}
-        left="19.5rem"
+        left={sidebarWidth + OVERFLOW_MENU_POSITION_ADJUSTMENT} // the space between kebab menu button and overflow menu is 8px
         position={POSITION_ABSOLUTE}
         whiteSpace={NO_WRAP}
         borderRadius={BORDERS.borderRadius8}
         boxShadow="0px 1px 3px rgba(0, 0, 0, 0.2)"
         backgroundColor={COLORS.white}
         flexDirection={DIRECTION_COLUMN}
-        onClick={(e: React.MouseEvent) => {
+        onClick={(e: MouseEvent<HTMLDivElement>) => {
           e.preventDefault()
           e.stopPropagation()
         }}
       >
         {multiSelectItemIds != null && multiSelectItemIds.length > 0 ? (
           <>
-            <MenuButton
+            <MenuItem
               disabled={batchEditFormHasUnstagedChanges}
               onClick={() => {
-                duplicateMultipleSteps()
-                setStepOverflowMenu(false)
+                dispatch(stepsActions.duplicateSelectedSteps())
+                setOpenedOverflowMenuId(null)
               }}
             >
               {t('duplicate_steps')}
-            </MenuButton>
+            </MenuItem>
             <Divider marginY="0" />
-            <MenuButton
+            <MenuItem
               onClick={() => {
                 confirmMultiDelete()
-                setStepOverflowMenu(false)
+                setOpenedOverflowMenuId(null)
               }}
             >
               {t('delete_steps')}
-            </MenuButton>
+            </MenuItem>
           </>
         ) : (
           <>
             {formData != null ? null : (
-              <MenuButton onClick={handleEdit}>{t('edit_step')}</MenuButton>
+              <MenuItem onClick={handleEdit}>{t('edit_step')}</MenuItem>
             )}
             {isPipetteStep || isThermocyclerProfile ? (
-              <MenuButton
+              <MenuItem
                 disabled={formData != null}
                 onClick={() => {
-                  setStepOverflowMenu(false)
+                  setOpenedOverflowMenuId(null)
                   dispatch(hoverOnStep(stepId))
                   dispatch(toggleViewSubstep(stepId))
+                  dispatch(analyticsEvent(selectViewDetailsEvent))
                 }}
               >
                 {t('view_details')}
-              </MenuButton>
+              </MenuItem>
             ) : null}
-            <MenuButton
+            <MenuItem
               disabled={singleEditFormHasUnsavedChanges}
               onClick={() => {
-                duplicateStep(stepId)
-                setStepOverflowMenu(false)
+                dispatch(stepsActions.duplicateSelectedSteps())
+                setOpenedOverflowMenuId(null)
               }}
             >
               {t('duplicate')}
-            </MenuButton>
+            </MenuItem>
             <Divider marginY="0" />
-            <MenuButton
+            <MenuItem
               onClick={() => {
                 confirmDelete()
-                setStepOverflowMenu(false)
+                setOpenedOverflowMenuId(null)
               }}
             >
               {t('delete')}
-            </MenuButton>
+            </MenuItem>
           </>
         )}
       </Flex>
     </>
   )
 }
-
-const MenuButton = styled.button`
-  background-color: ${COLORS.transparent};
-  align-items: ${ALIGN_CENTER};
-  grid-gap: ${SPACING.spacing8};
-  width: 100%;
-  cursor: pointer;
-  padding: ${SPACING.spacing8} ${SPACING.spacing12};
-  border: none;
-  border-radius: inherit;
-  display: flex;
-  &:hover {
-    background-color: ${COLORS.blue10};
-  }
-  &:disabled {
-    color: ${COLORS.grey40};
-    cursor: auto;
-    &:hover {
-      background-color: ${COLORS.transparent};
-    }
-  }
-`

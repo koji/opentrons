@@ -1,20 +1,23 @@
+import { shared_en_resources } from '@opentrons/components'
+
 import alert from './alert.json'
 import application from './application.json'
 import button from './button.json'
+import by_volume_builder from './by_volume_builder.json'
 import card from './card.json'
 import context_menu from './context_menu.json'
-import create_new_protocol from './create_new_protocol.json'
 import deck from './deck.json'
 import feature_flags from './feature_flags.json'
 import form from './form.json'
 import liquids from './liquids.json'
 import modal from './modal.json'
 import modules from './modules.json'
-import nav from './nav.json'
+import onboarding from './onboarding.json'
 import protocol_overview from './protocol_overview.json'
 import protocol_steps from './protocol_steps.json'
 import shared from './shared.json'
 import starting_deck_state from './starting_deck_state.json'
+import tip_selection from './tip_selection.json'
 import tooltip from './tooltip.json'
 import well_selection from './well_selection.json'
 
@@ -22,20 +25,23 @@ export const en = {
   alert,
   application,
   button,
+  by_volume_builder,
   card,
   context_menu,
-  create_new_protocol,
+  deck_configuration: shared_en_resources.deck_configuration,
   deck,
   feature_flags,
   form,
   liquids,
   modal,
   modules,
-  nav,
+  onboarding,
+  protocol_command_text: shared_en_resources.protocol_command_text,
   protocol_overview,
   protocol_steps,
   shared,
   starting_deck_state,
+  tip_selection,
   tooltip,
   well_selection,
 }

@@ -1,22 +1,23 @@
 import { useState } from 'react'
-import { css } from 'styled-components'
 import { useTranslation } from 'react-i18next'
+import { css } from 'styled-components'
 
 import {
   ALIGN_CENTER,
+  AnimationVideo,
   BORDERS,
   COLORS,
-  DIRECTION_COLUMN,
   CURSOR_POINTER,
+  DIRECTION_COLUMN,
   DIRECTION_ROW,
   DISPLAY_FLEX,
   Flex,
   JUSTIFY_CENTER,
   JUSTIFY_FLEX_START,
   JUSTIFY_SPACE_AROUND,
+  LegacyStyledText,
   RESPONSIVENESS,
   SPACING,
-  LegacyStyledText,
   StyledText,
 } from '@opentrons/components'
 
@@ -24,10 +25,10 @@ import { MediumButton } from '../../../atoms/buttons'
 import { DT_ROUTES } from '../constants'
 import { DropTipFooterButtons } from '../shared'
 
+import type { DropTipWizardContainerProps } from '../types'
+
 import blowoutVideo from '../../../assets/videos/droptip-wizard/Blowout-Liquid.webm'
 import droptipVideo from '../../../assets/videos/droptip-wizard/Drop-tip.webm'
-
-import type { DropTipWizardContainerProps } from '../types'
 
 type FlowType = 'blowout' | 'drop_tips' | null
 
@@ -51,8 +52,7 @@ export const BeforeBeginning = ({
 
   const buildTopText = (): string => {
     if (issuedCommandsType === 'fixit') {
-      return fixitCommandTypeUtils?.copyOverrides
-        .beforeBeginningTopText as string
+      return fixitCommandTypeUtils?.copyOverrides.beforeBeginningTopText!
     } else {
       return t('before_you_begin_do_you_want_to_blowout')
     }
@@ -167,18 +167,15 @@ function DropTipOption({
           : UNSELECTED_OPTIONS_STYLE
       }
     >
-      <video
+      <AnimationVideo
         css={css`
           max-width: 8.96rem;
         `}
-        autoPlay={true}
-        loop={true}
-        controls={false}
         aria-label={flowType}
       >
         <source src={videoSrc} />
-      </video>
-      <LegacyStyledText as="h3">{text}</LegacyStyledText>
+      </AnimationVideo>
+      <LegacyStyledText forwardedAs="h3">{text}</LegacyStyledText>
     </Flex>
   )
 }
@@ -235,6 +232,10 @@ const CONTAINER_STYLE = css`
   display: ${DISPLAY_FLEX};
   flex-direction: ${DIRECTION_COLUMN};
   grid-gap: ${SPACING.spacing16};
+
+  @media ${RESPONSIVENESS.touchscreenMediaQuerySpecs} {
+    grid-gap: ${SPACING.spacing8};
+  }
 `
 
 const ODD_MEDIUM_BUTTON_STYLE = css`

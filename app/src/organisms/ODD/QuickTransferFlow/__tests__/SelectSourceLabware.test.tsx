@@ -1,20 +1,22 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
+
 import { SelectSourceLabware } from '../SelectSourceLabware'
 
+import type { ComponentProps } from 'react'
+
 vi.mock('@opentrons/react-api-client')
-const render = (props: React.ComponentProps<typeof SelectSourceLabware>) => {
+const render = (props: ComponentProps<typeof SelectSourceLabware>) => {
   return renderWithProviders(<SelectSourceLabware {...props} />, {
     i18nInstance: i18n,
   })
 }
 
 describe('SelectSourceLabware', () => {
-  let props: React.ComponentProps<typeof SelectSourceLabware>
+  let props: ComponentProps<typeof SelectSourceLabware>
 
   beforeEach(() => {
     props = {

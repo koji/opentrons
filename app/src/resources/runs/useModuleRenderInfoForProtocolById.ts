@@ -7,10 +7,11 @@ import {
   OT2_ROBOT_TYPE,
 } from '@opentrons/shared-data'
 
-import { getProtocolModulesInfo } from '/app/transformations/analysis'
-import { useAttachedModules } from '/app/resources/modules'
 import { useStoredProtocolAnalysis } from '/app/resources/analysis'
 import { useNotifyDeckConfigurationQuery } from '/app/resources/deck_configuration'
+import { useAttachedModules } from '/app/resources/modules'
+import { getProtocolModulesInfo } from '/app/transformations/analysis'
+
 import { useMostRecentCompletedAnalysis } from './useMostRecentCompletedAnalysis'
 
 import type { CutoutConfig } from '@opentrons/shared-data'
@@ -111,11 +112,15 @@ export function useModuleRenderInfoForProtocolById(
       }
     }
   )
-  return allModuleRenderInfo.reduce(
-    (acc, moduleInfo) => ({
-      ...acc,
-      [moduleInfo.moduleId]: moduleInfo,
-    }),
-    {}
-  )
+  return allModuleRenderInfo
+    .sort((a, b) => a.slotName.localeCompare(b.slotName))
+    .reduce(
+      (acc, moduleInfo) => ({
+        ...acc,
+        [moduleInfo.moduleId]: {
+          ...moduleInfo,
+        },
+      }),
+      {}
+    )
 }

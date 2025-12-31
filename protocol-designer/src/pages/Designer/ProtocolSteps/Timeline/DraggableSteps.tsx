@@ -1,164 +1,368 @@
-import { useRef } from 'react'
+import { useCallback, useRef, useState } from 'react'
+import { useDrag, useDrop } from 'react-dnd'
 import { useTranslation } from 'react-i18next'
-import { useSelector } from 'react-redux'
-import { useDrop, useDrag } from 'react-dnd'
+import { useDispatch, useSelector } from 'react-redux'
+
 import {
   Box,
   COLORS,
   DIRECTION_COLUMN,
+  Divider,
   Flex,
   SPACING,
 } from '@opentrons/components'
-import { DND_TYPES } from '../../../../constants'
-import { selectors as stepFormSelectors } from '../../../../step-forms'
-import { stepIconsByType } from '../../../../form-types'
-import { StepContainer } from './StepContainer'
-import { ConnectedStepInfo } from './ConnectedStepInfo'
-import type { DragLayerMonitor, DropTargetMonitor } from 'react-dnd'
-import type { StepIdType } from '../../../../form-types'
-import type { ConnectedStepItemProps } from '../../../../containers/ConnectedStepItem'
 
-interface DragDropStepProps extends ConnectedStepItemProps {
-  stepId: StepIdType
-  moveStep: (stepId: StepIdType, value: number) => void
-  findStepIndex: (stepId: StepIdType) => number
-  orderedStepIds: string[]
+import {
+  ConcurrentGroup,
+  ConcurrentGroupCheckpoint,
+  ConcurrentGroupChild,
+} from '/protocol-designer/components/molecules'
+import { DND_TYPES } from '/protocol-designer/constants'
+import { getEnableConcurrentModuleActions } from '/protocol-designer/feature-flags/selectors'
+import {
+  getOrderedSavedForms,
+  getSavedStepHierarchy,
+} from '/protocol-designer/step-forms/selectors'
+import * as steplistActions from '/protocol-designer/steplist/actions'
+import {
+  computeStepMove,
+  convertStepArrayToHierarchy,
+  convertStepHierarchyToArray,
+} from '/protocol-designer/steplist/utils/stepHierarchy'
+import {
+  getMultiSelectItemIds,
+  getSelectedStepId,
+} from '/protocol-designer/ui/steps/selectors'
+
+import { ConnectedStepInfo } from './ConnectedStepInfo'
+
+import type { Dispatch, SetStateAction } from 'react'
+import type { DragLayerMonitor, DropTargetMonitor } from 'react-dnd'
+import type { StepIdType } from '/protocol-designer/form-types'
+
+interface DraggableStepsProps {
+  sidebarWidth: number
+}
+
+/**
+ * The entire list of the "real" steps in the protocol, as opposed to the
+ * terminal steps. The steps in here can be dragged and dropped to reorder them.
+ */
+export function DraggableSteps(props: DraggableStepsProps): JSX.Element | null {
+  const { sidebarWidth } = props
+  const [openedOverflowMenuId, setOpenedOverflowMenuId] = useState<
+    string | null
+  >(null)
+
+  const stepHierarchy = useSelector(getSavedStepHierarchy)
+
+  return (
+    <Flex flexDirection={DIRECTION_COLUMN} width="100%">
+      {stepHierarchy.topLevelItems.map(nestedStepElement => {
+        if (nestedStepElement.type === 'standaloneStep') {
+          return (
+            <DragDropStep
+              key={`${nestedStepElement.stepId}`}
+              stepId={nestedStepElement.stepId}
+              openedOverflowMenuId={openedOverflowMenuId}
+              setOpenedOverflowMenuId={setOpenedOverflowMenuId}
+              sidebarWidth={sidebarWidth}
+            />
+          )
+        } else if (nestedStepElement.type === 'thermocyclerProfileGroup') {
+          return (
+            <ThermocyclerProfile
+              key={
+                'concurrent-group-' +
+                nestedStepElement.thermocyclerProfileStepId
+              }
+              thermocyclerProfileStepId={
+                nestedStepElement.thermocyclerProfileStepId
+              }
+              concurrentStepIds={nestedStepElement.concurrentSteps.map(
+                step => step.stepId
+              )}
+              openedOverflowMenuId={openedOverflowMenuId}
+              setOpenedOverflowMenuId={setOpenedOverflowMenuId}
+              sidebarWidth={sidebarWidth}
+            />
+          )
+        } else {
+          nestedStepElement satisfies never // Exhaustiveness check.
+        }
+      })}
+    </Flex>
+  )
 }
 
 interface DropType {
   stepId: StepIdType
 }
 
+interface ConnectedStepItemProps {
+  stepId: StepIdType
+  onStepContextMenu?: () => void
+}
+
+interface DragDropStepProps extends ConnectedStepItemProps {
+  stepId: StepIdType
+  openedOverflowMenuId?: string | null
+  setOpenedOverflowMenuId?: Dispatch<SetStateAction<string | null>>
+  sidebarWidth: number
+}
+
+/**
+ * A step that can appear at the top level of the timeline or inside a nested group.
+ * It can be dragged around to move it within the timeline.
+ */
 function DragDropStep(props: DragDropStepProps): JSX.Element {
-  const { stepId, moveStep, findStepIndex, orderedStepIds, stepNumber } = props
+  const {
+    stepId,
+    openedOverflowMenuId,
+    setOpenedOverflowMenuId,
+    sidebarWidth,
+  } = props
   const stepRef = useRef<HTMLDivElement>(null)
+
+  const dispatch = useDispatch()
+  const steps = useSelector(getOrderedSavedForms)
+  const enableConcurrentModuleActions = useSelector(
+    getEnableConcurrentModuleActions
+  )
 
   const [{ isDragging }, drag] = useDrag(
     () => ({
       type: DND_TYPES.STEP_ITEM,
-      item: { stepId },
+      item: { stepId } satisfies DropType,
       collect: (monitor: DragLayerMonitor) => ({
         isDragging: monitor.isDragging(),
       }),
     }),
-    [orderedStepIds]
+    [stepId]
   )
 
-  const [{ handlerId, hovered }, drop] = useDrop(
+  const getStepsAfterMovingHere = useCallback(
+    (idOfStepBeingMoved: StepIdType) => {
+      return computeStepMove(
+        convertStepArrayToHierarchy(steps, enableConcurrentModuleActions),
+        {
+          moveType: 'insertBeforeDestinationStep',
+          movedStepId: idOfStepBeingMoved,
+          destinationStepId: stepId,
+        }
+      )
+    },
+    [steps, stepId, enableConcurrentModuleActions]
+  )
+
+  const [{ isHoveredOver, canBeDroppedUpon }, drop] = useDrop(
     () => ({
       accept: DND_TYPES.STEP_ITEM,
-      canDrop: () => {
-        return true
+      canDrop: (item: DropType) => {
+        const stepsAfterMove = getStepsAfterMovingHere(item.stepId)
+        return stepsAfterMove.isMoveAllowed
       },
       drop: (item: DropType) => {
-        const draggedId = item.stepId
-        if (draggedId !== stepId) {
-          const overIndex = findStepIndex(stepId)
-          moveStep(draggedId, overIndex)
+        const stepsAfterMove = getStepsAfterMovingHere(item.stepId)
+        if (stepsAfterMove.isMoveAllowed) {
+          dispatch(
+            steplistActions.reorderSteps(
+              convertStepHierarchyToArray(stepsAfterMove.stepsAfterMove)
+            )
+          )
+        } else {
+          // This shouldn't be possible if canDrop() is working right.
+          console.error(
+            "Unexpected attempt to move a step in a way that isn't allowed."
+          )
         }
       },
       collect: (monitor: DropTargetMonitor) => ({
-        handlerId: monitor.getHandlerId(),
-        hovered: monitor.isOver(),
+        isHoveredOver: monitor.isOver(),
+        canBeDroppedUpon: monitor.canDrop(),
       }),
     }),
-    [orderedStepIds]
+    [getStepsAfterMovingHere, dispatch]
   )
 
   drag(drop(stepRef))
   return (
-    <Box
+    <Flex
+      flexDirection={DIRECTION_COLUMN}
+      opacity={isDragging ? 0.3 : 1}
       ref={stepRef}
-      style={{ opacity: isDragging ? 0.3 : 1 }}
-      data-handler-id={handlerId}
     >
+      {isHoveredOver && canBeDroppedUpon && <DragDropPreviewBar />}
       <ConnectedStepInfo
-        stepNumber={stepNumber}
+        openedOverflowMenuId={openedOverflowMenuId}
+        setOpenedOverflowMenuId={setOpenedOverflowMenuId}
         stepId={stepId}
-        dragHovered={hovered}
+        sidebarWidth={sidebarWidth}
+      />
+    </Flex>
+  )
+}
+
+/** A horizontal divider indicating where the step will be placed. */
+function DragDropPreviewBar(): JSX.Element {
+  return (
+    <Box paddingY={SPACING.spacing2}>
+      <Divider
+        marginY="0"
+        borderBottom="none"
+        height="0.25rem" // 4px
+        width="100%"
+        backgroundColor={COLORS.blue50}
+        borderRadius="0.125rem" // half of height
       />
     </Box>
   )
 }
 
-interface DraggableStepsProps {
-  orderedStepIds: StepIdType[]
-  reorderSteps: (steps: StepIdType[]) => void
+interface ThermocyclerProfileProps {
+  thermocyclerProfileStepId: StepIdType
+  concurrentStepIds: StepIdType[]
+
+  openedOverflowMenuId?: string | null
+  setOpenedOverflowMenuId?: Dispatch<SetStateAction<string | null>>
+
+  sidebarWidth: number
 }
-export function DraggableSteps(props: DraggableStepsProps): JSX.Element | null {
-  const { orderedStepIds, reorderSteps } = props
-  const { t } = useTranslation('shared')
 
-  const findStepIndex = (stepId: StepIdType): number =>
-    orderedStepIds.findIndex(id => stepId === id)
+/**
+ * A Thermocycler profile step and the nested block that immediately follows it.
+ *
+ * The profile step can be dragged around to move the whole group.
+ * The nested block can have other steps dropped into it.
+ */
+function ThermocyclerProfile(props: ThermocyclerProfileProps): JSX.Element {
+  const {
+    thermocyclerProfileStepId,
+    concurrentStepIds,
+    openedOverflowMenuId,
+    setOpenedOverflowMenuId,
+    sidebarWidth,
+  } = props
 
-  const moveStep = (stepId: StepIdType, targetIndex: number): void => {
-    const currentIndex = findStepIndex(stepId)
+  const selectedStepId = useSelector(getSelectedStepId)
+  const multiSelectItemIds = useSelector(getMultiSelectItemIds)
+  const isRootSelected =
+    multiSelectItemIds != null && multiSelectItemIds.length > 0
+      ? multiSelectItemIds.includes(thermocyclerProfileStepId)
+      : selectedStepId === thermocyclerProfileStepId
 
-    const currentRemoved = [
-      ...orderedStepIds.slice(0, currentIndex),
-      ...orderedStepIds.slice(currentIndex + 1, orderedStepIds.length),
-    ]
-    const currentReinserted = [
-      ...currentRemoved.slice(0, targetIndex),
-      stepId,
-      ...currentRemoved.slice(targetIndex, currentRemoved.length),
-    ]
-    if (confirm(t('confirm_reorder') as string)) {
-      reorderSteps(currentReinserted)
-    }
-  }
+  const { t } = useTranslation()
 
   return (
-    <Flex
-      gridGap={SPACING.spacing4}
-      flexDirection={DIRECTION_COLUMN}
-      width="100%"
-    >
-      {orderedStepIds.map((stepId: StepIdType, index: number) => (
-        <DragDropStep
-          key={`${stepId}_${index}`}
-          stepNumber={index + 1}
-          stepId={stepId}
-          moveStep={moveStep}
-          findStepIndex={findStepIndex}
-          orderedStepIds={orderedStepIds}
-        />
-      ))}
-      <StepDragPreview />
-    </Flex>
+    <div>
+      <DragDropStep
+        stepId={thermocyclerProfileStepId}
+        openedOverflowMenuId={openedOverflowMenuId}
+        setOpenedOverflowMenuId={setOpenedOverflowMenuId}
+        sidebarWidth={sidebarWidth}
+      />
+
+      <ConcurrentGroup
+        active={isRootSelected}
+        // todo(mm, 2025-10-27): Following the styling of normal standalnone top-level steps,
+        // something should make this ConcurrentGroup and its checkpoint children semi-translucent
+        // if there's an error somewhere above in the timeline. But we need to avoid adding
+        // translucency to the DragDropStep children, because they already do that to themselves.
+      >
+        <ConcurrentGroupChild type="checkpoint">
+          <ConcurrentGroupCheckpoint
+            text={t(
+              'protocol_steps:thermocycler_module.profile_timeline.start'
+            )}
+          />
+        </ConcurrentGroupChild>
+        {concurrentStepIds.map(concurrentStepId => (
+          <ConcurrentGroupChild key={concurrentStepId} type="step">
+            <DragDropStep
+              stepId={concurrentStepId}
+              openedOverflowMenuId={openedOverflowMenuId}
+              setOpenedOverflowMenuId={setOpenedOverflowMenuId}
+              sidebarWidth={sidebarWidth}
+            />
+          </ConcurrentGroupChild>
+        ))}
+        <ConcurrentGroupChild type="checkpoint">
+          <ThermocyclerProfileEndCheckpoint
+            thermocyclerProfileStepId={thermocyclerProfileStepId}
+          />
+        </ConcurrentGroupChild>
+      </ConcurrentGroup>
+    </div>
   )
 }
 
-function StepDragPreview(): JSX.Element | null {
-  const [{ isDragging, itemType, item, currentOffset }] = useDrag(() => ({
-    type: DND_TYPES.STEP_ITEM,
-    collect: (monitor: DragLayerMonitor) => ({
-      currentOffset: monitor.getSourceClientOffset(),
-      isDragging: monitor.isDragging(),
-      itemType: monitor.getItemType(),
-      item: monitor.getItem() as { stepId: StepIdType },
+/**
+ * The "wait for profile to complete" checkpoint at the end of a Thermocycler profile's
+ * nested block. The user can drag a step onto it to move that step right above it.
+ */
+function ThermocyclerProfileEndCheckpoint(props: {
+  thermocyclerProfileStepId: string
+}): JSX.Element {
+  const { thermocyclerProfileStepId } = props
+
+  const dispatch = useDispatch()
+  const steps = useSelector(getOrderedSavedForms)
+  const enableConcurrentModuleActions = useSelector(
+    getEnableConcurrentModuleActions
+  )
+  const { t } = useTranslation()
+
+  const getStepsAfterMovingStepHere = useCallback(
+    (idOfStepBeingMoved: StepIdType) => {
+      return computeStepMove(
+        convertStepArrayToHierarchy(steps, enableConcurrentModuleActions),
+        {
+          moveType: 'insertAsLastStepOfGroup',
+          movedStepId: idOfStepBeingMoved,
+          destinationGroupRootStepId: thermocyclerProfileStepId,
+        }
+      )
+    },
+    [steps, thermocyclerProfileStepId, enableConcurrentModuleActions]
+  )
+
+  const [{ isHoveredOver, canBeDroppedUpon }, drop] = useDrop(
+    () => ({
+      accept: DND_TYPES.STEP_ITEM,
+      canDrop: (item: DropType) => {
+        const stepsAfterMove = getStepsAfterMovingStepHere(item.stepId)
+        return stepsAfterMove.isMoveAllowed
+      },
+      drop: (item: DropType) => {
+        const stepsAfterMove = getStepsAfterMovingStepHere(item.stepId)
+        if (stepsAfterMove.isMoveAllowed) {
+          dispatch(
+            steplistActions.reorderSteps(
+              convertStepHierarchyToArray(stepsAfterMove.stepsAfterMove)
+            )
+          )
+        } else {
+          // This shouldn't be possible if canDrop() is working right.
+          console.error(
+            "Unexpected attempt to move a step in a way that isn't allowed."
+          )
+        }
+      },
+      collect: monitor => ({
+        isHoveredOver: monitor.isOver(),
+        canBeDroppedUpon: monitor.canDrop(),
+      }),
     }),
-  }))
-
-  const savedStepForms = useSelector(stepFormSelectors.getSavedStepForms)
-  const savedForm = item && savedStepForms[item.stepId]
-  const { stepType, stepName } = savedForm || {}
-
-  if (
-    itemType !== DND_TYPES.STEP_ITEM ||
-    !isDragging ||
-    stepType == null ||
-    currentOffset == null
-  ) {
-    return null
-  }
+    [dispatch, getStepsAfterMovingStepHere]
+  )
 
   return (
-    <Flex cursor="grabbing" backgroundColor={COLORS.transparent}>
-      <StepContainer
-        iconName={stepIconsByType[stepType]}
-        title={stepName || ''}
+    <Flex flexDirection={DIRECTION_COLUMN} ref={drop}>
+      {isHoveredOver && canBeDroppedUpon && <DragDropPreviewBar />}
+      <ConcurrentGroupCheckpoint
+        text={t(
+          'protocol_steps:thermocycler_module.profile_timeline.wait_for_complete'
+        )}
       />
     </Flex>
   )

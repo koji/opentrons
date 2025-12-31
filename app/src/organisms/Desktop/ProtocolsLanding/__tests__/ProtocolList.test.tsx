@@ -1,8 +1,7 @@
-import type * as React from 'react'
 import { BrowserRouter } from 'react-router-dom'
-import { when } from 'vitest-when'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, beforeEach, vi, afterEach, expect } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { when } from 'vitest-when'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
@@ -11,10 +10,13 @@ import {
   storedProtocolData,
   storedProtocolDataTwo,
 } from '/app/redux/protocol-storage/__fixtures__'
-import { ProtocolList } from '../ProtocolList'
-import { useSortedProtocols } from '../hooks'
+
 import { EmptyStateLinks } from '../EmptyStateLinks'
+import { useSortedProtocols } from '../hooks'
 import { ProtocolCard } from '../ProtocolCard'
+import { ProtocolList } from '../ProtocolList'
+
+import type { ComponentProps } from 'react'
 
 vi.mock('../hooks')
 vi.mock('/app/redux/protocol-storage')
@@ -22,7 +24,7 @@ vi.mock('/app/redux/config')
 vi.mock('../EmptyStateLinks')
 vi.mock('../ProtocolCard')
 
-const render = (props: React.ComponentProps<typeof ProtocolList>) => {
+const render = (props: ComponentProps<typeof ProtocolList>) => {
   return renderWithProviders(
     <BrowserRouter>
       <ProtocolList {...props} />
@@ -34,7 +36,7 @@ const render = (props: React.ComponentProps<typeof ProtocolList>) => {
 }
 
 describe('ProtocolList', () => {
-  let props: React.ComponentProps<typeof ProtocolList>
+  let props: ComponentProps<typeof ProtocolList>
 
   beforeEach(() => {
     props = {

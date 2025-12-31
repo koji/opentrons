@@ -1,28 +1,31 @@
-import * as React from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
+import { Trans, useTranslation } from 'react-i18next'
 import { useDispatch } from 'react-redux'
-import { useTranslation, Trans } from 'react-i18next'
-import { css } from 'styled-components'
 
 import {
   ALIGN_CENTER,
-  Btn,
   Banner,
+  Btn,
   Flex,
   JUSTIFY_FLEX_END,
-  Modal,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
+  Modal,
+  OVERFLOW_AUTO,
   PrimaryButton,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
   WRAP_REVERSE,
 } from '@opentrons/components'
 
-import { analyzeProtocol } from '/app/redux/protocol-storage'
 import { getTopPortalEl } from '/app/App/portal'
+import { CodeBlock } from '/app/atoms/CodeBlock'
+import { analyzeProtocol } from '/app/redux/protocol-storage'
 
+import type { MouseEventHandler } from 'react'
 import type { Dispatch } from '/app/redux/types'
+
 interface ProtocolAnalysisFailureProps {
   errors: string[]
   protocolKey: string
@@ -34,19 +37,19 @@ export function ProtocolAnalysisFailure(
   const { errors, protocolKey } = props
   const { t } = useTranslation(['protocol_list', 'shared'])
   const dispatch = useDispatch<Dispatch>()
-  const [showErrorDetails, setShowErrorDetails] = React.useState(false)
+  const [showErrorDetails, setShowErrorDetails] = useState(false)
 
-  const handleClickShowDetails: React.MouseEventHandler = e => {
+  const handleClickShowDetails: MouseEventHandler = e => {
     e.preventDefault()
     e.stopPropagation()
     setShowErrorDetails(true)
   }
-  const handleClickHideDetails: React.MouseEventHandler = e => {
+  const handleClickHideDetails: MouseEventHandler = e => {
     e.preventDefault()
     e.stopPropagation()
     setShowErrorDetails(false)
   }
-  const handleClickReanalyze: React.MouseEventHandler = e => {
+  const handleClickReanalyze: MouseEventHandler = e => {
     e.preventDefault()
     e.stopPropagation()
     dispatch(analyzeProtocol(protocolKey))
@@ -61,26 +64,23 @@ export function ProtocolAnalysisFailure(
         alignItems={ALIGN_CENTER}
         width="100%"
       >
-        <LegacyStyledText as="p">
+        <LegacyStyledText forwardedAs="p">
           {t('protocol_analysis_failure')}
         </LegacyStyledText>
-        <LegacyStyledText as="p">
+        <LegacyStyledText forwardedAs="p">
           <Trans
             t={t}
             i18nKey="reanalyze_or_view_error"
             components={{
               errorLink: (
                 <Btn
-                  as="a"
-                  role="button"
                   textDecoration={TYPOGRAPHY.textDecorationUnderline}
                   onClick={handleClickShowDetails}
                 />
               ),
               analysisLink: (
                 <Btn
-                  as="a"
-                  role="button"
+                  // forwardedAs="a"
                   textDecoration={TYPOGRAPHY.textDecorationUnderline}
                   onClick={handleClickReanalyze}
                 />
@@ -96,11 +96,13 @@ export function ProtocolAnalysisFailure(
               title={t('protocol_analysis_failure')}
               onClose={handleClickHideDetails}
             >
-              <Flex css={SCROLL_LONG}>
+              <Flex
+                overflow={OVERFLOW_AUTO}
+                width="inherit"
+                maxHeight="11.75rem"
+              >
                 {errors.map((error, index) => (
-                  <LegacyStyledText key={index} as="p">
-                    {error}
-                  </LegacyStyledText>
+                  <CodeBlock key={`error-${index}`}>{error}</CodeBlock>
                 ))}
               </Flex>
               <Flex justifyContent={JUSTIFY_FLEX_END}>
@@ -119,9 +121,3 @@ export function ProtocolAnalysisFailure(
     </Banner>
   )
 }
-
-const SCROLL_LONG = css`
-  overflow: auto;
-  width: inherit;
-  max-height: 11.75rem;
-`

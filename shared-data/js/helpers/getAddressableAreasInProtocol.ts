@@ -1,8 +1,13 @@
 import { MOVABLE_TRASH_A3_ADDRESSABLE_AREA } from '../constants'
 import {
-  getAddressableAreaNamesFromLoadedModule,
   getAddressableAreaFromSlotId,
+  getAddressableAreaNamesFromLoadedModule,
 } from '../fixtures'
+import {
+  locationIsOnAddressableArea,
+  locationIsOnSlot,
+} from './symbolicPositionHelpers'
+
 import type { AddressableAreaName } from '../../deck'
 import type { ProtocolAnalysisOutput } from '../../protocol'
 import type { CompletedProtocolAnalysis, DeckDefinition } from '../types'
@@ -18,8 +23,7 @@ export function getAddressableAreasInProtocol(
       const { commandType, params } = command
       if (
         commandType === 'moveLabware' &&
-        params.newLocation !== 'offDeck' &&
-        'slotName' in params.newLocation &&
+        locationIsOnSlot(params.newLocation) &&
         !acc.includes(params.newLocation.slotName as AddressableAreaName)
       ) {
         const addressableAreaName = getAddressableAreaFromSlotId(
@@ -34,15 +38,15 @@ export function getAddressableAreasInProtocol(
         }
       } else if (
         commandType === 'moveLabware' &&
-        params.newLocation !== 'offDeck' &&
-        'addressableAreaName' in params.newLocation &&
+        locationIsOnAddressableArea(params.newLocation) &&
         !acc.includes(params.newLocation.addressableAreaName)
       ) {
         return [...acc, params.newLocation.addressableAreaName]
       } else if (
-        commandType === 'loadLabware' &&
-        params.location !== 'offDeck' &&
-        'slotName' in params.location &&
+        (commandType === 'loadLabware' ||
+          commandType === 'loadLid' ||
+          commandType === 'loadLidStack') &&
+        locationIsOnSlot(params.location) &&
         !acc.includes(params.location.slotName as AddressableAreaName)
       ) {
         const addressableAreaName = getAddressableAreaFromSlotId(
@@ -69,12 +73,12 @@ export function getAddressableAreasInProtocol(
           params.location.slotName,
           deckDef
         )
-
-        return [...acc, ...addressableAreaNames]
+        return [...acc, addressableAreaNames[0]]
       } else if (
-        commandType === 'loadLabware' &&
-        params.location !== 'offDeck' &&
-        'addressableAreaName' in params.location &&
+        (commandType === 'loadLabware' ||
+          commandType === 'loadLid' ||
+          commandType === 'loadLidStack') &&
+        locationIsOnAddressableArea(params.location) &&
         !acc.includes(params.location.addressableAreaName)
       ) {
         return [...acc, params.location.addressableAreaName]
@@ -99,8 +103,7 @@ export function getAddressableAreasInProtocol(
   const legacyTrashAddressableArea = labware.some(
     ({ loadName, location }) =>
       loadName === 'opentrons_1_trash_3200ml_fixed' &&
-      location !== 'offDeck' &&
-      'slotName' in location &&
+      locationIsOnSlot(location) &&
       location.slotName === 'A3'
   )
     ? MOVABLE_TRASH_A3_ADDRESSABLE_AREA

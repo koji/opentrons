@@ -1,24 +1,27 @@
-import type * as React from 'react'
-import { when } from 'vitest-when'
-import { describe, it, beforeEach, expect, vi } from 'vitest'
 import { fireEvent, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { when } from 'vitest-when'
+
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
+import { useIsFlex } from '/app/redux-resources/robots'
 import { mockTemperatureModule } from '/app/redux/modules/__fixtures__'
 import {
   getIsFixtureMismatch,
   getRequiredDeckConfig,
 } from '/app/resources/deck_configuration/utils'
 import {
-  useRunHasStarted,
   useModuleCalibrationStatus,
+  useRunHasStarted,
   useUnmatchedModulesForProtocol,
 } from '/app/resources/runs'
-import { useIsFlex } from '/app/redux-resources/robots'
+
 import { SetupModuleAndDeck } from '../index'
+import { SetupFixtureList } from '../SetupFixtureList'
 import { SetupModulesList } from '../SetupModulesList'
 import { SetupModulesMap } from '../SetupModulesMap'
-import { SetupFixtureList } from '../SetupFixtureList'
+
+import type { ComponentProps } from 'react'
 
 vi.mock('/app/redux-resources/robots')
 vi.mock('../SetupModulesList')
@@ -31,14 +34,14 @@ vi.mock('/app/resources/runs')
 const MOCK_ROBOT_NAME = 'otie'
 const MOCK_RUN_ID = '1'
 
-const render = (props: React.ComponentProps<typeof SetupModuleAndDeck>) => {
+const render = (props: ComponentProps<typeof SetupModuleAndDeck>) => {
   return renderWithProviders(<SetupModuleAndDeck {...props} />, {
     i18nInstance: i18n,
   })[0]
 }
 
 describe('SetupModuleAndDeck', () => {
-  let props: React.ComponentProps<typeof SetupModuleAndDeck>
+  let props: ComponentProps<typeof SetupModuleAndDeck>
   beforeEach(() => {
     props = {
       robotName: MOCK_ROBOT_NAME,
@@ -77,15 +80,15 @@ describe('SetupModuleAndDeck', () => {
     screen.getByRole('button', { name: 'Map View' })
   })
 
-  it('should render Proceed to labware setup CTA that is enabled', () => {
+  it('should render Proceed to labware offsets setup CTA that is enabled', () => {
     render(props)
     const button = screen.getByRole('button', {
-      name: 'Proceed to labware position check',
+      name: 'Proceed to labware offsets',
     })
     expect(button).toBeEnabled()
   })
 
-  it('should render a disabled Proceed to labware setup CTA if the protocol requests modules and they are not all attached to the robot', () => {
+  it('should render a disabled Proceed to labware offsets setup CTA if the protocol requests modules and they are not all attached to the robot', () => {
     when(useUnmatchedModulesForProtocol)
       .calledWith(MOCK_ROBOT_NAME, MOCK_RUN_ID)
       .thenReturn({
@@ -94,18 +97,18 @@ describe('SetupModuleAndDeck', () => {
       })
     render(props)
     const button = screen.getByRole('button', {
-      name: 'Proceed to labware position check',
+      name: 'Proceed to labware offsets',
     })
     expect(button).toBeDisabled()
   })
 
-  it('should render a disabled Proceed to labware setup CTA if the protocol requests modules they are not all calibrated', () => {
+  it('should render a disabled Proceed to labware offsets setup CTA if the protocol requests modules they are not all calibrated', () => {
     when(useModuleCalibrationStatus)
       .calledWith(MOCK_ROBOT_NAME, MOCK_RUN_ID)
       .thenReturn({ complete: false })
     render(props)
     const button = screen.getByRole('button', {
-      name: 'Proceed to labware position check',
+      name: 'Proceed to labware offsets',
     })
     expect(button).toBeDisabled()
   })
@@ -125,7 +128,6 @@ describe('SetupModuleAndDeck', () => {
         cutoutFixtureId: 'trashBinAdapter',
         requiredAddressableAreas: ['movableTrashA1'],
         compatibleCutoutFixtureIds: ['trashBinAdapter'],
-        missingLabwareDisplayName: null,
       },
     ])
     render(props)
@@ -155,7 +157,7 @@ describe('SetupModuleAndDeck', () => {
     vi.mocked(getIsFixtureMismatch).mockReturnValue(true)
     render(props)
     const button = screen.getByRole('button', {
-      name: 'Proceed to labware position check',
+      name: 'Proceed to labware offsets',
     })
     expect(button).toBeDisabled()
   })

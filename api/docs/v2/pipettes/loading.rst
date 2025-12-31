@@ -33,7 +33,9 @@ The pipette's API load name (``instrument_name``) is the first parameter of the 
         +                         +---------------+-------------------------+
         |                         | 5–1000        | ``flex_8channel_1000``  |
         +-------------------------+---------------+-------------------------+
-        | Flex 96-Channel Pipette | 5–1000        | ``flex_96channel_1000`` |
+        | Flex 96-Channel Pipette | 1–200         | ``flex_96channel_200``  |
+        +                         +---------------+-------------------------+
+        |                         | 5–1000        | ``flex_96channel_1000`` |
         +-------------------------+---------------+-------------------------+
 
     .. tab:: OT-2 Pipettes
@@ -80,7 +82,7 @@ This code sample loads a Flex 1-Channel Pipette in the left mount and a Flex 8-C
             mount="right",
             tip_racks=[tiprack2]) 
 
-If you're writing a protocol that uses the Flex Gripper, you might think that this would be the place in your protocol to declare that. However, the gripper doesn't require ``load_instrument``! Whether your gripper requires a protocol is determined by the presence of :py:meth:`.ProtocolContext.move_labware` commands. See :ref:`moving-labware` for more details.
+If you're writing a protocol that uses the Flex Gripper, you might think that this would be the place in your protocol to declare that. However, the gripper doesn't require ``load_instrument``! Whether your protocol requires a gripper is determined by the presence of :py:meth:`.ProtocolContext.move_labware` commands. See :ref:`moving-labware` for more details.
 
 Loading a Flex 96-Channel Pipette
 =================================
@@ -261,7 +263,7 @@ Let's take a look at how all this works. With automatic liquid detection enabled
 
 Liquid detection takes place prior to aspiration. Upon detecting a liquid, the pipette stops, raises itself above the liquid's surface, and then aspirates according to your protocol. Checking for a liquid adds time to your protocol run, so be aware of that before using it. If Flex doesn't detect liquid, it raises an error and stops the protocol until the problem is resolved.
 
-However, aspiration isn't required for liquid level detection. Two standalone methods, :py:meth:`.detect_liquid_presence` and :py:meth:`.require_liquid_presence`, let you add liquid detection to a protocol with or without aspirating. Automatic detection is the same as calling ``require_liquid_presence()`` before every aspiration. See :ref:`detect-liquid-presence` and :ref:`require-liquid-presence` for details.
+However, aspiration isn't required for liquid level detection. Three standalone methods, :py:meth:`.detect_liquid_presence`, :py:meth:`.require_liquid_presence`, and :py:meth:`.measure_liquid_height`, let you add liquid detection to a protocol with or without aspirating. Automatic detection is the same as calling ``require_liquid_presence()`` before every aspiration. See :ref:`detect-liquid-presence`, :ref:`require-liquid-presence`, or :ref:`measure-liquids` for details.
 
 .. versionadded:: 2.20
 

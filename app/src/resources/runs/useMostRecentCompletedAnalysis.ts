@@ -1,4 +1,5 @@
 import last from 'lodash/last'
+
 import {
   useProtocolAnalysisAsDocumentQuery,
   useProtocolQuery,
@@ -8,11 +9,10 @@ import { useNotifyRunQuery } from '/app/resources/runs'
 
 import type { CompletedProtocolAnalysis } from '@opentrons/shared-data'
 
-// TODO(jh, 06-17-24): This is used elsewhere in the app and should probably live in something like resources.
 export function useMostRecentCompletedAnalysis(
   runId: string | null
 ): CompletedProtocolAnalysis | null {
-  const { data: runRecord } = useNotifyRunQuery(runId)
+  const { data: runRecord } = useNotifyRunQuery(runId ?? null)
   const protocolId = runRecord?.data?.protocolId ?? null
   const { data: protocolData } = useProtocolQuery(protocolId, {
     enabled: protocolId != null,

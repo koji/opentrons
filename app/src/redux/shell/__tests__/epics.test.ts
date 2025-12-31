@@ -1,13 +1,13 @@
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { EMPTY } from 'rxjs'
-import { TestScheduler } from 'rxjs/testing'
 import { take } from 'rxjs/operators'
+import { TestScheduler } from 'rxjs/testing'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import * as Alerts from '../../alerts'
 import * as Config from '../../config'
-import * as ShellUpdate from '../update'
-import { remote as mockRemote } from '../remote'
 import { shellEpic } from '../epic'
+import { remote as mockRemote } from '../remote'
+import * as ShellUpdate from '../update'
 
 import type { Action, State } from '../../types'
 
@@ -19,9 +19,8 @@ vi.mock('../remote')
 // TODO(mc, 2020-10-08): this is a partial mock because shell/update
 // needs some reorg to split actions and selectors
 vi.mock('../update', async importOriginal => {
-  const actual = await importOriginal<
-    typeof ShellUpdate.getAvailableShellUpdate
-  >()
+  const actual =
+    await importOriginal<typeof ShellUpdate.getAvailableShellUpdate>()
   return {
     ...actual,
     getAvailableShellUpdate: vi.fn(),

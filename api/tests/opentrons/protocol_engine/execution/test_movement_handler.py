@@ -1,4 +1,5 @@
 """MovementHandler command subject."""
+
 import pytest
 from decoy import Decoy
 from typing import NamedTuple, Optional
@@ -24,6 +25,7 @@ from opentrons.protocol_engine.state.state import (
 )
 from opentrons.protocol_engine.state.motion import PipetteLocationData
 from opentrons.protocol_engine.execution.movement import MovementHandler
+from opentrons.protocol_engine.execution.equipment import EquipmentHandler
 from opentrons.protocol_engine.execution.thermocycler_movement_flagger import (
     ThermocyclerMovementFlagger,
 )
@@ -65,12 +67,19 @@ def mock_gantry_mover(decoy: Decoy) -> GantryMover:
 
 
 @pytest.fixture
+def mock_equipment_handler(decoy: Decoy) -> EquipmentHandler:
+    """Get a mock in the shape of an EquipmentHandler."""
+    return decoy.mock(cls=EquipmentHandler)
+
+
+@pytest.fixture
 def subject(
     state_store: StateStore,
     hardware_api: HardwareAPI,
     thermocycler_movement_flagger: ThermocyclerMovementFlagger,
     heater_shaker_movement_flagger: HeaterShakerMovementFlagger,
     mock_gantry_mover: GantryMover,
+    mock_equipment_handler: EquipmentHandler,
 ) -> MovementHandler:
     """Create a MovementHandler with its dependencies mocked out."""
     return MovementHandler(
@@ -79,6 +88,7 @@ def subject(
         thermocycler_movement_flagger=thermocycler_movement_flagger,
         heater_shaker_movement_flagger=heater_shaker_movement_flagger,
         gantry_mover=mock_gantry_mover,
+        equipment=mock_equipment_handler,
     )
 
 
@@ -106,7 +116,7 @@ async def test_move_to_well(
         DeckSlotName.SLOT_1
     )
 
-    decoy.when(state_store.tips.get_pipette_channels("pipette-id")).then_return(1)
+    decoy.when(state_store.pipettes.get_channels("pipette-id")).then_return(1)
     decoy.when(state_store.labware.is_tiprack("labware-id")).then_return(False)
 
     decoy.when(
@@ -150,6 +160,7 @@ async def test_move_to_well(
             force_direct=True,
             minimum_z_height=12.3,
             operation_volume=None,
+            offset_pipette_for_reservoir_subwells=False,
         )
     ).then_return(
         [Waypoint(Point(1, 2, 3), CriticalPoint.XY_CENTER), Waypoint(Point(4, 5, 6))]
@@ -179,7 +190,7 @@ async def test_move_to_well(
     assert result == Point(x=4, y=5, z=6)
 
     decoy.verify(
-        await thermocycler_movement_flagger.raise_if_labware_in_non_open_thermocycler(
+        await thermocycler_movement_flagger.ensure_labware_in_open_thermocycler(
             labware_parent=DeckSlotLocation(slotName=DeckSlotName.SLOT_1)
         ),
         heater_shaker_movement_flagger.raise_if_movement_restricted(
@@ -221,7 +232,7 @@ async def test_move_to_well_from_starting_location(
         DeckSlotName.SLOT_1
     )
 
-    decoy.when(state_store.tips.get_pipette_channels("pipette-id")).then_return(1)
+    decoy.when(state_store.pipettes.get_channels("pipette-id")).then_return(1)
     decoy.when(state_store.labware.is_tiprack("labware-id")).then_return(False)
 
     decoy.when(
@@ -259,6 +270,7 @@ async def test_move_to_well_from_starting_location(
             force_direct=False,
             minimum_z_height=None,
             operation_volume=None,
+            offset_pipette_for_reservoir_subwells=False,
         )
     ).then_return([Waypoint(Point(1, 2, 3), CriticalPoint.XY_CENTER)])
 
@@ -287,7 +299,7 @@ async def test_move_to_well_from_starting_location(
     assert result == Point(4, 5, 6)
 
     decoy.verify(
-        await thermocycler_movement_flagger.raise_if_labware_in_non_open_thermocycler(
+        await thermocycler_movement_flagger.ensure_labware_in_open_thermocycler(
             labware_parent=DeckSlotLocation(slotName=DeckSlotName.SLOT_1)
         ),
         heater_shaker_movement_flagger.raise_if_movement_restricted(
@@ -322,7 +334,7 @@ async def test_move_to_addressable_area(
         state_store.addressable_areas.get_addressable_area_base_slot("area-name")
     ).then_return(DeckSlotName.SLOT_1)
 
-    decoy.when(state_store.tips.get_pipette_channels("pipette-id")).then_return(1)
+    decoy.when(state_store.pipettes.get_channels("pipette-id")).then_return(1)
 
     decoy.when(
         state_store.motion.get_pipette_location(

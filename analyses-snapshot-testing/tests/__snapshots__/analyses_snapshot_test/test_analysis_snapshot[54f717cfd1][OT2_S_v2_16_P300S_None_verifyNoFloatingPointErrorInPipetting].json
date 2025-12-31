@@ -1,4 +1,8 @@
 {
+  "commandAnnotations": [],
+  "commandPreconditions": {
+    "isCameraUsed": false
+  },
   "commands": [
     {
       "commandType": "home",
@@ -1159,7 +1163,20 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "9",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutout9",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "singleStandardSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -1526,7 +1543,20 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "10",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutout10",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "singleStandardSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -1870,12 +1900,7 @@
   },
   "createdAt": "TIMESTAMP",
   "errors": [],
-  "files": [
-    {
-      "name": "OT2_S_v2_16_P300S_None_verifyNoFloatingPointErrorInPipetting.py",
-      "role": "main"
-    }
-  ],
+  "files": [],
   "labware": [
     {
       "definitionUri": "opentrons/opentrons_96_tiprack_300ul/1",
@@ -1894,6 +1919,7 @@
       }
     }
   ],
+  "liquidClasses": [],
   "liquids": [],
   "metadata": {},
   "modules": [],

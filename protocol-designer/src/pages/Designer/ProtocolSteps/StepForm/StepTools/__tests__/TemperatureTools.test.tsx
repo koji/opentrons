@@ -1,15 +1,44 @@
-import { describe, it, vi, beforeEach } from 'vitest'
 import { screen } from '@testing-library/react'
-import { renderWithProviders } from '../../../../../../__testing-utils__'
-import { i18n } from '../../../../../../assets/localization'
+import { beforeEach, describe, it, vi } from 'vitest'
+
+import { TEMPERATURE_MODULE_TYPE } from '@opentrons/shared-data'
+import { TEMPERATURE_APPROACHING_TARGET } from '@opentrons/step-generation'
+
+import { renderWithProviders } from '/protocol-designer/__testing-utils__'
+import { i18n } from '/protocol-designer/assets/localization'
+import { getEnableConcurrentModuleActions } from '/protocol-designer/feature-flags/selectors'
+import { getRobotStateAtActiveItem } from '/protocol-designer/top-selectors/labware-locations'
 import {
   getTemperatureLabwareOptions,
   getTemperatureModuleIds,
-} from '../../../../../../ui/modules/selectors'
-import { TemperatureTools } from '../TemperatureTools'
-import type * as ModulesSelectors from '../../../../../../ui/modules/selectors'
+} from '/protocol-designer/ui/modules/selectors'
 
-vi.mock('../../../../../../ui/modules/selectors', async importOriginal => {
+import { TemperatureTools } from '../TemperatureTools'
+
+import type { ComponentProps } from 'react'
+import type { TimelineFrame } from '@opentrons/step-generation'
+import type * as FeatureFlagSelectors from '/protocol-designer/feature-flags/selectors'
+import type * as LabwareLocationsSelectors from '/protocol-designer/top-selectors/labware-locations'
+import type * as ModulesSelectors from '/protocol-designer/ui/modules/selectors'
+
+vi.mock('/protocol-designer/feature-flags/selectors', async importOriginal => {
+  const original = await importOriginal<typeof FeatureFlagSelectors>()
+  return {
+    ...original,
+    getEnableConcurrentModuleActions: vi.fn(),
+  }
+})
+vi.mock(
+  '/protocol-designer/top-selectors/labware-locations',
+  async importOriginal => {
+    const original = await importOriginal<typeof LabwareLocationsSelectors>()
+    return {
+      ...original,
+      getRobotStateAtActiveItem: vi.fn(),
+    }
+  }
+)
+vi.mock('/protocol-designer/ui/modules/selectors', async importOriginal => {
   const actualFields = await importOriginal<typeof ModulesSelectors>()
   return {
     ...actualFields,
@@ -17,14 +46,14 @@ vi.mock('../../../../../../ui/modules/selectors', async importOriginal => {
     getTemperatureModuleIds: vi.fn(),
   }
 })
-const render = (props: React.ComponentProps<typeof TemperatureTools>) => {
+const render = (props: ComponentProps<typeof TemperatureTools>) => {
   return renderWithProviders(<TemperatureTools {...props} />, {
     i18nInstance: i18n,
   })[0]
 }
 
 describe('TemperatureTools', () => {
-  let props: React.ComponentProps<typeof TemperatureTools>
+  let props: ComponentProps<typeof TemperatureTools>
 
   beforeEach(() => {
     props = {
@@ -40,7 +69,6 @@ describe('TemperatureTools', () => {
         dirtyFields: [],
         focusedField: null,
       },
-      visibleFormErrors: [],
       toolboxStep: 1,
       propsForFields: {
         moduleId: {
@@ -72,6 +100,8 @@ describe('TemperatureTools', () => {
         },
       },
       showFormErrors: false,
+      tab: 'aspirate',
+      setTab: vi.fn(),
     }
 
     vi.mocked(getTemperatureModuleIds).mockReturnValue(['mockId'])
@@ -81,13 +111,26 @@ describe('TemperatureTools', () => {
         value: 'mockId',
       },
     ])
+    vi.mocked(getEnableConcurrentModuleActions).mockReturnValue(true)
+    const mockRobotState: Partial<TimelineFrame> = {
+      modules: {
+        mockId: {
+          slot: 'mockModuleSlot',
+          moduleState: {
+            type: TEMPERATURE_MODULE_TYPE,
+            status: TEMPERATURE_APPROACHING_TARGET,
+            targetTemperature: 123,
+          },
+        },
+      },
+    }
+    vi.mocked(getRobotStateAtActiveItem).mockReturnValue(mockRobotState as any)
   })
 
   it('renders a temperature module form with 1 module', () => {
     render(props)
-    screen.getByText('Module')
+    screen.getByText('Heat or cool')
     screen.getByText('mock module')
-    screen.getByText('Deactivate module')
-    screen.getByText('Change to temperature')
+    screen.getByText('123 °C')
   })
 })

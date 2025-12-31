@@ -1,7 +1,7 @@
 """Report."""
 from dataclasses import fields
 from enum import Enum
-from typing import List, Tuple, Any, Dict
+from typing import List, Tuple, Any, Dict, Optional
 
 from hardware_testing.data.csv_report import (
     CSVReport,
@@ -78,91 +78,20 @@ class EnvironmentReportState(str, Enum):
     MAX = "environment-max"
 
 
-def create_csv_test_report_photometric(
-    volumes: List[float], trials: int, name: str, run_id: str
-) -> CSVReport:
-    """Create CSV test report."""
-    env_info = [field.name.replace("_", "-") for field in fields(EnvironmentData)]
-    meas_vols: List[Tuple[int, int, int]] = []
-
-    for vol in volumes:
-        meas_vols += [
-            (
-                vol,  # type: ignore[misc]
-                0,
-                trial,
-            )
-            for trial in range(trials)
-        ]
-
-    report = CSVReport(
-        test_name=name,
-        run_id=run_id,
-        sections=[
-            CSVSection(
-                title="SERIAL-NUMBERS",
-                lines=[
-                    CSVLine("robot", [str]),
-                    CSVLine("pipette", [str]),
-                    CSVLine("tips_50ul", [str]),
-                    CSVLine("tips_200ul", [str]),
-                    CSVLine("tips_1000ul", [str]),
-                    CSVLine("environment", [str]),
-                    CSVLine("liquid", [str]),
-                ],
-            ),
-            CSVSection(
-                title="CONFIG",
-                lines=[
-                    CSVLine(field.name, [str])  # just convert to a string, always
-                    for field in fields(config.PhotometricConfig)
-                    if field.name not in config.PHOTO_CONFIG_EXCLUDE_FROM_REPORT
-                ],
-            ),
-            CSVSection(
-                title="MEASUREMENTS",
-                lines=[
-                    CSVLine(
-                        create_measurement_tag(measurement, volume, channel, trial)
-                        + f"-{e}",
-                        [float],
-                    )
-                    for volume, channel, trial in meas_vols
-                    for measurement in MeasurementType
-                    for e in env_info
-                    if volume is not None or trial < config.NUM_BLANK_TRIALS
-                ],
-            ),
-        ],
-    )
-    return report
-
-
-def store_config_pm(report: CSVReport, cfg: config.PhotometricConfig) -> None:
-    """Store the config file list."""
-    for field in fields(config.PhotometricConfig):
-        if field.name in config.PHOTO_CONFIG_EXCLUDE_FROM_REPORT:
-            continue
-        val_str = str(getattr(cfg, field.name)).replace(" ", "")
-        val_str = val_str.replace("[", "").replace("]", "").replace(",", "-")
-        report("CONFIG", field.name, [val_str])
-
-
 def create_csv_test_report(
     volumes: List[float],
-    pipette_channels: int,
-    increment: bool,
+    pipette_channels: List[int],
     trials: int,
     name: str,
     run_id: str,
+    runtime_parameters: Optional[List[List[str]]] = None,
+    dont_write_to_disk: bool = False,
 ) -> CSVReport:
     """Create CSV test report."""
+    if runtime_parameters is None:
+        runtime_parameters = []
     env_info = [field.name.replace("_", "-") for field in fields(EnvironmentData)]
     meas_info = [field.name.replace("_", "-") for field in fields(MeasurementData)]
-    if pipette_channels == 8 and not increment:
-        pip_channels_tested = 8
-    else:
-        pip_channels_tested = 1
     meas_vols = [
         (
             None,  # volume
@@ -178,7 +107,7 @@ def create_csv_test_report(
                 channel,
                 trial,
             )
-            for channel in range(pip_channels_tested)
+            for channel in pipette_channels
             for trial in range(trials)
         ]
 
@@ -186,7 +115,7 @@ def create_csv_test_report(
     # and "trial_1" through trial count
     volume_stat_type = (
         ["channel_all"]
-        + [f"channel_{c+1}" for c in range(pip_channels_tested)]
+        + [f"channel_{c+1}" for c in pipette_channels]
         + [f"trial_{t+1}" for t in range(trials)]
     )
 
@@ -199,12 +128,14 @@ def create_csv_test_report(
         test_name=name,
         run_id=run_id,
         validate_meta_data=False,  # to avoid >3 columns in CSV (:shrug:)
+        dont_write_to_disk=dont_write_to_disk,
         sections=[
             CSVSection(
                 title="SERIAL-NUMBERS",
                 lines=[
                     CSVLine("robot", [str]),
                     CSVLine("pipette", [str]),
+                    CSVLine("tips_20ul", [str]),
                     CSVLine("tips_50ul", [str]),
                     CSVLine("tips_200ul", [str]),
                     CSVLine("tips_1000ul", [str]),
@@ -244,7 +175,7 @@ def create_csv_test_report(
                         f"trial-{t + 1}-{m}-{round(v, 2)}-ul-channel_{c + 1}", [float]
                     )
                     for v in volumes
-                    for c in range(pip_channels_tested)
+                    for c in pipette_channels
                     for t in range(trials)
                     for m in ["aspirate", "dispense", "liquid_height"]
                 ],
@@ -287,14 +218,24 @@ def create_csv_test_report(
                         [float],
                     )
                     for v in volumes
-                    for c in range(pip_channels_tested)
+                    for c in pipette_channels
                     for t in range(trials)
                     for i in ["start", "end"]
                     for d in ["target", "encoder", "drift"]
                 ],
             ),
+            CSVSection(
+                title="RUNTIME_PARAMS",
+                lines=[
+                    CSVLine(
+                        param[0], [str for _ in range(len(param) - 1)]
+                    )  # just convert to a string, always
+                    for param in runtime_parameters
+                ],
+            ),
         ],
     )
+
     # NOTE: just immediately clear all the "isolate" flags on the volume section
     #       so that final CSV is guaranteed to not be filled with a bunch of "None"
     for line in report["VOLUMES"].lines:
@@ -310,34 +251,6 @@ def store_config_gm(report: CSVReport, cfg: config.GravimetricConfig) -> None:
         val_str = str(getattr(cfg, field.name)).replace(" ", "")
         val_str = val_str.replace("[", "").replace("]", "").replace(",", "-")
         report("CONFIG", field.name, [val_str])
-
-
-def store_serial_numbers_pm(
-    report: CSVReport,
-    robot: str,
-    pipette: str,
-    tips: Dict[str, str],
-    environment: str,
-    liquid: str,
-) -> None:
-    """Report serial numbers."""
-    report("SERIAL-NUMBERS", "robot", [robot])
-    report("SERIAL-NUMBERS", "pipette", [pipette])
-    for tip in tips.keys():
-        report("SERIAL-NUMBERS", tip, [tips[tip]])
-    report("SERIAL-NUMBERS", "environment", [environment])
-    report("SERIAL-NUMBERS", "liquid", [liquid])
-
-
-def store_measurements_pm(
-    report: CSVReport,
-    tag: str,
-    data: EnvironmentData,
-) -> None:
-    """Report measurement."""
-    for field in fields(EnvironmentData):
-        f_tag = field.name.replace("_", "-")
-        report("MEASUREMENTS", f"{tag}-{f_tag}", [getattr(data, field.name)])
 
 
 def store_serial_numbers(

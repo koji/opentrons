@@ -1,15 +1,16 @@
 import {
   useAllSessionsQuery,
+  useCurrentAllSubsystemUpdatesQuery,
   useEstopQuery,
   useHost,
-  useCurrentAllSubsystemUpdatesQuery,
 } from '@opentrons/react-api-client'
 
+import { useIsFlex } from '/app/redux-resources/robots'
 import { useNotifyCurrentMaintenanceRun } from '/app/resources/maintenance_runs'
 import { useNotifyAllRunsQuery } from '/app/resources/runs'
-import { useIsFlex } from '/app/redux-resources/robots'
 
-const ROBOT_STATUS_POLL_MS = 30000
+const ROBOT_SUBSTATE_POLL_MS = 30000
+const ROBOT_STATUS_POLL_MS = 5000
 
 interface UseIsRobotBusyOptions {
   poll: boolean
@@ -33,11 +34,10 @@ export function useIsRobotBusy(
     ...queryOptions,
     enabled: isFlex,
   })
-  const {
-    data: currentSubsystemsUpdatesData,
-  } = useCurrentAllSubsystemUpdatesQuery({
-    refetchInterval: ROBOT_STATUS_POLL_MS,
-  })
+  const { data: currentSubsystemsUpdatesData } =
+    useCurrentAllSubsystemUpdatesQuery({
+      refetchInterval: ROBOT_SUBSTATE_POLL_MS,
+    })
   const isSubsystemUpdating =
     currentSubsystemsUpdatesData?.data.some(
       update =>

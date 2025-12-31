@@ -1,18 +1,22 @@
-import type * as React from 'react'
-import { describe, it, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, it, vi } from 'vitest'
+
 import '@testing-library/jest-dom/vitest'
-import { FLEX_ROBOT_TYPE, fixture12Trough } from '@opentrons/shared-data'
+
 import { screen } from '@testing-library/react'
-import { i18n } from '../../../assets/localization'
+
+import { fixture12Trough, FLEX_ROBOT_TYPE } from '@opentrons/shared-data'
+
 import { renderWithProviders } from '../../../__testing-utils__'
+import { i18n } from '../../../assets/localization'
 import { getRobotType } from '../../../file-data/selectors'
 import { selectors } from '../../../labware-ingred/selectors'
 import { getInitialDeckSetup } from '../../../step-forms/selectors'
 import { getAllWellContentsForActiveItem } from '../../../top-selectors/well-contents'
 import { OffDeckThumbnail } from '../OffdeckThumbnail'
 
-import type { LabwareDefinition2 } from '@opentrons/shared-data'
+import type { ComponentProps } from 'react'
 import type * as Components from '@opentrons/components'
+import type { LabwareDefinition2 } from '@opentrons/shared-data'
 
 vi.mock('../../../top-selectors/well-contents')
 vi.mock('../../../labware-ingred/selectors')
@@ -26,14 +30,14 @@ vi.mock('@opentrons/components', async importOriginal => {
   }
 })
 
-const render = (props: React.ComponentProps<typeof OffDeckThumbnail>) => {
+const render = (props: ComponentProps<typeof OffDeckThumbnail>) => {
   return renderWithProviders(<OffDeckThumbnail {...props} />, {
     i18nInstance: i18n,
   })[0]
 }
 
 describe('OffDeckThumbnail', () => {
-  let props: React.ComponentProps<typeof OffDeckThumbnail>
+  let props: ComponentProps<typeof OffDeckThumbnail>
 
   beforeEach(() => {
     props = {
@@ -50,11 +54,12 @@ describe('OffDeckThumbnail', () => {
           id: 'mockId',
           def: fixture12Trough as LabwareDefinition2,
           labwareDefURI: 'mockDefUri',
-          slot: 'offDeck',
+          stack: ['mockId', 'offDeck'],
+          pythonName: 'mockPythonName',
         },
       },
     })
-    vi.mocked(selectors.getLiquidDisplayColors).mockReturnValue([])
+    vi.mocked(selectors.getLiquidDisplayColors).mockReturnValue({})
     vi.mocked(getAllWellContentsForActiveItem).mockReturnValue({})
   })
 

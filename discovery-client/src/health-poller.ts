@@ -1,9 +1,9 @@
 import net from 'net'
-import fetch from 'node-fetch'
 import intersectionBy from 'lodash/intersectionBy'
 import isEqual from 'lodash/isEqual'
 import unionBy from 'lodash/unionBy'
 import xorWith from 'lodash/xorWith'
+import fetch from 'node-fetch'
 
 import {
   ROBOT_SERVER_HEALTH_PATH,
@@ -14,13 +14,13 @@ import type { Agent } from 'http'
 import type { RequestInit } from 'node-fetch'
 import type {
   HealthPoller,
-  HealthPollerTarget,
   HealthPollerConfig,
   HealthPollerOptions,
   HealthPollerResult,
+  HealthPollerTarget,
   HealthResponse,
-  ServerHealthResponse,
   LogLevel,
+  ServerHealthResponse,
 } from './types'
 
 const DEFAULT_REQUEST_OPTS: RequestInit = {
@@ -109,7 +109,7 @@ export function createHealthPoller(options: HealthPollerOptions): HealthPoller {
         // since we're using a mutable array as a queue, guard against unsafe
         // array access before we start pushing
         if (pollQueue.length > 0) {
-          const head = pollQueue.shift() as HealthPollerTarget
+          const head = pollQueue.shift()!
           // take the head of the queue out and put it back in at the end
           pollQueue.push(head)
           // eslint-disable-next-line no-void

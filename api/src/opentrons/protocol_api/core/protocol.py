@@ -3,14 +3,20 @@
 from __future__ import annotations
 
 from abc import abstractmethod, ABC
-from typing import Generic, List, Optional, Union, Tuple, Dict, TYPE_CHECKING
+from typing import Generic, List, Optional, Union, Tuple, Dict, TYPE_CHECKING, Sequence
 
 from opentrons_shared_data.deck.types import DeckDefinitionV5, SlotDefV3
 from opentrons_shared_data.pipette.types import PipetteNameType
 from opentrons_shared_data.labware.types import LabwareDefinition
 from opentrons_shared_data.robot.types import RobotType
 
-from opentrons.types import DeckSlotName, StagingSlotName, Location, Mount, Point
+from opentrons.types import (
+    DeckSlotName,
+    StagingSlotName,
+    Location,
+    Mount,
+    Point,
+)
 from opentrons.hardware_control import SyncHardwareAPI
 from opentrons.hardware_control.modules.types import ModuleModel
 from opentrons.protocols.api_support.util import AxisMaxSpeeds
@@ -18,7 +24,9 @@ from opentrons.protocols.api_support.util import AxisMaxSpeeds
 from .instrument import InstrumentCoreType
 from .labware import LabwareCoreType, LabwareLoadParams
 from .module import ModuleCoreType
+from .tasks import TaskCoreType
 from .._liquid import Liquid, LiquidClass
+from .robot import AbstractRobot
 from .._types import OffDeckType
 from ..disposal_locations import TrashBin, WasteChute
 
@@ -27,7 +35,7 @@ if TYPE_CHECKING:
 
 
 class AbstractProtocol(
-    ABC, Generic[InstrumentCoreType, LabwareCoreType, ModuleCoreType]
+    ABC, Generic[InstrumentCoreType, LabwareCoreType, ModuleCoreType, TaskCoreType]
 ):
     @property
     @abstractmethod
@@ -37,20 +45,16 @@ class AbstractProtocol(
 
     @property
     @abstractmethod
-    def robot_type(self) -> RobotType:
-        ...
+    def robot_type(self) -> RobotType: ...
 
     @abstractmethod
-    def get_max_speeds(self) -> AxisMaxSpeeds:
-        ...
+    def get_max_speeds(self) -> AxisMaxSpeeds: ...
 
     @abstractmethod
-    def get_hardware(self) -> SyncHardwareAPI:
-        ...
+    def get_hardware(self) -> SyncHardwareAPI: ...
 
     @abstractmethod
-    def is_simulating(self) -> bool:
-        ...
+    def is_simulating(self) -> bool: ...
 
     @abstractmethod
     def add_labware_definition(
@@ -94,6 +98,17 @@ class AbstractProtocol(
         ...
 
     @abstractmethod
+    def load_lid(
+        self,
+        load_name: str,
+        location: LabwareCoreType,
+        namespace: Optional[str],
+        version: Optional[int],
+    ) -> LabwareCoreType:
+        """Load an individual lid labware using its identifying parameters. Must be loaded on a labware."""
+        ...
+
+    @abstractmethod
     def move_labware(
         self,
         labware_core: LabwareCoreType,
@@ -104,13 +119,31 @@ class AbstractProtocol(
             ModuleCoreType,
             OffDeckType,
             WasteChute,
+            TrashBin,
         ],
         use_gripper: bool,
         pause_for_manual_move: bool,
         pick_up_offset: Optional[Tuple[float, float, float]],
         drop_offset: Optional[Tuple[float, float, float]],
-    ) -> None:
-        ...
+    ) -> None: ...
+
+    @abstractmethod
+    def move_lid(
+        self,
+        source_location: Union[DeckSlotName, StagingSlotName, LabwareCoreType],
+        new_location: Union[
+            DeckSlotName,
+            StagingSlotName,
+            LabwareCoreType,
+            OffDeckType,
+            WasteChute,
+            TrashBin,
+        ],
+        use_gripper: bool,
+        pause_for_manual_move: bool,
+        pick_up_offset: Optional[Tuple[float, float, float]],
+        drop_offset: Optional[Tuple[float, float, float]],
+    ) -> LabwareCoreType | None: ...
 
     @abstractmethod
     def load_module(
@@ -118,8 +151,7 @@ class AbstractProtocol(
         model: ModuleModel,
         deck_slot: Optional[DeckSlotName],
         configuration: Optional[str],
-    ) -> ModuleCoreType:
-        ...
+    ) -> ModuleCoreType: ...
 
     @abstractmethod
     def load_instrument(
@@ -127,67 +159,69 @@ class AbstractProtocol(
         instrument_name: PipetteNameType,
         mount: Mount,
         liquid_presence_detection: bool = False,
-    ) -> InstrumentCoreType:
-        ...
+    ) -> InstrumentCoreType: ...
 
     @abstractmethod
-    def load_trash_bin(self, slot_name: DeckSlotName, area_name: str) -> TrashBin:
-        ...
+    def load_trash_bin(self, slot_name: DeckSlotName, area_name: str) -> TrashBin: ...
 
     @abstractmethod
-    def load_ot2_fixed_trash_bin(self) -> None:
-        ...
+    def load_ot2_fixed_trash_bin(self) -> None: ...
 
     @abstractmethod
-    def load_waste_chute(self) -> WasteChute:
-        ...
+    def load_waste_chute(self) -> WasteChute: ...
 
     @abstractmethod
-    def pause(self, msg: Optional[str]) -> None:
-        ...
+    def pause(self, msg: Optional[str]) -> None: ...
 
     @abstractmethod
-    def comment(self, msg: str) -> None:
-        ...
+    def comment(self, msg: str) -> None: ...
 
     @abstractmethod
-    def delay(self, seconds: float, msg: Optional[str]) -> None:
-        ...
+    def delay(self, seconds: float, msg: Optional[str]) -> None: ...
 
     @abstractmethod
-    def home(self) -> None:
-        ...
+    def wait_for_tasks(self, task_cores: Sequence[TaskCoreType]) -> None: ...
 
     @abstractmethod
-    def set_rail_lights(self, on: bool) -> None:
-        ...
+    def create_timer(self, seconds: float) -> TaskCoreType: ...
 
     @abstractmethod
-    def get_disposal_locations(self) -> List[Union[Labware, TrashBin, WasteChute]]:
-        ...
+    def home(self) -> None: ...
 
     @abstractmethod
-    def get_rail_lights_on(self) -> bool:
-        ...
+    def set_rail_lights(self, on: bool) -> None: ...
 
     @abstractmethod
-    def door_closed(self) -> bool:
-        ...
+    def get_disposal_locations(self) -> List[Union[Labware, TrashBin, WasteChute]]: ...
+
+    @abstractmethod
+    def get_rail_lights_on(self) -> bool: ...
+
+    @abstractmethod
+    def door_closed(self) -> bool: ...
 
     @abstractmethod
     def get_last_location(
         self,
         mount: Optional[Mount] = None,
-    ) -> Optional[Location]:
-        ...
+    ) -> Optional[Union[Location, TrashBin, WasteChute]]: ...
 
     @abstractmethod
     def set_last_location(
         self,
         location: Optional[Location],
         mount: Optional[Mount] = None,
-    ) -> None:
-        ...
+    ) -> None: ...
+
+    @abstractmethod
+    def load_lid_stack(
+        self,
+        load_name: str,
+        location: Union[DeckSlotName, StagingSlotName, LabwareCoreType],
+        quantity: int,
+        namespace: Optional[str],
+        version: Optional[int],
+    ) -> LabwareCoreType: ...
 
     @abstractmethod
     def get_deck_definition(self) -> DeckDefinitionV5:
@@ -248,11 +282,27 @@ class AbstractProtocol(
         """Define a liquid to load into a well."""
 
     @abstractmethod
-    def define_liquid_class(self, name: str) -> LiquidClass:
-        """Define a liquid class for use in transfer functions."""
+    def get_liquid_class(self, name: str, version: Optional[int]) -> LiquidClass:
+        """Get an instance of a built-in liquid class."""
 
     @abstractmethod
     def get_labware_location(
         self, labware_core: LabwareCoreType
     ) -> Union[str, LabwareCoreType, ModuleCoreType, OffDeckType]:
         """Get labware parent location."""
+
+    @abstractmethod
+    def capture_image(
+        self,
+        filename: Optional[str] = None,
+        resolution: Optional[Tuple[int, int]] = None,
+        zoom: Optional[float] = None,
+        contrast: Optional[float] = None,
+        brightness: Optional[float] = None,
+        saturation: Optional[float] = None,
+    ) -> None:
+        "Capture an image using a camera."
+
+    @abstractmethod
+    def load_robot(self) -> AbstractRobot:
+        """Load a Robot Core context into a protocol"""

@@ -3,7 +3,7 @@
 # Note: (2024-07-18): this file does not actually seem to be safe to delete
 from dataclasses import dataclass, asdict
 from enum import Enum
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Dict, Optional, Sequence, Tuple, TypeVar, Type
 from starlette import status as status_codes
 
 from opentrons_shared_data.errors import ErrorCodes
@@ -25,11 +25,18 @@ class ErrorCreateDef:
     error_code: str
 
 
-class ErrorDef(ErrorCreateDef, Enum):
-    """An enumeration of ErrorCreateDef Error definitions for use by
-    RobotServerError"""
+_ED = TypeVar("_ED", bound="ErrorDef")
 
-    def __init__(self, e) -> None:
+
+class ErrorDef(ErrorCreateDef, Enum):
+    """An enumeration of ErrorCreateDef Error definitions for use by RobotServerError."""
+
+    def __new__(cls: Type[_ED], dc_inst: ErrorCreateDef) -> _ED:
+        obj = object.__new__(cls)
+        obj._value_ = type(dc_inst)(**asdict(dc_inst))
+        return obj
+
+    def __init__(self, e: Any) -> None:
         super().__init__(**(asdict(e)))
 
 
@@ -48,9 +55,9 @@ class RobotServerError(ApiError):
         source: Optional[ErrorSource] = None,
         meta: Optional[Dict[str, Any]] = None,
         wrapping: Optional[Sequence[BaseException]] = None,
-        *fmt_args,
-        **fmt_kw_args
-    ):
+        *fmt_args: object,
+        **fmt_kw_args: object,
+    ) -> None:
         """
         Constructor.
 
@@ -79,7 +86,7 @@ class RobotServerError(ApiError):
                 *wrapped_details,
             ),
             links=links,
-        ).dict(exclude_none=True)
+        ).model_dump(exclude_none=True)
 
         super().__init__(
             status_code=definition.status_code,

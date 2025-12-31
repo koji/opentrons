@@ -1,31 +1,31 @@
 import { screen } from '@testing-library/react'
-import { describe, it, beforeEach, vi } from 'vitest'
-import { i18n } from '/app/i18n'
-import { useFeatureFlag } from '/app/redux/config'
+import { beforeEach, describe, it, vi } from 'vitest'
+
 import { renderWithProviders } from '/app/__testing-utils__'
+import { i18n } from '/app/i18n'
+import { useTipLengthCalibrations } from '/app/organisms/Desktop/Devices/hooks'
 import {
   mockTipLengthCalibration1,
   mockTipLengthCalibration2,
   mockTipLengthCalibration3,
 } from '/app/redux/calibration/tip-length/__fixtures__'
+import { useFeatureFlag } from '/app/redux/config'
 import { mockAttachedPipette } from '/app/redux/pipettes/__fixtures__'
-import { useTipLengthCalibrations } from '/app/organisms/Desktop/Devices/hooks'
 import { useAttachedPipettes } from '/app/resources/instruments'
 
-import { RobotSettingsTipLengthCalibration } from '../RobotSettingsTipLengthCalibration'
 import { TipLengthCalibrationItems } from '../CalibrationDetails/TipLengthCalibrationItems'
+import { RobotSettingsTipLengthCalibration } from '../RobotSettingsTipLengthCalibration'
 
-import type { FormattedPipetteOffsetCalibration } from '..'
 import type { AttachedPipettesByMount } from '/app/redux/pipettes/types'
+import type { FormattedPipetteOffsetCalibration } from '..'
 
 vi.mock('/app/redux/config')
 vi.mock('/app/organisms/Desktop/Devices/hooks')
 vi.mock('../CalibrationDetails/TipLengthCalibrationItems')
 vi.mock('/app/resources/instruments')
 
-const mockFormattedPipetteOffsetCalibrations: FormattedPipetteOffsetCalibration[] = []
-
-const mockUpdateRobotStatus = vi.fn()
+const mockFormattedPipetteOffsetCalibrations: FormattedPipetteOffsetCalibration[] =
+  []
 
 const render = () => {
   return renderWithProviders(
@@ -34,7 +34,7 @@ const render = () => {
         mockFormattedPipetteOffsetCalibrations
       }
       robotName="otie"
-      updateRobotStatus={mockUpdateRobotStatus}
+      isRobotBusy={false}
     />,
     {
       i18nInstance: i18n,

@@ -1,25 +1,26 @@
 import { useEffect } from 'react'
 
-import { useHost } from '@opentrons/react-api-client'
-import { RUN_STATUS_IDLE, RUN_STATUS_STOPPED } from '@opentrons/api-client'
+import { RUN_STATUS_IDLE } from '@opentrons/api-client'
+import { useErrorRecoverySettings } from '@opentrons/react-api-client'
 import { FLEX_ROBOT_TYPE, OT2_ROBOT_TYPE } from '@opentrons/shared-data'
 
-import {
-  useDropTipWizardFlows,
-  useTipAttachmentStatus,
-} from '/app/organisms/DropTipWizardFlows'
-import { useProtocolDropTipModal } from '../modals'
-import { useCloseCurrentRun, useIsRunCurrent } from '/app/resources/runs'
-import { isTerminalRunStatus } from '../../utils'
+import { lastRunCommandPromptedErrorRecovery } from '/app/local-resources/commands'
+import { isTerminatingOrTerminal } from '/app/local-resources/runs/utils'
+import { useDropTipWizardFlows } from '/app/organisms/DropTipWizardFlows'
+import { useTipAttachmentStatus } from '/app/resources/instruments'
+import { useCurrentRunCommands, useIsRunCurrent } from '/app/resources/runs'
 
-import type { RobotType } from '@opentrons/shared-data'
+import { useProtocolDropTipModal } from '../modals'
+
 import type { Run, RunStatus } from '@opentrons/api-client'
+import type { RobotType } from '@opentrons/shared-data'
+import type { DropTipWizardFlowsProps } from '/app/organisms/DropTipWizardFlows'
 import type {
-  DropTipWizardFlowsProps,
   PipetteWithTip,
-} from '/app/organisms/DropTipWizardFlows'
-import type { UseProtocolDropTipModalResult } from '../modals'
+  TipAttachmentStatusResult,
+} from '/app/resources/instruments'
 import type { PipetteDetails } from '/app/resources/maintenance_runs'
+import type { UseProtocolDropTipModalResult } from '../modals'
 
 export type RunHeaderDropTipWizProps =
   | { showDTWiz: true; dtWizProps: DropTipWizardFlowsProps }
@@ -30,11 +31,13 @@ export interface UseRunHeaderDropTipParams {
   runRecord: Run | null
   robotType: RobotType
   runStatus: RunStatus | null
+  closeCurrentRun: () => void
 }
 
 export interface UseRunHeaderDropTipResult {
   dropTipModalUtils: UseProtocolDropTipModalResult
   dropTipWizardUtils: RunHeaderDropTipWizProps
+  resetTipStatus: TipAttachmentStatusResult['resetTipStatus']
 }
 
 // Handles all the tip related logic during a protocol run on the desktop app.
@@ -43,12 +46,11 @@ export function useRunHeaderDropTip({
   runRecord,
   robotType,
   runStatus,
+  closeCurrentRun,
 }: UseRunHeaderDropTipParams): UseRunHeaderDropTipResult {
-  const host = useHost()
   const isRunCurrent = useIsRunCurrent(runId)
   const enteredER = runRecord?.data.hasEverEnteredErrorRecovery ?? false
 
-  const { closeCurrentRun } = useCloseCurrentRun()
   const { showDTWiz, disableDTWiz, enableDTWiz } = useDropTipWizardFlows()
 
   const {
@@ -61,7 +63,6 @@ export function useRunHeaderDropTip({
   } = useTipAttachmentStatus({
     runId,
     runRecord: runRecord ?? null,
-    host,
   })
 
   const dropTipModalUtils = useProtocolDropTipModal({
@@ -101,6 +102,16 @@ export function useRunHeaderDropTip({
         }
       : { showDTWiz: false, dtWizProps: null }
   }
+  const isRunTerminatingOrTerminal = isTerminatingOrTerminal(runStatus)
+  const { data } = useErrorRecoverySettings()
+  const isEREnabled = data?.data.enabled ?? true
+  const runSummaryNoFixit = useCurrentRunCommands(
+    {
+      includeFixitCommands: false,
+      pageLength: 1,
+    },
+    { enabled: isRunTerminatingOrTerminal }
+  )
 
   // Manage tip checking
   useEffect(() => {
@@ -109,31 +120,40 @@ export function useRunHeaderDropTip({
       if (runStatus === RUN_STATUS_IDLE) {
         resetTipStatus()
       }
-      // Only determine tip status when necessary as this can be an expensive operation. Error Recovery handles tips, so don't
-      // have to do it here if done during Error Recovery.
-      else if (isTerminalRunStatus(runStatus) && !enteredER) {
+      // Only run tip checking if it wasn't *just* handled during Error Recovery.
+      else if (
+        runSummaryNoFixit != null &&
+        !lastRunCommandPromptedErrorRecovery(runSummaryNoFixit, isEREnabled) &&
+        isRunCurrent &&
+        isRunTerminatingOrTerminal
+      ) {
         void determineTipStatus()
       }
     }
-  }, [runStatus, robotType, enteredER])
-
-  // TODO(jh, 08-15-24): The enteredER condition is a hack, because errorCommands are only returned when a run is current.
-  // Ideally the run should not need to be current to view errorCommands.
+  }, [runStatus, robotType, isRunCurrent, runSummaryNoFixit, isEREnabled])
 
   // If the run terminates with a "stopped" status, close the run if no tips are attached after running tip check at least once.
   // This marks the robot as "not busy" if drop tip CTAs are unnecessary.
   useEffect(() => {
     if (
-      runStatus === RUN_STATUS_STOPPED &&
+      isRunTerminatingOrTerminal &&
       isRunCurrent &&
-      (initialPipettesWithTipsCount === 0 || robotType === OT2_ROBOT_TYPE) &&
-      !enteredER
+      (initialPipettesWithTipsCount === 0 || robotType === OT2_ROBOT_TYPE)
     ) {
       closeCurrentRun()
     }
-  }, [runStatus, isRunCurrent, enteredER, initialPipettesWithTipsCount])
+  }, [
+    isRunTerminatingOrTerminal,
+    isRunCurrent,
+    enteredER,
+    initialPipettesWithTipsCount,
+  ])
 
-  return { dropTipModalUtils, dropTipWizardUtils: buildDTWizUtils() }
+  return {
+    dropTipModalUtils,
+    dropTipWizardUtils: buildDTWizUtils(),
+    resetTipStatus,
+  }
 }
 
 // TODO(jh, 09-12-24): Consolidate this with the same utility that exists elsewhere.

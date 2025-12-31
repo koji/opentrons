@@ -10,12 +10,12 @@ import {
   FONT_WEIGHT_REGULAR,
   Icon,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   Link,
   POSITION_ABSOLUTE,
   PrimaryButton,
-  SPACING_5,
   SPACING,
-  LegacyStyledText,
+  SPACING_5,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
@@ -39,7 +39,7 @@ export function DevicesEmptyState(): JSX.Element {
     >
       <Flex flexDirection={DIRECTION_COLUMN} alignItems={ALIGN_CENTER}>
         <LegacyStyledText
-          as="h1"
+          forwardedAs="h1"
           fontWeight={FONT_WEIGHT_REGULAR}
           paddingBottom={SPACING.spacing16}
           id="DevicesEmptyState_noRobotsFound"

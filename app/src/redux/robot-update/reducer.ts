@@ -2,7 +2,7 @@ import * as Constants from './constants'
 
 import type { Reducer } from 'redux'
 import type { Action } from '../types'
-import type { RobotUpdateState, RobotUpdateSession } from './types'
+import type { RobotUpdateSession, RobotUpdateState } from './types'
 
 export const INITIAL_STATE: RobotUpdateState = {
   flex: {
@@ -68,7 +68,7 @@ export const robotUpdateReducer: Reducer<RobotUpdateState, Action> = (
     }
 
     case Constants.ROBOTUPDATE_CHECKING_FOR_UPDATE: {
-      const session = state.session as RobotUpdateSession
+      const session = state.session!
       const target = action.payload
 
       return {

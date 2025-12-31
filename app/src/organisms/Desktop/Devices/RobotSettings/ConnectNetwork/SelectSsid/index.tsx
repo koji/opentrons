@@ -1,11 +1,14 @@
-import type * as React from 'react'
+import { useTranslation } from 'react-i18next'
+
 import { CONTEXT_MENU } from '@opentrons/components'
+
 import { SelectField } from '/app/atoms/SelectField'
-import * as Copy from '../i18n'
-import { NetworkOptionLabel, NetworkActionLabel } from './NetworkOptionLabel'
 
+import { NetworkActionLabel, NetworkOptionLabel } from './NetworkOptionLabel'
+
+import type { TFunction } from 'i18next'
+import type { ComponentProps } from 'react'
 import type { SelectOptionOrGroup } from '@opentrons/components'
-
 import type { WifiNetwork } from '../types'
 
 export interface SelectSsidProps {
@@ -20,11 +23,16 @@ const FIELD_NAME = '__SelectSsid__'
 
 const JOIN_OTHER_VALUE = '__join-other-network__'
 
-const SELECT_JOIN_OTHER_GROUP = {
-  options: [{ value: JOIN_OTHER_VALUE, label: Copy.LABEL_JOIN_OTHER_NETWORK }],
-}
+const formatOptions = (
+  list: WifiNetwork[],
+  t: TFunction
+): SelectOptionOrGroup[] => {
+  const SELECT_JOIN_OTHER_GROUP = {
+    options: [
+      { value: JOIN_OTHER_VALUE, label: `${t('join_other_network')}...` },
+    ],
+  }
 
-const formatOptions = (list: WifiNetwork[]): SelectOptionOrGroup[] => {
   const ssidOptionsList = {
     options: list?.map(({ ssid }) => ({ value: ssid })),
   }
@@ -34,6 +42,7 @@ const formatOptions = (list: WifiNetwork[]): SelectOptionOrGroup[] => {
 }
 
 export function SelectSsid(props: SelectSsidProps): JSX.Element {
+  const { t } = useTranslation('device_settings')
   const { list, value, onConnect, onJoinOther, isRobotBusy } = props
 
   const handleValueChange = (_: string, value: string): void => {
@@ -44,7 +53,7 @@ export function SelectSsid(props: SelectSsidProps): JSX.Element {
     }
   }
 
-  const formatOptionLabel: React.ComponentProps<
+  const formatOptionLabel: ComponentProps<
     typeof SelectField
   >['formatOptionLabel'] = (option, { context }): JSX.Element | null => {
     const { value, label } = option
@@ -69,8 +78,8 @@ export function SelectSsid(props: SelectSsidProps): JSX.Element {
       disabled={isRobotBusy}
       name={FIELD_NAME}
       value={value}
-      options={formatOptions(list)}
-      placeholder={Copy.SELECT_NETWORK}
+      options={formatOptions(list, t as TFunction)}
+      placeholder={t('choose_a_network')}
       onValueChange={handleValueChange}
       formatOptionLabel={formatOptionLabel}
       width="16rem"

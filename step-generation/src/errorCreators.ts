@@ -29,12 +29,15 @@ export function removeAdapter(): CommandCreatorError {
 export function noTipOnPipette(args: {
   actionName: string
   pipette: string
-  labware: string
-  well: string
+  labware?: string
+  well?: string
 }): CommandCreatorError {
   const { actionName, pipette, labware, well } = args
   return {
-    message: `Attempted to ${actionName} with no tip on pipette: ${pipette} from ${labware}'s well ${well}`,
+    message:
+      labware == null || well == null
+        ? `Attempted to ${actionName} with no tip on pipette: ${pipette} in place`
+        : `Attempted to ${actionName} with no tip on pipette: ${pipette} from ${labware}'s well ${well}`,
     type: 'NO_TIP_ON_PIPETTE',
   }
 }
@@ -96,6 +99,13 @@ export function missingTemperatureStep(): CommandCreatorError {
   }
 }
 
+export function missingProfileStep(): CommandCreatorError {
+  return {
+    message: 'This module is not currently running a profile.',
+    type: 'MISSING_PROFILE_STEP',
+  }
+}
+
 export function tipVolumeExceeded(args: {
   actionName: string
   volume: string | number
@@ -103,7 +113,7 @@ export function tipVolumeExceeded(args: {
 }): CommandCreatorError {
   const { volume, maxVolume, actionName } = args
   return {
-    message: `This step tries to ${actionName} ${volume}μL, but the tip can only hold ${maxVolume}μL.`,
+    message: `This step tries to ${actionName} ${volume}µL, but the tip can only hold ${maxVolume}µL.`,
     type: 'TIP_VOLUME_EXCEEDED',
   }
 }
@@ -118,7 +128,7 @@ export function pipetteVolumeExceeded(args: {
   const message =
     disposalVolume != null
       ? `Attemped to ${actionName} volume + disposal volume greater than pipette max volume (${volume} + ${disposalVolume} > ${maxVolume})`
-      : `This step tries to ${actionName} ${volume}μL, but the tip can only hold ${maxVolume}μL.`
+      : `This step tries to ${actionName} ${volume}µL, but the tip can only hold ${maxVolume}µL.`
   return {
     message,
     type: 'PIPETTE_VOLUME_EXCEEDED',
@@ -157,6 +167,73 @@ export const heaterShakerLatchClosed = (): CommandCreatorError => {
   }
 }
 
+export const absorbanceReaderLidClosed = (): CommandCreatorError => {
+  return {
+    type: 'ABSORBANCE_READER_LID_CLOSED',
+    message:
+      'Attempted to interact with contents of an absorbance plate reader with the lid closed.',
+  }
+}
+
+export const absorbanceReaderNoInitialization = (): CommandCreatorError => {
+  return {
+    type: 'ABSORBANCE_READER_NO_INITIALIZATION',
+    message:
+      'This step tries to read labware without initializing the Plate Reader first. Initialize the Plate Reader module or remove this step in order to proceed.',
+  }
+}
+
+export const absorbanceReaderNoGripper = (): CommandCreatorError => {
+  return {
+    type: 'ABSORBANCE_READER_NO_GRIPPER',
+    message:
+      'This step involves opening or closing the Absorbance Plate Reader lid with a gripper. Add a gripper or remove step to proceed.',
+  }
+}
+
+export const flexStackerNoGripper = (): CommandCreatorError => {
+  return {
+    type: 'FLEX_STACKER_NO_GRIPPER',
+    message:
+      'This step involves a gripper. Add a gripper or remove step to proceed.',
+  }
+}
+
+export const flexStackerHopperEmpty = (): CommandCreatorError => {
+  return {
+    type: 'HOPPER_EMPTY',
+    message: 'Cannot retrieve labware from empty stacker',
+  }
+}
+
+export const flexStackerShuttleFull = (): CommandCreatorError => {
+  return {
+    type: 'SHUTTLE_FULL',
+    message:
+      'Shuttle must be empty in order to retrieve labware from the stacker',
+  }
+}
+
+export const flexStackerShuttleEmpty = (): CommandCreatorError => {
+  return {
+    type: 'SHUTTLE_EMPTY',
+    message: 'Shuttle must have labware in order to store it in the stacker',
+  }
+}
+
+export const flexStackerLabwareTypeMismatch = (): CommandCreatorError => {
+  return {
+    type: 'MISMATCHED_STACKER_LABWARE_TYPE',
+    message: 'The stacker can only store a single type of labware at a time',
+  }
+}
+
+export const flexStackerHopperFull = (): CommandCreatorError => {
+  return {
+    type: 'HOPPER_FULL',
+    message: 'The hopper has reached capacity',
+  }
+}
 export const heaterShakerIsShaking = (): CommandCreatorError => {
   return {
     type: 'HEATER_SHAKER_IS_SHAKING',
@@ -189,26 +266,29 @@ export const heaterShakerEastWestWithLatchOpen = (): CommandCreatorError => {
   }
 }
 
-export const heaterShakerNorthSouthEastWestShaking = (): CommandCreatorError => {
-  return {
-    type: 'HEATER_SHAKER_NORTH_SOUTH_EAST_WEST_SHAKING',
-    message: 'The Heater-Shaker is shaking',
+export const heaterShakerNorthSouthEastWestShaking =
+  (): CommandCreatorError => {
+    return {
+      type: 'HEATER_SHAKER_NORTH_SOUTH_EAST_WEST_SHAKING',
+      message: 'The Heater-Shaker is shaking',
+    }
   }
-}
 
-export const heaterShakerEastWestOfMultiChannelPipette = (): CommandCreatorError => {
-  return {
-    type: 'HEATER_SHAKER_EAST_WEST_MULTI_CHANNEL',
-    message: 'The Heater-Shaker is shaking',
+export const heaterShakerEastWestOfMultiChannelPipette =
+  (): CommandCreatorError => {
+    return {
+      type: 'HEATER_SHAKER_EAST_WEST_MULTI_CHANNEL',
+      message: 'The Heater-Shaker is shaking',
+    }
   }
-}
 
-export const heaterShakerNorthSouthOfNonTiprackWithMultiChannelPipette = (): CommandCreatorError => {
-  return {
-    type: 'HEATER_SHAKER_NORTH_SOUTH__OF_NON_TIPRACK_WITH_MULTI_CHANNEL',
-    message: '8-Channel pipette cannot access labware',
+export const heaterShakerNorthSouthOfNonTiprackWithMultiChannelPipette =
+  (): CommandCreatorError => {
+    return {
+      type: 'HEATER_SHAKER_NORTH_SOUTH__OF_NON_TIPRACK_WITH_MULTI_CHANNEL',
+      message: '8-Channel pipette cannot access labware',
+    }
   }
-}
 
 export const labwareOffDeck = (): CommandCreatorError => {
   return {
@@ -271,7 +351,102 @@ export const noTipSelected = (): CommandCreatorError => {
 
 export const labwareDiscarded = (): CommandCreatorError => {
   return {
-    type: 'LABWARE_DISCARDED_IN_WASTE_CHUTE',
-    message: 'The labware was discarded in waste chute in a previous step.',
+    type: 'LABWARE_DISCARDED_IN_TRASH',
+    message: 'The labware was discarded in trash in a previous step.',
+  }
+}
+
+export const submergeBelowAspirate = (): CommandCreatorError => {
+  return {
+    type: 'SUBMERGE_BELOW_ASPIRATE',
+    message: 'The submerge position must be above the aspirate position',
+  }
+}
+
+export const retractBelowAspirate = (): CommandCreatorError => {
+  return {
+    type: 'RETRACT_BELOW_ASPIRATE',
+    message: 'The retract position must be above the aspirate position',
+  }
+}
+
+export const submergeBelowDispense = (): CommandCreatorError => {
+  return {
+    type: 'SUBMERGE_BELOW_DISPENSE',
+    message: 'The submerge position must be above the dispense position',
+  }
+}
+
+export const retractBelowDispense = (): CommandCreatorError => {
+  return {
+    type: 'RETRACT_BELOW_DISPENSE',
+    message: 'The retract position must be above the dispense position',
+  }
+}
+
+export const multiAspirateVolumeTooHigh = (): CommandCreatorError => {
+  return {
+    type: 'MULTI_ASPIRATE_VOLUME_TOO_HIGH',
+    message:
+      'Consolidate pipette path was selected but cannot fit volume for more than 1 well in the tip',
+  }
+}
+
+export const multiDispenseVolumeTooHigh = (): CommandCreatorError => {
+  return {
+    type: 'MULTI_DISPENSE_VOLUME_TOO_HIGH',
+    message:
+      'Distribute pipette path was selected but cannot fit volume for more than 1 well in the tip',
+  }
+}
+
+export const closingThermocyclerWithInvalidLid = (args: {
+  lidDisplayName: string
+}): CommandCreatorError => {
+  return {
+    type: 'CLOSING_THERMOCYCLER_WITH_INVALID_LABWARE_LID',
+    message: `Closing the Thermocycler lid with ${args.lidDisplayName} in place will cause damage`,
+  }
+}
+
+export const returnTipUnavailable = (): CommandCreatorError => {
+  return {
+    type: 'RETURN_TIP_UNAVAILABLE',
+    message: 'Current tip does not have a known location to return to',
+  }
+}
+
+export const tipRackLidNotAllowedOnDeck = (): CommandCreatorError => {
+  return {
+    type: 'TIPRACK_LID_NOT_ALLOWED_ON_DECK',
+    message: 'The tip rack lid is not supported directly on the deck',
+  }
+}
+
+export const nextTiprackHasLid = (): CommandCreatorError => {
+  return {
+    type: 'NEXT_TIPRACK_HAS_LID',
+    message: 'A pipette cannot pick up tips from a tip rack with a lid',
+  }
+}
+
+export const stackTooHigh = (args: { slot: string }): CommandCreatorError => {
+  return {
+    type: 'STACK_TOO_HIGH',
+    message: `The stack on slot ${args.slot} is too high`,
+  }
+}
+
+export const tooManyTips = (): CommandCreatorError => {
+  return {
+    type: 'TOO_MANY_TIPS',
+    message: 'Action will pick up too many tips',
+  }
+}
+
+export const incompletePickup = (): CommandCreatorError => {
+  return {
+    type: 'INCOMPLETE_PICKUP',
+    message: 'At least one of the selected tips is empty',
   }
 }

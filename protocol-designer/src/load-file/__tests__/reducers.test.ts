@@ -1,11 +1,12 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
 import { _allReducers } from '../reducers'
 
 const { unsavedChanges } = _allReducers
 describe('unsavedChanges', () => {
   it('should return true when an action changes the protocol', () => {
     const actionTypes = [
-      'CREATE_NEW_PROTOCOL',
+      'TOGGLE_NEW_PROTOCOL_MODAL',
       'DISMISS_FORM_WARNING',
       'DISMISS_TIMELINE_WARNING',
       'CREATE_CONTAINER',
@@ -19,14 +20,14 @@ describe('unsavedChanges', () => {
       'REMOVE_WELLS_CONTENTS',
       'SET_WELL_CONTENTS',
       'ADD_STEP',
-      'DELETE_STEP',
       'DELETE_MULTIPLE_STEPS',
+      'REORDER_STEPS',
+      'REORDER_SELECTED_STEP',
       'SAVE_STEP_FORM',
       'SAVE_FILE_METADATA',
       'REPLACE_CUSTOM_LABWARE_DEF',
       'CREATE_MODULE',
       'DELETE_MODULE',
-      'EDIT_MODULE',
     ]
     expect.assertions(actionTypes.length)
     actionTypes.forEach(actionType => {

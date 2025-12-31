@@ -1,4 +1,8 @@
 {
+  "commandAnnotations": [],
+  "commandPreconditions": {
+    "isCameraUsed": false
+  },
   "commands": [
     {
       "commandType": "home",
@@ -1159,7 +1163,20 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "7",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutout7",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "singleStandardSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -2311,7 +2328,20 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "8",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutout8",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "singleStandardSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -3489,7 +3519,20 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "2",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutout2",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "singleStandardSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -3735,7 +3778,20 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "1",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutout1",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "singleStandardSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -3828,7 +3884,20 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "3",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutout3",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "singleStandardSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -19666,12 +19735,7 @@
   },
   "createdAt": "TIMESTAMP",
   "errors": [],
-  "files": [
-    {
-      "name": "OT2_S_v2_20_8_None_PARTIAL_COLUMN_HappyPathMixedTipRacks.py",
-      "role": "main"
-    }
-  ],
+  "files": [],
   "labware": [
     {
       "definitionUri": "opentrons/opentrons_96_tiprack_300ul/1",
@@ -19714,6 +19778,7 @@
       }
     }
   ],
+  "liquidClasses": [],
   "liquids": [],
   "metadata": {
     "description": "OT-2 protocol with 1ch and 8ch pipette partial/single tip configurations. Mixing tipracks and using separate tipracks. ",

@@ -1,11 +1,26 @@
+from asyncio import Queue
 import enum
 import logging
 from dataclasses import dataclass
-from typing import cast, Tuple, Union, List, Callable, Dict, TypeVar, Type
+from typing import (
+    cast,
+    Tuple,
+    Union,
+    List,
+    Callable,
+    Dict,
+    TypeVar,
+    Type,
+    TYPE_CHECKING,
+)
 from typing_extensions import Literal
 from opentrons import types as top_types
 from opentrons_shared_data.pipette.types import PipetteChannelType
+from opentrons_shared_data.errors.exceptions import EnumeratedError
 from opentrons.config import feature_flags
+
+if TYPE_CHECKING:
+    from .modules.types import ModuleModel
 
 MODULE_LOG = logging.getLogger(__name__)
 
@@ -383,6 +398,8 @@ class HardwareEventType(enum.Enum):
     DOOR_SWITCH_CHANGE = enum.auto()
     ERROR_MESSAGE = enum.auto()
     ESTOP_CHANGE = enum.auto()
+    ASYNCHRONOUS_MODULE_ERROR = enum.auto()
+    MODULE_DISCONNECTED = enum.auto()
 
 
 @dataclass
@@ -407,10 +424,11 @@ class HepaUVState:
 
 @dataclass(frozen=True)
 class DoorStateNotification:
-    event: Literal[
+    event: Literal[HardwareEventType.DOOR_SWITCH_CHANGE] = (
         HardwareEventType.DOOR_SWITCH_CHANGE
-    ] = HardwareEventType.DOOR_SWITCH_CHANGE
+    )
     new_state: DoorState = DoorState.CLOSED
+    module_serial: str | None = None
 
 
 @dataclass(frozen=True)
@@ -426,10 +444,35 @@ class ErrorMessageNotification:
     event: Literal[HardwareEventType.ERROR_MESSAGE] = HardwareEventType.ERROR_MESSAGE
 
 
+@dataclass(frozen=True)
+class AsynchronousModuleErrorNotification:
+    exception: EnumeratedError
+    module_serial: str | None
+    module_model: "ModuleModel"
+    port: str
+    event: Literal[HardwareEventType.ASYNCHRONOUS_MODULE_ERROR] = (
+        HardwareEventType.ASYNCHRONOUS_MODULE_ERROR
+    )
+
+
+@dataclass(frozen=True)
+class ModuleDisconnectedNotification:
+    module_serial: str | None
+    module_model: "ModuleModel"
+    port: str
+    event: Literal[HardwareEventType.MODULE_DISCONNECTED] = (
+        HardwareEventType.MODULE_DISCONNECTED
+    )
+
+
 # new event types get new dataclasses
 # when we add more event types we add them here
 HardwareEvent = Union[
-    DoorStateNotification, ErrorMessageNotification, EstopStateNotification
+    DoorStateNotification,
+    ErrorMessageNotification,
+    EstopStateNotification,
+    AsynchronousModuleErrorNotification,
+    ModuleDisconnectedNotification,
 ]
 
 HardwareEventHandler = Callable[[HardwareEvent], None]
@@ -599,6 +642,16 @@ class StatusBarState(enum.Enum):
         }
 
 
+@dataclass(frozen=True)
+class StatusBarUpdateEvent:
+    state: StatusBarState
+    enabled: bool
+
+
+StatusBarUpdateListener = Callable[[StatusBarUpdateEvent], None]
+StatusBarUpdateUnsubscriber = Callable[[], None]
+
+
 @dataclass
 class AionotifyEvent:
     flags: enum.EnumMeta
@@ -625,12 +678,20 @@ class GripperJawState(enum.Enum):
     #: the gripper is actively force-control gripping something
     HOLDING = enum.auto()
     #: the gripper is in position-control mode
+    STOPPED = enum.auto()
+    #: the gripper has been homed before but is stopped now
 
 
 class InstrumentProbeType(enum.Enum):
     PRIMARY = enum.auto()
     SECONDARY = enum.auto()
     BOTH = enum.auto()
+
+
+class TipScrapeType(enum.Enum):
+    NONE = enum.auto()
+    RIGHT_ONE_COL = enum.auto()
+    LEFT_ONE_COL = enum.auto()
 
 
 class GripperProbe(enum.Enum):
@@ -710,3 +771,63 @@ class FailedTipStateCheck(RuntimeError):
         super().__init__(
             f"Expected tip state {expected_state}, but received {actual_state}."
         )
+
+
+@enum.unique
+class PipetteSensorId(int, enum.Enum):
+    """Sensor IDs available.
+
+    Not to be confused with SensorType. This is the ID value that separate
+    two or more of the same type of sensor within a system.
+
+    Note that this is a copy of an enum defined in opentrons_hardware.firmware_bindings.constants. That version
+    is authoritative; this version is here because this data is exposed above the hardware control layer and
+    therefore needs a typing source here so that we don't create a dependency on the internal hardware package.
+    """
+
+    S0 = 0x0
+    S1 = 0x1
+    UNUSED = 0x2
+    BOTH = 0x3
+
+
+@enum.unique
+class PipetteSensorType(int, enum.Enum):
+    """Sensor types available.
+
+    Note that this is a copy of an enum defined in opentrons_hardware.firmware_bindings.constants. That version
+    is authoritative; this version is here because this data is exposed above the hardware control layer and
+    therefore needs a typing source here so that we don't create a dependency on the internal hardware package.
+    """
+
+    tip = 0x00
+    capacitive = 0x01
+    environment = 0x02
+    pressure = 0x03
+    pressure_temperature = 0x04
+    humidity = 0x05
+    temperature = 0x06
+
+
+@dataclass(frozen=True)
+class PipetteSensorData:
+    """Sensor data from a monitored sensor.
+
+    Note that this is a copy of an enum defined in opentrons_hardware.firmware_bindings.constants. That version
+    is authoritative; this version is here because this data is exposed above the hardware control layer and
+    therefore needs a typing source here so that we don't create a dependency on the internal hardware package.
+    """
+
+    sensor_type: PipetteSensorType
+    _as_int: int
+    _as_float: float
+
+    def to_float(self) -> float:
+        return self._as_float
+
+    @property
+    def to_int(self) -> int:
+        return self._as_int
+
+
+PipetteSensorResponseQueue = Queue[Dict[PipetteSensorId, List[PipetteSensorData]]]

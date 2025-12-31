@@ -1,4 +1,5 @@
 """Command queue execution worker module."""
+
 import asyncio
 from logging import getLogger
 from typing import Optional, AsyncGenerator, Callable
@@ -51,6 +52,7 @@ class QueueWorker:
         """
         if self._worker_task:
             self._worker_task.cancel()
+            self._command_executor.cancel_tasks("Engine cancelled")
 
     async def join(self) -> None:
         """Wait for the worker to finish, propagating any errors."""
@@ -65,14 +67,24 @@ class QueueWorker:
                 pass
             except Exception as e:
                 log.error("Unhandled exception in QueueWorker job", exc_info=e)
+                self._command_executor.cancel_tasks("Engine failed")
                 raise e
+            else:
+                self._command_executor.cancel_tasks("Engine commands complete")
 
     async def _run_commands(self) -> None:
         async for command_id in self._command_generator():
             try:
                 await self._command_executor.execute(command_id=command_id)
             except BaseException:
-                log.exception("Unhandled failure in command executor")
+                log.exception(
+                    # The state can tear if e.g. we've finished updating PipetteStore,
+                    # but the exception came before we could update LabwareStore. Or
+                    # the exception could have interrupted updating a single store.
+                    "Unhandled failure in command executor."
+                    " This is a bug in opentrons.protocol_engine"
+                    " and has probably left the ProtocolEngine in a torn state."
+                )
                 raise
             # Yield to the event loop in case we're executing a long sequence of commands
             # that never yields internally. For example, a long sequence of comment commands.

@@ -151,8 +151,7 @@ settings = [
         _id="enableOT3HardwareController",
         title="Enable experimental OT-3 hardware controller",
         description=(
-            "Do not enable. This is an Opentrons-internal setting to test "
-            "new hardware."
+            "Do not enable. This is an Opentrons-internal setting to test new hardware."
         ),
         restart_required=True,
         robot_type=[RobotTypeEnum.FLEX],
@@ -223,15 +222,12 @@ settings = [
         internal_only=True,
     ),
     SettingDefinition(
-        _id="allowLiquidClasses",
-        title="Allow the use of liquid classes",
+        _id="disableFlexStackerLabwareDetection",
+        title="Disable Flex Stacker's labware detection features",
         description=(
-            "Do not enable."
-            " This is an Opentrons internal setting to allow using in-development"
-            " liquid classes."
+            "Flex Stackers will ignore labware's presence in the hopper and on the shuttle. Protocol runs will no longer raise the following recoverable errors: Hopper Empty, Shuttle Empty and Shuttle Occupied."
         ),
-        robot_type=[RobotTypeEnum.OT2, RobotTypeEnum.FLEX],
-        internal_only=True,
+        robot_type=[RobotTypeEnum.FLEX],
     ),
 ]
 
@@ -736,6 +732,24 @@ def _migrate35to36(previous: SettingsMap) -> SettingsMap:
     return newmap
 
 
+def _migrate36to37(previous: SettingsMap) -> SettingsMap:
+    """Migrate to version 37 of the feature flags file.
+
+    - Removes the allowLiquidClasses flag.
+    """
+    return {k: v for k, v in previous.items() if "allowLiquidClasses" != k}
+
+
+def _migrate37to38(previous: SettingsMap) -> SettingsMap:
+    """Migrate to version 36 of the feature flags file.
+
+    -  Adds the disableFlexStackerLabwareDetection config element.
+    """
+    newmap = {k: v for k, v in previous.items()}
+    newmap["disableFlexStackerLabwareDetection"] = None
+    return newmap
+
+
 _MIGRATIONS = [
     _migrate0to1,
     _migrate1to2,
@@ -773,6 +787,8 @@ _MIGRATIONS = [
     _migrate33to34,
     _migrate34to35,
     _migrate35to36,
+    _migrate36to37,
+    _migrate37to38,
 ]
 """
 List of all migrations to apply, indexed by (version - 1). See _migrate below

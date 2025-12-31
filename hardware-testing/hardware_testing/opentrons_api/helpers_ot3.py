@@ -1,17 +1,37 @@
 """Opentrons helper methods."""
 import asyncio
+import atexit
+import logging
+import struct
+
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from math import pi
 from subprocess import run, Popen
 from time import time
-from typing import Callable, Coroutine, Dict, List, Optional, Tuple, Union, cast
-import atexit
+from typing import (
+    Callable,
+    Coroutine,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    cast,
+    Sequence,
+    Any,
+)
 from opentrons_hardware.drivers.can_bus import DriverSettings, build, CanMessenger
 from opentrons_hardware.drivers.can_bus import settings as can_bus_settings
 from opentrons_hardware.firmware_bindings.constants import SensorId
 from opentrons_hardware.sensors import sensor_driver, sensor_types
+from opentrons_hardware.drivers.eeprom.types import (
+    PropType,
+    MAX_DATA_LEN,
+    EEPROMData,
+    FORMAT_VERSION,
+)
 
 from opentrons_shared_data.deck import load as load_deck
 from opentrons_shared_data.labware import load_definition as load_labware
@@ -40,6 +60,23 @@ from .types import (
     Point,
     CriticalPoint,
 )
+
+
+# Supress logging.exception messages as they can be confusing when running scripts.
+class StripExceptionMessageHandler(logging.StreamHandler):
+    """Custom StreamHandler to strip logging.exception messages."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        """Emit a record, but supress logging.exception logs."""
+        if record.exc_info:
+            # Remove the msg, traceback if it's an exception
+            record.msg = ""
+            record.exc_info = None
+        super().emit(record)
+
+
+logger = logging.getLogger()
+logger.addHandler(StripExceptionMessageHandler())
 
 # TODO: use values from shared data, so we don't need to update here again
 TIP_LENGTH_OVERLAP = 10.5
@@ -109,9 +146,17 @@ def _create_fake_pipette_id(mount: OT3Mount, model: Optional[str]) -> Optional[s
         return None
     items = model.split("_")
     assert len(items) == 3
-    size = "P1K" if items[0] == "p1000" else "P50"
+    match items[0]:
+        case "p1000":
+            size = "P1K"
+            version = 35
+        case "p50":
+            size = "P50"
+            version = 35
+        case "p200":
+            size = "P2H"
+            version = 30
     channels = "S" if items[1] == "single" else "M"
-    version = 35  # model names don't have a version so just fake a 3.5 version
     date = datetime.now().strftime("%y%m%d")
     unique_number = 1 if mount == OT3Mount.LEFT else 2
     return f"{size}{channels}{version}{date}A0{unique_number}"
@@ -138,7 +183,7 @@ def _create_attached_instruments_dict(
 
 
 async def update_firmware(
-    api: OT3API, force: bool = False, subsystems: Optional[List[SubSystem]] = None
+    api: OT3API, force: bool = False, subsystems: Optional[Sequence[SubSystem]] = None
 ) -> None:
     """Update firmware of OT3."""
     if not api.is_simulator:
@@ -335,10 +380,13 @@ def set_gantry_per_axis_setting_ot3(
 ) -> None:
     """Set a value in an OT3 Gantry's per-axis-settings."""
     axis_kind = Axis.to_kind(axis)
-    if load == GantryLoad.HIGH_THROUGHPUT:
-        settings.high_throughput[axis_kind] = value
-    else:
-        settings.low_throughput[axis_kind] = value
+    match load:
+        case GantryLoad.HIGH_THROUGHPUT_1000:
+            settings.high_throughput_1000[axis_kind] = value
+        case GantryLoad.HIGH_THROUGHPUT_1000:
+            settings.high_throughput_200[axis_kind] = value
+        case GantryLoad.LOW_THROUGHPUT:
+            settings.low_throughput[axis_kind] = value
 
 
 def get_gantry_per_axis_setting_ot3(
@@ -346,9 +394,13 @@ def get_gantry_per_axis_setting_ot3(
 ) -> float:
     """Set a value in an OT3 Gantry's per-axis-settings."""
     axis_kind = Axis.to_kind(axis)
-    if load == GantryLoad.HIGH_THROUGHPUT:
-        return settings.high_throughput[axis_kind]
-    return settings.low_throughput[axis_kind]
+    match load:
+        case GantryLoad.HIGH_THROUGHPUT_1000:
+            return settings.high_throughput_1000[axis_kind]
+        case GantryLoad.HIGH_THROUGHPUT_200:
+            return settings.high_throughput_200[axis_kind]
+        case GantryLoad.LOW_THROUGHPUT:
+            return settings.low_throughput[axis_kind]
 
 
 async def set_gantry_load_per_axis_current_settings_ot3(
@@ -619,16 +671,13 @@ async def move_tip_motor_relative_ot3(
     if not api.hardware_pipettes[OT3Mount.LEFT.to_mount()]:
         raise RuntimeError("No pipette found on LEFT mount")
 
-    current_gear_pos_float = api._backend.gear_motor_position or 0.0
-    current_gear_pos_dict = {Axis.Q: current_gear_pos_float}
-    target_pos_dict = {Axis.Q: current_gear_pos_float + distance}
+    current_gear_pos = api._backend.gear_motor_position or 0.0
+    target_pos = current_gear_pos + distance
 
-    if speed is not None and distance < 0:
-        speed *= -1
+    # if speed is not None and distance < 0:
+    #     speed *= -1
 
-    _move_coro = api._backend.tip_action(
-        current_gear_pos_dict, [(target_pos_dict, speed or 400)]
-    )
+    _move_coro = api._backend.tip_action(current_gear_pos, [(target_pos, speed or 400)])
     if motor_current is None:
         await _move_coro
     else:
@@ -662,7 +711,7 @@ async def move_gripper_jaw_relative_ot3(api: OT3API, delta: float) -> None:
 
 def get_endstop_position_ot3(api: OT3API, mount: OT3Mount) -> Dict[Axis, float]:
     """Get the endstop's position per mount."""
-    carriage_pos = api._deck_from_machine(api._backend.home_position())
+    carriage_pos = api.get_deck_from_machine(api._backend.home_position())
     pos_at_home = api._effector_pos_from_carriage_pos(
         OT3Mount.from_mount(mount), carriage_pos, None
     )
@@ -1009,13 +1058,13 @@ def set_pipette_offset_ot3(api: OT3API, mount: OT3Mount, offset: Point) -> None:
 
 def get_gripper_offset_ot3(api: OT3API) -> Point:
     """Get gripper offset OT3."""
-    assert api.has_gripper, "No gripper found"
+    assert api.has_gripper(), "No gripper found"
     return api._gripper_handler._gripper._calibration_offset.offset  # type: ignore[union-attr]
 
 
 def set_gripper_offset_ot3(api: OT3API, offset: Point) -> None:
     """Set gripper offset OT3."""
-    assert api.has_gripper, "No gripper found"
+    assert api.has_gripper(), "No gripper found"
     api._gripper_handler._gripper._calibration_offset.offset = offset  # type: ignore[union-attr]
 
 
@@ -1099,8 +1148,14 @@ def get_pipette_serial_ot3(pipette: Union[PipetteOT2, PipetteOT3]) -> str:
     """Get pipette serial number."""
     model = pipette.model
     volume = model.split("_")[0].replace("p", "")
-    volume = "1K" if volume == "1000" else volume
+    # volume = "1K" if volume == "1000" else volume
+    if volume == "1000":
+        volume = "1K"
+    elif volume == "200":
+        volume = "2H"
     channels = "S" if "single" in model else "M"
+    if "96" in model:
+        channels = "H"
     version = model.split("v")[-1].strip().replace(".", "")
     assert pipette.pipette_id, f"no pipette_id found for pipette: {pipette}"
     if "P" in pipette.pipette_id:
@@ -1132,6 +1187,8 @@ def clear_pipette_ul_per_mm(api: OT3API, mount: OT3Mount) -> None:
         pip_nominal_ul_per_mm = _ul_per_mm_of_shaft_diameter(1)
     elif "p1000" in pip.model.lower():
         pip_nominal_ul_per_mm = _ul_per_mm_of_shaft_diameter(4.5)
+    elif "p200" in pip.model.lower():
+        pip_nominal_ul_per_mm = _ul_per_mm_of_shaft_diameter(2)
     else:
         raise RuntimeError(f"unexpected pipette model: {pip.model}")
     # 10000 is an arbitrarily large volume that none of our pipettes can reach
@@ -1155,3 +1212,110 @@ def clear_pipette_ul_per_mm(api: OT3API, mount: OT3Mount) -> None:
     assert pip.ul_per_mm(pip.working_volume, "aspirate") == pip_nominal_ul_per_mm
     assert pip.ul_per_mm(1, "dispense") == pip_nominal_ul_per_mm
     assert pip.ul_per_mm(pip.working_volume, "dispense") == pip_nominal_ul_per_mm
+
+
+class DirectPropId(Enum):
+    """The hardware-testing equivalent of a unique property id for a property."""
+
+    INVALID = 0xFF
+    FORMAT_VERSION = 1
+    SERIAL_NUMBER = 2
+    SKU = 3
+
+
+DIRECT_PROP_ID_TYPES = {
+    DirectPropId.FORMAT_VERSION: PropType.BYTE,
+    DirectPropId.SERIAL_NUMBER: PropType.STR,
+    DirectPropId.SKU: PropType.STR,
+}
+
+
+def _generate_packet(prop_id: DirectPropId, value: Any) -> Optional[bytes]:
+    data = _encode_data(prop_id, value)
+    if data and len(data) <= MAX_DATA_LEN:
+        return struct.pack("!BB", prop_id.value, len(data)) + data
+    return None
+
+
+def _encode_data(prop_id: DirectPropId, value: Any) -> Optional[bytes]:
+    if prop_id == DirectPropId.INVALID:
+        return None
+    encoded_data: bytes = b""
+    try:
+        prop_id = DirectPropId(prop_id)
+        data_type = DIRECT_PROP_ID_TYPES[prop_id]
+        if data_type == PropType.BYTE:
+            encoded_data = struct.pack("!B", value)
+        elif data_type == PropType.CHAR:
+            encoded_data = struct.pack("!B", ord(value))
+        elif data_type == PropType.SHORT:
+            encoded_data = struct.pack("!h", value)
+        elif data_type == PropType.INT:
+            encoded_data = struct.pack("!i", value)
+        elif data_type == PropType.STR:
+            encoded_data = f"{value}".encode("utf-8")
+        elif data_type == PropType.BIN:
+            encoded_data = bytes(value)
+        return encoded_data
+    except (ValueError, TypeError, struct.error):
+        return None
+
+
+@dataclass
+class DirectEEPROMData:
+    """Hardware testing equivalent of dataclass that represents the serialized data from the eeprom."""
+
+    format_version: int = FORMAT_VERSION
+    serial_number: Optional[str] = None
+    machine_type: Optional[str] = None
+    machine_version: Optional[str] = None
+    programmed_date: Optional[datetime] = None
+    unit_number: Optional[int] = None
+    sku: Optional[str] = None
+
+    def to_set(self) -> set[tuple[DirectPropId, str | int]]:
+        """Hardware testing equivalent of an eeprom utility that returns a set of expected data values paired with a property id."""
+        eeprom_set: set[tuple[DirectPropId, str | int]] = set()
+        eeprom_set.add((DirectPropId.FORMAT_VERSION, self.format_version))
+        if self.serial_number:
+            eeprom_set.add((DirectPropId.SERIAL_NUMBER, self.serial_number))
+        if self.sku:
+            eeprom_set.add((DirectPropId.SKU, self.sku))
+        return eeprom_set
+
+
+def direct_property_write(
+    api: OT3API, properties: set[tuple[DirectPropId, str | int]]
+) -> set[DirectPropId]:
+    """Hardware testing equivalent of the eeprom property write. Write the given properties to the eeprom, returning a set of the successful ones."""
+    written_props: set[DirectPropId] = set()
+    # sort the properties so they are written in ascending order
+    properties = set(sorted(properties, key=lambda prop: prop[0].value))
+    data: bytes = b""
+    for prop_id, value in properties:
+        packet = _generate_packet(prop_id, value)
+        if packet:
+            written_props.add(prop_id)
+            data += packet
+    if data:
+        try:
+            api._backend.eeprom_driver._gpio.activate_eeprom_wp()  # type: ignore
+            api._backend.eeprom_driver._write(data)  # type: ignore
+        except RuntimeError:
+            # something went wrong, clear written props
+            written_props = set()
+        finally:
+            api._backend.eeprom_driver._gpio.deactivate_eeprom_wp()  # type: ignore
+    return written_props
+
+
+def direct_eeprom_data(data: EEPROMData) -> DirectEEPROMData:
+    """Returns the hardware testing equivalent of the eeprom data return."""
+    return DirectEEPROMData(
+        format_version=data.format_version,
+        serial_number=data.serial_number,
+        machine_type=data.machine_type,
+        programmed_date=data.programmed_date,
+        unit_number=data.unit_number,
+        sku=getattr(data, "sku", None),
+    )

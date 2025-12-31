@@ -1,19 +1,21 @@
-import type * as React from 'react'
-import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { when } from 'vitest-when'
+
 import '@testing-library/jest-dom/vitest'
 
-import { screen, fireEvent } from '@testing-library/react'
-import { COLORS, BORDERS } from '@opentrons/components'
+import { fireEvent, screen } from '@testing-library/react'
 
-import { i18n } from '/app/i18n'
+import { BORDERS, COLORS } from '@opentrons/components'
+
 import { renderWithProviders } from '/app/__testing-utils__'
+import { i18n } from '/app/i18n'
 import { getIsOnDevice } from '/app/redux/config'
 
 import { InterventionModal } from '../'
 
-import type { ModalType } from '../'
+import type { ComponentProps } from 'react'
 import type { State } from '/app/redux/types'
+import type { ModalType } from '../'
 
 vi.mock('/app/redux/config')
 
@@ -23,7 +25,7 @@ const MOCK_STATE: State = {
   },
 } as any
 
-const render = (props: React.ComponentProps<typeof InterventionModal>) => {
+const render = (props: ComponentProps<typeof InterventionModal>) => {
   return renderWithProviders(<InterventionModal {...props} />, {
     i18nInstance: i18n,
     initialState: MOCK_STATE,
@@ -31,13 +33,13 @@ const render = (props: React.ComponentProps<typeof InterventionModal>) => {
 }
 
 describe('InterventionModal', () => {
-  let props: React.ComponentProps<typeof InterventionModal>
+  let props: ComponentProps<typeof InterventionModal>
 
   beforeEach(() => {
     props = {
       iconHeading: 'mock intervention icon heading',
       children: 'mock intervention children',
-      iconName: 'alert-circle',
+      iconName: 'ot-alert',
       type: 'intervention-required',
     }
     when(vi.mocked(getIsOnDevice)).calledWith(MOCK_STATE).thenReturn(false)
@@ -70,17 +72,13 @@ describe('InterventionModal', () => {
   it('renders an icon if an icon is specified', () => {
     const { container } = render(props)
     // eslint-disable-next-line testing-library/no-node-access, testing-library/no-container
-    const icon = container.querySelector(
-      '[aria-roledescription="alert-circle"]'
-    )
+    const icon = container.querySelector('[aria-roledescription="ot-alert"]')
     expect(icon).not.toBeNull()
   })
   it('does not render an icon if no icon is specified', () => {
     const { container } = render({ ...props, iconName: undefined })
     // eslint-disable-next-line testing-library/no-node-access, testing-library/no-container
-    const icon = container.querySelector(
-      '[aria-roledescription="alert-circle"]'
-    )
+    const icon = container.querySelector('[aria-roledescription="ot-alert"]')
     expect(icon).toBeNull()
   })
 

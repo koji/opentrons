@@ -1,11 +1,12 @@
-import { vi, it, expect, describe, beforeEach } from 'vitest'
-import { when } from 'vitest-when'
 import { renderHook } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { when } from 'vitest-when'
 
+import { useRobot } from '/app/redux-resources/robots'
 import { mockConnectedRobot } from '/app/redux/discovery/__fixtures__'
 import { mockTemperatureModule } from '/app/redux/modules/__fixtures__'
-import { useRobot } from '/app/redux-resources/robots'
 import { useAttachedModules } from '/app/resources/modules'
+
 import {
   useModuleRenderInfoForProtocolById,
   useUnmatchedModulesForProtocol,
@@ -63,7 +64,7 @@ describe('useModuleMatchResults', () => {
           x: 0,
           y: 0,
           z: 0,
-          moduleDef: (mockMagneticBlockDef as unknown) as ModuleDefinition,
+          moduleDef: mockMagneticBlockDef as unknown as ModuleDefinition,
           nestedLabwareDef: null,
           nestedLabwareId: null,
           nestedLabwareDisplayName: null,
@@ -119,7 +120,7 @@ describe('useModuleMatchResults', () => {
           x: 0,
           y: 0,
           z: 0,
-          moduleDef: (mockTemperatureModuleDef as unknown) as ModuleDefinition,
+          moduleDef: mockTemperatureModuleDef as unknown as ModuleDefinition,
           nestedLabwareDef: null,
           nestedLabwareId: null,
           nestedLabwareDisplayName: null,
@@ -146,10 +147,10 @@ describe('useModuleMatchResults', () => {
           x: 0,
           y: 0,
           z: 0,
-          moduleDef: ({
+          moduleDef: {
             ...mockTemperatureModuleDef,
             compatibleWith: ['fakeModuleModel'],
-          } as unknown) as ModuleDefinition,
+          } as unknown as ModuleDefinition,
           nestedLabwareDef: null,
           nestedLabwareId: null,
           nestedLabwareDisplayName: null,

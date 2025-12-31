@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
 import { useTranslation } from 'react-i18next'
+import { useDispatch, useSelector } from 'react-redux'
 
 import {
   ALIGN_CENTER,
@@ -23,16 +23,17 @@ import {
   getProtocolsOnDeviceSortKey,
   updateConfigValue,
 } from '/app/redux/config'
-import { PinnedProtocolCarousel } from './PinnedProtocolCarousel'
-import { sortProtocols } from './utils'
-import { ProtocolCard } from './ProtocolCard'
-import { NoProtocols } from './NoProtocols'
-import { DeleteProtocolConfirmationModal } from './DeleteProtocolConfirmationModal'
 import { useNotifyAllRunsQuery } from '/app/resources/runs'
 
-import type { Dispatch } from '/app/redux/types'
-import type { ProtocolsOnDeviceSortKey } from '/app/redux/config/types'
+import { DeleteProtocolConfirmationModal } from './DeleteProtocolConfirmationModal'
+import { NoProtocols } from './NoProtocols'
+import { PinnedProtocolCarousel } from './PinnedProtocolCarousel'
+import { ProtocolCard } from './ProtocolCard'
+import { sortProtocols } from './utils'
+
 import type { ProtocolResource } from '@opentrons/shared-data'
+import type { ProtocolsOnDeviceSortKey } from '/app/redux/config/types'
+import type { Dispatch } from '/app/redux/types'
 
 export function ProtocolDashboard(): JSX.Element {
   const protocols = useAllProtocolsQuery()
@@ -40,13 +41,10 @@ export function ProtocolDashboard(): JSX.Element {
   const { t } = useTranslation('protocol_info')
   const dispatch = useDispatch<Dispatch>()
   const [navMenuIsOpened, setNavMenuIsOpened] = useState<boolean>(false)
-  const [longPressModalIsOpened, setLongPressModalOpened] = useState<boolean>(
-    false
-  )
-  const [
-    showDeleteConfirmationModal,
-    setShowDeleteConfirmationModal,
-  ] = useState<boolean>(false)
+  const [longPressModalIsOpened, setLongPressModalOpened] =
+    useState<boolean>(false)
+  const [showDeleteConfirmationModal, setShowDeleteConfirmationModal] =
+    useState<boolean>(false)
   const [targetProtocolId, setTargetProtocolId] = useState<string>('')
   const [isRequiredCSV, setIsRequiredCSV] = useState<boolean>(false)
   const sortBy = useSelector(getProtocolsOnDeviceSortKey) ?? 'alphabetical'
@@ -160,7 +158,7 @@ export function ProtocolDashboard(): JSX.Element {
               marginBottom={SPACING.spacing32}
             >
               <LegacyStyledText
-                as="p"
+                forwardedAs="p"
                 marginBottom={SPACING.spacing8}
                 color={COLORS.grey60}
               >
@@ -252,9 +250,10 @@ export function ProtocolDashboard(): JSX.Element {
               </Flex>
               <Flex flexDirection={DIRECTION_COLUMN}>
                 {sortedProtocols.map(protocol => {
-                  const lastRun = runs.data?.data.find(
+                  // Run data is ordered based on timestamp. We want the last time a matching run was ran.
+                  const lastRun = runs.data?.data.findLast(
                     run => run.protocolId === protocol.id
-                  )?.createdAt
+                  )?.completedAt
 
                   return (
                     <ProtocolCard

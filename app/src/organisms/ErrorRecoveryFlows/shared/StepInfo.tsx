@@ -1,11 +1,13 @@
-import type * as React from 'react'
-
 import { useTranslation } from 'react-i18next'
 
-import { Flex, DISPLAY_INLINE, StyledText } from '@opentrons/components'
+import {
+  CommandText,
+  DISPLAY_INLINE,
+  Flex,
+  StyledText,
+} from '@opentrons/components'
 
-import { CommandText } from '/app/molecules/Command'
-
+import type { ComponentProps } from 'react'
 import type { StyleProps } from '@opentrons/components'
 import type { RecoveryContentProps } from '../types'
 
@@ -15,8 +17,8 @@ interface StepInfoProps extends StyleProps {
   robotType: RecoveryContentProps['robotType']
   protocolAnalysis: RecoveryContentProps['protocolAnalysis']
   allRunDefs: RecoveryContentProps['allRunDefs']
-  desktopStyle?: React.ComponentProps<typeof StyledText>['desktopStyle']
-  oddStyle?: React.ComponentProps<typeof StyledText>['oddStyle']
+  desktopStyle?: ComponentProps<typeof StyledText>['desktopStyle']
+  oddStyle?: ComponentProps<typeof StyledText>['oddStyle']
 }
 
 export function StepInfo({
@@ -30,13 +32,18 @@ export function StepInfo({
   ...styleProps
 }: StepInfoProps): JSX.Element {
   const { t } = useTranslation('error_recovery')
-  const { currentStepNumber, totalStepCount } = stepCounts
+  const { currentStepNumber, totalStepCount, hasRunDiverged } = stepCounts
 
   const currentCopy = currentStepNumber ?? '?'
   const totalCopy = totalStepCount ?? '?'
 
   const desktopStyleDefaulted = desktopStyle ?? 'bodyDefaultRegular'
   const oddStyleDefaulted = oddStyle ?? 'bodyTextRegular'
+
+  const buildAtStepCopy = (): string =>
+    hasRunDiverged
+      ? `${t('at_step')}: N/A`
+      : `${t('at_step')} ${currentCopy}/${totalCopy}: `
 
   return (
     <Flex display={DISPLAY_INLINE} {...styleProps}>
@@ -45,7 +52,7 @@ export function StepInfo({
         oddStyle={oddStyleDefaulted}
         display={DISPLAY_INLINE}
       >
-        {`${t('at_step')} ${currentCopy}/${totalCopy}: `}
+        {buildAtStepCopy()}
       </StyledText>
       {failedCommand?.byAnalysis != null && protocolAnalysis != null ? (
         <CommandText

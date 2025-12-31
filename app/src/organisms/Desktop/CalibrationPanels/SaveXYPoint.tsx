@@ -1,28 +1,19 @@
 import { useMemo } from 'react'
-import { css } from 'styled-components'
 import { useTranslation } from 'react-i18next'
+import { css } from 'styled-components'
+
 import {
   ALIGN_FLEX_END,
   ALIGN_STRETCH,
+  AnimationVideo,
   Box,
   DIRECTION_COLUMN,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   PrimaryButton,
   SPACING,
-  LegacyStyledText,
 } from '@opentrons/components'
-
-import { useLogger } from '/app/logger'
-import * as Sessions from '/app/redux/sessions'
-import {
-  JogControls,
-  MEDIUM_STEP_SIZE_MM,
-  SMALL_STEP_SIZE_MM,
-} from '/app/molecules/JogControls'
-import { formatJogVector } from './utils'
-import { useConfirmCrashRecovery } from './useConfirmCrashRecovery'
-import { NeedHelpLink } from '/app/molecules/OT2CalibrationNeedHelpLink'
 
 import slot1LeftMultiDemoAsset from '/app/assets/videos/cal-movement/SLOT_1_LEFT_MULTI_X-Y.webm'
 import slot1LeftSingleDemoAsset from '/app/assets/videos/cal-movement/SLOT_1_LEFT_SINGLE_X-Y.webm'
@@ -36,19 +27,29 @@ import slot7LeftMultiDemoAsset from '/app/assets/videos/cal-movement/SLOT_7_LEFT
 import slot7LeftSingleDemoAsset from '/app/assets/videos/cal-movement/SLOT_7_LEFT_SINGLE_X-Y.webm'
 import slot7RightMultiDemoAsset from '/app/assets/videos/cal-movement/SLOT_7_RIGHT_MULTI_X-Y.webm'
 import slot7RightSingleDemoAsset from '/app/assets/videos/cal-movement/SLOT_7_RIGHT_SINGLE_X-Y.webm'
+import { useLogger } from '/app/logger'
+import {
+  JogControls,
+  MEDIUM_STEP_SIZE_MM,
+  SMALL_STEP_SIZE_MM,
+} from '/app/molecules/JogControls'
+import { NeedHelpLink } from '/app/molecules/OT2CalibrationNeedHelpLink'
+import * as Sessions from '/app/redux/sessions'
 
+import { useConfirmCrashRecovery } from './useConfirmCrashRecovery'
+import { formatJogVector } from './utils'
+
+import type { Mount } from '@opentrons/components'
 import type { Axis, Sign, StepSize } from '/app/molecules/JogControls/types'
-import type { CalibrationPanelProps } from './types'
 import type {
-  SessionType,
   CalibrationSessionStep,
   SessionCommandString,
-  CalibrationLabware,
+  SessionType,
 } from '/app/redux/sessions/types'
-import type { Mount } from '@opentrons/components'
+import type { CalibrationPanelProps } from './types'
 
 const assetMap: Record<
-  CalibrationLabware['slot'],
+  string,
   Record<Mount, Record<'multi' | 'single', string>>
 > = {
   '1': {
@@ -151,9 +152,8 @@ export function SaveXYPoint(props: CalibrationPanelProps): JSX.Element | null {
     [slotNumber, mount, isMulti]
   )
 
-  const [confirmLink, crashRecoveryConfirmation] = useConfirmCrashRecovery(
-    props
-  )
+  const [confirmLink, crashRecoveryConfirmation] =
+    useConfirmCrashRecovery(props)
 
   if (slotNumber == null) {
     logger.warn(
@@ -222,31 +222,28 @@ export function SaveXYPoint(props: CalibrationPanelProps): JSX.Element | null {
           gridGap={SPACING.spacing8}
         >
           <Flex flexDirection={DIRECTION_COLUMN} flex="1">
-            <LegacyStyledText as="h1" marginBottom={SPACING.spacing16}>
+            <LegacyStyledText forwardedAs="h1" marginBottom={SPACING.spacing16}>
               {t(isHealthCheck ? 'check_xy_axes' : 'calibrate_xy_axes', {
                 slotName: slotNumber,
               })}
             </LegacyStyledText>
-            <LegacyStyledText as="p">
+            <LegacyStyledText forwardedAs="p">
               {t('jog_pipette_to_touch_cross', { slotName: slotNumber })}
             </LegacyStyledText>
           </Flex>
           <Box flex="1">
-            <video
+            <AnimationVideo
               key={String(demoAsset)}
               css={css`
                 max-width: 100%;
                 max-height: 15rem;
               `}
-              autoPlay={true}
-              loop={true}
-              controls={false}
               aria-label={`${mount} ${
                 isMulti ? 'multi' : 'single'
               } channel pipette moving to slot ${slotNumber}`}
             >
               <source src={demoAsset} />
-            </video>
+            </AnimationVideo>
           </Box>
         </Flex>
         <JogControls

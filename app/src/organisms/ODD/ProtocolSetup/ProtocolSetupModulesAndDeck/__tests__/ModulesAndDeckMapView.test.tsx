@@ -1,16 +1,19 @@
-import type * as React from 'react'
-import { describe, it, vi, beforeEach, afterEach } from 'vitest'
 import { screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, it, vi } from 'vitest'
 
 import { BaseDeck } from '@opentrons/components'
 import {
   FLEX_SIMPLEST_DECK_CONFIG_PROTOCOL_SPEC,
   getSimplestDeckConfigForProtocol,
+  OT2_ROBOT_TYPE,
 } from '@opentrons/shared-data'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
+
 import { ModulesAndDeckMapView } from '../ModulesAndDeckMapView'
+
+import type { ComponentProps } from 'react'
 
 vi.mock('@opentrons/components/src/hardware-sim/BaseDeck')
 vi.mock('@opentrons/api-client')
@@ -25,6 +28,7 @@ const PROTOCOL_ANALYSIS = {
   id: 'fake analysis',
   status: 'completed',
   labware: [],
+  robotType: OT2_ROBOT_TYPE,
 } as any
 
 const mockAttachedProtocolModuleMatches = [
@@ -72,7 +76,6 @@ const mockAttachedProtocolModuleMatches = [
         ot3_standard: {},
       },
       compatibleWith: [],
-      twoDimensionalRendering: {},
     },
     nestedLabwareDef: null,
     nestedLabwareDisplayName: null,
@@ -99,14 +102,14 @@ vi.mock('@opentrons/components', async importOriginal => {
   }
 })
 
-const render = (props: React.ComponentProps<typeof ModulesAndDeckMapView>) => {
+const render = (props: ComponentProps<typeof ModulesAndDeckMapView>) => {
   return renderWithProviders(<ModulesAndDeckMapView {...props} />, {
     i18nInstance: i18n,
   })[0]
 }
 
 describe('ModulesAndDeckMapView', () => {
-  let props: React.ComponentProps<typeof ModulesAndDeckMapView>
+  let props: ComponentProps<typeof ModulesAndDeckMapView>
 
   beforeEach(() => {
     props = {

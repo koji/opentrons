@@ -1,28 +1,24 @@
 import { useMemo } from 'react'
-import { css } from 'styled-components'
 import { useTranslation } from 'react-i18next'
+import { css } from 'styled-components'
+
 import {
   ALIGN_FLEX_END,
   ALIGN_STRETCH,
+  AnimationVideo,
   Box,
   DIRECTION_COLUMN,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   PrimaryButton,
   SPACING,
-  LegacyStyledText,
 } from '@opentrons/components'
 
-import * as Sessions from '/app/redux/sessions'
-import {
-  JogControls,
-  MEDIUM_STEP_SIZE_MM,
-  SMALL_STEP_SIZE_MM,
-} from '/app/molecules/JogControls'
-import { NeedHelpLink } from '/app/molecules/OT2CalibrationNeedHelpLink'
-import { useConfirmCrashRecovery } from './useConfirmCrashRecovery'
-import { formatJogVector } from './utils'
-
+import leftMultiBlockAssetHealth from '/app/assets/videos/health-check/Left_Multi_CalBlock_WITH_TIP_(330x260)REV2.webm'
+import leftSingleBlockAssetHealth from '/app/assets/videos/health-check/Left_Single_CalBlock_WITH_TIP_(330x260)REV2.webm'
+import rightMultiBlockAssetHealth from '/app/assets/videos/health-check/Right_Multi_CalBlock_WITH_TIP_(330x260)REV2.webm'
+import rightSingleBlockAssetHealth from '/app/assets/videos/health-check/Right_Single_CalBlock_WITH_TIP_(330x260)REV2.webm'
 import leftMultiBlockAssetTLC from '/app/assets/videos/tip-length-cal/Left_Multi_CalBlock_WITH_TIP_(330x260)REV1.webm'
 import leftMultiTrashAsset from '/app/assets/videos/tip-length-cal/Left_Multi_Trash_WITH_TIP_(330x260)REV1.webm'
 import leftSingleBlockAssetTLC from '/app/assets/videos/tip-length-cal/Left_Single_CalBlock_WITH_TIP_(330x260)REV1.webm'
@@ -31,10 +27,16 @@ import rightMultiBlockAssetTLC from '/app/assets/videos/tip-length-cal/Right_Mul
 import rightMultiTrashAsset from '/app/assets/videos/tip-length-cal/Right_Multi_Trash_WITH_TIP_(330x260)REV1.webm'
 import rightSingleBlockAssetTLC from '/app/assets/videos/tip-length-cal/Right_Single_CalBlock_WITH_TIP_(330x260)REV1.webm'
 import rightSingleTrashAsset from '/app/assets/videos/tip-length-cal/Right_Single_Trash_WITH_TIP_(330x260)REV1.webm'
-import leftMultiBlockAssetHealth from '/app/assets/videos/health-check/Left_Multi_CalBlock_WITH_TIP_(330x260)REV2.webm'
-import rightMultiBlockAssetHealth from '/app/assets/videos/health-check/Right_Multi_CalBlock_WITH_TIP_(330x260)REV2.webm'
-import leftSingleBlockAssetHealth from '/app/assets/videos/health-check/Left_Single_CalBlock_WITH_TIP_(330x260)REV2.webm'
-import rightSingleBlockAssetHealth from '/app/assets/videos/health-check/Right_Single_CalBlock_WITH_TIP_(330x260)REV2.webm'
+import {
+  JogControls,
+  MEDIUM_STEP_SIZE_MM,
+  SMALL_STEP_SIZE_MM,
+} from '/app/molecules/JogControls'
+import { NeedHelpLink } from '/app/molecules/OT2CalibrationNeedHelpLink'
+import * as Sessions from '/app/redux/sessions'
+
+import { useConfirmCrashRecovery } from './useConfirmCrashRecovery'
+import { formatJogVector } from './utils'
 
 import type { Mount } from '@opentrons/components'
 import type { Axis, Sign, StepSize } from '/app/molecules/JogControls/types'
@@ -114,9 +116,8 @@ export function MeasureTip(props: CalibrationPanelProps): JSX.Element {
         )
   }
 
-  const [confirmLink, crashRecoveryConfirmation] = useConfirmCrashRecovery(
-    props
-  )
+  const [confirmLink, crashRecoveryConfirmation] =
+    useConfirmCrashRecovery(props)
 
   let titleText =
     calBlock != null ? t('calibrate_tip_on_block') : t('calibrate_tip_on_trash')
@@ -138,28 +139,25 @@ export function MeasureTip(props: CalibrationPanelProps): JSX.Element {
           gridGap={SPACING.spacing8}
         >
           <Flex flexDirection={DIRECTION_COLUMN} flex="1">
-            <LegacyStyledText as="h1" marginBottom={SPACING.spacing16}>
+            <LegacyStyledText forwardedAs="h1" marginBottom={SPACING.spacing16}>
               {titleText}
             </LegacyStyledText>
-            <LegacyStyledText as="p">
+            <LegacyStyledText forwardedAs="p">
               {calBlock != null
                 ? t('jog_nozzle_to_block', { slotName: calBlock.slot })
                 : t('jog_nozzle_to_trash')}
             </LegacyStyledText>
           </Flex>
           <Box flex="1">
-            <video
+            <AnimationVideo
               key={demoAsset}
               css={css`
                 max-width: 100%;
                 max-height: 15rem;
               `}
-              autoPlay={true}
-              loop={true}
-              controls={false}
             >
               <source src={demoAsset} />
-            </video>
+            </AnimationVideo>
           </Box>
         </Flex>
         <JogControls

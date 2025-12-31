@@ -1,42 +1,44 @@
-import type * as React from 'react'
-import { when } from 'vitest-when'
 import { screen } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { when } from 'vitest-when'
+
 import '@testing-library/jest-dom/vitest'
 
-import { useCommandQuery } from '@opentrons/react-api-client'
 import {
   RUN_STATUS_IDLE,
   RUN_STATUS_RUNNING,
-  RUN_STATUS_SUCCEEDED,
   RUN_STATUS_STOPPED,
+  RUN_STATUS_SUCCEEDED,
 } from '@opentrons/api-client'
+import { useCommandQuery } from '@opentrons/react-api-client'
 
+import { renderWithProviders } from '/app/__testing-utils__'
+import { ProgressBar } from '/app/atoms/ProgressBar'
 import { i18n } from '/app/i18n'
 import {
-  useInterventionModal,
   InterventionModal,
+  useInterventionModal,
 } from '/app/organisms/InterventionModal'
-import { ProgressBar } from '/app/atoms/ProgressBar'
 import { useRunControls } from '/app/organisms/RunTimeControl'
+import { useModuleCommandAnalytics } from '/app/redux-resources/analytics/'
+import { useRunningStepCounts } from '/app/resources/protocols/hooks'
 import {
-  useNotifyRunQuery,
-  useNotifyAllCommandsQuery,
-  useRunStatus,
-  useMostRecentCompletedAnalysis,
+  DEFAULT_STATUS_REFETCH_INTERVAL,
   useLastRunCommand,
+  useMostRecentCompletedAnalysis,
+  useNotifyAllCommandsQuery,
+  useNotifyRunQuery,
 } from '/app/resources/runs'
-import { useDownloadRunLog } from '../../Devices/hooks'
+
+import { RunProgressMeter } from '..'
 import {
   mockUseAllCommandsResponseNonDeterministic,
   mockUseCommandResultNonDeterministic,
   NON_DETERMINISTIC_COMMAND_KEY,
 } from '../__fixtures__'
+import { useDownloadRunLog } from '../../Devices/hooks'
 
-import { RunProgressMeter } from '..'
-import { renderWithProviders } from '/app/__testing-utils__'
-import { useRunningStepCounts } from '/app/resources/protocols/hooks'
-
+import type { ComponentProps } from 'react'
 import type { RunCommandSummary } from '@opentrons/api-client'
 import type * as ApiClient from '@opentrons/react-api-client'
 
@@ -54,8 +56,9 @@ vi.mock('/app/organisms/InterventionModal')
 vi.mock('../../Devices/hooks')
 vi.mock('/app/resources/protocols/hooks')
 vi.mock('/app/redux-resources/robots')
+vi.mock('/app/redux-resources/analytics')
 
-const render = (props: React.ComponentProps<typeof RunProgressMeter>) => {
+const render = (props: ComponentProps<typeof RunProgressMeter>) => {
   return renderWithProviders(<RunProgressMeter {...props} />, {
     i18nInstance: i18n,
   })[0]
@@ -65,19 +68,17 @@ const NON_DETERMINISTIC_RUN_ID = 'nonDeterministicID'
 const ROBOT_NAME = 'otie'
 
 describe('RunProgressMeter', () => {
-  let props: React.ComponentProps<typeof RunProgressMeter>
+  let props: ComponentProps<typeof RunProgressMeter>
   beforeEach(() => {
     vi.mocked(ProgressBar).mockReturnValue(<div>MOCK PROGRESS BAR</div>)
     vi.mocked(InterventionModal).mockReturnValue(
       <div>MOCK_INTERVENTION_MODAL</div>
     )
-    vi.mocked(useRunStatus).mockReturnValue(RUN_STATUS_RUNNING)
     when(useMostRecentCompletedAnalysis)
       .calledWith(NON_DETERMINISTIC_RUN_ID)
       .thenReturn(null)
     when(useNotifyAllCommandsQuery)
       .calledWith(NON_DETERMINISTIC_RUN_ID, {
-        cursor: null,
         pageLength: 1,
       })
       .thenReturn(mockUseAllCommandsResponseNonDeterministic)
@@ -92,7 +93,18 @@ describe('RunProgressMeter', () => {
       .calledWith(NON_DETERMINISTIC_RUN_ID, { refetchInterval: 1000 })
       .thenReturn({ key: NON_DETERMINISTIC_COMMAND_KEY } as RunCommandSummary)
 
-    vi.mocked(useNotifyRunQuery).mockReturnValue({ data: null } as any)
+    when(vi.mocked(useNotifyRunQuery))
+      .calledWith(NON_DETERMINISTIC_RUN_ID, {
+        refetchInterval: DEFAULT_STATUS_REFETCH_INTERVAL,
+      })
+      .thenReturn({
+        data: {
+          data: {
+            id: NON_DETERMINISTIC_RUN_ID,
+            status: RUN_STATUS_RUNNING,
+          },
+        },
+      } as any)
     vi.mocked(useRunningStepCounts).mockReturnValue({
       totalStepCount: null,
       currentStepNumber: null,
@@ -113,22 +125,35 @@ describe('RunProgressMeter', () => {
 
   it('should show only the total count of commands in run and not show the meter when protocol is non-deterministic', () => {
     vi.mocked(useCommandQuery).mockReturnValue({ data: null } as any)
+    vi.mocked(useModuleCommandAnalytics).mockReturnValue({
+      reportModuleCommand: vi.fn(),
+    } as any)
     render(props)
-    expect(screen.getByText('Current Step ?/?:')).toBeTruthy()
+    expect(screen.getByText('Step: N/A')).toBeTruthy()
     expect(screen.queryByText('MOCK PROGRESS BAR')).toBeFalsy()
   })
-  it('should give the correct info when run status is idle', () => {
+
+  it('should give no step info when run status is idle', () => {
     vi.mocked(useCommandQuery).mockReturnValue({ data: null } as any)
-    vi.mocked(useRunStatus).mockReturnValue(RUN_STATUS_IDLE)
+    when(vi.mocked(useNotifyRunQuery))
+      .calledWith(NON_DETERMINISTIC_RUN_ID, {
+        refetchInterval: DEFAULT_STATUS_REFETCH_INTERVAL,
+      })
+      .thenReturn({
+        data: {
+          data: {
+            id: NON_DETERMINISTIC_RUN_ID,
+            status: RUN_STATUS_IDLE,
+          },
+        },
+      } as any)
+
     render(props)
-    screen.getByText('Current Step:')
-    screen.getByText('Not started yet')
-    screen.getByText('Download run log')
+    expect(screen.queryByText(/Step/)).toBeNull()
   })
 
   it('should render an intervention modal when showInterventionModal is true', () => {
     vi.mocked(useCommandQuery).mockReturnValue({ data: null } as any)
-    vi.mocked(useRunStatus).mockReturnValue(RUN_STATUS_IDLE)
     vi.mocked(useInterventionModal).mockReturnValue({
       showModal: true,
       modalProps: {} as any,
@@ -139,22 +164,45 @@ describe('RunProgressMeter', () => {
     screen.getByText('MOCK_INTERVENTION_MODAL')
   })
 
-  it('should render the correct run status when run status is completed', () => {
+  it('should render no text when run status is completed', () => {
     vi.mocked(useCommandQuery).mockReturnValue({ data: null } as any)
-    vi.mocked(useRunStatus).mockReturnValue(RUN_STATUS_SUCCEEDED)
+    when(vi.mocked(useNotifyRunQuery))
+      .calledWith(NON_DETERMINISTIC_RUN_ID, {
+        refetchInterval: DEFAULT_STATUS_REFETCH_INTERVAL,
+      })
+      .thenReturn({
+        data: {
+          data: {
+            id: NON_DETERMINISTIC_RUN_ID,
+            status: RUN_STATUS_SUCCEEDED,
+          },
+        },
+      } as any)
+
     vi.mocked(useRunningStepCounts).mockReturnValue({
       totalStepCount: 10,
       currentStepNumber: 10,
       hasRunDiverged: false,
     })
     render(props)
-    screen.getByText('Final Step 10/10:')
+    expect(screen.queryByText(/Step/)).toBeNull()
   })
 
-  it('should render the correct step info when the run is cancelled before running', () => {
+  it('should render no text when the run is cancelled before running', () => {
     vi.mocked(useCommandQuery).mockReturnValue({ data: null } as any)
-    vi.mocked(useRunStatus).mockReturnValue(RUN_STATUS_STOPPED)
+    when(vi.mocked(useNotifyRunQuery))
+      .calledWith(NON_DETERMINISTIC_RUN_ID, {
+        refetchInterval: DEFAULT_STATUS_REFETCH_INTERVAL,
+      })
+      .thenReturn({
+        data: {
+          data: {
+            id: NON_DETERMINISTIC_RUN_ID,
+            status: RUN_STATUS_STOPPED,
+          },
+        },
+      } as any)
     render(props)
-    screen.getByText('Final Step: N/A')
+    expect(screen.queryByText(/Step/)).toBeNull()
   })
 })

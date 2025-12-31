@@ -1,27 +1,29 @@
-import type * as React from 'react'
-import { describe, it, vi, beforeEach } from 'vitest'
 import { screen } from '@testing-library/react'
+import { beforeEach, describe, it, vi } from 'vitest'
 
-import { mockRecoveryContentProps } from '../../__fixtures__'
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { SkipStepSameTips } from '../SkipStepSameTips'
+import { SkipStepInfo } from '/app/organisms/ErrorRecoveryFlows/shared'
+
+import { mockRecoveryContentProps } from '../../__fixtures__'
 import { RECOVERY_MAP } from '../../constants'
 import { SelectRecoveryOption } from '../SelectRecoveryOption'
-import { SkipStepInfo } from '/app/organisms/ErrorRecoveryFlows/shared'
+import { SkipStepSameTips } from '../SkipStepSameTips'
+
+import type { ComponentProps } from 'react'
 
 vi.mock('/app/molecules/Command')
 vi.mock('/app/organisms/ErrorRecoveryFlows/shared')
 vi.mock('../SelectRecoveryOption')
 
-const render = (props: React.ComponentProps<typeof SkipStepSameTips>) => {
+const render = (props: ComponentProps<typeof SkipStepSameTips>) => {
   return renderWithProviders(<SkipStepSameTips {...props} />, {
     i18nInstance: i18n,
   })[0]
 }
 
 describe('SkipStepSameTips', () => {
-  let props: React.ComponentProps<typeof SkipStepSameTips>
+  let props: ComponentProps<typeof SkipStepSameTips>
 
   beforeEach(() => {
     props = {

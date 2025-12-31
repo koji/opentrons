@@ -16,11 +16,21 @@ Protocols
    :members:
    :exclude-members: location_cache, cleanup, clear_commands
 
+.. autoclass:: opentrons.protocol_api.Task
+   :members:
+
 Instruments
 ===========
 .. autoclass:: opentrons.protocol_api.InstrumentContext
    :members:
    :exclude-members: delay
+
+Robot Motors
+============
+
+.. autoclass:: opentrons.protocol_api.RobotContext
+   :members: 
+   :exclude-members: 
 
 .. _protocol-api-labware:
 
@@ -48,34 +58,69 @@ Wells and Liquids
 
 .. autoclass:: opentrons.protocol_api.Liquid
 
+.. autoclass:: opentrons.protocol_api.LiquidClass
+   :members: get_for
+
 .. _protocol-api-modules:
 
 Modules
 =======
+
+Absorbance Plate Reader
+-----------------------
+
+.. autoclass:: opentrons.protocol_api.AbsorbanceReaderContext
+   :members:
+   :exclude-members: broker, geometry, load_labware_object, load_adapter, load_adapter_from_definition
+   :inherited-members:
+
+
+Flex Stacker
+------------
+
+.. autoclass:: opentrons.protocol_api.FlexStackerContext
+   :members:
+   :exclude-members: calibrate, broker, geometry, load_labware_object
+   :inherited-members:
+
+Heater-Shaker
+-------------
 
 .. autoclass:: opentrons.protocol_api.HeaterShakerContext
    :members:
    :exclude-members: broker, geometry, load_labware_object
    :inherited-members:
 
+Magnetic Block
+--------------
+
 .. autoclass:: opentrons.protocol_api.MagneticBlockContext
    :members:
    :exclude-members: broker, geometry, load_labware_object
    :inherited-members:
+
+Magnetic Module
+---------------
 
 .. autoclass:: opentrons.protocol_api.MagneticModuleContext
    :members:
    :exclude-members: calibrate, broker, geometry, load_labware_object
    :inherited-members:
 
+Temperature Module
+------------------
+
 .. autoclass:: opentrons.protocol_api.TemperatureModuleContext
    :members:
-   :exclude-members: start_set_temperature, await_temperature, broker, geometry, load_labware_object
+   :exclude-members: await_temperature, broker, geometry, load_labware_object
    :inherited-members:
+
+Thermocycler
+------------
 
 .. autoclass:: opentrons.protocol_api.ThermocyclerContext
    :members:
-   :exclude-members: total_step_count, current_cycle_index, total_cycle_count, hold_time, ramp_rate, current_step_index, broker, geometry, load_labware_object
+   :exclude-members: total_step_count, current_cycle_index, total_cycle_count, hold_time, ramp_rate, current_step_index, broker, geometry, load_labware_object, load_adapter, load_adapter_from_definition
    :inherited-members:
    
 
@@ -96,6 +141,8 @@ Useful Types
 
 .. autodata:: opentrons.protocol_api.OFF_DECK
    :no-value:
+
+.. autoclass:: opentrons.protocol_api.OffDeckType
 
 Executing and Simulating Protocols
 ==================================

@@ -1,8 +1,9 @@
 // app info card with version and updated
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { useSelector, useDispatch } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
+import uuidv1 from 'uuid/v4'
 
 import {
   ALIGN_CENTER,
@@ -15,42 +16,39 @@ import {
   DropdownMenu,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
-  Link,
-  SPACING_AUTO,
-  SPACING,
   LegacyStyledText,
+  Link,
+  SPACING,
+  SPACING_AUTO,
   TYPOGRAPHY,
   useMountEffect,
 } from '@opentrons/components'
 
+import { getTopPortalEl } from '/app/App/portal'
 import { TertiaryButton, ToggleButton } from '/app/atoms/buttons'
 import { ExternalLink } from '/app/atoms/Link/ExternalLink'
 import { Divider } from '/app/atoms/structure'
 import { LANGUAGES } from '/app/i18n'
-import {
-  CURRENT_VERSION,
-  getAvailableShellUpdate,
-  checkShellUpdate,
-} from '/app/redux/shell'
+import { ConnectRobotSlideout } from '/app/organisms/Desktop/AppSettings/ConnectRobotSlideout'
+import { PreviousVersionModal } from '/app/organisms/Desktop/AppSettings/PreviousVersionModal'
+import { UpdateAppModal } from '/app/organisms/Desktop/UpdateAppModal'
 import {
   ALERT_APP_UPDATE_AVAILABLE,
-  getAlertIsPermanentlyIgnored,
   alertPermanentlyIgnored,
   alertUnignored,
+  getAlertIsPermanentlyIgnored,
 } from '/app/redux/alerts'
 import {
-  useTrackEvent,
   ANALYTICS_APP_UPDATE_NOTIFICATIONS_TOGGLED,
+  ANALYTICS_LANGUAGE_UPDATED_DESKTOP_APP_SETTINGS,
+  useTrackEvent,
 } from '/app/redux/analytics'
+import { getAppLanguage, updateConfigValue } from '/app/redux/config'
 import {
-  getAppLanguage,
-  updateConfigValue,
-  useFeatureFlag,
-} from '/app/redux/config'
-import { UpdateAppModal } from '/app/organisms/Desktop/UpdateAppModal'
-import { PreviousVersionModal } from '/app/organisms/Desktop/AppSettings/PreviousVersionModal'
-import { ConnectRobotSlideout } from '/app/organisms/Desktop/AppSettings/ConnectRobotSlideout'
-import { getTopPortalEl } from '/app/App/portal'
+  checkShellUpdate,
+  CURRENT_VERSION,
+  getAvailableShellUpdate,
+} from '/app/redux/shell'
 
 import type { Dispatch, State } from '/app/redux/types'
 
@@ -59,31 +57,37 @@ const GITHUB_LINK =
   'https://github.com/Opentrons/opentrons/blob/edge/app-shell/build/release-notes.md'
 
 const ENABLE_APP_UPDATE_NOTIFICATIONS = 'Enable app update notifications'
+const uuid: () => string = uuidv1
 
 export function GeneralSettings(): JSX.Element {
   const { t } = useTranslation(['app_settings', 'shared', 'branded'])
   const dispatch = useDispatch<Dispatch>()
   const trackEvent = useTrackEvent()
-  const [
-    showPreviousVersionModal,
-    setShowPreviousVersionModal,
-  ] = useState<boolean>(false)
+  const [showPreviousVersionModal, setShowPreviousVersionModal] =
+    useState<boolean>(false)
   const updateAvailable = Boolean(useSelector(getAvailableShellUpdate))
 
-  const enableLocalization = useFeatureFlag('enableLocalization')
   const appLanguage = useSelector(getAppLanguage)
   const currentLanguageOption = LANGUAGES.find(lng => lng.value === appLanguage)
-
+  let transactionId = ''
+  useEffect(() => {
+    transactionId = uuid()
+  }, [])
   const handleDropdownClick = (value: string): void => {
     dispatch(updateConfigValue('language.appLanguage', value))
+    trackEvent({
+      name: ANALYTICS_LANGUAGE_UPDATED_DESKTOP_APP_SETTINGS,
+      properties: {
+        language: value,
+        transactionId,
+      },
+    })
   }
 
-  const [showUpdateBanner, setShowUpdateBanner] = useState<boolean>(
-    updateAvailable
-  )
-  const [showConnectRobotSlideout, setShowConnectRobotSlideout] = useState(
-    false
-  )
+  const [showUpdateBanner, setShowUpdateBanner] =
+    useState<boolean>(updateAvailable)
+  const [showConnectRobotSlideout, setShowConnectRobotSlideout] =
+    useState(false)
 
   // may be enabled, disabled, or unknown (because config is loading)
   const updateAlertEnabled = useSelector((s: State) => {
@@ -167,13 +171,13 @@ export function GeneralSettings(): JSX.Element {
                 {t('software_version')}
               </LegacyStyledText>
               <LegacyStyledText
-                as="p"
+                forwardedAs="p"
                 paddingBottom={SPACING.spacing8}
                 id="GeneralSettings_currentVersion"
               >
                 {CURRENT_VERSION}
               </LegacyStyledText>
-              <LegacyStyledText as="p">
+              <LegacyStyledText forwardedAs="p">
                 {t('shared:view_latest_release_notes')}
                 <Link
                   external
@@ -206,7 +210,7 @@ export function GeneralSettings(): JSX.Element {
             )}
           </Flex>
           <Box width="70%">
-            <LegacyStyledText as="p" paddingY={SPACING.spacing8}>
+            <LegacyStyledText forwardedAs="p" paddingY={SPACING.spacing8}>
               {t('manage_versions')}
             </LegacyStyledText>
           </Box>
@@ -243,7 +247,7 @@ export function GeneralSettings(): JSX.Element {
           alignItems={ALIGN_CENTER}
           justifyContent={JUSTIFY_SPACE_BETWEEN}
         >
-          <LegacyStyledText as="p">
+          <LegacyStyledText forwardedAs="p">
             {t('branded:receive_alert')}
           </LegacyStyledText>
           <ToggleButton
@@ -277,11 +281,12 @@ export function GeneralSettings(): JSX.Element {
           </TertiaryButton>
         </Flex>
         <Divider marginY={SPACING.spacing24} />
-        {enableLocalization && currentLanguageOption != null ? (
+        {currentLanguageOption != null ? (
           <>
             <Flex
               flexDirection={DIRECTION_ROW}
               justifyContent={JUSTIFY_SPACE_BETWEEN}
+              gridGap={SPACING.spacing24}
             >
               <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing8}>
                 <LegacyStyledText
@@ -290,7 +295,7 @@ export function GeneralSettings(): JSX.Element {
                 >
                   {t('app_language_preferences')}
                 </LegacyStyledText>
-                <LegacyStyledText as="p">
+                <LegacyStyledText forwardedAs="p">
                   {t('app_language_description')}
                 </LegacyStyledText>
               </Flex>

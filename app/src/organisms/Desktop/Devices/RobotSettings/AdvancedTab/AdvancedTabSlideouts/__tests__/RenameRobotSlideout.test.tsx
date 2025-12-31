@@ -1,10 +1,15 @@
 import { MemoryRouter } from 'react-router-dom'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
-import { describe, it, vi, expect, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import '@testing-library/jest-dom/vitest'
+
+import { OT2_ROBOT_TYPE } from '@opentrons/shared-data'
+
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { useTrackEvent, ANALYTICS_RENAME_ROBOT } from '/app/redux/analytics'
+import { useIsFlex } from '/app/redux-resources/robots'
+import { ANALYTICS_RENAME_ROBOT, useTrackEvent } from '/app/redux/analytics'
 import {
   getConnectableRobots,
   getReachableRobots,
@@ -16,7 +21,6 @@ import {
 } from '/app/redux/discovery/__fixtures__'
 
 import { RenameRobotSlideout } from '../RenameRobotSlideout'
-import { useIsFlex } from '/app/redux-resources/robots'
 
 vi.mock('/app/redux/discovery/selectors')
 vi.mock('/app/redux/analytics')
@@ -111,7 +115,11 @@ describe('RobotSettings RenameRobotSlideout', () => {
     await waitFor(() => {
       expect(mockTrackEvent).toHaveBeenCalledWith({
         name: ANALYTICS_RENAME_ROBOT,
-        properties: { newRobotName: 'mockInput', previousRobotName: 'otie' },
+        properties: {
+          newRobotName: 'mockInput',
+          previousRobotName: 'otie',
+          robotType: OT2_ROBOT_TYPE,
+        },
       })
     })
   })

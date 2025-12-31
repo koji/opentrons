@@ -1,24 +1,27 @@
-import type * as React from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, vi, expect, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import '@testing-library/jest-dom/vitest'
+
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 import { resetConfig } from '/app/redux/robot-admin'
 import { useDispatchApiRequest } from '/app/redux/robot-api'
+
 import { DeviceResetModal } from '../DeviceResetModal'
 
+import type { ComponentProps } from 'react'
 import type { DispatchApiRequestType } from '/app/redux/robot-api'
 
 vi.mock('/app/redux-resources/robots')
 vi.mock('/app/redux/robot-admin')
 vi.mock('/app/redux/robot-api')
 
-const mockResetOptions = {}
+const mockResetOptions = { resetLabwareOffsets: false, settingsResets: {} }
 const mockCloseModal = vi.fn()
 const ROBOT_NAME = 'otie'
-const render = (props: React.ComponentProps<typeof DeviceResetModal>) => {
+const render = (props: ComponentProps<typeof DeviceResetModal>) => {
   return renderWithProviders(
     <MemoryRouter>
       <DeviceResetModal {...props} />
@@ -42,15 +45,20 @@ describe('RobotSettings DeviceResetModal', () => {
       resetOptions: mockResetOptions,
     })
     screen.getByText('Reset to factory settings?')
-    screen.getByText('This data cannot be retrieved later.')
+    screen.getByText(
+      'Resetting will erase all saved data and restart the robot. This action is permanent and cannot be undone.'
+    )
     screen.getByRole('button', { name: 'cancel' })
-    screen.getByRole('button', { name: 'Yes, clear data and restart robot' })
+    screen.getByRole('button', { name: 'Confirm' })
   })
 
   it('should close the modal when the user clicks the Yes button', () => {
     const clearMockResetOptions = {
-      bootScript: true,
-      deckCalibration: true,
+      resetLabwareOffsets: false,
+      settingsResets: {
+        bootScript: true,
+        deckCalibration: true,
+      },
     }
     render({
       closeModal: mockCloseModal,
@@ -59,7 +67,7 @@ describe('RobotSettings DeviceResetModal', () => {
       resetOptions: clearMockResetOptions,
     })
     const clearDataAndRestartRobotButton = screen.getByRole('button', {
-      name: 'Yes, clear data and restart robot',
+      name: 'Confirm',
     })
     fireEvent.click(clearDataAndRestartRobotButton)
     expect(dispatchApiRequest).toBeCalledWith(
@@ -99,7 +107,10 @@ describe('RobotSettings DeviceResetModal', () => {
       closeModal: mockCloseModal,
       isRobotReachable: false,
       robotName: ROBOT_NAME,
-      resetOptions: {},
+      resetOptions: {
+        resetLabwareOffsets: false,
+        settingsResets: {},
+      },
     })
     screen.getByText('Connection to robot lost')
     screen.getByText(
@@ -113,7 +124,10 @@ describe('RobotSettings DeviceResetModal', () => {
       closeModal: mockCloseModal,
       isRobotReachable: false,
       robotName: ROBOT_NAME,
-      resetOptions: {},
+      resetOptions: {
+        resetLabwareOffsets: false,
+        settingsResets: {},
+      },
     })
 
     const closeButton = screen.getByRole('button', { name: 'close' })
@@ -126,7 +140,10 @@ describe('RobotSettings DeviceResetModal', () => {
       closeModal: mockCloseModal,
       isRobotReachable: false,
       robotName: ROBOT_NAME,
-      resetOptions: {},
+      resetOptions: {
+        resetLabwareOffsets: false,
+        settingsResets: {},
+      },
     })
     const closeIconButton = screen.getByTestId(
       'ModalHeader_icon_close_Connection to robot lost'

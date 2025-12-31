@@ -1,33 +1,41 @@
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 
-import {
-  RUN_STATUS_IDLE,
-  RUN_STATUS_RUNNING,
-  RUN_STATUS_STOP_REQUESTED,
-  RUN_STATUS_STOPPED,
-} from '@opentrons/api-client'
+import { RUN_STATUS_IDLE } from '@opentrons/api-client'
+import { useAddCameraSettingsToRunMutation } from '@opentrons/react-api-client'
 
+import {
+  isModuleConfirmationStatus,
+  isRunAgainStatus,
+  isRunningOrRecoveryStatus,
+  isStartRunStatus,
+  isStopRequestedStatus,
+} from '/app/local-resources/runs/utils'
+import { useIsHeaterShakerInProtocol } from '/app/organisms/ModuleCard/hooks'
+import { useToaster } from '/app/organisms/ToasterOven'
+import { useTrackProtocolRunEvent } from '/app/redux-resources/analytics'
+import {
+  SOURCE_RUN_RECORD,
+  useCameraAnalytics,
+} from '/app/redux-resources/analytics/'
+import { useRobotType } from '/app/redux-resources/robots'
 import {
   ANALYTICS_PROTOCOL_PROCEED_TO_RUN,
   ANALYTICS_PROTOCOL_RUN_ACTION,
   useTrackEvent,
 } from '/app/redux/analytics'
-import { useTrackProtocolRunEvent } from '/app/redux-resources/analytics'
-import { getMissingSetupSteps } from '/app/redux/protocol-runs'
-import { useIsHeaterShakerInProtocol } from '/app/organisms/ModuleCard/hooks'
-import { isAnyHeaterShakerShaking } from '../../../RunHeaderModalContainer/modals'
 import {
-  isRecoveryStatus,
-  isRunAgainStatus,
-  isStartRunStatus,
-} from '../../../utils'
+  getCameraUsageState,
+  getMissingSetupSteps,
+} from '/app/redux/protocol-runs'
+
+import { isAnyHeaterShakerShaking } from '../../../RunHeaderModalContainer/modals'
+import { useActionBtnDisabledUtils } from './useActionBtnDisabledUtils'
 
 import type { IconName } from '@opentrons/components'
-import type { BaseActionButtonProps } from '..'
-import type { State } from '/app/redux/types'
 import type { StepKey } from '/app/redux/protocol-runs'
+import type { State } from '/app/redux/types'
+import type { BaseActionButtonProps } from '..'
 
 interface UseButtonPropertiesProps extends BaseActionButtonProps {
   isProtocolNotReady: boolean
@@ -39,7 +47,9 @@ interface UseButtonPropertiesProps extends BaseActionButtonProps {
   isValidRunAgain: boolean
   isOtherRunCurrent: boolean
   isRobotOnWrongVersionOfSoftware: boolean
+  areCameraPreferencesConfirmed: boolean
   isClosingCurrentRun: boolean
+  isCameraReadyToRun: boolean
 }
 
 // Returns ActionButton properties.
@@ -48,8 +58,13 @@ export function useActionButtonProperties({
   runStatus,
   robotName,
   runId,
+  currentRunId,
+  isOtherRunCurrent,
+  isRobotOnWrongVersionOfSoftware,
   confirmAttachment,
   confirmMissingSteps,
+  makeHandleJumpToStep,
+  runRecord,
   robotAnalyticsData,
   robotSerialNumber,
   protocolRunControls,
@@ -57,40 +72,93 @@ export function useActionButtonProperties({
   runHeaderModalContainerUtils,
   isResetRunLoadingRef,
   isClosingCurrentRun,
+  areCameraPreferencesConfirmed,
+  isValidRunAgain,
+  protocolRunHeaderRef,
+  isCameraReadyToRun,
 }: UseButtonPropertiesProps): {
   buttonText: string
   handleButtonClick: () => void
   buttonIconName: IconName | null
 } {
   const { t } = useTranslation(['run_details', 'shared'])
-  const navigate = useNavigate()
   const { play, pause, reset } = protocolRunControls
   const { trackProtocolRunEvent } = useTrackProtocolRunEvent(runId, robotName)
+  const robotType = useRobotType(robotName)
+  const { reportCameraEnablementSettings } = useCameraAnalytics({
+    source: SOURCE_RUN_RECORD,
+    robotType: robotType,
+  })
   const isHeaterShakerInProtocol = useIsHeaterShakerInProtocol()
   const isHeaterShakerShaking = isAnyHeaterShakerShaking(attachedModules)
   const trackEvent = useTrackEvent()
   const missingSetupSteps = useSelector<State, StepKey[]>((state: State) =>
     getMissingSetupSteps(state, runId)
   )
-
+  const { addCameraSettingsToRun } = useAddCameraSettingsToRunMutation()
+  const runCameraSettings = useSelector((state: State) =>
+    getCameraUsageState(state, runId)
+  )
   let buttonText = ''
   let handleButtonClick = (): void => {}
   let buttonIconName: IconName | null = null
+  console.log('🚀 ~ handlePlay ~ runStatus:', runStatus)
+
+  const handlePlay = (): void => {
+    play()
+    trackProtocolRunEvent({
+      name:
+        runStatus === RUN_STATUS_IDLE
+          ? ANALYTICS_PROTOCOL_RUN_ACTION.START
+          : ANALYTICS_PROTOCOL_RUN_ACTION.RESUME,
+      properties:
+        runStatus === RUN_STATUS_IDLE && robotAnalyticsData != null
+          ? robotAnalyticsData
+          : {},
+    })
+    const { enabled, recoveryEnabled, liveStreamEnabled } = runCameraSettings
+    reportCameraEnablementSettings({
+      cameraEnabled: enabled,
+      liveFeedEnabled: liveStreamEnabled,
+      recoveryCaptureEnabled: recoveryEnabled,
+    })
+  }
+  const isSetupComplete = !missingSetupSteps || missingSetupSteps.length === 0
+  const { makeSnackbar } = useToaster()
+  const { isDisabled, disabledReason } = useActionBtnDisabledUtils({
+    robotName,
+    runId,
+    isValidRunAgain,
+    isSetupComplete,
+    isOtherRunCurrent,
+    isProtocolNotReady,
+    isRobotOnWrongVersionOfSoftware,
+    isClosingCurrentRun,
+    makeHandleJumpToStep,
+    runRecord,
+    runStatus,
+    isResetRunLoadingRef,
+    protocolRunHeaderRef,
+    attachedModules,
+    protocolRunControls,
+    runHeaderModalContainerUtils,
+    isCameraReadyToRun,
+  })
 
   if (isProtocolNotReady) {
     buttonIconName = 'ot-spinner'
     buttonText = t('analyzing_on_robot')
   } else if (isClosingCurrentRun) {
     buttonIconName = 'ot-spinner'
-    buttonText = t('canceling_run')
-  } else if (runStatus === RUN_STATUS_RUNNING || isRecoveryStatus(runStatus)) {
+    buttonText = t('shared:robot_is_busy')
+  } else if (isRunningOrRecoveryStatus(runStatus)) {
     buttonIconName = 'pause'
     buttonText = t('pause_run')
     handleButtonClick = () => {
       pause()
       trackProtocolRunEvent({ name: ANALYTICS_PROTOCOL_RUN_ACTION.PAUSE })
     }
-  } else if (runStatus === RUN_STATUS_STOP_REQUESTED) {
+  } else if (isStopRequestedStatus(runStatus)) {
     buttonIconName = 'ot-spinner'
     buttonText = t('canceling_run')
   } else if (isStartRunStatus(runStatus)) {
@@ -98,32 +166,44 @@ export function useActionButtonProperties({
     buttonText =
       runStatus === RUN_STATUS_IDLE ? t('start_run') : t('resume_run')
     handleButtonClick = () => {
+      if (isDisabled && disabledReason) {
+        makeSnackbar(disabledReason)
+        return
+      }
       if (isHeaterShakerShaking && isHeaterShakerInProtocol) {
         runHeaderModalContainerUtils.HSRunningModalUtils.toggleModal?.()
       } else if (
         missingSetupSteps.length !== 0 &&
-        (runStatus === RUN_STATUS_IDLE || runStatus === RUN_STATUS_STOPPED)
+        isModuleConfirmationStatus(runStatus)
       ) {
         confirmMissingSteps()
       } else if (
         isHeaterShakerInProtocol &&
         !isHeaterShakerShaking &&
-        (runStatus === RUN_STATUS_IDLE || runStatus === RUN_STATUS_STOPPED)
+        isModuleConfirmationStatus(runStatus)
       ) {
         confirmAttachment()
+      }
+      // Camera settings do not require explicit confirmation by *any* user,
+      // so if the settings haven't been confirmed, use this user's settings
+      // before starting the run.
+      else if (!areCameraPreferencesConfirmed) {
+        const { enabled, recoveryEnabled, liveStreamEnabled } =
+          runCameraSettings
+
+        addCameraSettingsToRun(
+          {
+            runId,
+            settings: {
+              liveStreamEnabled,
+              cameraEnabled: enabled,
+              errorRecoveryCameraEnabled: recoveryEnabled,
+            },
+          },
+          { onSettled: handlePlay }
+        )
       } else {
-        play()
-        navigate(`/devices/${robotName}/protocol-runs/${runId}/run-preview`)
-        trackProtocolRunEvent({
-          name:
-            runStatus === RUN_STATUS_IDLE
-              ? ANALYTICS_PROTOCOL_RUN_ACTION.START
-              : ANALYTICS_PROTOCOL_RUN_ACTION.RESUME,
-          properties:
-            runStatus === RUN_STATUS_IDLE && robotAnalyticsData != null
-              ? robotAnalyticsData
-              : {},
-        })
+        handlePlay()
       }
     }
   } else if (isRunAgainStatus(runStatus)) {
@@ -132,6 +212,7 @@ export function useActionButtonProperties({
     handleButtonClick = () => {
       isResetRunLoadingRef.current = true
       reset()
+      runHeaderModalContainerUtils.dropTipUtils.resetTipStatus()
       trackEvent({
         name: ANALYTICS_PROTOCOL_PROCEED_TO_RUN,
         properties: { sourceLocation: 'RunRecordDetail', robotSerialNumber },
@@ -141,6 +222,5 @@ export function useActionButtonProperties({
       })
     }
   }
-
   return { buttonText, handleButtonClick, buttonIconName }
 }

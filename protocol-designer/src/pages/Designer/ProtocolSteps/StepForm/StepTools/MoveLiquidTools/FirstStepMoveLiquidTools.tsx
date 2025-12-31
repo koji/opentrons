@@ -1,0 +1,126 @@
+import { useTranslation } from 'react-i18next'
+import { useSelector } from 'react-redux'
+
+import { DIRECTION_COLUMN, Divider, Flex, SPACING } from '@opentrons/components'
+
+import {
+  getAdditionalEquipmentEntities,
+  getPipetteEntities,
+} from '/protocol-designer/step-forms/selectors'
+
+import {
+  LabwareField,
+  PartialTipField,
+  PathField,
+  PipetteField,
+  TiprackField,
+  VolumeField,
+  WellSelectionField,
+} from '../../PipetteFields'
+
+import type { FormData } from '/protocol-designer/form-types'
+import type { FieldPropsByName } from '../../types'
+
+interface FirstStepMoveLiquidToolsProps {
+  propsForFields: FieldPropsByName
+  formData: FormData
+}
+
+export function FirstStepMoveLiquidTools({
+  propsForFields,
+  formData,
+}: FirstStepMoveLiquidToolsProps): JSX.Element {
+  const { t } = useTranslation('protocol_steps')
+  const pipettes = useSelector(getPipetteEntities)
+  const additionalEquipmentEntities = useSelector(
+    getAdditionalEquipmentEntities
+  )
+
+  const { pipette, tipRack } = propsForFields
+  const channels =
+    pipette.value != null
+      ? pipettes[String(pipette.value)]?.spec.channels
+      : null
+  const isDisposalLocation =
+    additionalEquipmentEntities[String(propsForFields.dispense_labware.value)]
+      ?.name === 'wasteChute' ||
+    additionalEquipmentEntities[String(propsForFields.dispense_labware.value)]
+      ?.name === 'trashBin'
+
+  return (
+    <Flex
+      flexDirection={DIRECTION_COLUMN}
+      gridGap={SPACING.spacing12}
+      paddingY={SPACING.spacing16}
+    >
+      <PipetteField {...propsForFields.pipette} />
+      {channels != null && channels !== 1 ? (
+        <>
+          <Divider marginY="0" />
+          <PartialTipField
+            {...propsForFields.nozzles}
+            pipetteSpecs={pipettes[String(propsForFields.pipette.value)]?.spec}
+          />
+        </>
+      ) : null}
+      <Divider marginY="0" />
+      <TiprackField {...tipRack} pipetteId={pipette.value} />
+      <Divider marginY="0" />
+      <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing12}>
+        <LabwareField {...propsForFields.aspirate_labware} />
+        <WellSelectionField
+          {...propsForFields.aspirate_wells}
+          labwareId={
+            typeof propsForFields.aspirate_labware.value === 'string'
+              ? propsForFields.aspirate_labware.value
+              : null
+          }
+          pipetteId={formData.pipette}
+          nozzles={
+            typeof propsForFields.nozzles.value === 'string'
+              ? propsForFields.nozzles.value
+              : null
+          }
+          hasFormError={propsForFields.aspirate_wells.errorToShow != null}
+        />
+      </Flex>
+      <Divider marginY="0" />
+      <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing12}>
+        <LabwareField {...propsForFields.dispense_labware} />
+        {isDisposalLocation ? null : (
+          <WellSelectionField
+            {...propsForFields.dispense_wells}
+            labwareId={
+              typeof propsForFields.dispense_labware.value === 'string'
+                ? propsForFields.dispense_labware.value
+                : null
+            }
+            pipetteId={formData.pipette}
+            nozzles={
+              typeof propsForFields.nozzles.value === 'string'
+                ? propsForFields.nozzles.value
+                : null
+            }
+            hasFormError={propsForFields.dispense_wells.errorToShow != null}
+          />
+        )}
+      </Flex>
+      <Divider marginY="0" />
+      <PathField
+        {...propsForFields.path}
+        aspirate_airGap_checkbox={formData.aspirate_airGap_checkbox}
+        aspirate_airGap_volume={formData.aspirate_airGap_volume}
+        aspirate_wells={formData.aspirate_wells}
+        changeTip={formData.changeTip}
+        dispense_wells={formData.dispense_wells}
+        pipette={formData.pipette}
+        volume={formData.volume}
+        tipRack={formData.tipRack}
+        isDisposalLocation={isDisposalLocation}
+        title={t('pipette_path')}
+      />
+      <Divider marginY="0" />
+      <VolumeField fieldProps={propsForFields.volume} path={formData.path} />
+    </Flex>
+  )
+}

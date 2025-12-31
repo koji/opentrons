@@ -1,27 +1,26 @@
+import { useTranslation } from 'react-i18next'
 import { useDispatch } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
-
-import {
-  useTrackEvent,
-  ANALYTICS_DESKTOP_APP_ERROR,
-} from '/app/redux/analytics'
-
-import type { FallbackProps } from 'react-error-boundary'
 
 import {
   AlertPrimaryButton,
   ALIGN_FLEX_END,
   DIRECTION_COLUMN,
   Flex,
-  SPACING,
   LegacyStyledText,
-  TYPOGRAPHY,
   Modal,
+  SPACING,
+  TYPOGRAPHY,
 } from '@opentrons/components'
 
+import { useSentryReport } from '/app/App/hooks'
+import {
+  ANALYTICS_DESKTOP_APP_ERROR,
+  useTrackEvent,
+} from '/app/redux/analytics'
 import { reloadUi } from '/app/redux/shell'
 
+import type { FallbackProps } from 'react-error-boundary'
 import type { Dispatch } from '/app/redux/types'
 
 export function DesktopAppFallback({ error }: FallbackProps): JSX.Element {
@@ -39,14 +38,19 @@ export function DesktopAppFallback({ error }: FallbackProps): JSX.Element {
     dispatch(reloadUi(error.message as string))
   }
 
+  useSentryReport(error)
+
   return (
     <Modal type="warning" title={t('error_boundary_title')} marginLeft="0">
       <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing32}>
         <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing8}>
-          <LegacyStyledText as="p">
+          <LegacyStyledText forwardedAs="p">
             {t('error_boundary_desktop_app_description')}
           </LegacyStyledText>
-          <LegacyStyledText as="p" fontWeight={TYPOGRAPHY.fontWeightSemiBold}>
+          <LegacyStyledText
+            forwardedAs="p"
+            fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+          >
             {error.message}
           </LegacyStyledText>
         </Flex>

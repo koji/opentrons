@@ -1,25 +1,43 @@
 import { useRef } from 'react'
+
 import { Svg } from '../../primitives'
 
 import type { ReactNode } from 'react'
 import type { DeckDefinition, DeckSlot } from '@opentrons/shared-data'
+import type { SvgProps } from '../../primitives'
 
 export interface RobotCoordinateSpaceWithRefRenderProps {
   deckSlotsById: { [slotId: string]: DeckSlot }
 }
 
-interface RobotCoordinateSpaceWithRefProps
-  extends React.ComponentProps<typeof Svg> {
-  viewBox?: string | null
+interface RobotCoordinateSpaceWithRefProps extends SvgProps {
+  viewBox?: string
   deckDef?: DeckDefinition
   zoomed?: boolean
+  adjustViewBoxForStacker?: boolean
   children?: (props: RobotCoordinateSpaceWithRefRenderProps) => ReactNode
+}
+
+// manual visual adjustments for flex stacker deck view to fit properly and
+// in the center of the frame
+const STACKER_VIEWBOX_ADJUSTMENTS = {
+  viewBoxOriginX: 260,
+  viewBoxOriginY: -25,
+  deckXDimension: -255,
+  deckYDimension: 105,
 }
 
 export function RobotCoordinateSpaceWithRef(
   props: RobotCoordinateSpaceWithRefProps
 ): JSX.Element | null {
-  const { children, deckDef, viewBox, zoomed = false, ...restProps } = props
+  const {
+    children,
+    deckDef,
+    viewBox,
+    adjustViewBoxForStacker = false,
+    zoomed = false,
+    ...restProps
+  } = props
   const wrapperRef = useRef<SVGSVGElement>(null)
 
   if (deckDef == null && viewBox == null) return null
@@ -34,19 +52,23 @@ export function RobotCoordinateSpaceWithRef(
       (acc, deckSlot) => ({ ...acc, [deckSlot.id]: deckSlot }),
       {}
     )
+    const base = [
+      viewBoxOriginX,
+      viewBoxOriginY,
+      deckXDimension,
+      deckYDimension,
+    ] as const
+    const adj = [
+      base[0] + STACKER_VIEWBOX_ADJUSTMENTS.viewBoxOriginX,
+      base[1] + STACKER_VIEWBOX_ADJUSTMENTS.viewBoxOriginY,
+      base[2] + STACKER_VIEWBOX_ADJUSTMENTS.deckXDimension,
+      base[3] + STACKER_VIEWBOX_ADJUSTMENTS.deckYDimension,
+    ] as const
 
-    if (deckDef.otId === 'ot2_standard') {
-      const PADDING = 5
-      wholeDeckViewBox = `${viewBoxOriginX - PADDING} ${
-        viewBoxOriginY + PADDING * 5
-      } ${deckXDimension + PADDING * 2} ${deckYDimension - PADDING * 10}`
-    } else {
-      const PADDING = 20
-      wholeDeckViewBox = `${viewBoxOriginX - PADDING} ${
-        viewBoxOriginY + PADDING
-      } ${deckXDimension + PADDING * 2} ${deckYDimension + PADDING * 2}`
-    }
+    const adjustedViewBox = adjustViewBoxForStacker ? adj : base
+    wholeDeckViewBox = `${adjustedViewBox[0]} ${adjustedViewBox[1]} ${adjustedViewBox[2]} ${adjustedViewBox[3]}`
   }
+
   return (
     <Svg
       viewBox={zoomed ? viewBox : wholeDeckViewBox}

@@ -1,4 +1,5 @@
 """Comment command request, result, and implementation models."""
+
 from __future__ import annotations
 from pydantic import BaseModel, Field
 from typing import Optional, Type
@@ -43,7 +44,7 @@ class Comment(BaseCommand[CommentParams, CommentResult, ErrorOccurrence]):
 
     commandType: CommentCommandType = "comment"
     params: CommentParams
-    result: Optional[CommentResult]
+    result: Optional[CommentResult] = None
 
     _ImplementationCls: Type[CommentImplementation] = CommentImplementation
 

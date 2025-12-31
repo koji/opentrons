@@ -1,5 +1,5 @@
 import typing
-from pydantic import BaseModel, Field
+from pydantic import ConfigDict, BaseModel, Field
 
 
 class TemperatureModuleLiveData(BaseModel):
@@ -27,7 +27,7 @@ class ThermocyclerModuleLiveData(BaseModel):
 
     lid: str = Field(..., description="The current state of the lid")
     lidTarget: typing.Optional[float] = Field(
-        ..., description="The target temperature of the lid temperature " "controller"
+        ..., description="The target temperature of the lid temperature controller"
     )
     lidTemp: float = Field(..., description="The current temperature of the lid")
     currentTemp: float = Field(
@@ -38,11 +38,11 @@ class ThermocyclerModuleLiveData(BaseModel):
     )
     holdTime: typing.Optional[float] = Field(
         ...,
-        description="The time left in the current hold step, if any (in " "seconds)",
+        description="The time left in the current hold step, if any (in seconds)",
     )
     rampRate: typing.Optional[float] = Field(
         ...,
-        description="The current ramp rate (in degC/s) for the " "thermocycler block",
+        description="The current ramp rate (in degC/s) for the thermocycler block",
     )
     currentCycleIndex: typing.Optional[int] = Field(
         ...,
@@ -50,12 +50,11 @@ class ThermocyclerModuleLiveData(BaseModel):
         "programmed sequence",
     )
     totalCycleCount: typing.Optional[int] = Field(
-        ..., description="The total number of cycles within the current " "sequence"
+        ..., description="The total number of cycles within the current sequence"
     )
     currentStepIndex: typing.Optional[int] = Field(
         ...,
-        description="The index of the current step within the current "
-        "programmed cycle",
+        description="The index of the current step within the current programmed cycle",
     )
     totalStepCount: typing.Optional[int] = Field(
         ..., description="The total number of steps within the current cycle"
@@ -96,8 +95,7 @@ ModuleLiveData = typing.Union[
 class PhysicalPort(BaseModel):
     hub: bool = Field(
         ...,
-        description="If a physical USB external hub is"
-        " connected to the raspberry pi",
+        description="If a physical USB external hub is connected to the raspberry pi",
     )
     port: int = Field(
         ...,
@@ -168,9 +166,8 @@ class Modules(BaseModel):
     """A list of all attached modules and the status of each one"""
 
     modules: typing.List[Module]
-
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "examples": [
                 {"modules": []},
                 {
@@ -270,6 +267,7 @@ class Modules(BaseModel):
                 },
             ]
         }
+    )
 
 
 class ModuleSerial(BaseModel):
@@ -288,9 +286,11 @@ class SerialCommand(BaseModel):
     args: typing.Optional[typing.List[typing.Any]] = Field(
         None, description="The ordered args list for the call"
     )
-
-    class Config:
-        schema_extra = {"examples": [{"command_type": "set_Temperature", "args": [60]}]}
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [{"command_type": "set_Temperature", "args": [60]}]
+        }
+    )
 
 
 class SerialCommandResponse(BaseModel):
@@ -300,6 +300,6 @@ class SerialCommandResponse(BaseModel):
     returnValue: typing.Optional[str] = Field(
         None, description="The return value from the call"
     )
-
-    class Config:
-        schema_extra = {"examples": [{"message": "Success", "returnValue": None}]}
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"message": "Success", "returnValue": None}]}
+    )

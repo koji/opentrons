@@ -1,34 +1,49 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
 import {
+  fixture96Plate,
+  fixtureTiprackAdapter,
   HEATERSHAKER_MODULE_TYPE,
   HEATERSHAKER_MODULE_V1,
   TEMPERATURE_MODULE_TYPE,
   TEMPERATURE_MODULE_V1,
   WASTE_CHUTE_CUTOUT,
-  fixture96Plate,
 } from '@opentrons/shared-data'
-import { getSlotInformation } from '../utils'
+
+import {
+  _sortLabwareDropdownOptions,
+  formatTime,
+  getSlotInformation,
+  getUnoccupiedStackOptions,
+} from '../utils'
+
 import type { LabwareDefinition2 } from '@opentrons/shared-data'
-import type { AdditionalEquipmentName } from '@opentrons/step-generation'
+import type {
+  AdditionalEquipmentName,
+  RobotState,
+} from '@opentrons/step-generation'
 import type { AllTemporalPropertiesForTimelineFrame } from '../../../step-forms'
 
 const mockLabOnDeck1 = {
-  slot: 'mockHsId',
+  stack: ['labId', 'mockHsId', '1'],
   id: 'labId',
   labwareDefURI: 'mockUri',
-  def: fixture96Plate as LabwareDefinition2,
+  def: fixtureTiprackAdapter as LabwareDefinition2,
+  pythonName: 'mockPythonName',
 }
 const mockLabOnDeck2 = {
-  slot: 'labId',
+  stack: ['labId2', 'labId', 'mockHsId', '1'],
   id: 'labId2',
   labwareDefURI: 'mockUri2',
   def: fixture96Plate as LabwareDefinition2,
+  pythonName: 'mockPythonName',
 }
 const mockLabOnDeck3 = {
-  slot: '2',
+  stack: ['labId3', '2'],
   id: 'labId3',
   labwareDefURI: 'mockUri3',
-  def: fixture96Plate as LabwareDefinition2,
+  def: fixtureTiprackAdapter as LabwareDefinition2,
+  pythonName: 'mockPythonName',
 }
 const mockHS = {
   id: 'mockHsId',
@@ -36,13 +51,14 @@ const mockHS = {
   type: HEATERSHAKER_MODULE_TYPE,
   slot: '1',
   moduleState: {} as any,
+  pythonName: 'mockPythonName',
 }
 
 const mockOt2DeckSetup: AllTemporalPropertiesForTimelineFrame = {
   labware: {
     labId: mockLabOnDeck1,
-    lab2: mockLabOnDeck2,
-    lab3: mockLabOnDeck3,
+    labId2: mockLabOnDeck2,
+    labId3: mockLabOnDeck3,
   },
   pipettes: {},
   modules: {
@@ -53,6 +69,7 @@ const mockOt2DeckSetup: AllTemporalPropertiesForTimelineFrame = {
       type: TEMPERATURE_MODULE_TYPE,
       slot: '3',
       moduleState: {} as any,
+      pythonName: 'mockPythonName',
     },
   },
   additionalEquipmentOnDeck: {
@@ -61,10 +78,11 @@ const mockOt2DeckSetup: AllTemporalPropertiesForTimelineFrame = {
 }
 
 const mockLabOnStagingArea = {
-  slot: 'D4',
+  stack: ['labId3', 'D4'],
   id: 'labId3',
   labwareDefURI: 'mockUri3',
   def: fixture96Plate as LabwareDefinition2,
+  pythonName: 'mockPythonName',
 }
 const mockHSFlex = {
   id: 'mockHsId',
@@ -72,6 +90,7 @@ const mockHSFlex = {
   type: HEATERSHAKER_MODULE_TYPE,
   slot: 'D1',
   moduleState: {} as any,
+  pythonName: 'mockPythonName',
 }
 const mockTrash = {
   name: 'trashBin' as AdditionalEquipmentName,
@@ -88,11 +107,26 @@ const mockStagingArea = {
   id: 'mockStagingAreaId',
   location: WASTE_CHUTE_CUTOUT,
 }
+const mockLabOnDeck1Flex = {
+  stack: ['labId', 'mockHsId', 'D1'],
+  id: 'labId',
+  labwareDefURI: 'mockUri',
+  def: fixtureTiprackAdapter as LabwareDefinition2,
+  pythonName: 'mockPythonName',
+}
+const mockLabOnDeck2Flex = {
+  stack: ['labId2', 'labId', 'mockHsId', 'D1'],
+  id: 'labId2',
+  labwareDefURI: 'mockUri2',
+  def: fixture96Plate as LabwareDefinition2,
+  pythonName: 'mockPythonName',
+}
+
 const mockFlex2DeckSetup: AllTemporalPropertiesForTimelineFrame = {
   labware: {
-    labId: mockLabOnDeck1,
-    lab2: mockLabOnDeck2,
-    lab3: mockLabOnStagingArea,
+    labId: mockLabOnDeck1Flex,
+    labId2: mockLabOnDeck2Flex,
+    labId3: mockLabOnStagingArea,
   },
   pipettes: {},
   modules: {
@@ -103,6 +137,7 @@ const mockFlex2DeckSetup: AllTemporalPropertiesForTimelineFrame = {
       type: TEMPERATURE_MODULE_TYPE,
       slot: 'C1',
       moduleState: {} as any,
+      pythonName: 'mockPythonName',
     },
   },
   additionalEquipmentOnDeck: {
@@ -117,20 +152,25 @@ describe('getSlotInformation', () => {
     expect(
       getSlotInformation({ deckSetup: mockOt2DeckSetup, slot: '1' })
     ).toEqual({
+      matchingLabwareFor4thColumn: null,
       createdModuleForSlot: mockHS,
-      createdLabwareForSlot: mockLabOnDeck1,
-      createdNestedLabwareForSlot: mockLabOnDeck2,
-      createFixtureForSlots: [],
+      createdAdapterForSlot: mockLabOnDeck1,
+      createdStackForSlot: [mockLabOnDeck2.id],
+      createdFixtureForSlots: [],
       slotPosition: null,
+      isSlotAHopper: false,
     })
   })
   it('renders only a labware for ot-2 on slot 2', () => {
     expect(
       getSlotInformation({ deckSetup: mockOt2DeckSetup, slot: '2' })
     ).toEqual({
-      createdLabwareForSlot: mockLabOnDeck3,
-      createFixtureForSlots: [],
+      matchingLabwareFor4thColumn: null,
+      createdAdapterForSlot: mockLabOnDeck3,
+      createdFixtureForSlots: [],
       slotPosition: null,
+      createdStackForSlot: [],
+      isSlotAHopper: false,
     })
   })
   it('renders no items on the slot for a flex', () => {
@@ -142,45 +182,184 @@ describe('getSlotInformation', () => {
     }
     expect(
       getSlotInformation({ deckSetup: mockDeckSetup, slot: 'A1' })
-    ).toEqual({ slotPosition: null, createFixtureForSlots: [] })
+    ).toEqual({
+      matchingLabwareFor4thColumn: null,
+      slotPosition: null,
+      createdFixtureForSlots: [],
+      createdStackForSlot: [],
+      isSlotAHopper: false,
+    })
+  })
+  it('renders the slot as a hopper', () => {
+    const mockDeckSetup: AllTemporalPropertiesForTimelineFrame = {
+      labware: {},
+      pipettes: {},
+      modules: {},
+      additionalEquipmentOnDeck: {},
+    }
+    expect(
+      getSlotInformation({ deckSetup: mockDeckSetup, slot: 'hopperA4' })
+    ).toEqual({
+      matchingLabwareFor4thColumn: null,
+      slotPosition: null,
+      createdFixtureForSlots: [],
+      createdStackForSlot: [],
+      isSlotAHopper: true,
+    })
   })
   it('renders a trashbin for a Flex on slot A3', () => {
     expect(
       getSlotInformation({ deckSetup: mockFlex2DeckSetup, slot: 'A3' })
     ).toEqual({
+      matchingLabwareFor4thColumn: null,
       slotPosition: null,
-      createFixtureForSlots: [mockTrash],
+      createdFixtureForSlots: [mockTrash],
       preSelectedFixture: 'trashBin',
+      createdStackForSlot: [],
+      isSlotAHopper: false,
     })
   })
   it('renders a h-s, labware and nested labware for a Flex on slot D1', () => {
     expect(
       getSlotInformation({ deckSetup: mockFlex2DeckSetup, slot: 'D1' })
     ).toEqual({
+      matchingLabwareFor4thColumn: null,
       slotPosition: null,
       createdModuleForSlot: mockHSFlex,
-      createdLabwareForSlot: mockLabOnDeck1,
-      createdNestedLabwareForSlot: mockLabOnDeck2,
-      createFixtureForSlots: [],
+      createdAdapterForSlot: mockLabOnDeck1Flex,
+      createdStackForSlot: [mockLabOnDeck2Flex.id],
+      createdFixtureForSlots: [],
+      isSlotAHopper: false,
     })
   })
   it('renders the waste chute and staging area for slot D3 for Flex', () => {
     expect(
       getSlotInformation({ deckSetup: mockFlex2DeckSetup, slot: 'D3' })
     ).toEqual({
+      matchingLabwareFor4thColumn: mockLabOnStagingArea,
       slotPosition: null,
-      createFixtureForSlots: [mockWasteChute, mockStagingArea],
+      createdFixtureForSlots: [mockWasteChute, mockStagingArea],
       preSelectedFixture: 'wasteChuteAndStagingArea',
+      createdStackForSlot: [],
+      isSlotAHopper: false,
     })
   })
   it('renders the staging area with waste chute and labware in slot D4 for flex', () => {
     expect(
       getSlotInformation({ deckSetup: mockFlex2DeckSetup, slot: 'D4' })
     ).toEqual({
+      matchingLabwareFor4thColumn: null,
       slotPosition: null,
-      createdLabwareForSlot: mockLabOnStagingArea,
-      createFixtureForSlots: [mockWasteChute, mockStagingArea],
+      createdStackForSlot: [mockLabOnStagingArea.id],
+      createdFixtureForSlots: [mockWasteChute, mockStagingArea],
       preSelectedFixture: 'wasteChuteAndStagingArea',
+      isSlotAHopper: false,
     })
+  })
+})
+
+describe('formatTime', () => {
+  it('input is 3:3:3 and output is 03:03:03', () => {
+    expect(formatTime('3:3:3')).toEqual('03:03:03')
+  })
+  it('input is 3:3 and output is 03:03', () => {
+    expect(formatTime('3:3')).toEqual('03:03')
+  })
+  it('input is 30:12 and output is 30:12', () => {
+    expect(formatTime('30:12')).toEqual('30:12')
+  })
+  it('input is 12:23:34 and output is 12:23:34', () => {
+    expect(formatTime('12:23:34')).toEqual('12:23:34')
+  })
+  it('input is 0:03 and output is 00:03', () => {
+    expect(formatTime('0:03')).toEqual('00:03')
+  })
+})
+
+describe('_sortLabwareDropdownOptions', () => {
+  const zzzPlateOption = { name: 'Zzz Plate', value: 'zzz' }
+  const aaaPlateOption = { name: 'Aaa Plate', value: 'aaa' }
+  it('should sort labware ids in alphabetical order', () => {
+    const result = _sortLabwareDropdownOptions([aaaPlateOption, zzzPlateOption])
+    expect(result).toEqual([aaaPlateOption, zzzPlateOption])
+  })
+
+  it('should handle {} case', () => {
+    const result = _sortLabwareDropdownOptions([])
+    expect(result).toEqual([])
+  })
+})
+
+const mockT = (key: string) => key
+
+describe('getUnoccupiedStackOptions', () => {
+  const mockRobotState: RobotState = {
+    labware: { labId: { stack: ['labId', 'mockHsId', 'D1'] } },
+    pipettes: {},
+    modules: {},
+    tipState: {} as any,
+    liquidState: {} as any,
+  }
+
+  it('should render a labware on a stack', () => {
+    const mockLabware: AllTemporalPropertiesForTimelineFrame['labware'] = {
+      labId: mockLabOnDeck1Flex,
+      labId2: {
+        ...mockLabOnDeck2Flex,
+        def: {
+          ...fixture96Plate,
+          compatibleParentLabware: [fixtureTiprackAdapter.parameters.loadName],
+        } as LabwareDefinition2,
+      },
+      labId3: mockLabOnStagingArea,
+    }
+    expect(
+      getUnoccupiedStackOptions({
+        robotState: mockRobotState,
+        deckSetupLabware: mockLabware,
+        labwareIdFromDropdown: 'labId2',
+        labwareEntities: mockLabware,
+        t: mockT,
+      })
+    ).toEqual([
+      {
+        name: 'Fixture Flex 96 Tip Rack Adapter',
+        value: 'labId',
+        deckLabel: 'D1',
+      },
+    ])
+  })
+  it('should render no labware', () => {
+    const mockLabware: AllTemporalPropertiesForTimelineFrame['labware'] = {
+      labId: mockLabOnDeck1Flex,
+    }
+    expect(
+      getUnoccupiedStackOptions({
+        robotState: mockRobotState,
+        deckSetupLabware: mockLabware,
+        labwareIdFromDropdown: 'labId',
+        labwareEntities: mockLabware,
+        t: mockT,
+      })
+    ).toEqual([])
+  })
+
+  it('should filter out labware that was moved to a waste chute', () => {
+    const mockLabware: AllTemporalPropertiesForTimelineFrame['labware'] = {
+      labId: mockLabOnDeck1Flex,
+      labId2: {
+        ...mockLabOnDeck2Flex,
+        stack: ['labId2', 'gripperWasteChute'],
+      },
+    }
+    expect(
+      getUnoccupiedStackOptions({
+        robotState: mockRobotState,
+        deckSetupLabware: mockLabware,
+        labwareIdFromDropdown: 'labId',
+        labwareEntities: mockLabware,
+        t: mockT,
+      })
+    ).toEqual([])
   })
 })

@@ -48,8 +48,8 @@ from .ot3utils import (
     moving_pipettes_in_move_group,
     gripper_jaw_state_from_fw,
     get_system_constraints,
-    get_system_constraints_for_calibration,
     get_system_constraints_for_plunger_acceleration,
+    add_delay_to_move_group,
 )
 from .tip_presence_manager import TipPresenceManager
 
@@ -104,7 +104,6 @@ from opentrons_hardware.firmware_bindings.constants import (
     ErrorCode,
     SensorId,
 )
-from opentrons_hardware.sensors.types import SensorDataType
 from opentrons_hardware.firmware_bindings.messages.message_definitions import (
     StopRequest,
 )
@@ -142,6 +141,15 @@ from opentrons.hardware_control.types import (
     EstopState,
     HardwareEventHandler,
     HardwareEventUnsubscriber,
+    PipetteSensorId,
+    PipetteSensorType,
+    PipetteSensorData,
+    PipetteSensorResponseQueue,
+    StatusBarState,
+    StatusBarUpdateListener,
+    StatusBarUpdateUnsubscriber,
+    HepaFanState,
+    HepaUVState,
 )
 from opentrons.hardware_control.errors import (
     InvalidPipetteName,
@@ -164,6 +172,7 @@ from opentrons_hardware.hardware_control.tool_sensors import (
     liquid_probe,
     check_overpressure,
     grab_pressure,
+    touch_probe,
 )
 from opentrons_hardware.hardware_control.rear_panel_settings import (
     get_door_state,
@@ -197,6 +206,7 @@ from opentrons_shared_data.errors.exceptions import (
     PipetteLiquidNotFoundError,
     CommunicationError,
     PythonException,
+    UnsupportedHardwareCommand,
 )
 
 from .subsystem_manager import SubsystemManager
@@ -206,11 +216,20 @@ from ..dev_types import (
     AttachedGripper,
     OT3AttachedInstruments,
 )
-from ..types import HepaFanState, HepaUVState, StatusBarState
 
 from .types import HWStopCondition
 from .flex_protocol import FlexBackend
 from .status_bar_state import StatusBarStateController
+from opentrons_hardware.sensors.sensor_types import (
+    EnvironmentSensor,
+    CapacitiveSensor,
+    PressureSensor,
+)
+from opentrons_hardware.sensors.types import SensorDataType, EnvironmentSensorDataType
+from opentrons_hardware.sensors.sensor_driver import SensorDriver
+from opentrons_hardware.sensors.utils import send_evo_dispense_count_increase
+
+from .. import modules
 
 log = logging.getLogger(__name__)
 
@@ -362,6 +381,7 @@ class OT3Controller(FlexBackend):
                 self._configuration.motion_settings, GantryLoad.LOW_THROUGHPUT
             )
         )
+        self._pressure_sensor_available: Dict[NodeId, bool] = {}
 
     @asynccontextmanager
     async def restore_system_constraints(self) -> AsyncIterator[None]:
@@ -380,18 +400,15 @@ class OT3Controller(FlexBackend):
         async with grab_pressure(channels, tool, self._messenger):
             yield
 
-    def update_constraints_for_calibration_with_gantry_load(
-        self,
-        gantry_load: GantryLoad,
+    def set_pressure_sensor_available(
+        self, pipette_axis: Axis, available: bool
     ) -> None:
-        self._move_manager.update_constraints(
-            get_system_constraints_for_calibration(
-                self._configuration.motion_settings, gantry_load
-            )
-        )
-        log.debug(
-            f"Set system constraints for calibration: {self._move_manager.get_constraints()}"
-        )
+        pip_node = axis_to_node(pipette_axis)
+        self._pressure_sensor_available[pip_node] = available
+
+    def get_pressure_sensor_available(self, pipette_axis: Axis) -> bool:
+        pip_node = axis_to_node(pipette_axis)
+        return self._pressure_sensor_available[pip_node]
 
     def update_constraints_for_gantry_load(self, gantry_load: GantryLoad) -> None:
         self._move_manager.update_constraints(
@@ -399,10 +416,18 @@ class OT3Controller(FlexBackend):
         )
 
     def update_constraints_for_plunger_acceleration(
-        self, mount: OT3Mount, acceleration: float, gantry_load: GantryLoad
+        self,
+        mount: OT3Mount,
+        acceleration: float,
+        gantry_load: GantryLoad,
+        high_speed_pipette: bool = False,
     ) -> None:
         new_constraints = get_system_constraints_for_plunger_acceleration(
-            self._configuration.motion_settings, gantry_load, mount, acceleration
+            self._configuration.motion_settings,
+            gantry_load,
+            mount,
+            acceleration,
+            high_speed_pipette,
         )
         self._move_manager.update_constraints(new_constraints)
 
@@ -597,30 +622,132 @@ class OT3Controller(FlexBackend):
         return axis_convert(self._encoder_position, 0.0)
 
     def _handle_motor_status_response(
-        self,
-        response: NodeMap[MotorPositionStatus],
+        self, response: NodeMap[MotorPositionStatus], handle_gear_move: bool = False
     ) -> None:
         for axis, pos in response.items():
-            self._position.update({axis: pos.motor_position})
-            self._encoder_position.update({axis: pos.encoder_position})
-            # TODO (FPS 6-01-2023): Remove this once the Feature Flag to ignore stall detection is removed.
-            # This check will latch the motor status for an axis at "true" if it was ever set to true.
-            # To account for the case where a motor axis has its power reset, we also depend on the
-            # "encoder_ok" flag staying set (it will only be False if the motor axis has not been
-            # homed since a power cycle)
-            motor_ok_latch = (
-                (not self._feature_flags.stall_detection_enabled)
-                and ((axis in self._motor_status) and self._motor_status[axis].motor_ok)
-                and self._motor_status[axis].encoder_ok
-            )
-            self._motor_status.update(
-                {
-                    axis: MotorStatus(
-                        motor_ok=(pos.motor_ok or motor_ok_latch),
-                        encoder_ok=pos.encoder_ok,
+            if handle_gear_move and axis == NodeId.pipette_left:
+                self._gear_motor_position = {axis: pos.motor_position}
+            else:
+                self._position.update({axis: pos.motor_position})
+                self._encoder_position.update({axis: pos.encoder_position})
+                # TODO (FPS 6-01-2023): Remove this once the Feature Flag to ignore stall detection is removed.
+                # This check will latch the motor status for an axis at "true" if it was ever set to true.
+                # To account for the case where a motor axis has its power reset, we also depend on the
+                # "encoder_ok" flag staying set (it will only be False if the motor axis has not been
+                # homed since a power cycle)
+                motor_ok_latch = (
+                    (not self._feature_flags.stall_detection_enabled)
+                    and (
+                        (axis in self._motor_status)
+                        and self._motor_status[axis].motor_ok
                     )
-                }
+                    and self._motor_status[axis].encoder_ok
+                )
+                self._motor_status.update(
+                    {
+                        axis: MotorStatus(
+                            motor_ok=(pos.motor_ok or motor_ok_latch),
+                            encoder_ok=pos.encoder_ok,
+                        )
+                    }
+                )
+
+    def _build_move_node_axis_runner(
+        self,
+        origin: Dict[Axis, float],
+        target: Dict[Axis, float],
+        speed: float,
+        stop_condition: HWStopCondition,
+        nodes_in_moves_only: bool,
+        delay: Optional[Tuple[List[Axis], float]] = None,
+    ) -> Tuple[Optional[MoveGroupRunner], bool]:
+        if not target:
+            return None, False
+        # Create a target that doesn't incorporate the plunger into a joint axis with the gantry
+        plunger_axes = [Axis.P_L, Axis.P_R]
+
+        try:
+            move_target = self._move_manager.devectorize_axes(
+                origin, target, speed, plunger_axes
             )
+            _, movelist = self._move_manager.plan_motion(
+                origin=origin, target_list=[move_target]
+            )
+        except ZeroLengthMoveError as zme:
+            log.debug(f"Not moving because move was zero length {str(zme)}")
+            return None, False
+        moves = movelist[0]
+        log.debug(
+            f"move: machine coordinates {target} from origin: machine coordinates {origin} at speed: {speed} requires {moves}"
+        )
+
+        ordered_nodes = self._motor_nodes()
+        if nodes_in_moves_only:
+            moving_axes = {
+                axis_to_node(ax) for move in moves for ax in move.unit_vector.keys()
+            }
+            ordered_nodes = ordered_nodes.intersection(moving_axes)
+
+        move_group, _ = create_move_group(
+            origin, moves, ordered_nodes, MoveStopCondition[stop_condition.name]
+        )
+
+        if delay is not None:
+            delay_axes, delay_time = delay
+            delay_nodes = [axis_to_node(ax) for ax in delay_axes]
+            move_group = add_delay_to_move_group(
+                move_group, ordered_nodes, (delay_nodes, delay_time)
+            )
+
+        (
+            plunger_slowed,
+            error_str,
+        ) = self._move_manager.ensure_pipette_flow_rate_unchanged(
+            [node_to_axis(node) for node in ordered_nodes],
+            origin,
+            target,
+            speed,
+            move_group,
+            [(ax, axis_to_node(ax)) for ax in plunger_axes],
+        )
+        if plunger_slowed:
+            log.error(error_str)
+
+        return (
+            MoveGroupRunner(
+                move_groups=[move_group],
+                ignore_stalls=(
+                    True if not self._feature_flags.stall_detection_enabled else False
+                ),
+            ),
+            False,
+        )
+
+    def _build_move_gear_axis_runner(
+        self,
+        possible_q_axis_origin: Optional[float],
+        possible_q_axis_target: Optional[float],
+        speed: float,
+        nodes_in_moves_only: bool,
+    ) -> Tuple[Optional[MoveGroupRunner], bool]:
+        if possible_q_axis_origin is None or possible_q_axis_target is None:
+            return None, True
+        tip_motor_move_group = self._build_tip_action_group(
+            possible_q_axis_origin, [(possible_q_axis_target, speed)]
+        )
+        if nodes_in_moves_only:
+            ordered_nodes = self._motor_nodes()
+
+            ordered_nodes.intersection({axis_to_node(Axis.Q)})
+        return (
+            MoveGroupRunner(
+                move_groups=[tip_motor_move_group],
+                ignore_stalls=(
+                    True if not self._feature_flags.stall_detection_enabled else False
+                ),
+            ),
+            True,
+        )
 
     @requires_update
     @requires_estop
@@ -631,6 +758,7 @@ class OT3Controller(FlexBackend):
         speed: float,
         stop_condition: HWStopCondition = HWStopCondition.none,
         nodes_in_moves_only: bool = True,
+        delay: Optional[Tuple[List[Axis], float]] = None,
     ) -> None:
         """Move to a position.
 
@@ -648,40 +776,52 @@ class OT3Controller(FlexBackend):
         Returns:
             None
         """
-        move_target = MoveTarget.build(position=target, max_speed=speed)
-        try:
-            _, movelist = self._move_manager.plan_motion(
-                origin=origin, target_list=[move_target]
-            )
-        except ZeroLengthMoveError as zme:
-            log.debug(f"Not moving because move was zero length {str(zme)}")
-            return
-        moves = movelist[0]
-        log.info(f"move: machine {target} from {origin} requires {moves}")
+        possible_q_axis_origin = origin.pop(Axis.Q, None)
+        possible_q_axis_target = target.pop(Axis.Q, None)
 
-        ordered_nodes = self._motor_nodes()
-        if nodes_in_moves_only:
-            moving_axes = {
-                axis_to_node(ax) for move in moves for ax in move.unit_vector.keys()
-            }
-            ordered_nodes = ordered_nodes.intersection(moving_axes)
-
-        group = create_move_group(
-            origin, moves, ordered_nodes, MoveStopCondition[stop_condition.name]
+        maybe_runners = (
+            self._build_move_node_axis_runner(
+                origin, target, speed, stop_condition, nodes_in_moves_only, delay
+            ),
+            self._build_move_gear_axis_runner(
+                possible_q_axis_origin,
+                possible_q_axis_target,
+                speed,
+                nodes_in_moves_only,
+            ),
         )
-        move_group, _ = group
-        runner = MoveGroupRunner(
-            move_groups=[move_group],
-            ignore_stalls=True
-            if not self._feature_flags.stall_detection_enabled
-            else False,
+        log.debug(f"The move groups are {maybe_runners}.")
+
+        gather_moving_nodes = set()
+        all_moving_nodes = set()
+        for runner, _ in maybe_runners:
+            if runner:
+                for n in runner.all_nodes():
+                    gather_moving_nodes.add(n)
+                for n in runner.all_moving_nodes():
+                    all_moving_nodes.add(n)
+
+        pipettes_moving = moving_pipettes_in_move_group(
+            gather_moving_nodes, all_moving_nodes
         )
 
-        pipettes_moving = moving_pipettes_in_move_group(move_group)
-
-        async with self._monitor_overpressure(pipettes_moving):
+        async def _runner_coroutine(
+            runner: MoveGroupRunner, is_gear_move: bool
+        ) -> Tuple[Dict[NodeId, MotorPositionStatus], bool]:
             positions = await runner.run(can_messenger=self._messenger)
-        self._handle_motor_status_response(positions)
+            return positions, is_gear_move
+
+        coros = [
+            _runner_coroutine(runner, is_gear_move)
+            for runner, is_gear_move in maybe_runners
+            if runner
+        ]
+        checked_moving_pipettes = self._pipettes_to_monitor_pressure(pipettes_moving)
+        async with self._monitor_overpressure(checked_moving_pipettes):
+            all_positions = await asyncio.gather(*coros)
+
+        for positions, handle_gear_move in all_positions:
+            self._handle_motor_status_response(positions, handle_gear_move)
 
     def _get_axis_home_distance(self, axis: Axis) -> float:
         if self.check_motor_status([axis]):
@@ -786,19 +926,27 @@ class OT3Controller(FlexBackend):
         moving_pipettes = [
             axis_to_node(ax) for ax in checked_axes if ax in Axis.pipette_axes()
         ]
-        async with self._monitor_overpressure(moving_pipettes):
+        checked_moving_pipettes = self._pipettes_to_monitor_pressure(moving_pipettes)
+        async with self._monitor_overpressure(checked_moving_pipettes):
             positions = await asyncio.gather(*coros)
         # TODO(CM): default gear motor homing routine to have some acceleration
-        if Axis.Q in checked_axes:
+        if gantry_load in [
+            GantryLoad.HIGH_THROUGHPUT_1000,
+            GantryLoad.HIGH_THROUGHPUT_200,
+        ]:
             await self.home_tip_motors(
                 distance=self.axis_bounds[Axis.Q][1] - self.axis_bounds[Axis.Q][0],
-                velocity=self._configuration.motion_settings.max_speed_discontinuity.high_throughput[
-                    Axis.to_kind(Axis.Q)
-                ],
+                velocity=self._configuration.motion_settings.max_speed_discontinuity[
+                    gantry_load
+                ][Axis.to_kind(Axis.Q)],
             )
+
         for position in positions:
             self._handle_motor_status_response(position)
         return axis_convert(self._position, 0.0)
+
+    def _pipettes_to_monitor_pressure(self, pipettes: List[NodeId]) -> List[NodeId]:
+        return [pip for pip in pipettes if self._pressure_sensor_available[pip]]
 
     def _filter_move_group(self, move_group: MoveGroup) -> MoveGroup:
         new_group: MoveGroup = []
@@ -822,9 +970,9 @@ class OT3Controller(FlexBackend):
 
         runner = MoveGroupRunner(
             move_groups=[move_group],
-            ignore_stalls=True
-            if not self._feature_flags.stall_detection_enabled
-            else False,
+            ignore_stalls=(
+                True if not self._feature_flags.stall_detection_enabled else False
+            ),
         )
         try:
             positions = await runner.run(can_messenger=self._messenger)
@@ -840,22 +988,28 @@ class OT3Controller(FlexBackend):
             self._gear_motor_position = {}
             raise e
 
-    async def tip_action(
-        self, origin: Dict[Axis, float], targets: List[Tuple[Dict[Axis, float], float]]
-    ) -> None:
+    def _build_tip_action_group(
+        self, origin: float, targets: List[Tuple[float, float]]
+    ) -> MoveGroup:
         move_targets = [
-            MoveTarget.build(target_pos, speed) for target_pos, speed in targets
+            MoveTarget.build({Axis.Q: target_pos}, speed)
+            for target_pos, speed in targets
         ]
         _, moves = self._move_manager.plan_motion(
-            origin=origin, target_list=move_targets
+            origin={Axis.Q: origin}, target_list=move_targets
         )
-        move_group = create_tip_action_group(moves[0], [NodeId.pipette_left], "clamp")
 
+        return create_tip_action_group(moves[0], [NodeId.pipette_left], "clamp")
+
+    async def tip_action(
+        self, origin: float, targets: List[Tuple[float, float]]
+    ) -> None:
+        move_group = self._build_tip_action_group(origin, targets)
         runner = MoveGroupRunner(
             move_groups=[move_group],
-            ignore_stalls=True
-            if not self._feature_flags.stall_detection_enabled
-            else False,
+            ignore_stalls=(
+                True if not self._feature_flags.stall_detection_enabled else False
+            ),
         )
         try:
             positions = await runner.run(can_messenger=self._messenger)
@@ -915,10 +1069,12 @@ class OT3Controller(FlexBackend):
         lookup_name = {
             FirmwarePipetteName.p1000_single: "P1KS",
             FirmwarePipetteName.p1000_multi: "P1KM",
+            FirmwarePipetteName.p1000_multi_em: "P1KP",
             FirmwarePipetteName.p50_single: "P50S",
             FirmwarePipetteName.p50_multi: "P50M",
             FirmwarePipetteName.p1000_96: "P1KH",
             FirmwarePipetteName.p50_96: "P50H",
+            FirmwarePipetteName.p200_96: "P2HH",
         }
         return lookup_name[pipette_name]
 
@@ -949,6 +1105,7 @@ class OT3Controller(FlexBackend):
                     converted_name.pipette_type,
                     converted_name.pipette_channels,
                     converted_name.pipette_version,
+                    converted_name.oem_type,
                 ),
                 "id": OT3Controller._combine_serial_number(attached),
             }
@@ -1272,8 +1429,15 @@ class OT3Controller(FlexBackend):
         except RuntimeError:
             return
 
+        if hasattr(self, "_module_controls") and self._module_controls is not None:
+            await self._module_controls.clean_up()
+
         if hasattr(self, "_event_watcher"):
-            if loop.is_running() and self._event_watcher:
+            if (
+                loop.is_running()
+                and self._event_watcher
+                and not self._event_watcher.closed
+            ):
                 self._event_watcher.close()
 
         messenger = getattr(self, "_messenger", None)
@@ -1338,7 +1502,7 @@ class OT3Controller(FlexBackend):
             provided_context_manager = await check_overpressure(
                 self._messenger, tools_with_id
             )
-            errors: asyncio.Queue[Tuple[NodeId, ErrorCode]] = asyncio.Queue()
+            errors: asyncio.Queue[Tuple[NodeId, ErrorCode]]
 
             async with provided_context_manager() as errors:
                 try:
@@ -1361,6 +1525,21 @@ class OT3Controller(FlexBackend):
         else:
             yield
 
+    async def touch_probe(self, axis: Axis, speed: float, distance: float) -> float:
+        status = await touch_probe(
+            messenger=self._messenger,
+            mover=axis_to_node(axis),
+            distance=distance,
+            speed=speed,
+        )
+
+        self._position[axis_to_node(axis)] = status.motor_position
+
+        if status.move_ack != MoveCompleteAck.stopped_by_condition:
+            raise Exception("Booo")
+
+        return self._position[axis_to_node(axis)]
+
     async def liquid_probe(
         self,
         mount: OT3Mount,
@@ -1370,14 +1549,39 @@ class OT3Controller(FlexBackend):
         threshold_pascals: float,
         plunger_impulse_time: float,
         num_baseline_reads: int,
+        z_offset_for_plunger_prep: float,
         probe: InstrumentProbeType = InstrumentProbeType.PRIMARY,
         force_both_sensors: bool = False,
-        response_queue: Optional[
-            asyncio.Queue[Dict[SensorId, List[SensorDataType]]]
-        ] = None,
+        response_queue: Optional[PipetteSensorResponseQueue] = None,
     ) -> float:
         head_node = axis_to_node(Axis.by_mount(mount))
         tool = sensor_node_for_pipette(OT3Mount(mount.value))
+        if tool not in self._pipettes_to_monitor_pressure([tool]):
+            raise UnsupportedHardwareCommand(
+                "Liquid Presence Detection not available on this pipette."
+            )
+
+        if response_queue is None:
+            response_capture: Optional[
+                Callable[[Dict[SensorId, List[SensorDataType]]], None]
+            ] = None
+        else:
+
+            def response_capture(data: Dict[SensorId, List[SensorDataType]]) -> None:
+                response_queue.put_nowait(
+                    {
+                        PipetteSensorId(sensor_id.value): [
+                            PipetteSensorData(
+                                sensor_type=PipetteSensorType(packet.sensor_type.value),
+                                _as_int=packet.to_int,
+                                _as_float=packet.to_float(),
+                            )
+                            for packet in packets
+                        ]
+                        for sensor_id, packets in data.items()
+                    }
+                )
+
         positions = await liquid_probe(
             messenger=self._messenger,
             tool=tool,
@@ -1388,9 +1592,10 @@ class OT3Controller(FlexBackend):
             threshold_pascals=threshold_pascals,
             plunger_impulse_time=plunger_impulse_time,
             num_baseline_reads=num_baseline_reads,
+            z_offset_for_plunger_prep=z_offset_for_plunger_prep,
             sensor_id=sensor_id_for_instrument(probe),
             force_both_sensors=force_both_sensors,
-            response_queue=response_queue,
+            emplace_data=response_capture,
         )
         for node, point in positions.items():
             self._position.update({node: point.motor_position})
@@ -1490,14 +1695,28 @@ class OT3Controller(FlexBackend):
         door_open = await get_door_state(self._usb_messenger)
         return DoorState.OPEN if door_open else DoorState.CLOSED
 
-    def add_door_state_listener(self, callback: Callable[[DoorState], None]) -> None:
+    def add_door_state_listener(
+        self, callback: Callable[[DoorState, str | None], None]
+    ) -> None:
+        def _module_door_listener(door_state: DoorState) -> None:
+            module_serial: str | None = None
+            for module in self.module_controls.available_modules:
+                # Systematically handle doored modules
+                if (
+                    module.MODULE_TYPE == modules.types.ModuleType.FLEX_STACKER
+                    and module.hopper_door_state == modules.types.HopperDoorState.OPENED
+                ):
+                    module_serial = module.serial_number
+                    break
+            callback(door_state, module_serial)
+
         def _door_listener(msg: BinaryMessageDefinition) -> None:
             door_state = (
                 DoorState.OPEN
                 if cast(DoorSwitchStateInfo, msg).door_open.value
                 else DoorState.CLOSED
             )
-            callback(door_state)
+            _module_door_listener(door_state)
 
         if self._usb_messenger is not None:
             self._usb_messenger.add_listener(
@@ -1547,8 +1766,17 @@ class OT3Controller(FlexBackend):
     async def set_status_bar_enabled(self, enabled: bool) -> None:
         await self._status_bar_controller.set_enabled(enabled)
 
+    def get_status_bar_enabled(self) -> bool:
+        return self._status_bar_controller.get_enabled()
+
     def get_status_bar_state(self) -> StatusBarState:
         return self._status_bar_controller.get_current_state()
+
+    def add_status_bar_listener(
+        self, listener: StatusBarUpdateListener
+    ) -> StatusBarUpdateUnsubscriber:
+        remove_cb = self._status_bar_controller.add_listener(listener)
+        return remove_cb
 
     @property
     def estop_status(self) -> EstopOverallStatus:
@@ -1584,6 +1812,7 @@ class OT3Controller(FlexBackend):
         max_allowed_grip_error: float,
         hard_limit_lower: float,
         hard_limit_upper: float,
+        disable_geometry_grip_check: bool = False,
     ) -> None:
         """
         Check if the gripper is at the expected location.
@@ -1598,7 +1827,16 @@ class OT3Controller(FlexBackend):
             expected_grip_width + grip_width_uncertainty_wider
         )
         current_gripper_position = jaw_width
-        if isclose(current_gripper_position, hard_limit_lower):
+        log.info(
+            f"Checking gripper position: current {jaw_width}; max error {max_allowed_grip_error}; hard limits {hard_limit_lower}, {hard_limit_upper}; expected {expected_gripper_position_min}, {expected_grip_width}, {expected_gripper_position_max}; uncertainty {grip_width_uncertainty_narrower}, {grip_width_uncertainty_wider}"
+        )
+        if (
+            isclose(current_gripper_position, hard_limit_lower)
+            # this odd check handles internal backlash that can lead the position to read as if
+            # the gripper has overshot its lower bound; this is physically impossible and an
+            # artifact of the gearing, so it always indicates a hard stop
+            or current_gripper_position < hard_limit_lower
+        ):
             raise FailedGripperPickupError(
                 message="Failed to grip: jaws all the way closed",
                 details={
@@ -1617,6 +1855,7 @@ class OT3Controller(FlexBackend):
         if (
             current_gripper_position - expected_gripper_position_min
             < -max_allowed_grip_error
+            and not disable_geometry_grip_check
         ):
             raise FailedGripperPickupError(
                 message="Failed to grip: jaws closed too far",
@@ -1630,6 +1869,7 @@ class OT3Controller(FlexBackend):
         if (
             current_gripper_position - expected_gripper_position_max
             > max_allowed_grip_error
+            and not disable_geometry_grip_check
         ):
             raise FailedGripperPickupError(
                 message="Failed to grip: jaws could not close far enough",
@@ -1674,3 +1914,78 @@ class OT3Controller(FlexBackend):
         """This is something we only use in the simulator.
         It is required so that PE simulations using ot3api don't break."""
         pass
+
+    async def increase_evo_disp_count(self, mount: OT3Mount) -> None:
+        """Tell a pipette to increase it's evo-tip-dispense-count in eeprom."""
+        await send_evo_dispense_count_increase(
+            self._messenger, sensor_node_for_pipette(OT3Mount(mount.value))
+        )
+
+    async def _read_env_sensor(
+        self, mount: OT3Mount, primary: bool
+    ) -> Optional[EnvironmentSensorDataType]:
+        """Read and return the current sensor information."""
+        sensor = EnvironmentSensor.build(
+            sensor_id=SensorId.S0 if primary else SensorId.S1,
+            node_id=sensor_node_for_mount(mount),
+        )
+        s_driver = SensorDriver()
+        sensor_data = await s_driver.read(
+            can_messenger=self._messenger,
+            sensor=sensor,
+            offset=False,
+        )
+        assert sensor_data is None or isinstance(sensor_data, EnvironmentSensorDataType)
+        return sensor_data
+
+    async def read_env_temp_sensor(
+        self, mount: OT3Mount, primary: bool
+    ) -> Optional[float]:
+        """Read and return the current sensor information."""
+        s_data = await self._read_env_sensor(mount, primary)
+        if s_data is None or s_data.temperature is None:
+            return None
+        return s_data.temperature.to_float()
+
+    async def read_env_hum_sensor(
+        self, mount: OT3Mount, primary: bool
+    ) -> Optional[float]:
+        """Read and return the current sensor information."""
+        s_data = await self._read_env_sensor(mount, primary)
+        if s_data is None or s_data.humidity is None:
+            return None
+        return s_data.humidity.to_float()
+
+    async def read_pressure_sensor(
+        self, mount: OT3Mount, primary: bool
+    ) -> Optional[float]:
+        """Read and return the current sensor information."""
+        sensor = PressureSensor.build(
+            sensor_id=SensorId.S0 if primary else SensorId.S1,
+            node_id=sensor_node_for_mount(mount),
+        )
+        s_driver = SensorDriver()
+        sensor_data = await s_driver.read(
+            can_messenger=self._messenger,
+            sensor=sensor,
+            offset=False,
+        )
+        assert sensor_data is None or isinstance(sensor_data, SensorDataType)
+        return sensor_data.to_float() if sensor_data else None
+
+    async def read_capacitive_sensor(
+        self, mount: OT3Mount, primary: bool
+    ) -> Optional[float]:
+        """Read and return the current sensor information."""
+        sensor = CapacitiveSensor.build(
+            sensor_id=SensorId.S0 if primary else SensorId.S1,
+            node_id=sensor_node_for_mount(mount),
+        )
+        s_driver = SensorDriver()
+        sensor_data = await s_driver.read(
+            can_messenger=self._messenger,
+            sensor=sensor,
+            offset=False,
+        )
+        assert sensor_data is None or isinstance(sensor_data, SensorDataType)
+        return sensor_data.to_float() if sensor_data else None

@@ -1,9 +1,15 @@
-import type { OutputSelector } from 'reselect'
-import type { NozzleConfigurationStyle } from '@opentrons/shared-data'
+import type { FC } from 'react'
+import type {
+  HEATERSHAKER_MODULE_TYPE,
+  MAGNETIC_MODULE_TYPE,
+  NozzleConfigurationStyle,
+  TEMPERATURE_MODULE_TYPE,
+  THERMOCYCLER_MODULE_TYPE,
+} from '@opentrons/shared-data'
 import type { RootState as Analytics } from './analytics'
 import type { RootState as Dismiss } from './dismiss'
-import type { RootState as FileData } from './file-data'
 import type { RootState as FeatureFlags } from './feature-flags'
+import type { RootState as FileData } from './file-data'
 import type { RootState as LabwareIngred } from './labware-ingred/reducers'
 import type { RootState as LoadFile } from './load-file'
 import type { RootState as Navigation } from './navigation'
@@ -11,6 +17,7 @@ import type { RootState as StepForms } from './step-forms'
 import type { RootState as Tutorial } from './tutorial'
 import type { RootState as UI } from './ui'
 import type { RootState as WellSelection } from './well-selection/reducers'
+
 export interface BaseState {
   analytics: Analytics
   dismiss: Dismiss
@@ -26,10 +33,10 @@ export interface BaseState {
 }
 export type GetState = () => BaseState
 export type Selector<T> = (arg: BaseState) => T
-export type MemoizedSelector<T> = OutputSelector<BaseState, void, T>
-// eslint-disable-next-line no-use-before-define
 export type ThunkDispatch<A> = (action: A | ThunkAction<A>) => A
 
+// todo(mm, 2025-10-15): Replace with Redux's native ThunkAction. This type definition
+// predates our use of TypeScript and may predate TypeScript support in Redux.
 export type ThunkAction<A> =
   | ((dispatch: ThunkDispatch<A>, getState: GetState) => A)
   | ((dispatch: ThunkDispatch<A>, getState: GetState) => void)
@@ -51,7 +58,7 @@ export interface RouteProps {
   /** the component rendered by a route match
    * drop developed components into slots held by placeholder div components
    * */
-  Component: React.FC
+  Component: FC
   /** a route/page name to render in the nav bar
    */
   name: string
@@ -60,3 +67,9 @@ export interface RouteProps {
   path: string
   navLinkTo: string
 }
+
+export type OT2ModuleType =
+  | typeof MAGNETIC_MODULE_TYPE
+  | typeof TEMPERATURE_MODULE_TYPE
+  | typeof THERMOCYCLER_MODULE_TYPE
+  | typeof HEATERSHAKER_MODULE_TYPE

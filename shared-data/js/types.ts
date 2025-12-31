@@ -1,35 +1,46 @@
+import type { LoadedLabwareLocation, RunTimeCommand } from '../command/types'
+import type { CommandAnnotation } from '../commandAnnotation/types'
+import type { AddressableAreaName, CutoutFixtureId, CutoutId } from '../deck'
 import type {
-  MAGDECK,
-  TEMPDECK,
-  THERMOCYCLER,
-  MAGNETIC_MODULE_V1,
-  MAGNETIC_MODULE_V2,
-  TEMPERATURE_MODULE_V1,
-  TEMPERATURE_MODULE_V2,
-  THERMOCYCLER_MODULE_V1,
-  THERMOCYCLER_MODULE_V2,
-  HEATERSHAKER_MODULE_V1,
-  ABSORBANCE_READER_V1,
-  MAGNETIC_MODULE_TYPE,
-  TEMPERATURE_MODULE_TYPE,
-  THERMOCYCLER_MODULE_TYPE,
-  HEATERSHAKER_MODULE_TYPE,
-  MAGNETIC_BLOCK_TYPE,
   ABSORBANCE_READER_TYPE,
+  ABSORBANCE_READER_V1,
+  AddressableAreaNamesWithFakes,
+  AddressableAreaWithFakes,
+  AreaTypeWithFakes,
+  CutoutFixtureIdsWithFakes,
+  EXTENSION,
+  FLEX,
+  FLEX_STACKER_MODULE_TYPE,
+  FLEX_STACKER_MODULE_V1,
   GEN1,
   GEN2,
-  FLEX,
-  LEFT,
-  RIGHT,
   GRIPPER_V1,
   GRIPPER_V1_1,
   GRIPPER_V1_2,
   GRIPPER_V1_3,
-  EXTENSION,
+  HEATERSHAKER_MODULE_TYPE,
+  HEATERSHAKER_MODULE_V1,
+  LEFT,
+  MAGDECK,
+  MAGNETIC_BLOCK_TYPE,
   MAGNETIC_BLOCK_V1,
+  MAGNETIC_MODULE_TYPE,
+  MAGNETIC_MODULE_V1,
+  MAGNETIC_MODULE_V2,
+  POSITION_REFERENCE_BOTTOM,
+  POSITION_REFERENCE_CENTER,
+  POSITION_REFERENCE_LIQUID_MENISCUS,
+  POSITION_REFERENCE_TOP,
+  RIGHT,
+  TEMPDECK,
+  TEMPERATURE_MODULE_TYPE,
+  TEMPERATURE_MODULE_V1,
+  TEMPERATURE_MODULE_V2,
+  THERMOCYCLER,
+  THERMOCYCLER_MODULE_TYPE,
+  THERMOCYCLER_MODULE_V1,
+  THERMOCYCLER_MODULE_V2,
 } from './constants'
-import type { RunTimeCommand, LabwareLocation } from '../command/types'
-import type { AddressableAreaName, CutoutFixtureId, CutoutId } from '../deck'
 import type { PipetteName } from './pipettes'
 
 export type RobotType = 'OT-2 Standard' | 'OT-3 Standard'
@@ -38,6 +49,18 @@ export interface RobotDefinition {
   displayName: string
   robotType: RobotType
   models: string[]
+  extents: CoordinateTuple
+  paddingOffsets: {
+    rear: number
+    front: number
+    leftSide: number
+    rightSide: number
+  }
+  mountOffsets: {
+    left: CoordinateTuple
+    right: CoordinateTuple
+    gripper?: CoordinateTuple
+  }
 }
 
 // TODO Ian 2019-06-04 split this out into eg ../labware/flowTypes/labwareV1.js
@@ -87,6 +110,7 @@ export type LabwareDisplayCategory =
   | 'other'
   | 'adapter'
   | 'lid'
+  | 'system'
 export type LabwareVolumeUnits = 'µL' | 'mL' | 'L'
 
 // TODO(mc, 2019-05-29): Remove this enum in favor of string + exported
@@ -107,12 +131,17 @@ export interface LabwareDimensions {
   zDimension: number
 }
 
-export interface Coordinates {
+export interface Vector2D {
+  x: number
+  y: number
+}
+export interface Vector3D {
   x: number
   y: number
   z: number
 }
-export type LabwareOffset = Coordinates
+
+export type LabwareOffset = Vector3D
 
 // 1. Valid pipette type for a container (i.e. is there multi channel access?)
 // 2. Is the container a tiprack?
@@ -122,6 +151,7 @@ export interface LabwareParameters {
   isTiprack: boolean
   tipLength?: number
   isMagneticModuleCompatible: boolean
+  isDeckSlotCompatible?: boolean
   magneticModuleEngageHeight?: number
   quirks?: string[]
 }
@@ -186,7 +216,7 @@ export interface CuboidalFrustum {
 
 export interface SquaredConeSegment {
   shape: 'squaredcone'
-  bottomCrossSection: string
+  bottomCrossSection: 'circular' | 'rectangular'
   circleDiameter: number
   rectangleXDimension: number
   rectangleYDimension: number
@@ -196,7 +226,7 @@ export interface SquaredConeSegment {
 
 export interface RoundedCuboidSegment {
   shape: 'roundedcuboid'
-  bottomCrossSection: string
+  bottomCrossSection: 'circular' | 'rectangular'
   circleDiameter: number
   rectangleXDimension: number
   rectangleYDimension: number
@@ -211,8 +241,16 @@ export type WellSegment =
   | SphericalSegment
   | RoundedCuboidSegment
 
+export interface HeightVolumePair {
+  height: number
+  volume: number
+}
+
 export interface InnerWellGeometry {
   sections: WellSegment[]
+}
+export interface UserDefinedVolumes {
+  heightToVolumeMap: HeightVolumePair[]
 }
 
 // TODO(mc, 2019-03-21): exact object is tough to use with the initial value in
@@ -231,12 +269,44 @@ export interface LabwareWellGroup {
   brand?: LabwareBrand
 }
 
+export interface AxisAlignedBoundingBox2D {
+  backLeft: Vector2D
+  frontRight: Vector2D
+}
+
+export interface AxisAlignedBoundingBox3D {
+  backLeftBottom: Vector3D
+  frontRightTop: Vector3D
+}
+
+export interface Extents {
+  total: AxisAlignedBoundingBox3D
+}
+
+export interface SlotFootprintAsChildFeature {
+  z: number
+  backLeft: Vector2D
+  frontRight: Vector2D
+}
+
+export interface SlotFootprintAsParentFeature {
+  z: number
+  backLeft: Vector2D
+  frontRight: Vector2D
+}
+
+export interface LocatingFeatures {
+  slotFootprintAsChild?: SlotFootprintAsChildFeature
+  slotFootprintAsParent?: SlotFootprintAsParentFeature
+}
+
 export type LabwareRoles =
   | 'labware'
   | 'adapter'
   | 'fixture'
   | 'maintenance'
   | 'lid'
+  | 'system'
 
 // NOTE: must be synced with shared-data/labware/schemas/2.json
 export interface LabwareDefinition2 {
@@ -254,15 +324,22 @@ export interface LabwareDefinition2 {
   allowedRoles?: LabwareRoles[]
   stackingOffsetWithLabware?: Record<string, LabwareOffset>
   stackingOffsetWithModule?: Record<string, LabwareOffset>
+  stackLimit?: number
+  compatibleParentLabware?: string[]
+  innerLabwareGeometry?: Record<
+    string,
+    InnerWellGeometry | UserDefinedVolumes
+  > | null
 }
 
 export interface LabwareDefinition3 {
   version: number
+  $otSharedSchema: '#/labware/schemas/3'
   schemaVersion: 3
   namespace: string
   metadata: LabwareMetadata
-  dimensions: LabwareDimensions
-  cornerOffsetFromSlot: LabwareOffset
+  extents: Extents
+  features: LocatingFeatures
   parameters: LabwareParameters
   brand: LabwareBrand
   ordering: string[][]
@@ -270,11 +347,21 @@ export interface LabwareDefinition3 {
   groups: LabwareWellGroup[]
   allowedRoles?: LabwareRoles[]
   stackingOffsetWithLabware?: Record<string, LabwareOffset>
+  legacyStackingOffsetWithLabware?: Record<string, LabwareOffset>
   stackingOffsetWithModule?: Record<string, LabwareOffset>
+  stackLimit?: number
+  compatibleParentLabware?: string[]
   innerLabwareGeometry?: Record<string, InnerWellGeometry> | null
 }
 
-export interface LabwareDefByDefURI {
+// LabwareDefinition1 deliberately excluded.
+// I'm pretty sure nothing in the frontend needs to deal with it anymore.
+export type LabwareDefinition = LabwareDefinition2 | LabwareDefinition3
+
+export interface LabwareDefinitionsByURI {
+  [defURI: string]: LabwareDefinition
+}
+export interface LabwareDef2ByDefURI {
   [defUri: string]: LabwareDefinition2
 }
 export interface LegacyLabwareDefByName {
@@ -288,6 +375,7 @@ export type ModuleType =
   | typeof HEATERSHAKER_MODULE_TYPE
   | typeof MAGNETIC_BLOCK_TYPE
   | typeof ABSORBANCE_READER_TYPE
+  | typeof FLEX_STACKER_MODULE_TYPE
 
 // ModuleModel corresponds to top-level keys in shared-data/module/definitions/2
 export type MagneticModuleModel =
@@ -308,6 +396,8 @@ export type MagneticBlockModel = typeof MAGNETIC_BLOCK_V1
 
 export type AbsorbanceReaderModel = typeof ABSORBANCE_READER_V1
 
+export type FlexStackerModuleModel = typeof FLEX_STACKER_MODULE_V1
+
 export type ModuleModel =
   | MagneticModuleModel
   | TemperatureModuleModel
@@ -315,6 +405,7 @@ export type ModuleModel =
   | HeaterShakerModuleModel
   | MagneticBlockModel
   | AbsorbanceReaderModel
+  | FlexStackerModuleModel
 
 export type GripperModel =
   | typeof GRIPPER_V1
@@ -361,8 +452,12 @@ export interface DeckCalibrationPoint {
   displayName: string
 }
 
+export type CutoutIdToCutoutFixtureId = {
+  [cutoutId in CutoutId]?: CutoutFixtureId
+}
+
 export type CutoutFixtureGroup = {
-  [cutoutId in CutoutId]?: Array<{ [cutoutId in CutoutId]?: CutoutFixtureId }>
+  [cutoutId in CutoutId]?: CutoutIdToCutoutFixtureId[]
 }
 
 export interface CutoutFixture {
@@ -375,13 +470,32 @@ export interface CutoutFixture {
   height: number
 }
 
-type AreaType =
+export interface FakeCutoutFixture extends Omit<
+  CutoutFixture,
+  'id' | 'providesAddressableAreas'
+> {
+  id: CutoutFixtureIdsWithFakes
+  providesAddressableAreas: Record<
+    CutoutId,
+    AddressableAreaNamesWithFakes[] | AddressableAreaName[]
+  >
+}
+
+export type CutoutFixtureWithFakes = FakeCutoutFixture | CutoutFixture
+
+export type AreaType =
   | 'slot'
   | 'movableTrash'
   | 'wasteChute'
   | 'fixedTrash'
   | 'stagingSlot'
   | 'lidDock'
+  | 'thermocycler'
+  | 'heaterShaker'
+  | 'temperatureModule'
+  | 'magneticBlock'
+  | 'absorbanceReader'
+  | 'flexStacker'
 
 export interface AddressableArea {
   id: AddressableAreaName
@@ -393,6 +507,14 @@ export interface AddressableArea {
   ableToDropLabware?: boolean
   ableToDropTips?: boolean
   matingSurfaceUnitVector?: UnitVectorTuple
+}
+
+export interface FakeAddressableArea extends Omit<
+  AddressableArea,
+  'id' | 'areaType'
+> {
+  id: AddressableAreaNamesWithFakes
+  areaType: AreaTypeWithFakes
 }
 
 export interface DeckMetadata {
@@ -420,6 +542,13 @@ export interface DeckLocations {
   legacyFixtures: LegacyFixture[]
 }
 
+export interface DeckLocationsWithFakes extends Omit<
+  DeckLocations,
+  'addressableAreas' | 'calibrationPoints' | 'legacyFixtures'
+> {
+  addressableAreas: AddressableAreaWithFakes[]
+}
+
 export interface DeckDefinition {
   otId: string
   cornerOffsetFromOrigin: CoordinateTuple
@@ -428,6 +557,20 @@ export interface DeckDefinition {
   locations: DeckLocations
   metadata: DeckMetadata
   cutoutFixtures: CutoutFixture[]
+}
+
+export interface DeckDefinitionWithFakes extends Omit<
+  DeckDefinition,
+  | 'locations'
+  | 'cutoutFixtures'
+  | 'otId'
+  | 'cornerOffsetFromOrigin'
+  | 'dimensions'
+  | 'metadata'
+  | 'robot'
+> {
+  locations: DeckLocationsWithFakes
+  cutoutFixtures: CutoutFixtureWithFakes[]
 }
 
 export interface ModuleDimensions {
@@ -440,6 +583,7 @@ export interface ModuleDimensions {
   labwareInterfaceXDimension?: number
   labwareInterfaceYDimension?: number
   lidHeight?: number
+  maxStackerFillHeight?: number
 }
 
 export interface ModuleCalibrationPoint {
@@ -457,25 +601,34 @@ export interface ModuleLayer {
 export interface ModuleDefinition {
   moduleType: ModuleType
   model: ModuleModel
-  labwareOffset: Coordinates
+  labwareOffset: Vector3D
   dimensions: ModuleDimensions
-  cornerOffsetFromSlot: Coordinates
+  cornerOffsetFromSlot: Vector3D
   calibrationPoint: ModuleCalibrationPoint
   displayName: string
   quirks: string[]
   slotTransforms: SlotTransforms
   compatibleWith: ModuleModel[]
-  twoDimensionalRendering: any // deprecated SVGson INode use Module SVG Components instead
 }
 
-export type AffineTransformMatrix = number[][]
+type AffineTransformRow = [number, number, number, number]
+export type AffineTransformMatrix = [
+  AffineTransformRow,
+  AffineTransformRow,
+  AffineTransformRow,
+  AffineTransformRow,
+]
 
 export interface SlotTransforms {
-  [deckOtId: string]: {
-    [slotId: string]: {
-      [transformKey in keyof ModuleDefinition]?: AffineTransformMatrix
-    }
-  }
+  [deckOtId: string]:
+    | undefined
+    | {
+        [slotId: string]:
+          | undefined
+          | {
+              [transformKey in keyof ModuleDefinition]?: AffineTransformMatrix
+            }
+      }
 }
 
 export type ModuleOrientation = 'left' | 'right'
@@ -490,6 +643,13 @@ export interface FlowRateSpec {
   value: number
   min: number
   max: number
+}
+
+interface PlungerPositionsConfiguration {
+  top: number
+  bottom: number
+  blowout: number
+  drop: number
 }
 
 interface pressAndCamConfigurationValues {
@@ -527,12 +687,8 @@ export interface PipetteV2GeneralSpecs {
     run: number
   }
   plungerPositionsConfigurations: {
-    default: {
-      top: number
-      bottom: number
-      blowout: number
-      drop: number
-    }
+    default: PlungerPositionsConfiguration
+    lowVolumeDefault?: PlungerPositionsConfiguration
   }
   availableSensors: {
     sensors: string[]
@@ -673,7 +829,7 @@ export interface LoadedLabware {
   id: string
   loadName: string
   definitionUri: string
-  location: LabwareLocation
+  location: LoadedLabwareLocation
   offsetId?: string
   displayName?: string
 }
@@ -687,9 +843,113 @@ export interface LoadedModule {
 }
 export interface Liquid {
   id: string
-  displayName: string
+  displayName: string | null
   description: string
   displayColor?: string
+  totalLiquids?: number
+}
+
+// TODO(ND, 12/17/2024): investigate why typescript doesn't allow Array<[number, number]>
+export type LiquidHandlingPropertyByVolume = number[][]
+export type PositionReference =
+  | typeof POSITION_REFERENCE_BOTTOM
+  | typeof POSITION_REFERENCE_CENTER
+  | typeof POSITION_REFERENCE_TOP
+  | typeof POSITION_REFERENCE_LIQUID_MENISCUS
+
+type BlowoutLocation = 'source' | 'destination' | 'trash'
+interface DelayParams {
+  duration: number
+}
+export interface TipPosition {
+  positionReference: PositionReference
+  offset: Vector3D
+}
+export interface DelayProperties {
+  enable: boolean
+  params?: DelayParams
+}
+interface TouchTipParams {
+  zOffset: number
+  mmFromEdge: number
+  speed: number
+}
+export interface TouchTipProperties {
+  enable: boolean
+  params?: TouchTipParams
+}
+
+interface MixParams {
+  repetitions: number
+  volume: number
+}
+export interface MixProperties {
+  enable: boolean
+  params?: MixParams
+}
+interface BlowoutParams {
+  location: BlowoutLocation
+  flowRate: number
+}
+export interface BlowoutProperties {
+  enable: boolean
+  params?: BlowoutParams
+}
+export interface Submerge {
+  startPosition: TipPosition
+  speed: number
+  delay: DelayProperties
+}
+interface BaseRetract {
+  endPosition: TipPosition
+  speed: number
+  airGapByVolume: LiquidHandlingPropertyByVolume
+  touchTip: TouchTipProperties
+  delay: DelayProperties
+}
+export type RetractAspirate = BaseRetract
+export interface RetractDispense extends BaseRetract {
+  blowout: BlowoutProperties
+}
+interface BaseLiquidHandlingProperties<RetractType> {
+  submerge: Submerge
+  retract: RetractType
+  flowRateByVolume: LiquidHandlingPropertyByVolume
+  correctionByVolume: LiquidHandlingPropertyByVolume
+  delay: DelayProperties
+}
+export interface AspirateProperties extends BaseLiquidHandlingProperties<RetractAspirate> {
+  aspiratePosition: TipPosition
+  preWet: boolean
+  mix: MixProperties
+}
+export interface SingleDispenseProperties extends BaseLiquidHandlingProperties<RetractDispense> {
+  dispensePosition: TipPosition
+  mix: MixProperties
+  pushOutByVolume: LiquidHandlingPropertyByVolume
+}
+export interface MultiDispenseProperties extends BaseLiquidHandlingProperties<RetractDispense> {
+  dispensePosition: TipPosition
+  conditioningByVolume: LiquidHandlingPropertyByVolume
+  disposalByVolume: LiquidHandlingPropertyByVolume
+}
+export interface ByTipTypeSetting {
+  tiprack: string
+  aspirate: AspirateProperties
+  singleDispense: SingleDispenseProperties
+  multiDispense?: MultiDispenseProperties
+}
+export interface ByPipetteSetting {
+  pipetteModel: string
+  byTipType: ByTipTypeSetting[]
+}
+export interface LiquidClass {
+  liquidClassName: string
+  displayName: string
+  description: string
+  schemaVersion: number
+  namespace: string
+  byPipette: ByPipetteSetting[]
 }
 
 export interface AnalysisError {
@@ -789,6 +1049,11 @@ export type RunTimeParameter =
   | NumberParameter
   | CsvFileParameter
 
+export interface CommandPreconditions {
+  isCameraUsed: boolean
+}
+export type CameraId = 'ot_system_camera'
+
 // TODO(BC, 10/25/2023): this type (and others in this file) probably belong in api-client, not here
 export interface CompletedProtocolAnalysis {
   id: string
@@ -802,6 +1067,8 @@ export interface CompletedProtocolAnalysis {
   errors: AnalysisError[]
   robotType?: RobotType | null
   runTimeParameters?: RunTimeParameter[]
+  commandAnnotations?: CommandAnnotation[]
+  commandPreconditions?: CommandPreconditions
 }
 
 export interface ResourceFile {
@@ -832,6 +1099,7 @@ export type MotorAxis =
   | 'rightPlunger'
   | 'extensionZ'
   | 'extensionJaw'
+  | 'axis96ChannelCam'
 
 export type MotorAxes = MotorAxis[]
 
@@ -883,6 +1151,13 @@ export interface CutoutConfig {
 }
 
 export type DeckConfiguration = CutoutConfig[]
+
+type CutoutConfigWithoutCutoutFixtureId = Omit<CutoutConfig, 'cutoutFixtureId'>
+
+export interface CutoutConfigMap extends CutoutConfigWithoutCutoutFixtureId {
+  addressableAreaId: AddressableAreaNamesWithFakes
+  cutoutFixtureId: CutoutFixtureIdsWithFakes
+}
 
 export type NozzleLayoutConfig =
   | 'single'

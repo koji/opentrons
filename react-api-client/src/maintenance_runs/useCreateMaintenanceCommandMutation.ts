@@ -1,16 +1,15 @@
 import { useMutation, useQueryClient } from 'react-query'
+
 import { createMaintenanceCommand } from '@opentrons/api-client'
+
 import { useHost } from '../api'
+
 import type {
-  UseMutationResult,
-  UseMutationOptions,
   UseMutateAsyncFunction,
+  UseMutationOptions,
+  UseMutationResult,
 } from 'react-query'
-import type {
-  CommandData,
-  HostConfig,
-  CreateCommandParams,
-} from '@opentrons/api-client'
+import type { CommandData, CreateCommandParams } from '@opentrons/api-client'
 import type { CreateCommand } from '@opentrons/shared-data'
 
 interface CreateMaintenanceCommandMutateParams extends CreateCommandParams {
@@ -47,7 +46,7 @@ export function useCreateMaintenanceCommandMutation(): UseCreateMaintenanceComma
     unknown,
     CreateMaintenanceCommandMutateParams
   >(({ maintenanceRunId, command, waitUntilComplete, timeout }) =>
-    createMaintenanceCommand(host as HostConfig, maintenanceRunId, command, {
+    createMaintenanceCommand(host!, maintenanceRunId, command, {
       waitUntilComplete,
       timeout,
     })

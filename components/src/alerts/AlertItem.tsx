@@ -1,9 +1,10 @@
-import type * as React from 'react'
 import cx from 'classnames'
-import { Icon } from '../icons'
+
 import { IconButton } from '../buttons'
+import { Icon } from '../icons'
 import styles from './alerts.module.css'
 
+import type { ReactNode } from 'react'
 import type { IconProps } from '../icons'
 
 export type AlertType = 'success' | 'warning' | 'error' | 'info'
@@ -12,9 +13,9 @@ export interface AlertItemProps {
   /** name constant of the icon to display */
   type: AlertType
   /** title/main message of colored alert bar */
-  title: React.ReactNode
+  title: ReactNode
   /** Alert message body contents */
-  children?: React.ReactNode
+  children?: ReactNode
   /** Additional class name */
   className?: string
   /** optional handler to show close button/clear alert  */
@@ -37,11 +38,11 @@ const ALERT_PROPS_BY_TYPE: Record<
     className: styles.success,
   },
   error: {
-    icon: { name: 'alert-circle' },
+    icon: { name: 'ot-alert' },
     className: styles.error,
   },
   warning: {
-    icon: { name: 'alert-circle' },
+    icon: { name: 'ot-alert' },
     className: styles.warning,
   },
   info: {

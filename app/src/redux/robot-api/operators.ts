@@ -1,11 +1,11 @@
 import { pipe } from 'rxjs'
-import { map, mergeMap, withLatestFrom, filter } from 'rxjs/operators'
+import { filter, map, mergeMap, withLatestFrom } from 'rxjs/operators'
 
 import { getRobotByName } from '../discovery/selectors'
 import { fetchRobotApi } from './http'
 
-import type { Observable, UnaryFunction, OperatorFunction } from 'rxjs'
-import type { State, Action } from '../types'
+import type { Observable, OperatorFunction, UnaryFunction } from 'rxjs'
+import type { Action, State } from '../types'
 import type * as Types from './types'
 
 export type ActionToRequestMapper<TriggerAction> = (
@@ -24,11 +24,14 @@ export function withRobotHost<A>(
   getRobotName: (action: A) => string
 ): UnaryFunction<Observable<A>, Observable<[A, State, Types.RobotHost]>> {
   return pipe(
-    withLatestFrom(state$, (a: A, s: State): [
-      A,
-      State,
-      Types.RobotHost | null
-    ] => [a, s, getRobotByName(s, getRobotName(a)) as Types.RobotHost | null]),
+    withLatestFrom(
+      state$,
+      (a: A, s: State): [A, State, Types.RobotHost | null] => [
+        a,
+        s,
+        getRobotByName(s, getRobotName(a)) as Types.RobotHost | null,
+      ]
+    ),
     filter((args): args is [A, State, Types.RobotHost] => {
       const [, , maybeRobot] = args
       return maybeRobot !== null

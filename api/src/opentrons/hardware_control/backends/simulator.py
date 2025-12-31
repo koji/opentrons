@@ -144,7 +144,7 @@ class Simulator:
             raise KeyError(
                 "If you specify attached_instruments, the model "
                 "should be pipette names or pipette models, but "
-                f'{passed_ai["model"]} is not'
+                f"{passed_ai['model']} is not"
             )
 
         self._attached_instruments = {
@@ -414,7 +414,8 @@ class Simulator:
 
     @ensure_yield
     async def clean_up(self) -> None:
-        pass
+        if hasattr(self, "_module_controls") and self._module_controls is not None:
+            await self._module_controls.clean_up()
 
     @ensure_yield
     async def configure_mount(

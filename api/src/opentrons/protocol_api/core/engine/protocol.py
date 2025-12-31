@@ -1,13 +1,13 @@
 """ProtocolEngine-based Protocol API core implementation."""
+
 from __future__ import annotations
-from typing import Dict, Optional, Type, Union, List, Tuple, TYPE_CHECKING
+from typing import Dict, Optional, Type, Union, List, Tuple, TYPE_CHECKING, Sequence
 
 from opentrons_shared_data.liquid_classes import LiquidClassDefinitionDoesNotExist
-
-from opentrons.protocol_engine import commands as cmd
-from opentrons.protocol_engine.commands import LoadModuleResult
 from opentrons_shared_data.deck.types import DeckDefinitionV5, SlotDefV3
-from opentrons_shared_data.labware.labware_definition import LabwareDefinition
+from opentrons_shared_data.labware.labware_definition import (
+    labware_definition_type_adapter,
+)
 from opentrons_shared_data.labware.types import LabwareDefinition as LabwareDefDict
 from opentrons_shared_data import liquid_classes
 from opentrons_shared_data.liquid_classes.liquid_class_definition import (
@@ -31,7 +31,8 @@ from opentrons.hardware_control.types import DoorState
 from opentrons.protocols.api_support.util import AxisMaxSpeeds
 from opentrons.protocols.api_support.types import APIVersion
 
-
+from opentrons.protocol_engine import commands as cmd
+from opentrons.protocol_engine.commands import LoadModuleResult
 from opentrons.protocol_engine import (
     DeckSlotLocation,
     AddressableAreaLocation,
@@ -46,7 +47,9 @@ from opentrons.protocol_engine import (
 from opentrons.protocol_engine.types import (
     ModuleModel as ProtocolEngineModuleModel,
     OFF_DECK_LOCATION,
-    LabwareLocation,
+    SYSTEM_LOCATION,
+    LoadableLabwareLocation,
+    WASTE_CHUTE_LOCATION,
     NonStackedLocation,
 )
 from opentrons.protocol_engine.clients import SyncClient as ProtocolEngineClient
@@ -62,7 +65,9 @@ from ...disposal_locations import TrashBin, WasteChute
 from ..protocol import AbstractProtocol
 from ..labware import LabwareLoadParams
 from .labware import LabwareCore
+from .tasks import EngineTaskCore
 from .instrument import InstrumentCore
+from .robot import RobotCore
 from .module_core import (
     ModuleCore,
     TemperatureModuleCore,
@@ -72,9 +77,16 @@ from .module_core import (
     NonConnectedModuleCore,
     MagneticBlockCore,
     AbsorbanceReaderCore,
+    FlexStackerCore,
 )
 from .exceptions import InvalidModuleLocationError
-from . import load_labware_params, deck_conflict, overlap_versions
+from . import (
+    load_labware_params,
+    deck_conflict,
+    overlap_versions,
+    _default_liquid_class_versions,
+)
+from opentrons.protocol_engine.resources import labware_validation
 
 if TYPE_CHECKING:
     from ...labware import Labware
@@ -82,7 +94,10 @@ if TYPE_CHECKING:
 
 class ProtocolCore(
     AbstractProtocol[
-        InstrumentCore, LabwareCore, Union[ModuleCore, NonConnectedModuleCore]
+        InstrumentCore,
+        LabwareCore,
+        Union[ModuleCore, NonConnectedModuleCore],
+        EngineTaskCore,
     ]
 ):
     """Protocol API core using a ProtocolEngine.
@@ -102,14 +117,14 @@ class ProtocolCore(
         self._engine_client = engine_client
         self._api_version = api_version
         self._sync_hardware = sync_hardware
-        self._last_location: Optional[Location] = None
+        self._last_location: Optional[Union[Location, TrashBin, WasteChute]] = None
         self._last_mount: Optional[Mount] = None
         self._labware_cores_by_id: Dict[str, LabwareCore] = {}
         self._module_cores_by_id: Dict[
             str, Union[ModuleCore, NonConnectedModuleCore]
         ] = {}
         self._disposal_locations: List[Union[Labware, TrashBin, WasteChute]] = []
-        self._defined_liquid_class_defs_by_name: Dict[str, LiquidClassSchemaV1] = {}
+        self._liquid_class_def_cache: Dict[Tuple[str, int], LiquidClassSchemaV1] = {}
         self._load_fixed_trash()
 
     @property
@@ -189,7 +204,7 @@ class ProtocolCore(
     ) -> LabwareLoadParams:
         """Add a labware definition to the set of loadable definitions."""
         uri = self._engine_client.add_labware_definition(
-            LabwareDefinition.parse_obj(definition)
+            labware_definition_type_adapter.validate_python(definition)
         )
         return LabwareLoadParams.from_uri(uri)
 
@@ -215,7 +230,7 @@ class ProtocolCore(
             self._engine_client.state.labware.find_custom_labware_load_params()
         )
         namespace, version = load_labware_params.resolve(
-            load_name, namespace, version, custom_labware_params
+            load_name, namespace, version, custom_labware_params, self._api_version
         )
 
         load_result = self._engine_client.execute_command_without_recovery(
@@ -229,6 +244,9 @@ class ProtocolCore(
         )
         # FIXME(jbl, 2023-08-14) validating after loading the object issue
         validation.ensure_definition_is_labware(load_result.definition)
+        validation.ensure_definition_is_not_lid_after_api_version(
+            self.api_version, load_result.definition
+        )
 
         # FIXME(mm, 2023-02-21):
         #
@@ -283,7 +301,7 @@ class ProtocolCore(
             self._engine_client.state.labware.find_custom_labware_load_params()
         )
         namespace, version = load_labware_params.resolve(
-            load_name, namespace, version, custom_labware_params
+            load_name, namespace, version, custom_labware_params, self._api_version
         )
         load_result = self._engine_client.execute_command_without_recovery(
             cmd.LoadLabwareParams(
@@ -318,6 +336,52 @@ class ProtocolCore(
 
         return labware_core
 
+    def load_lid(
+        self,
+        load_name: str,
+        location: LabwareCore,
+        namespace: Optional[str],
+        version: Optional[int],
+    ) -> LabwareCore:
+        """Load an individual lid using its identifying parameters. Must be loaded on an existing Labware."""
+        load_location = self._convert_labware_location(location=location)
+        custom_labware_params = (
+            self._engine_client.state.labware.find_custom_labware_load_params()
+        )
+        namespace, version = load_labware_params.resolve(
+            load_name, namespace, version, custom_labware_params, self._api_version
+        )
+        load_result = self._engine_client.execute_command_without_recovery(
+            cmd.LoadLidParams(
+                loadName=load_name,
+                location=load_location,
+                namespace=namespace,
+                version=version,
+            )
+        )
+        # FIXME(chb, 2024-12-06) validating after loading the object issue
+        validation.ensure_definition_is_lid(load_result.definition)
+
+        deck_conflict.check(
+            engine_state=self._engine_client.state,
+            new_labware_id=load_result.labwareId,
+            existing_disposal_locations=self._disposal_locations,
+            # TODO: We can now fetch these IDs from engine too.
+            #  See comment in self.load_labware().
+            #
+            # Wrapping .keys() in list() is just to make Decoy verification easier.
+            existing_labware_ids=list(self._labware_cores_by_id.keys()),
+            existing_module_ids=list(self._module_cores_by_id.keys()),
+        )
+
+        labware_core = LabwareCore(
+            labware_id=load_result.labwareId,
+            engine_client=self._engine_client,
+        )
+
+        self._labware_cores_by_id[labware_core.labware_id] = labware_core
+        return labware_core
+
     def move_labware(
         self,
         labware_core: LabwareCore,
@@ -329,6 +393,7 @@ class ProtocolCore(
             NonConnectedModuleCore,
             OffDeckType,
             WasteChute,
+            TrashBin,
         ],
         use_gripper: bool,
         pause_for_manual_move: bool,
@@ -388,6 +453,240 @@ class ProtocolCore(
             existing_module_ids=list(self._module_cores_by_id.keys()),
         )
 
+    def move_lid(  # noqa: C901
+        self,
+        source_location: Union[DeckSlotName, StagingSlotName, LabwareCore],
+        new_location: Union[
+            DeckSlotName,
+            StagingSlotName,
+            LabwareCore,
+            OffDeckType,
+            WasteChute,
+            TrashBin,
+        ],
+        use_gripper: bool,
+        pause_for_manual_move: bool,
+        pick_up_offset: Optional[Tuple[float, float, float]],
+        drop_offset: Optional[Tuple[float, float, float]],
+    ) -> LabwareCore | None:
+        """Move the given lid to a new location."""
+        if use_gripper:
+            strategy = LabwareMovementStrategy.USING_GRIPPER
+        elif pause_for_manual_move:
+            strategy = LabwareMovementStrategy.MANUAL_MOVE_WITH_PAUSE
+        else:
+            strategy = LabwareMovementStrategy.MANUAL_MOVE_WITHOUT_PAUSE
+
+        if isinstance(source_location, DeckSlotName) or isinstance(
+            source_location, StagingSlotName
+        ):
+            # Find the source labware at the provided deck slot
+            labware_in_slot = self._engine_client.state.labware.get_by_slot(
+                source_location
+            )
+            if labware_in_slot is None:
+                raise LabwareNotLoadedOnLabwareError(
+                    "Lid cannot be loaded on non-labware position."
+                )
+            else:
+                labware = LabwareCore(labware_in_slot.id, self._engine_client)
+        else:
+            labware = source_location
+
+        # if this is a labware stack, we need to find the labware at the top of the stack
+        if labware_validation.is_lid_stack(labware.load_name):
+            lid_id = self._engine_client.state.labware.get_highest_child_labware(
+                labware.labware_id
+            )
+        # if this is a labware with a lid, we just need to find its lid_id
+        else:
+            # we need to check to see if this labware is hosting a lid stack
+            potential_lid_stack = (
+                self._engine_client.state.labware.get_next_child_labware(
+                    labware.labware_id
+                )
+            )
+            if potential_lid_stack and labware_validation.is_lid_stack(
+                self._engine_client.state.labware.get_load_name(potential_lid_stack)
+            ):
+                lid_id = self._engine_client.state.labware.get_highest_child_labware(
+                    labware.labware_id
+                )
+            else:
+                lid = self._engine_client.state.labware.get_lid_by_labware_id(
+                    labware.labware_id
+                )
+                if lid is not None:
+                    lid_id = lid.id
+                else:
+                    raise ValueError(
+                        f"Cannot move a lid off of {labware.get_display_name()} because it has no lid."
+                    )
+
+        _pick_up_offset = (
+            LabwareOffsetVector(
+                x=pick_up_offset[0], y=pick_up_offset[1], z=pick_up_offset[2]
+            )
+            if pick_up_offset
+            else None
+        )
+        _drop_offset = (
+            LabwareOffsetVector(x=drop_offset[0], y=drop_offset[1], z=drop_offset[2])
+            if drop_offset
+            else None
+        )
+
+        create_new_lid_stack = False
+
+        if isinstance(new_location, DeckSlotName) or isinstance(
+            new_location, StagingSlotName
+        ):
+            # Find the destination labware at the provided deck slot
+            destination_labware_in_slot = self._engine_client.state.labware.get_by_slot(
+                new_location
+            )
+            if destination_labware_in_slot is None:
+                to_location = self._convert_labware_location(location=new_location)
+                # absolutely must make a new lid stack
+                create_new_lid_stack = True
+            else:
+                highest_child_location = (
+                    self._engine_client.state.labware.get_highest_child_labware(
+                        destination_labware_in_slot.id
+                    )
+                )
+                if labware_validation.validate_definition_is_adapter(
+                    self._engine_client.state.labware.get_definition(
+                        highest_child_location
+                    )
+                ):
+                    # absolutely must make a new lid stack
+                    create_new_lid_stack = True
+
+                to_location = self._convert_labware_location(
+                    location=LabwareCore(highest_child_location, self._engine_client)
+                )
+        elif isinstance(new_location, LabwareCore):
+            highest_child_location = (
+                self._engine_client.state.labware.get_highest_child_labware(
+                    new_location.labware_id
+                )
+            )
+            if labware_validation.validate_definition_is_adapter(
+                self._engine_client.state.labware.get_definition(highest_child_location)
+            ):
+                # absolutely must make a new lid stack
+                create_new_lid_stack = True
+            to_location = self._convert_labware_location(
+                location=LabwareCore(highest_child_location, self._engine_client)
+            )
+        else:
+            to_location = self._convert_labware_location(location=new_location)
+
+        output_result = None
+        if create_new_lid_stack:
+            # Make a new lid stack object that is empty
+            result = self._engine_client.execute_command_without_recovery(
+                cmd.LoadLidStackParams(
+                    location=SYSTEM_LOCATION,
+                    loadName="empty",
+                    version=1,
+                    namespace="empty",
+                    quantity=0,
+                )
+            )
+
+            # Move the lid stack object from the SYSTEM_LOCATION space to the desired deck location
+            self._engine_client.execute_command(
+                cmd.MoveLabwareParams(
+                    labwareId=result.stackLabwareId,
+                    newLocation=to_location,
+                    strategy=LabwareMovementStrategy.MANUAL_MOVE_WITHOUT_PAUSE,
+                    pickUpOffset=None,
+                    dropOffset=None,
+                )
+            )
+
+            output_result = LabwareCore(
+                labware_id=result.stackLabwareId, engine_client=self._engine_client
+            )
+            destination = self._convert_labware_location(location=output_result)
+        else:
+            destination = to_location
+
+        self._engine_client.execute_command(
+            cmd.MoveLabwareParams(
+                labwareId=lid_id,
+                newLocation=destination,
+                strategy=strategy,
+                pickUpOffset=_pick_up_offset,
+                dropOffset=_drop_offset,
+            )
+        )
+
+        # Handle leftover empty lid stack if there is one
+        potential_lid_stack = self._engine_client.state.labware.get_next_child_labware(
+            labware.labware_id
+        )
+        if (
+            labware_validation.is_lid_stack(labware.load_name)
+            and self._engine_client.state.labware.get_highest_child_labware(
+                labware_id=labware.labware_id
+            )
+            == labware.labware_id
+        ):
+            # The originating lid stack is now empty, so we need to move it to the SYSTEM_LOCATION
+            self._engine_client.execute_command(
+                cmd.MoveLabwareParams(
+                    labwareId=labware.labware_id,
+                    newLocation=SYSTEM_LOCATION,
+                    strategy=LabwareMovementStrategy.MANUAL_MOVE_WITHOUT_PAUSE,
+                    pickUpOffset=None,
+                    dropOffset=None,
+                )
+            )
+        elif (
+            potential_lid_stack
+            and labware_validation.is_lid_stack(
+                self._engine_client.state.labware.get_load_name(potential_lid_stack)
+            )
+            and self._engine_client.state.labware.get_highest_child_labware(
+                potential_lid_stack
+            )
+            == potential_lid_stack
+        ):
+            self._engine_client.execute_command(
+                cmd.MoveLabwareParams(
+                    labwareId=potential_lid_stack,
+                    newLocation=SYSTEM_LOCATION,
+                    strategy=LabwareMovementStrategy.MANUAL_MOVE_WITHOUT_PAUSE,
+                    pickUpOffset=None,
+                    dropOffset=None,
+                )
+            )
+
+        if strategy == LabwareMovementStrategy.USING_GRIPPER:
+            # Clear out last location since it is not relevant to pipetting
+            # and we only use last location for in-place pipetting commands
+            self.set_last_location(location=None, mount=Mount.EXTENSION)
+
+        # FIXME(jbl, 2024-01-04) deck conflict after execution logic issue, read notes in load_labware for more info:
+        deck_conflict.check(
+            engine_state=self._engine_client.state,
+            new_labware_id=lid_id,
+            existing_disposal_locations=self._disposal_locations,
+            # TODO: We can now fetch these IDs from engine too.
+            #  See comment in self.load_labware().
+            existing_labware_ids=[
+                labware_id
+                for labware_id in self._labware_cores_by_id
+                if labware_id != labware_id
+            ],
+            existing_module_ids=list(self._module_cores_by_id.keys()),
+        )
+
+        return output_result
+
     def _resolve_module_hardware(
         self, serial_number: str, model: ModuleModel
     ) -> AbstractModule:
@@ -421,6 +720,8 @@ class ProtocolCore(
                 raise InvalidModuleLocationError(deck_slot, model.name)
 
         robot_type = self._engine_client.state.config.robot_type
+        # todo(mm, 2024-12-03): This might be possible to remove:
+        # Protocol Engine will normalize the deck slot itself.
         normalized_deck_slot = deck_slot.to_equivalent_for_robot_type(robot_type)
 
         result = self._engine_client.execute_command_without_recovery(
@@ -447,39 +748,9 @@ class ProtocolCore(
             existing_module_ids=list(self._module_cores_by_id.keys()),
         )
 
-        # When the protocol engine is created, we add Module Lids as part of the deck fixed labware
-        # If a valid module exists in the deck config. For analysis, we add the labware here since
-        # deck fixed labware is not created under the same conditions. We also need to inject the Module
-        # lids when the module isnt already on the deck config, like when adding a new
-        # module during a protocol setup.
-        self._load_virtual_module_lid(module_core)
-
         self._module_cores_by_id[module_core.module_id] = module_core
 
         return module_core
-
-    def _load_virtual_module_lid(
-        self, module_core: Union[ModuleCore, NonConnectedModuleCore]
-    ) -> None:
-        if isinstance(module_core, AbsorbanceReaderCore):
-            substate = self._engine_client.state.modules.get_absorbance_reader_substate(
-                module_core.module_id
-            )
-            if substate.lid_id is None:
-                lid = self._engine_client.execute_command_without_recovery(
-                    cmd.LoadLabwareParams(
-                        loadName="opentrons_flex_lid_absorbance_plate_reader_module",
-                        location=ModuleLocation(moduleId=module_core.module_id),
-                        namespace="opentrons",
-                        version=1,
-                        displayName="Absorbance Reader Lid",
-                    )
-                )
-
-                self._engine_client.add_absorbance_reader_lid(
-                    module_id=module_core.module_id,
-                    lid_id=lid.labwareId,
-                )
 
     def _create_non_connected_module_core(
         self, load_module_result: LoadModuleResult
@@ -488,6 +759,7 @@ class ProtocolCore(
             module_id=load_module_result.moduleId,
             engine_client=self._engine_client,
             api_version=self.api_version,
+            protocol_core=self,
         )
 
     def _create_module_core(
@@ -501,15 +773,16 @@ class ProtocolCore(
             ModuleType.THERMOCYCLER: ThermocyclerModuleCore,
             ModuleType.HEATER_SHAKER: HeaterShakerModuleCore,
             ModuleType.ABSORBANCE_READER: AbsorbanceReaderCore,
+            ModuleType.FLEX_STACKER: FlexStackerCore,
         }
 
         module_type = load_module_result.model.as_type()
 
         module_core_cls = type_lookup[module_type]
 
-        assert (
-            load_module_result.serialNumber is not None
-        ), "Expected a connected module but did not get a serial number."
+        assert load_module_result.serialNumber is not None, (
+            "Expected a connected module but did not get a serial number."
+        )
         selected_hardware = self._resolve_module_hardware(
             load_module_result.serialNumber, model
         )
@@ -519,6 +792,7 @@ class ProtocolCore(
             engine_client=self._engine_client,
             api_version=self.api_version,
             sync_module_hardware=SynchronousAdapter(selected_hardware),
+            protocol_core=self,
         )
 
     def _get_module_core(
@@ -530,6 +804,21 @@ class ProtocolCore(
             return self._create_module_core(
                 load_module_result=load_module_result, model=model
             )
+
+    def add_or_get_labware_core(self, labware_id: str) -> LabwareCore:
+        """Create a LabwareCore and add it to the map or return one if it exists."""
+        if labware_id in self._labware_cores_by_id:
+            return self._labware_cores_by_id[labware_id]
+        else:
+            core = LabwareCore(labware_id, self._engine_client)
+            self._labware_cores_by_id[labware_id] = core
+            return core
+
+    def load_robot(self) -> RobotCore:
+        """Load a robot core into the RobotContext."""
+        return RobotCore(
+            engine_client=self._engine_client, sync_hardware_api=self._sync_hardware
+        )
 
     def load_instrument(
         self,
@@ -626,6 +915,21 @@ class ProtocolCore(
             cmd.WaitForDurationParams(seconds=seconds, message=msg)
         )
 
+    def wait_for_tasks(self, task_cores: Sequence[EngineTaskCore]) -> None:
+        """Wait for specified tasks to complete."""
+        task_ids = task_ids = [task._id for task in task_cores if task._id is not None]
+        self._engine_client.execute_command(cmd.WaitForTasksParams(task_ids=task_ids))
+
+    def create_timer(self, seconds: float) -> EngineTaskCore:
+        """Create a timer task that runs in the background."""
+        result = self._engine_client.execute_command_without_recovery(
+            cmd.CreateTimerParams(time=seconds)
+        )
+        timer_task = EngineTaskCore(
+            engine_client=self._engine_client, task_id=result.task_id
+        )
+        return timer_task
+
     def home(self) -> None:
         """Move all axes to their home positions."""
         self._engine_client.execute_command(cmd.HomeParams(axes=None))
@@ -645,7 +949,7 @@ class ProtocolCore(
     def get_last_location(
         self,
         mount: Optional[Mount] = None,
-    ) -> Optional[Location]:
+    ) -> Optional[Union[Location, TrashBin, WasteChute]]:
         """Get the last accessed location."""
         if mount is None or mount == self._last_mount:
             return self._last_location
@@ -654,12 +958,79 @@ class ProtocolCore(
 
     def set_last_location(
         self,
-        location: Optional[Location],
+        location: Optional[Union[Location, TrashBin, WasteChute]],
         mount: Optional[Mount] = None,
     ) -> None:
         """Set the last accessed location."""
         self._last_location = location
         self._last_mount = mount
+
+    def load_lid_stack(
+        self,
+        load_name: str,
+        location: Union[DeckSlotName, StagingSlotName, LabwareCore],
+        quantity: int,
+        namespace: Optional[str],
+        version: Optional[int],
+    ) -> LabwareCore:
+        """Load a Stack of Lids to a given location, creating a Lid Stack."""
+        if quantity < 1:
+            raise ValueError(
+                "When loading a lid stack quantity cannot be less than one."
+            )
+        if isinstance(location, DeckSlotName) or isinstance(location, StagingSlotName):
+            load_location = self._convert_labware_location(location=location)
+        else:
+            if isinstance(location, LabwareCore):
+                load_location = self._convert_labware_location(location=location)
+            else:
+                raise ValueError(
+                    "Expected type of Labware Location for lid stack must be Labware, not Legacy Labware or Well."
+                )
+
+        custom_labware_params = (
+            self._engine_client.state.labware.find_custom_labware_load_params()
+        )
+        namespace, version = load_labware_params.resolve(
+            load_name, namespace, version, custom_labware_params, self._api_version
+        )
+
+        load_result = self._engine_client.execute_command_without_recovery(
+            cmd.LoadLidStackParams(
+                loadName=load_name,
+                location=load_location,
+                namespace=namespace,
+                version=version,
+                quantity=quantity,
+            )
+        )
+
+        # FIXME(CHB, 2024-12-04) just like load labware and load adapter we have a validating after loading the object issue
+        assert load_result.definition is not None
+        validation.ensure_definition_is_lid(load_result.definition)
+
+        deck_conflict.check(
+            engine_state=self._engine_client.state,
+            new_labware_id=load_result.stackLabwareId,
+            existing_disposal_locations=self._disposal_locations,
+            # TODO (spp, 2023-11-27): We've been using IDs from _labware_cores_by_id
+            #  and _module_cores_by_id instead of getting the lists directly from engine
+            #  because of the chance of engine carrying labware IDs from LPC too.
+            #  But with https://github.com/Opentrons/opentrons/pull/13943,
+            #  & LPC in maintenance runs, we can now rely on engine state for these IDs too.
+            # Wrapping .keys() in list() is just to make Decoy verification easier.
+            existing_labware_ids=list(self._labware_cores_by_id.keys()),
+            existing_module_ids=list(self._module_cores_by_id.keys()),
+        )
+
+        labware_core = LabwareCore(
+            labware_id=load_result.stackLabwareId,
+            engine_client=self._engine_client,
+        )
+
+        self._labware_cores_by_id[labware_core.labware_id] = labware_core
+
+        return labware_core
 
     def get_deck_definition(self) -> DeckDefinitionV5:
         """Get the geometry definition of the robot's deck."""
@@ -705,9 +1076,9 @@ class ProtocolCore(
             labware_id = self._engine_client.state.labware.get_id_by_module(
                 module_core.module_id
             )
-            return self._labware_cores_by_id[labware_id]
         except LabwareNotLoadedOnModuleError:
             return None
+        return self.add_or_get_labware_core(labware_id)
 
     def get_labware_on_labware(
         self, labware_core: LabwareCore
@@ -717,9 +1088,9 @@ class ProtocolCore(
             labware_id = self._engine_client.state.labware.get_id_by_labware(
                 labware_core.labware_id
             )
-            return self._labware_cores_by_id[labware_id]
         except LabwareNotLoadedOnLabwareError:
             return None
+        return self.add_or_get_labware_core(labware_id)
 
     def get_slot_center(self, slot_name: Union[DeckSlotName, StagingSlotName]) -> Point:
         """Get the absolute coordinate of a slot's center."""
@@ -754,25 +1125,29 @@ class ProtocolCore(
             _id=liquid.id,
             name=liquid.displayName,
             description=liquid.description,
-            display_color=(
-                liquid.displayColor.__root__ if liquid.displayColor else None
-            ),
+            display_color=(liquid.displayColor.root if liquid.displayColor else None),
         )
 
-    def define_liquid_class(self, name: str) -> LiquidClass:
-        """Define a liquid class for use in transfer functions."""
+    def get_liquid_class(self, name: str, version: Optional[int]) -> LiquidClass:
+        """Get an instance of a built-in liquid class."""
+        if version is None:
+            version = _default_liquid_class_versions.get_liquid_class_version(
+                self._api_version, name
+            )
         try:
             # Check if we have already loaded this liquid class' definition
-            liquid_class_def = self._defined_liquid_class_defs_by_name[name]
+            liquid_class_def = self._liquid_class_def_cache[(name, version)]
         except KeyError:
             try:
                 # Fetching the liquid class data from file and parsing it
                 # is an expensive operation and should be avoided.
                 # Calling this often will degrade protocol execution performance.
-                liquid_class_def = liquid_classes.load_definition(name)
-                self._defined_liquid_class_defs_by_name[name] = liquid_class_def
+                liquid_class_def = liquid_classes.load_definition(name, version=version)
+                self._liquid_class_def_cache[(name, version)] = liquid_class_def
             except LiquidClassDefinitionDoesNotExist:
-                raise ValueError(f"Liquid class definition not found for '{name}'.")
+                raise ValueError(
+                    f"Liquid class definition not found for '{name}' version {version}."
+                )
 
         return LiquidClass.create(liquid_class_def)
 
@@ -794,8 +1169,47 @@ class ProtocolCore(
             return self._module_cores_by_id[labware_location.moduleId]
         elif isinstance(labware_location, OnLabwareLocation):
             return self._labware_cores_by_id[labware_location.labwareId]
-
+        elif labware_location == WASTE_CHUTE_LOCATION:
+            return OffDeckType.WASTE_CHUTE
         return OffDeckType.OFF_DECK
+
+    def capture_image(
+        self,
+        filename: Optional[str] = None,
+        resolution: Optional[Tuple[int, int]] = None,
+        zoom: Optional[float] = None,
+        contrast: Optional[float] = None,
+        brightness: Optional[float] = None,
+        saturation: Optional[float] = None,
+    ) -> None:
+        """Capture an image using a camera.
+        Args:
+            resolution: Width by height resolution in pixels for the image to be captured with.
+            zoom: Multiplier to use when cropping and scaling a captured image. Scale is 1.0 to 2.0.
+            contrast: The contrast to use when processing an image. Scale is 0% to 100%
+            brightness: The brightness to use when processing an image. Scale is 0% to 100%.
+            saturation: The saturation to use when processing an image. Scale is 0% to 100%.
+        """
+        self._engine_client.execute_command(
+            cmd.CaptureImageParams(
+                fileName=filename,
+                resolution=resolution
+                if resolution is not None
+                else self._engine_client.state.camera.get_resolution(),
+                zoom=zoom
+                if zoom is not None
+                else self._engine_client.state.camera.get_zoom(),
+                contrast=contrast
+                if contrast is not None
+                else self._engine_client.state.camera.get_contrast(),
+                brightness=brightness
+                if brightness is not None
+                else self._engine_client.state.camera.get_brightness(),
+                saturation=saturation
+                if saturation is not None
+                else self._engine_client.state.camera.get_saturation(),
+            )
+        )
 
     def _convert_labware_location(
         self,
@@ -807,8 +1221,9 @@ class ProtocolCore(
             NonConnectedModuleCore,
             OffDeckType,
             WasteChute,
+            TrashBin,
         ],
-    ) -> LabwareLocation:
+    ) -> LoadableLabwareLocation:
         if isinstance(location, LabwareCore):
             return OnLabwareLocation(labwareId=location.labware_id)
         else:
@@ -823,12 +1238,15 @@ class ProtocolCore(
             NonConnectedModuleCore,
             OffDeckType,
             WasteChute,
-        ]
+            TrashBin,
+        ],
     ) -> NonStackedLocation:
         if isinstance(location, (ModuleCore, NonConnectedModuleCore)):
             return ModuleLocation(moduleId=location.module_id)
         elif location is OffDeckType.OFF_DECK:
             return OFF_DECK_LOCATION
+        elif location is OffDeckType.WASTE_CHUTE:
+            return AddressableAreaLocation(addressableAreaName="gripperWasteChute")
         elif isinstance(location, DeckSlotName):
             return DeckSlotLocation(slotName=location)
         elif isinstance(location, StagingSlotName):
@@ -836,3 +1254,5 @@ class ProtocolCore(
         elif isinstance(location, WasteChute):
             # TODO(mm, 2023-12-06) This will need to determine the appropriate Waste Chute to return, but only move_labware uses this for now
             return AddressableAreaLocation(addressableAreaName="gripperWasteChute")
+        elif isinstance(location, TrashBin):
+            return AddressableAreaLocation(addressableAreaName=location.area_name)

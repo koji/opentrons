@@ -1,22 +1,21 @@
-import * as React from 'react'
-import { Trans, useTranslation } from 'react-i18next'
+import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { css } from 'styled-components'
-import {
-  Banner,
-  CURSOR_POINTER,
-  LegacyStyledText,
-  SPACING,
-  TYPOGRAPHY,
-} from '@opentrons/components'
-import { getGripperDisplayName } from '@opentrons/shared-data'
+
+import { InlineNotification } from '@opentrons/components'
 import { useCurrentSubsystemUpdateQuery } from '@opentrons/react-api-client'
+import { getGripperDisplayName } from '@opentrons/shared-data'
+
 import { InstrumentCard } from '/app/molecules/InstrumentCard'
 import { GripperWizardFlows } from '/app/organisms/GripperWizardFlows'
-import { AboutGripperSlideout } from './AboutGripperSlideout'
 import { GRIPPER_FLOW_TYPES } from '/app/organisms/GripperWizardFlows/constants'
 
+import { AboutGripperSlideout } from './AboutGripperSlideout'
+
+import type { MouseEventHandler } from 'react'
 import type { BadGripper, GripperData } from '@opentrons/api-client'
 import type { GripperModel } from '@opentrons/shared-data'
+import type { MenuOverlayItemProps } from '/app/molecules/InstrumentCard/MenuOverlay'
 import type { GripperWizardFlowType } from '/app/organisms/GripperWizardFlows/types'
 
 interface GripperCardProps {
@@ -25,11 +24,6 @@ interface GripperCardProps {
   isRunActive: boolean
   isEstopNotDisengaged: boolean
 }
-const BANNER_LINK_CSS = css`
-  text-decoration: ${TYPOGRAPHY.textDecorationUnderline};
-  cursor: ${CURSOR_POINTER};
-  margin-left: ${SPACING.spacing8};
-`
 
 const INSTRUMENT_CARD_STYLE = css`
   p {
@@ -50,29 +44,23 @@ export function GripperCard({
   isEstopNotDisengaged,
 }: GripperCardProps): JSX.Element {
   const { t, i18n } = useTranslation(['device_details', 'shared'])
-  const [
-    openWizardFlowType,
-    setOpenWizardFlowType,
-  ] = React.useState<GripperWizardFlowType | null>(null)
-  const [
-    showAboutGripperSlideout,
-    setShowAboutGripperSlideout,
-  ] = React.useState<boolean>(false)
+  const [openWizardFlowType, setOpenWizardFlowType] =
+    useState<GripperWizardFlowType | null>(null)
+  const [showAboutGripperSlideout, setShowAboutGripperSlideout] =
+    useState<boolean>(false)
 
-  const handleAttach: React.MouseEventHandler<HTMLButtonElement> = () => {
+  const handleAttach: MouseEventHandler<HTMLButtonElement> = () => {
     setOpenWizardFlowType(GRIPPER_FLOW_TYPES.ATTACH)
   }
 
-  const handleDetach: React.MouseEventHandler<HTMLButtonElement> = () => {
+  const handleDetach: MouseEventHandler<HTMLButtonElement> = () => {
     setOpenWizardFlowType(GRIPPER_FLOW_TYPES.DETACH)
   }
 
-  const handleCalibrate: React.MouseEventHandler<HTMLButtonElement> = () => {
+  const handleCalibrate: MouseEventHandler<HTMLAnchorElement> = () => {
     setOpenWizardFlowType(GRIPPER_FLOW_TYPES.RECALIBRATE)
   }
-  const [pollForSubsystemUpdate, setPollForSubsystemUpdate] = React.useState(
-    false
-  )
+  const [pollForSubsystemUpdate, setPollForSubsystemUpdate] = useState(false)
   const { data: subsystemUpdateData } = useCurrentSubsystemUpdateQuery(
     'gripper',
     {
@@ -84,7 +72,7 @@ export function GripperCard({
   // detected until the update has been done for 5 seconds
   // this gives the instruments endpoint time to start reporting
   // a good instrument
-  React.useEffect(() => {
+  useEffect(() => {
     if (attachedGripper?.ok === false) {
       setPollForSubsystemUpdate(true)
     } else if (
@@ -142,32 +130,18 @@ export function GripperCard({
           }
           banner={
             attachedGripper?.ok && !isCalibrated ? (
-              <Banner type="error" marginBottom={SPACING.spacing4} width="100%">
-                {isEstopNotDisengaged ? (
-                  <LegacyStyledText as="p">
-                    {t('calibration_needed_without_link')}
-                  </LegacyStyledText>
-                ) : (
-                  <Trans
-                    t={t}
-                    i18nKey={'calibration_needed'}
-                    components={{
-                      calLink: (
-                        <LegacyStyledText
-                          as="p"
-                          css={BANNER_LINK_CSS}
-                          onClick={handleCalibrate}
-                        />
-                      ),
-                    }}
-                  />
-                )}
-              </Banner>
+              <InlineNotification
+                type="error"
+                message={t('calibration_needed_without_link')}
+                linkText={isEstopNotDisengaged ? undefined : t('calibrate_now')}
+                onLinkClick={isEstopNotDisengaged ? undefined : handleCalibrate}
+                minWidth="12.625rem"
+              />
             ) : null
           }
           isGripperAttached={attachedGripper != null}
           label={t('shared:extension_mount')}
-          menuOverlayItems={menuOverlayItems}
+          menuOverlayItems={menuOverlayItems as MenuOverlayItemProps[]}
           isEstopNotDisengaged={isEstopNotDisengaged}
         />
       ) : null}
@@ -178,19 +152,15 @@ export function GripperCard({
           css={INSTRUMENT_CARD_STYLE}
           description={t('instrument_attached')}
           banner={
-            <Banner
-              type={subsystemUpdateData != null ? 'warning' : 'error'}
-              marginBottom={SPACING.spacing4}
-            >
-              <Trans
-                t={t}
-                i18nKey={
-                  subsystemUpdateData != null
-                    ? 'firmware_update_occurring'
-                    : 'firmware_update_needed'
-                }
-              />
-            </Banner>
+            <InlineNotification
+              type={subsystemUpdateData != null ? 'alert' : 'error'}
+              message={
+                subsystemUpdateData != null
+                  ? t('firmware_update_occurring')
+                  : t('firmware_update_needed')
+              }
+              minWidth="12.625rem"
+            />
           }
           isEstopNotDisengaged={isEstopNotDisengaged}
         />

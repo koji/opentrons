@@ -1,30 +1,31 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
-
-import type * as React from 'react'
-import { when } from 'vitest-when'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, it, beforeEach, vi, afterEach, expect } from 'vitest'
 import { screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { when } from 'vitest-when'
 
 import { OT2_ROBOT_TYPE } from '@opentrons/shared-data'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
+import { ModuleInfo } from '/app/molecules/ModuleInfo'
 import {
-  mockThermocycler as mockThermocyclerFixture,
   mockMagneticModule as mockMagneticModuleFixture,
+  mockThermocycler as mockThermocyclerFixture,
 } from '/app/redux/modules/__fixtures__/index'
 import { useMostRecentCompletedAnalysis } from '/app/resources/runs'
-import { ModuleInfo } from '/app/molecules/ModuleInfo'
-import { SetupModulesMap } from '../SetupModulesMap'
 import { getAttachedProtocolModuleMatches } from '/app/transformations/analysis'
+
+import { SetupModulesMap } from '../SetupModulesMap'
+
+import type { ComponentProps } from 'react'
+import type * as OpentronsComponents from '@opentrons/components'
 import type {
   CompletedProtocolAnalysis,
+  inferModuleOrientationFromXCoordinate,
   ModuleModel,
   ModuleType,
-  inferModuleOrientationFromXCoordinate,
 } from '@opentrons/shared-data'
-import type * as OpentronsComponents from '@opentrons/components'
 
 vi.mock('@opentrons/components', async importOriginal => {
   const actualComponents = await importOriginal<typeof OpentronsComponents>()
@@ -34,9 +35,8 @@ vi.mock('@opentrons/components', async importOriginal => {
   }
 })
 vi.mock('@opentrons/shared-data', async importOriginal => {
-  const actualSharedData = await importOriginal<
-    typeof inferModuleOrientationFromXCoordinate
-  >()
+  const actualSharedData =
+    await importOriginal<typeof inferModuleOrientationFromXCoordinate>()
   return {
     ...actualSharedData,
     inferModuleOrientationFromXCoordinate: vi.fn(),
@@ -47,7 +47,7 @@ vi.mock('/app/transformations/analysis')
 vi.mock('/app/molecules/ModuleInfo')
 vi.mock('/app/resources/modules')
 
-const render = (props: React.ComponentProps<typeof SetupModulesMap>) => {
+const render = (props: ComponentProps<typeof SetupModulesMap>) => {
   return renderWithProviders(
     <MemoryRouter>
       <SetupModulesMap {...props} />
@@ -77,7 +77,7 @@ const mockMagneticModule = {
     labwareInterfaceXDimension: 80,
     labwareInterfaceYDimension: 120,
   },
-  twoDimensionalRendering: { children: [] },
+  slotTransforms: {},
 }
 
 const mockTCModule = {
@@ -94,22 +94,22 @@ const mockTCModule = {
     labwareInterfaceXDimension: 80,
     labwareInterfaceYDimension: 120,
   },
-  twoDimensionalRendering: { children: [] },
+  slotTransforms: {},
 }
 
 describe('SetupModulesMap', () => {
-  let props: React.ComponentProps<typeof SetupModulesMap>
+  let props: ComponentProps<typeof SetupModulesMap>
   beforeEach(() => {
     props = {
       runId: MOCK_RUN_ID,
     }
     when(vi.mocked(useMostRecentCompletedAnalysis))
       .calledWith(MOCK_RUN_ID)
-      .thenReturn(({
+      .thenReturn({
         commands: [],
         labware: [],
         robotType: OT2_ROBOT_TYPE,
-      } as unknown) as CompletedProtocolAnalysis)
+      } as unknown as CompletedProtocolAnalysis)
     vi.mocked(getAttachedProtocolModuleMatches).mockReturnValue([])
   })
 
@@ -156,7 +156,7 @@ describe('SetupModulesMap', () => {
         expect.objectContaining({
           moduleModel: mockMagneticModule.model,
           isAttached: false,
-          physicalPort: null,
+          physicalPort: 'usb not connected',
           runId: MOCK_RUN_ID,
         }),
         // @ts-expect-error Potential Vitest issue. Seems this actually takes two args.
@@ -211,7 +211,7 @@ describe('SetupModulesMap', () => {
         expect.objectContaining({
           moduleModel: mockMagneticModule.model,
           isAttached: true,
-          physicalPort: mockMagneticModuleFixture.usbPort,
+          physicalPort: 'USB-1',
           runId: MOCK_RUN_ID,
         }),
         // @ts-expect-error Potential Vitest issue. Seems this actually takes two args.
@@ -224,7 +224,7 @@ describe('SetupModulesMap', () => {
         expect.objectContaining({
           moduleModel: mockTCModule.model,
           isAttached: true,
-          physicalPort: mockThermocyclerFixture.usbPort,
+          physicalPort: 'USB-1',
           runId: MOCK_RUN_ID,
         }),
         // @ts-expect-error Potential Vitest issue. Seems this actually takes two args.
@@ -287,7 +287,7 @@ describe('SetupModulesMap', () => {
         expect.objectContaining({
           moduleModel: mockMagneticModule.model,
           isAttached: true,
-          physicalPort: mockMagneticModuleFixture.usbPort,
+          physicalPort: 'USB-1',
           runId: MOCK_RUN_ID,
         }),
         // @ts-expect-error Potential Vitest issue. Seems this actually takes two args.
@@ -300,12 +300,7 @@ describe('SetupModulesMap', () => {
         expect.objectContaining({
           moduleModel: mockMagneticModule.model,
           isAttached: true,
-          physicalPort: {
-            port: dupModPort,
-            hub: false,
-            portGroup: 'unknown',
-            path: '',
-          },
+          physicalPort: `USB-${dupModPort}`,
           runId: MOCK_RUN_ID,
         }),
         // @ts-expect-error Potential Vitest issue. Seems this actually takes two args.

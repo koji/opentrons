@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
+
 import {
   DIRECTION_COLUMN,
   Flex,
@@ -9,10 +10,11 @@ import {
   StyledText,
 } from '@opentrons/components'
 
-import { getTopPortalEl } from '../../../../../../components/portals/TopPortal'
+import { getMainPagePortalEl } from '/protocol-designer/components/organisms'
+
 import { ThermocyclerProfileModal } from './ThermocyclerProfileModal'
 
-import type { FormData } from '../../../../../../form-types'
+import type { FormData } from '/protocol-designer/form-types'
 import type { FieldPropsByName } from '../../types'
 
 interface ProfileStepsSummaryProps {
@@ -35,13 +37,13 @@ export function ProfileStepsSummary(
               propsForFields={propsForFields}
               setShowProfileModal={setShowProfileModal}
             />,
-            getTopPortalEl()
+            getMainPagePortalEl()
           )
         : null}
       <Flex
         flexDirection={DIRECTION_COLUMN}
         gridGap={SPACING.spacing12}
-        padding={SPACING.spacing16}
+        padding={`0 ${SPACING.spacing16}`}
       >
         <StyledText desktopStyle="bodyDefaultSemiBold">
           {i18n.format(

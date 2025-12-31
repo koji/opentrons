@@ -1,4 +1,4 @@
-import * as React from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDispatch, useSelector } from 'react-redux'
 
@@ -7,64 +7,83 @@ import {
   COLORS,
   DIRECTION_COLUMN,
   DIRECTION_ROW,
-  FLEX_MAX_CONTENT,
+  Divider,
   Flex,
+  FLEX_MAX_CONTENT,
   Icon,
   LegacyStyledText,
-  Link,
   NO_WRAP,
   SPACING,
+  StyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
+import {
+  useInstrumentsQuery,
+  useProtocolQuery,
+} from '@opentrons/react-api-client'
 import {
   FLEX_ROBOT_TYPE,
   OT2_ROBOT_TYPE,
   parseAllRequiredModuleModels,
 } from '@opentrons/shared-data'
 
-import { Line } from '/app/atoms/structure'
+import { getIncompleteInstrumentCount } from '/app/local-resources/instruments'
 import { InfoMessage } from '/app/molecules/InfoMessage'
+import { SetupCamera } from '/app/organisms/Desktop/Devices/ProtocolRun/SetupCamera'
+import { useLPCFlows } from '/app/organisms/LabwarePositionCheck'
+import { useCameraAnalytics } from '/app/redux-resources/analytics/'
+import { useIsFlex, useRobot } from '/app/redux-resources/robots'
+import { useRequiredSetupStepsInOrder } from '/app/redux-resources/runs'
 import { INCOMPATIBLE, INEXACT_MATCH } from '/app/redux/pipettes'
+import {
+  appliedOffsetsToRun,
+  CAMERA_SETUP_STEP_KEY,
+  getCameraUsageState,
+  getMissingSetupSteps,
+  LABWARE_SETUP_STEP_KEY,
+  LPC_STEP_KEY,
+  MODULE_SETUP_STEP_KEY,
+  ROBOT_CALIBRATION_STEP_KEY,
+  selectAreOffsetsApplied,
+  selectIsAnyNecessaryDefaultOffsetMissing,
+  selectTotalCountLocationSpecificOffsets,
+  updateRunSetupStepsComplete,
+} from '/app/redux/protocol-runs'
+import { useStoredProtocolAnalysis } from '/app/resources/analysis'
+import { useUpdateClientLPC } from '/app/resources/client_data'
+import { useDeckConfigurationCompatibility } from '/app/resources/deck_configuration/hooks'
 import {
   getIsFixtureMismatch,
   getRequiredDeckConfig,
 } from '/app/resources/deck_configuration/utils'
-import { useDeckConfigurationCompatibility } from '/app/resources/deck_configuration/hooks'
-import { useRobot, useIsFlex } from '/app/redux-resources/robots'
-import { useRequiredSetupStepsInOrder } from '/app/redux-resources/runs'
-import { useStoredProtocolAnalysis } from '/app/resources/analysis'
+import { useRobotStorageInfo } from '/app/resources/health/useIsImageStorageLow'
 import {
+  useModuleCalibrationStatus,
   useMostRecentCompletedAnalysis,
-  useRunPipetteInfoByMount,
+  useNotifyRunQuery,
+  useProtocolAnalysisErrors,
   useRunCalibrationStatus,
   useRunHasStarted,
+  useRunPipetteInfoByMount,
   useUnmatchedModulesForProtocol,
-  useModuleCalibrationStatus,
-  useProtocolAnalysisErrors,
 } from '/app/resources/runs'
-import {
-  ROBOT_CALIBRATION_STEP_KEY,
-  MODULE_SETUP_STEP_KEY,
-  LPC_STEP_KEY,
-  LABWARE_SETUP_STEP_KEY,
-  LIQUID_SETUP_STEP_KEY,
-  updateRunSetupStepsComplete,
-  getMissingSetupSteps,
-} from '/app/redux/protocol-runs'
+
+import { EmptySetupStep } from './EmptySetupStep'
+import { LearnAboutOffsetsLink } from './LearnAboutOffsetsLink'
 import { SetupLabware } from './SetupLabware'
 import { SetupLabwarePositionCheck } from './SetupLabwarePositionCheck'
-import { SetupRobotCalibration } from './SetupRobotCalibration'
 import { SetupModuleAndDeck } from './SetupModuleAndDeck'
+import { SetupRobotCalibration } from './SetupRobotCalibration'
 import { SetupStep } from './SetupStep'
-import { SetupLiquids } from './SetupLiquids'
-import { EmptySetupStep } from './EmptySetupStep'
-import { HowLPCWorksModal } from './SetupLabwarePositionCheck/HowLPCWorksModal'
 
-import type { Dispatch, State } from '/app/redux/types'
+import type { RefObject } from 'react'
 import type { StepKey } from '/app/redux/protocol-runs'
+import type { Dispatch, State } from '/app/redux/types'
+
+const RUN_RECORD_REFETCH_MS = 5000
 
 interface ProtocolRunSetupProps {
-  protocolRunHeaderRef: React.RefObject<HTMLDivElement> | null
+  protocolRunHeaderRef: RefObject<HTMLDivElement> | null
   robotName: string
   runId: string
 }
@@ -74,17 +93,15 @@ export function ProtocolRunSetup({
   robotName,
   runId,
 }: ProtocolRunSetupProps): JSX.Element | null {
-  const { t, i18n } = useTranslation('protocol_setup')
+  const { t } = useTranslation('protocol_setup')
   const dispatch = useDispatch<Dispatch>()
   const robotProtocolAnalysis = useMostRecentCompletedAnalysis(runId)
   const storedProtocolAnalysis = useStoredProtocolAnalysis(runId)
   const protocolAnalysis = robotProtocolAnalysis ?? storedProtocolAnalysis
-  const {
-    orderedSteps,
-    orderedApplicableSteps,
-  } = useRequiredSetupStepsInOrder({ runId, protocolAnalysis })
+  const { orderedSteps, orderedApplicableSteps } = useRequiredSetupStepsInOrder(
+    { runId, protocolAnalysis }
+  )
   const modules = parseAllRequiredModuleModels(protocolAnalysis?.commands ?? [])
-
   const robot = useRobot(robotName)
   const calibrationStatusRobot = useRunCalibrationStatus(robotName, runId)
   const calibrationStatusModules = useModuleCalibrationStatus(robotName, runId)
@@ -92,15 +109,77 @@ export function ProtocolRunSetup({
   const isFlex = useIsFlex(robotName)
   const runHasStarted = useRunHasStarted(runId)
   const { analysisErrors } = useProtocolAnalysisErrors(runId)
-  const [expandedStepKey, setExpandedStepKey] = React.useState<StepKey | null>(
-    null
-  )
+  const [expandedStepKey, setExpandedStepKey] = useState<StepKey | null>(null)
   const robotType = isFlex ? FLEX_ROBOT_TYPE : OT2_ROBOT_TYPE
   const deckConfigCompatibility = useDeckConfigurationCompatibility(
     robotType,
     protocolAnalysis
   )
   const runPipetteInfoByMount = useRunPipetteInfoByMount(runId)
+  const { data: runRecord } = useNotifyRunQuery(runId, {
+    staleTime: Infinity,
+    refetchInterval: RUN_RECORD_REFETCH_MS,
+  })
+  const { data: protocolRecord } = useProtocolQuery(
+    runRecord?.data.protocolId ?? null,
+    {
+      staleTime: Infinity,
+    }
+  )
+  const protocolName =
+    protocolRecord?.data.metadata.protocolName ??
+    protocolRecord?.data.files[0].name ??
+    ''
+
+  const lpcUtils = useLPCFlows({
+    runId,
+    robotType,
+    protocolName,
+  })
+  const { enabled: cameraEnabled } = useSelector((state: State) =>
+    getCameraUsageState(state, runId)
+  )
+
+  const missingSteps = useSelector<State, StepKey[]>(
+    (state: State): StepKey[] => getMissingSetupSteps(state, runId)
+  )
+
+  const flexOffsetsMissing = useSelector(
+    selectIsAnyNecessaryDefaultOffsetMissing(runId)
+  )
+  const { updateWithRunId: updateLPCStatusWithRunId } = useUpdateClientLPC()
+  const flexOffsetsApplied = useSelector(selectAreOffsetsApplied(runId))
+  const noLwOffsetsInRun =
+    useSelector(selectTotalCountLocationSpecificOffsets(runId)) === 0 && isFlex
+
+  // A separate app can apply offsets. We need to update the missing steps as a side effect.
+  useEffect(() => {
+    if (flexOffsetsApplied) {
+      dispatch(updateRunSetupStepsComplete(runId, { [LPC_STEP_KEY]: true }))
+    }
+  }, [dispatch, flexOffsetsApplied, runId])
+
+  const offsetsConfirmed = isFlex
+    ? runHasStarted ||
+      (flexOffsetsApplied && !missingSteps.includes(LPC_STEP_KEY))
+    : !missingSteps.includes(LPC_STEP_KEY)
+  const buildLPCIncompleteText = (): string | null => {
+    if (isFlex) {
+      return flexOffsetsMissing
+        ? t('offsets_missing')
+        : t('offsets_not_applied')
+    } else {
+      return null
+    }
+  }
+
+  const buildLPCCompleteText = (): string => {
+    if (noLwOffsetsInRun) {
+      return t('offsets_not_required')
+    } else {
+      return isFlex ? t('offsets_applied') : t('offsets_ready')
+    }
+  }
 
   const isMissingPipette =
     (runPipetteInfoByMount.left != null &&
@@ -119,8 +198,13 @@ export function ProtocolRunSetup({
 
   const isMissingModule = missingModuleIds.length > 0
 
-  const liquids = protocolAnalysis?.liquids ?? []
-  const hasLiquids = liquids.length > 0
+  const { data: attachedInstruments } = useInstrumentsQuery()
+
+  const incompleteInstrumentCount: number | null =
+    protocolAnalysis != null && attachedInstruments != null
+      ? getIncompleteInstrumentCount(protocolAnalysis, attachedInstruments)
+      : null
+
   const hasModules = protocolAnalysis != null && modules.length > 0
   // need config compatibility (including check for single slot conflicts)
   const requiredDeckConfigCompatibility = getRequiredDeckConfig(
@@ -134,19 +218,60 @@ export function ProtocolRunSetup({
   const ot2DeckHardwareDescription = hasModules
     ? t('install_modules', { count: modules.length })
     : t('no_deck_hardware_specified')
-
-  const missingSteps = useSelector<State, StepKey[]>(
-    (state: State): StepKey[] => getMissingSetupSteps(state, runId)
-  )
+  const modulesOrFixturesReady =
+    calibrationStatusModules.complete && !isMissingModule && !isFixtureMismatch
+  const isCameraRequired =
+    protocolAnalysis?.commandPreconditions?.isCameraUsed ?? false
+  const isCameraConfirmed =
+    !missingSteps.includes(CAMERA_SETUP_STEP_KEY) || runHasStarted
+  const cameraSettingsApplied = runRecord?.data.cameraSettings != null
+  const storageInfo = useRobotStorageInfo()
+  const baseProps = {
+    source: 'runRecord' as const,
+    robotType: robotType,
+  }
+  const { reportPhotoAccessUsage } = useCameraAnalytics(baseProps)
+  useEffect(() => {
+    if (storageInfo.isImageStorageLow) {
+      reportPhotoAccessUsage({
+        ...baseProps,
+        transactionId: runId,
+        action: 'storageWarning',
+      })
+    }
+  }, [storageInfo.isImageStorageLow !== null])
+  // A separate app can apply camera settings.
+  // We need to update the missing steps as a side effect.
+  useEffect(() => {
+    if (cameraSettingsApplied && !isCameraConfirmed) {
+      dispatch(
+        updateRunSetupStepsComplete(runId, { [CAMERA_SETUP_STEP_KEY]: true })
+      )
+    }
+  }, [cameraSettingsApplied, dispatch, isCameraConfirmed, runId])
 
   if (robot == null) {
     return null
   }
+  const applicableSteps: StepKey[] = (() => {
+    const [firstStep, ...restSteps] = orderedApplicableSteps
+
+    return !modulesOrFixturesReady
+      ? ([firstStep, MODULE_SETUP_STEP_KEY, ...restSteps] as StepKey[])
+      : [...orderedApplicableSteps]
+  })()
+
+  const filteredNextStep =
+    applicableSteps[
+      applicableSteps.findIndex(step => step === ROBOT_CALIBRATION_STEP_KEY) + 1
+    ]
+
   const StepDetailMap: Record<
     StepKey,
     {
       stepInternals: JSX.Element
       description: string
+      descriptionElement: JSX.Element | null
       rightElProps: StepRightElementProps
     }
   > = {
@@ -155,13 +280,7 @@ export function ProtocolRunSetup({
         <SetupRobotCalibration
           robotName={robotName}
           runId={runId}
-          nextStep={
-            orderedApplicableSteps[
-              orderedApplicableSteps.findIndex(
-                v => v === ROBOT_CALIBRATION_STEP_KEY
-              ) + 1
-            ]
-          }
+          nextStep={filteredNextStep}
           expandStep={setExpandedStepKey}
           calibrationStatus={calibrationStatusRobot}
         />
@@ -170,14 +289,18 @@ export function ProtocolRunSetup({
       description: isFlex
         ? t(`${ROBOT_CALIBRATION_STEP_KEY}_description_pipettes_only`)
         : t(`${ROBOT_CALIBRATION_STEP_KEY}_description`),
+      descriptionElement: null,
       rightElProps: {
         stepKey: ROBOT_CALIBRATION_STEP_KEY,
         complete: calibrationStatusRobot.complete,
-        completeText: t('calibration_ready'),
+        completeText: isFlex
+          ? t('instruments_attached')
+          : t('calibration_ready'),
         missingHardware: isMissingPipette,
         incompleteText: t('calibration_needed'),
         missingHardwareText: t('action_needed'),
         incompleteElement: null,
+        disabledHardware: false,
       },
     },
     [MODULE_SETUP_STEP_KEY]: {
@@ -195,18 +318,15 @@ export function ProtocolRunSetup({
       description: isFlex
         ? flexDeckHardwareDescription
         : ot2DeckHardwareDescription,
+      descriptionElement: null,
       rightElProps: {
         stepKey: MODULE_SETUP_STEP_KEY,
-        complete:
-          calibrationStatusModules.complete &&
-          !isMissingModule &&
-          !isFixtureMismatch,
-        completeText:
-          isFlex && hasModules
-            ? t('calibration_ready')
-            : t('deck_hardware_ready'),
-        incompleteText:
-          isFlex && hasModules ? t('calibration_needed') : t('action_needed'),
+        complete: modulesOrFixturesReady,
+        completeText: isFlex
+          ? t('modules_and_fixtures_ready')
+          : t('modules_ready'),
+        incompleteText: t('action_needed'),
+        disabledHardware: false,
         missingHardware: isMissingModule || isFixtureMismatch,
         missingHardwareText: t('action_needed'),
         incompleteElement: null,
@@ -215,25 +335,38 @@ export function ProtocolRunSetup({
     [LPC_STEP_KEY]: {
       stepInternals: (
         <SetupLabwarePositionCheck
-          {...{ runId, robotName }}
+          {...{ runId, robotName, robotType }}
           setOffsetsConfirmed={confirmed => {
-            dispatch(
-              updateRunSetupStepsComplete(runId, { [LPC_STEP_KEY]: confirmed })
-            )
             if (confirmed) {
+              dispatch(appliedOffsetsToRun(runId))
+              dispatch(
+                updateRunSetupStepsComplete(runId, {
+                  [LPC_STEP_KEY]: confirmed,
+                })
+              )
+              updateLPCStatusWithRunId(runId)
+
               setExpandedStepKey(LABWARE_SETUP_STEP_KEY)
             }
           }}
-          offsetsConfirmed={!missingSteps.includes(LPC_STEP_KEY)}
+          offsetsConfirmed={offsetsConfirmed}
+          hasMissingModulesForFlex={isMissingModule}
+          hasMissingCalForFlex={
+            incompleteInstrumentCount != null && incompleteInstrumentCount > 0
+          }
+          lpcUtils={lpcUtils}
         />
       ),
-      description: t('labware_position_check_step_description'),
+      description: noLwOffsetsInRun
+        ? t('no_offsets_in_run')
+        : t('labware_position_check_step_description'),
+      descriptionElement: <LearnAboutOffsetsLink />,
       rightElProps: {
         stepKey: LPC_STEP_KEY,
-        complete: !missingSteps.includes(LPC_STEP_KEY),
-        completeText: t('offsets_ready'),
-        incompleteText: null,
-        incompleteElement: <LearnAboutLPC />,
+        complete: offsetsConfirmed,
+        completeText: buildLPCCompleteText(),
+        incompleteText: buildLPCIncompleteText(),
+        incompleteElement: null,
       },
     },
     [LABWARE_SETUP_STEP_KEY]: {
@@ -249,55 +382,61 @@ export function ProtocolRunSetup({
               })
             )
             if (confirmed) {
-              const nextStep =
-                orderedApplicableSteps.findIndex(
-                  v => v === LABWARE_SETUP_STEP_KEY
-                ) ===
-                orderedApplicableSteps.length - 1
-                  ? null
-                  : LIQUID_SETUP_STEP_KEY
-              setExpandedStepKey(nextStep)
+              setExpandedStepKey(CAMERA_SETUP_STEP_KEY)
             }
           }}
         />
       ),
       description: t(`${LABWARE_SETUP_STEP_KEY}_description`),
+      descriptionElement: null,
       rightElProps: {
         stepKey: LABWARE_SETUP_STEP_KEY,
         complete: !missingSteps.includes(LABWARE_SETUP_STEP_KEY),
         completeText: t('placements_ready'),
         incompleteText: null,
-        incompleteElement: null,
+        incompleteElement: (
+          <StyledText
+            color={COLORS.black90}
+            css={TYPOGRAPHY.pSemiBold}
+            marginRight={SPACING.spacing16}
+            id={`RunSetupCard_${LABWARE_SETUP_STEP_KEY}_incompleteText`}
+            whiteSpace={NO_WRAP}
+          >
+            {t('check_locations_and_volumes')}
+          </StyledText>
+        ),
       },
     },
-    [LIQUID_SETUP_STEP_KEY]: {
+    [CAMERA_SETUP_STEP_KEY]: {
       stepInternals: (
-        <SetupLiquids
-          robotName={robotName}
+        <SetupCamera
           runId={runId}
-          protocolAnalysis={protocolAnalysis}
-          isLiquidSetupConfirmed={!missingSteps.includes(LIQUID_SETUP_STEP_KEY)}
-          setLiquidSetupConfirmed={(confirmed: boolean) => {
+          robotName={robotName}
+          isCameraRequired={isCameraRequired}
+          cameraConfirmed={isCameraConfirmed}
+          confirmCameraSettings={() => {
             dispatch(
               updateRunSetupStepsComplete(runId, {
-                [LIQUID_SETUP_STEP_KEY]: confirmed,
+                [CAMERA_SETUP_STEP_KEY]: true,
               })
             )
-            if (confirmed) {
-              setExpandedStepKey(null)
-            }
+            setExpandedStepKey(null)
           }}
         />
       ),
-      description: hasLiquids
-        ? t(`${LIQUID_SETUP_STEP_KEY}_description`)
-        : i18n.format(t('liquids_not_in_the_protocol'), 'capitalize'),
+      description: t(`${CAMERA_SETUP_STEP_KEY}_description`),
+      descriptionElement: null,
       rightElProps: {
-        stepKey: LIQUID_SETUP_STEP_KEY,
-        complete: !missingSteps.includes(LIQUID_SETUP_STEP_KEY),
-        completeText: t('liquids_ready'),
-        incompleteText: null,
+        stepKey: CAMERA_SETUP_STEP_KEY,
+        complete: !missingSteps.includes(CAMERA_SETUP_STEP_KEY),
+        completeText: cameraEnabled
+          ? t('camera_enabled')
+          : t('camera_disabled'),
+        incompleteText: t('check_preferences'),
         incompleteElement: null,
+        disabledHardware: !cameraEnabled && isCameraRequired,
+        missingHardware: !!storageInfo?.isImageStorageLow,
+        missingHardwareText: t('check_preferences'),
       },
     },
   }
@@ -321,10 +460,10 @@ export function ProtocolRunSetup({
             orderedSteps.map((stepKey, index) => {
               const setupStepTitle = t(`${stepKey}_title`)
               const showEmptySetupStep =
-                (stepKey === 'liquid_setup_step' && !hasLiquids) ||
                 (stepKey === 'module_setup_step' &&
                   ((!isFlex && !hasModules) ||
-                    (isFlex && !hasModules && !hasFixtures)))
+                    (isFlex && !hasModules && !hasFixtures))) ||
+                (stepKey === 'labware_position_check_step' && noLwOffsetsInRun)
               return (
                 <Flex flexDirection={DIRECTION_COLUMN} key={stepKey}>
                   {showEmptySetupStep ? (
@@ -342,6 +481,9 @@ export function ProtocolRunSetup({
                       expanded={stepKey === expandedStepKey}
                       title={setupStepTitle}
                       description={StepDetailMap[stepKey].description}
+                      descriptionElement={
+                        StepDetailMap[stepKey].descriptionElement
+                      }
                       toggleExpanded={() => {
                         stepKey === expandedStepKey
                           ? setExpandedStepKey(null)
@@ -357,7 +499,7 @@ export function ProtocolRunSetup({
                     </SetupStep>
                   )}
                   {index !== orderedSteps.length - 1 ? (
-                    <Line marginTop={SPACING.spacing24} />
+                    <Divider marginTop={SPACING.spacing24} marginBottom={0} />
                   ) : null}
                 </Flex>
               )
@@ -385,9 +527,13 @@ interface NoHardwareRequiredStepCompletion {
 }
 
 interface HardwareRequiredStepCompletion {
-  stepKey: typeof ROBOT_CALIBRATION_STEP_KEY | typeof MODULE_SETUP_STEP_KEY
+  stepKey:
+    | typeof ROBOT_CALIBRATION_STEP_KEY
+    | typeof MODULE_SETUP_STEP_KEY
+    | typeof CAMERA_SETUP_STEP_KEY
   complete: boolean
   missingHardware: boolean
+  disabledHardware: boolean
   incompleteText: string | null
   incompleteElement: JSX.Element | null
   completeText: string
@@ -402,7 +548,8 @@ const stepRequiresHW = (
   props: StepRightElementProps
 ): props is HardwareRequiredStepCompletion =>
   props.stepKey === ROBOT_CALIBRATION_STEP_KEY ||
-  props.stepKey === MODULE_SETUP_STEP_KEY
+  props.stepKey === MODULE_SETUP_STEP_KEY ||
+  props.stepKey === CAMERA_SETUP_STEP_KEY
 
 function StepRightElement(props: StepRightElementProps): JSX.Element | null {
   if (props.complete) {
@@ -414,41 +561,53 @@ function StepRightElement(props: StepRightElementProps): JSX.Element | null {
       >
         <Icon
           size="1rem"
-          color={COLORS.green50}
+          color={COLORS.green60}
           marginRight={SPACING.spacing8}
           name="ot-check"
           id={`RunSetupCard_${props.stepKey}_completeIcon`}
         />
-        <LegacyStyledText
-          color={COLORS.black90}
-          css={TYPOGRAPHY.pSemiBold}
+        <StyledText
+          desktopStyle="bodyDefaultSemiBold"
+          color={COLORS.green60}
           marginRight={SPACING.spacing16}
           id={`RunSetupCard_${props.stepKey}_completeText`}
-          whitespace={NO_WRAP}
         >
           {props.completeText}
-        </LegacyStyledText>
+        </StyledText>
       </Flex>
     )
-  } else if (stepRequiresHW(props) && props.missingHardware) {
+  } else if (stepRequiresHW(props)) {
     return (
       <Flex flexDirection={DIRECTION_ROW} alignItems={ALIGN_CENTER}>
         <Icon
           size="1rem"
-          color={COLORS.yellow50}
+          color={
+            props.disabledHardware
+              ? COLORS.red60
+              : props.missingHardware
+                ? COLORS.yellow60
+                : COLORS.grey60
+          }
           marginRight={SPACING.spacing8}
-          name="alert-circle"
+          name="ot-alert"
           id={`RunSetupCard_${props.stepKey}_missingHardwareIcon`}
         />
-        <LegacyStyledText
-          color={COLORS.black90}
-          css={TYPOGRAPHY.pSemiBold}
+        <StyledText
+          desktopStyle="bodyDefaultSemiBold"
+          color={
+            props.disabledHardware
+              ? COLORS.red60
+              : props.missingHardware
+                ? COLORS.yellow60
+                : COLORS.grey60
+          }
           marginRight={SPACING.spacing16}
           id={`RunSetupCard_${props.stepKey}_missingHardwareText`}
-          whitespace={NO_WRAP}
         >
-          {props.missingHardwareText}
-        </LegacyStyledText>
+          {props.missingHardware
+            ? props.missingHardwareText
+            : props.incompleteText}
+        </StyledText>
       </Flex>
     )
   } else if (props.incompleteText != null) {
@@ -456,20 +615,19 @@ function StepRightElement(props: StepRightElementProps): JSX.Element | null {
       <Flex flexDirection={DIRECTION_ROW} alignItems={ALIGN_CENTER}>
         <Icon
           size="1rem"
-          color={COLORS.yellow50}
+          color={COLORS.grey60}
           marginRight={SPACING.spacing8}
-          name="alert-circle"
+          name="ot-alert"
           id={`RunSetupCard_${props.stepKey}_incompleteIcon`}
         />
-        <LegacyStyledText
-          color={COLORS.black90}
-          css={TYPOGRAPHY.pSemiBold}
+        <StyledText
+          desktopStyle="bodyDefaultSemiBold"
+          color={COLORS.grey60}
           marginRight={SPACING.spacing16}
           id={`RunSetupCard_${props.stepKey}_incompleteText`}
-          whitespace={NO_WRAP}
         >
           {props.incompleteText}
-        </LegacyStyledText>
+        </StyledText>
       </Flex>
     )
   } else if (props.incompleteElement != null) {
@@ -477,33 +635,4 @@ function StepRightElement(props: StepRightElementProps): JSX.Element | null {
   } else {
     return null
   }
-}
-
-function LearnAboutLPC(): JSX.Element {
-  const { t } = useTranslation('protocol_setup')
-  const [showLPCHelpModal, setShowLPCHelpModal] = React.useState(false)
-  return (
-    <>
-      <Link
-        css={TYPOGRAPHY.linkPSemiBold}
-        marginRight={SPACING.spacing16}
-        whiteSpace={NO_WRAP}
-        onClick={(e: React.MouseEvent) => {
-          // clicking link shouldn't toggle step expanded state
-          e.preventDefault()
-          e.stopPropagation()
-          setShowLPCHelpModal(true)
-        }}
-      >
-        {t('learn_how_it_works')}
-      </Link>
-      {showLPCHelpModal ? (
-        <HowLPCWorksModal
-          onCloseClick={() => {
-            setShowLPCHelpModal(false)
-          }}
-        />
-      ) : null}
-    </>
-  )
 }

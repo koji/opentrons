@@ -1,32 +1,32 @@
-import * as React from 'react'
-import { css } from 'styled-components'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { css } from 'styled-components'
+
 import {
   ALIGN_FLEX_END,
   Btn,
   COLORS,
+  LegacyStyledText,
   PrimaryButton,
   RESPONSIVENESS,
   SecondaryButton,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
-import { LEFT, RIGHT, NINETY_SIX_CHANNEL } from '@opentrons/shared-data'
+import { LEFT, NINETY_SIX_CHANNEL, RIGHT } from '@opentrons/shared-data'
+
 import { SmallButton } from '/app/atoms/buttons'
+import { usePipetteNameSpecs } from '/app/local-resources/instruments'
 import {
   SimpleWizardBody,
   SimpleWizardInProgressBody,
 } from '/app/molecules/SimpleWizardBody'
-import { usePipetteNameSpecs } from '/app/local-resources/instruments'
+
 import { CheckPipetteButton } from './CheckPipetteButton'
 import { FLOWS } from './constants'
 
-import type {
-  LoadedPipette,
-  MotorAxes,
-  PipetteName,
-} from '@opentrons/shared-data'
+import type { Dispatch, SetStateAction } from 'react'
+import type { LoadedPipette, MotorAxes } from '@opentrons/shared-data'
 import type { PipetteWizardStepProps } from './types'
 
 interface ResultsProps extends PipetteWizardStepProps {
@@ -34,7 +34,7 @@ interface ResultsProps extends PipetteWizardStepProps {
   currentStepIndex: number
   totalStepCount: number
   isFetching: boolean
-  setFetching: React.Dispatch<React.SetStateAction<boolean>>
+  setFetching: Dispatch<SetStateAction<boolean>>
   hasCalData: boolean
   requiredPipette?: LoadedPipette
   nextMount?: string
@@ -75,10 +75,9 @@ export const Results = (props: ResultsProps): JSX.Element => {
     requiredPipette.pipetteName === attachedPipettes[mount]?.instrumentName
 
   const requiredPipDisplayName =
-    usePipetteNameSpecs(requiredPipette?.pipetteName as PipetteName)
-      ?.displayName ?? null
+    usePipetteNameSpecs(requiredPipette?.pipetteName!)?.displayName ?? null
 
-  const [numberOfTryAgains, setNumberOfTryAgains] = React.useState<number>(0)
+  const [numberOfTryAgains, setNumberOfTryAgains] = useState<number>(0)
   let header: string = 'unknown results screen'
   let iconColor: string = COLORS.green50
   let isSuccess: boolean = true

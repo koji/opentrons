@@ -2,7 +2,7 @@ import typing
 from datetime import datetime
 
 from functools import partial
-from pydantic import BaseModel, Field
+from pydantic import ConfigDict, BaseModel, Field
 
 from robot_server.service.json_api import (
     DeprecatedResponseDataModel,
@@ -57,8 +57,7 @@ class LabwareCalibration(DeprecatedResponseDataModel):
 
     calibrationData: CalibrationData = Field(
         ...,
-        description="A dictionary of calibration data"
-        "including tip length and offsets",
+        description="A dictionary of calibration dataincluding tip length and offsets",
     )
     loadName: str = Field(..., description="The loadname of the labware definition.")
     namespace: str = Field(
@@ -73,9 +72,8 @@ class LabwareCalibration(DeprecatedResponseDataModel):
     definitionHash: str = Field(
         ..., description="The sha256 hash of key labware definition details"
     )
-
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "examples": [
                 {
                     "calibrationData": {
@@ -111,6 +109,7 @@ class LabwareCalibration(DeprecatedResponseDataModel):
                 },
             ]
         }
+    )
 
 
 MultipleCalibrationsResponse = DeprecatedMultiResponseModel[LabwareCalibration]

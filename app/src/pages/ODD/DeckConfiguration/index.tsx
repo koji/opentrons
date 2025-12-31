@@ -1,4 +1,4 @@
-import * as React from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
@@ -11,15 +11,16 @@ import {
   JUSTIFY_SPACE_AROUND,
 } from '@opentrons/components'
 
-import { ChildNavigation } from '/app/organisms/ODD/ChildNavigation'
-import { DeckFixtureSetupInstructionsModal } from '/app/organisms/DeviceDetailsDeckConfiguration/DeckFixtureSetupInstructionsModal'
-import { DeckConfigurationDiscardChangesModal } from '/app/organisms/DeviceDetailsDeckConfiguration/DeckConfigurationDiscardChangesModal'
 import { getTopPortalEl } from '/app/App/portal'
+import { DeckConfigurationDiscardChangesModal } from '/app/organisms/DeviceDetailsDeckConfiguration/DeckConfigurationDiscardChangesModal'
+import { DeckFixtureSetupInstructionsModal } from '/app/organisms/DeviceDetailsDeckConfiguration/DeckFixtureSetupInstructionsModal'
+import { ChildNavigation } from '/app/organisms/ODD/ChildNavigation'
 import {
   useDeckConfigurationEditingTools,
   useNotifyDeckConfigurationQuery,
 } from '/app/resources/deck_configuration'
 
+import type { ComponentProps } from 'react'
 import type { SmallButton } from '/app/atoms/buttons'
 
 export function DeckConfigurationEditor(): JSX.Element {
@@ -29,22 +30,15 @@ export function DeckConfigurationEditor(): JSX.Element {
     'shared',
   ])
   const navigate = useNavigate()
-  const [
-    showSetupInstructionsModal,
-    setShowSetupInstructionsModal,
-  ] = React.useState<boolean>(false)
+  const [showSetupInstructionsModal, setShowSetupInstructionsModal] =
+    useState<boolean>(false)
 
   const isOnDevice = true
-  const {
-    addFixtureToCutout,
-    removeFixtureFromCutout,
-    addFixtureModal,
-  } = useDeckConfigurationEditingTools(isOnDevice)
+  const { addFixtureToCutout, removeFixtureFromCutout, addFixtureModal } =
+    useDeckConfigurationEditingTools(isOnDevice)
 
-  const [
-    showDiscardChangeModal,
-    setShowDiscardChangeModal,
-  ] = React.useState<boolean>(false)
+  const [showDiscardChangeModal, setShowDiscardChangeModal] =
+    useState<boolean>(false)
 
   const deckConfig = useNotifyDeckConfigurationQuery().data ?? []
 
@@ -52,7 +46,7 @@ export function DeckConfigurationEditor(): JSX.Element {
     navigate(-1)
   }
 
-  const secondaryButtonProps: React.ComponentProps<typeof SmallButton> = {
+  const secondaryButtonProps: ComponentProps<typeof SmallButton> = {
     onClick: () => {
       setShowSetupInstructionsModal(true)
     },

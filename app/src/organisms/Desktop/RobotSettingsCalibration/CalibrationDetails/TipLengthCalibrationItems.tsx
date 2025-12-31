@@ -5,20 +5,21 @@ import styled, { css } from 'styled-components'
 import {
   BORDERS,
   COLORS,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
-import { useAttachedPipettes } from '/app/resources/instruments'
 import { getCustomLabwareDefinitions } from '/app/redux/custom-labware'
+import { useAttachedPipettes } from '/app/resources/instruments'
+
 import { OverflowMenu } from './OverflowMenu'
 import { formatLastCalibrated, getDisplayNameForTipRack } from './utils'
 
 import type { Mount } from '@opentrons/components'
 import type { State } from '/app/redux/types'
-import type { FormattedTipLengthCalibration } from '../RobotSettingsTipLengthCalibration'
 import type { FormattedPipetteOffsetCalibration } from '..'
+import type { FormattedTipLengthCalibration } from '../RobotSettingsTipLengthCalibration'
 
 const StyledTable = styled.table`
   width: 100%;
@@ -44,16 +45,16 @@ const BODY_STYLE = css`
 `
 interface TipLengthCalibrationItemsProps {
   robotName: string
+  isRobotBusy: boolean
   formattedPipetteOffsetCalibrations: FormattedPipetteOffsetCalibration[]
   formattedTipLengthCalibrations: FormattedTipLengthCalibration[]
-  updateRobotStatus: (isRobotBusy: boolean) => void
 }
 
 export function TipLengthCalibrationItems({
   robotName,
+  isRobotBusy,
   formattedPipetteOffsetCalibrations,
   formattedTipLengthCalibrations,
-  updateRobotStatus,
 }: TipLengthCalibrationItemsProps): JSX.Element {
   const { t } = useTranslation('device_settings')
   const customLabwareDefs = useSelector((state: State) => {
@@ -98,7 +99,7 @@ export function TipLengthCalibrationItems({
         {tipLengthCalibrations.map((calibration, index) => (
           <StyledTableRow key={index}>
             <StyledTableCell>
-              <LegacyStyledText as="p">
+              <LegacyStyledText forwardedAs="p">
                 {calibration.tiprackDefURI &&
                   getDisplayNameForTipRack(
                     calibration.tiprackDefURI,
@@ -107,15 +108,15 @@ export function TipLengthCalibrationItems({
               </LegacyStyledText>
             </StyledTableCell>
             <StyledTableCell>
-              <LegacyStyledText as="p">
+              <LegacyStyledText forwardedAs="p">
                 {calibration.modelName}
               </LegacyStyledText>
-              <LegacyStyledText as="p">
+              <LegacyStyledText forwardedAs="p">
                 {calibration.serialNumber}
               </LegacyStyledText>
             </StyledTableCell>
             <StyledTableCell>
-              <LegacyStyledText as="p">
+              <LegacyStyledText forwardedAs="p">
                 {calibration.lastCalibrated !== undefined
                   ? formatLastCalibrated(calibration.lastCalibrated)
                   : 'Not calibrated'}
@@ -125,13 +126,13 @@ export function TipLengthCalibrationItems({
               <OverflowMenu
                 calType="tipLength"
                 robotName={robotName}
+                isRobotBusy={isRobotBusy}
                 serialNumber={calibration.serialNumber}
                 mount={
                   calibration.mount != null
                     ? calibration.mount
                     : checkMountWithAttachedPipettes(calibration.serialNumber)
                 }
-                updateRobotStatus={updateRobotStatus}
                 tiprackDefURI={calibration.tiprackDefURI}
               />
             </StyledTableCell>

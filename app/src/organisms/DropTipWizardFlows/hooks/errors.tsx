@@ -2,15 +2,15 @@ import { useTranslation } from 'react-i18next'
 
 import { AlertPrimaryButton, SPACING } from '@opentrons/components'
 
-import { DROP_TIP_SPECIAL_ERROR_TYPES } from '../constants'
 import { SmallButton } from '/app/atoms/buttons'
+
+import { DROP_TIP_SPECIAL_ERROR_TYPES } from '../constants'
 
 import type { RunCommandError } from '@opentrons/shared-data'
 import type { ErrorDetails } from '../types'
 
 export interface SetRobotErrorDetailsParams {
-  runCommandError?: RunCommandError
-  message?: string
+  message: string | null
   header?: string
   type?: RunCommandError['errorType']
 }
@@ -23,16 +23,8 @@ export function useDropTipCommandErrors(
 ): (cbProps: SetRobotErrorDetailsParams) => void {
   const { t } = useTranslation('drop_tip_wizard')
 
-  return ({
-    runCommandError,
-    message,
-    header,
-    type,
-  }: SetRobotErrorDetailsParams) => {
-    if (
-      runCommandError?.errorType ===
-      DROP_TIP_SPECIAL_ERROR_TYPES.MUST_HOME_ERROR
-    ) {
+  return ({ message, header, type }: SetRobotErrorDetailsParams) => {
+    if (type === DROP_TIP_SPECIAL_ERROR_TYPES.MUST_HOME_ERROR) {
       const headerText = t('cant_safely_drop_tips')
       const messageText = t('remove_the_tips_manually')
 
@@ -43,7 +35,11 @@ export function useDropTipCommandErrors(
       })
     } else {
       const messageText = message ?? ''
-      setErrorDetails({ header, message: messageText, type })
+      setErrorDetails({
+        header: header ?? t('cant_safely_drop_tips'),
+        message: messageText ?? t('remove_the_tips_manually'),
+        type,
+      })
     }
   }
 }

@@ -1,4 +1,5 @@
 """Utils for motion planning."""
+
 import numpy as np
 import logging
 from typing import Iterator, List, Tuple, Set, TYPE_CHECKING, cast
@@ -425,10 +426,10 @@ def build_blocks(
     - have at most one 0 acceleration coast phase at our max speed
     """
     log = logging.getLogger("build_blocks")
-    assert abs(initial_speed) <= max_speed or np.isclose(
+    assert abs(initial_speed) <= abs(max_speed) or np.isclose(
         abs(initial_speed), max_speed
     ), f"initial speed {initial_speed} exceeds max speed {max_speed}"
-    assert abs(final_speed) <= max_speed or np.isclose(
+    assert abs(final_speed) <= abs(max_speed) or np.isclose(
         abs(final_speed), max_speed
     ), f"final speed {final_speed} exceeds max speed {max_speed}"
 

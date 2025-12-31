@@ -1,4 +1,3 @@
-import type * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDispatch, useSelector } from 'react-redux'
 
@@ -7,8 +6,8 @@ import {
   DIRECTION_COLUMN,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
@@ -19,6 +18,7 @@ import {
   updateConfigValue,
 } from '/app/redux/config'
 
+import type { ComponentProps } from 'react'
 import type { SelectOption } from '/app/atoms/SelectField/Select'
 import type { Dispatch } from '/app/redux/types'
 
@@ -31,15 +31,14 @@ export function UpdatedChannel(): JSX.Element {
     dispatch(updateConfigValue('update.channel', value))
   }
 
-  const formatOptionLabel: React.ComponentProps<
+  const formatOptionLabel: ComponentProps<
     typeof SelectField
   >['formatOptionLabel'] = (option, index): JSX.Element => {
     const { label, value } = option
     return (
       <LegacyStyledText
-        as="p"
+        forwardedAs="p"
         textTransform={TYPOGRAPHY.textTransformCapitalize}
-        id={index}
       >
         {value === 'latest' ? label : value}
       </LegacyStyledText>
@@ -60,7 +59,7 @@ export function UpdatedChannel(): JSX.Element {
         >
           {t('update_channel')}
         </LegacyStyledText>
-        <LegacyStyledText as="p" paddingBottom={SPACING.spacing8}>
+        <LegacyStyledText forwardedAs="p" paddingBottom={SPACING.spacing8}>
           {t('update_description')}
         </LegacyStyledText>
       </Flex>

@@ -1,5 +1,5 @@
-import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 
 import {
   ALIGN_CENTER,
@@ -7,14 +7,14 @@ import {
   DIRECTION_COLUMN,
   Flex,
   JUSTIFY_CENTER,
-  SPACING,
   LegacyStyledText,
+  SPACING,
+  StepMeter,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
-import { StepMeter } from '/app/atoms/StepMeter'
-import { MediumButton } from '/app/atoms/buttons'
 import screenImage from '/app/assets/images/on-device-display/odd_abstract@x2.png'
+import { MediumButton } from '/app/atoms/buttons'
 
 const IMAGE_ALT = 'finish setting up a robot'
 
@@ -39,7 +39,10 @@ export function ConfirmRobotName({
         flexDirection={DIRECTION_COLUMN}
       >
         <Flex justifyContent={JUSTIFY_CENTER} marginBottom="3.041875rem">
-          <LegacyStyledText as="h2" fontWeight={TYPOGRAPHY.fontWeightBold}>
+          <LegacyStyledText
+            forwardedAs="h2"
+            fontWeight={TYPOGRAPHY.fontWeightBold}
+          >
             {t('name_love_it', { name: robotName })}
           </LegacyStyledText>
         </Flex>
@@ -56,7 +59,7 @@ export function ConfirmRobotName({
               height="236px"
             />
             <LegacyStyledText
-              as="h4"
+              forwardedAs="h4"
               fontWeight={TYPOGRAPHY.fontWeightRegular}
               marginTop={SPACING.spacing12}
               marginBottom={SPACING.spacing40}

@@ -1,12 +1,12 @@
 import type { DeckSlotId, ModuleModel } from '../../js/types'
 import type {
-  ProtocolFile as V3ProtocolFile,
   AspDispAirgapParams,
   BlowoutParams,
-  TouchTipParams,
-  PipetteAccessParams,
-  MoveToSlotParams,
   DelayParams,
+  MoveToSlotParams,
+  PipetteAccessParams,
+  TouchTipParams,
+  ProtocolFile as V3ProtocolFile,
 } from './schemaV3'
 
 export type { BlowoutParams, FilePipette, FileLabware } from './schemaV3'
@@ -134,11 +134,10 @@ export type Command =
     }
 
 // NOTE: must be kept in sync with '../schemas/4.json'
-export interface ProtocolFile<DesignerApplicationData>
-  extends Omit<
-    V3ProtocolFile<DesignerApplicationData>,
-    'schemaVersion' | 'commands'
-  > {
+export interface ProtocolFile<DesignerApplicationData> extends Omit<
+  V3ProtocolFile<DesignerApplicationData>,
+  'schemaVersion' | 'commands'
+> {
   $otSharedSchema: '#/protocol/schemas/4'
   schemaVersion: 4
   modules: Record<string, FileModule>

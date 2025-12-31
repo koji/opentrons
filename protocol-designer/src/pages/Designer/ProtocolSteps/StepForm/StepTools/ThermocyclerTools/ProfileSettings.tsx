@@ -1,41 +1,33 @@
 import { useTranslation } from 'react-i18next'
+
 import {
   DIRECTION_COLUMN,
   Flex,
   SPACING,
   StyledText,
 } from '@opentrons/components'
-import { InputStepFormField } from '../../../../../../molecules'
-import { getFormErrorsMappedToField, getFormLevelError } from '../../utils'
 
-import type { StepFormErrors } from '../../../../../../steplist'
+import { InputStepFormField } from '/protocol-designer/components/molecules'
+
 import type { FieldPropsByName } from '../../types'
 
 interface ProfileSettingsProps {
   propsForFields: FieldPropsByName
   showFormErrors: boolean
-  visibleFormErrors: StepFormErrors
   focusedField?: string | null
 }
 export function ProfileSettings(props: ProfileSettingsProps): JSX.Element {
-  const {
-    propsForFields,
-    showFormErrors,
-    visibleFormErrors,
-    focusedField,
-  } = props
+  const { propsForFields } = props
 
-  const mappedErrorsToField = getFormErrorsMappedToField(visibleFormErrors)
-
-  const { i18n, t } = useTranslation(['application', 'form'])
+  const { t } = useTranslation(['application', 'form'])
   return (
     <Flex
       flexDirection={DIRECTION_COLUMN}
       gridGap={SPACING.spacing12}
-      padding={SPACING.spacing16}
+      padding={`0 ${SPACING.spacing16}`}
     >
       <StyledText desktopStyle="bodyDefaultSemiBold">
-        {i18n.format(t('stepType.profile_settings'), 'capitalize')}
+        {t('stepType.profile')}
       </StyledText>
       <InputStepFormField
         {...propsForFields.profileVolume}
@@ -43,12 +35,6 @@ export function ProfileSettings(props: ProfileSettingsProps): JSX.Element {
         units={t('units.microliter')}
         padding="0"
         showTooltip={false}
-        formLevelError={getFormLevelError(
-          showFormErrors,
-          'profileVolume',
-          mappedErrorsToField,
-          focusedField
-        )}
       />
       <InputStepFormField
         {...propsForFields.profileTargetLidTemp}
@@ -59,12 +45,6 @@ export function ProfileSettings(props: ProfileSettingsProps): JSX.Element {
         units={t('units.degrees')}
         padding="0"
         showTooltip={false}
-        formLevelError={getFormLevelError(
-          showFormErrors,
-          'profileTargetLidTemp',
-          mappedErrorsToField,
-          focusedField
-        )}
       />
     </Flex>
   )

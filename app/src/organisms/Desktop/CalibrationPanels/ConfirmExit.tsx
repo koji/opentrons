@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+
 import {
   AlertPrimaryButton,
   ALIGN_CENTER,
@@ -8,9 +9,9 @@ import {
   Icon,
   JUSTIFY_CENTER,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   SecondaryButton,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
@@ -46,12 +47,12 @@ export function ConfirmExit(props: ConfirmExitProps): JSX.Element {
           marginBottom={SPACING.spacing24}
         />
         {heading != null ? (
-          <LegacyStyledText as="h1" marginBottom={SPACING.spacing8}>
+          <LegacyStyledText forwardedAs="h1" marginBottom={SPACING.spacing8}>
             {heading}
           </LegacyStyledText>
         ) : null}
         {body != null ? (
-          <LegacyStyledText as="p">{body}</LegacyStyledText>
+          <LegacyStyledText forwardedAs="p">{body}</LegacyStyledText>
         ) : null}
       </Flex>
       <Flex

@@ -1,6 +1,7 @@
-import last from 'lodash/last'
 import { useTranslation } from 'react-i18next'
+import last from 'lodash/last'
 import styled from 'styled-components'
+
 import {
   BORDERS,
   COLORS,
@@ -8,19 +9,18 @@ import {
   DIRECTION_ROW,
   Flex,
   Icon,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
   WRAP,
 } from '@opentrons/components'
-import { parseLiquidsInLoadOrder } from '@opentrons/shared-data'
-import { EmptySection } from './EmptySection'
-
 import {
   useProtocolAnalysisAsDocumentQuery,
   useProtocolQuery,
 } from '@opentrons/react-api-client'
-import type { CompletedProtocolAnalysis } from '@opentrons/shared-data'
+import { parseLiquidsInLoadOrder } from '@opentrons/shared-data'
+
+import { EmptySection } from './EmptySection'
 
 const Table = styled('table')`
   table-layout: ${SPACING.spacingAuto};
@@ -59,16 +59,14 @@ const TableDatum = styled('td')`
 export const Liquids = (props: { protocolId: string }): JSX.Element => {
   const { protocolId } = props
   const { data: protocolData } = useProtocolQuery(protocolId)
-  const {
-    data: mostRecentAnalysis,
-  } = useProtocolAnalysisAsDocumentQuery(
+  const { data: mostRecentAnalysis } = useProtocolAnalysisAsDocumentQuery(
     protocolId,
     last(protocolData?.data.analysisSummaries)?.id ?? null,
     { enabled: protocolData != null }
   )
   const liquidsInOrder = parseLiquidsInLoadOrder(
-    (mostRecentAnalysis as CompletedProtocolAnalysis).liquids ?? [],
-    (mostRecentAnalysis as CompletedProtocolAnalysis).commands ?? []
+    mostRecentAnalysis!.liquids ?? [],
+    mostRecentAnalysis!.commands ?? []
   )
   const { t, i18n } = useTranslation('protocol_details')
 
@@ -107,10 +105,10 @@ export const Liquids = (props: { protocolId: string }): JSX.Element => {
                     />
                   </Flex>
                   <Flex flexDirection={DIRECTION_COLUMN}>
-                    <LegacyStyledText as="p">
+                    <LegacyStyledText forwardedAs="p">
                       {i18n.format(liquid.displayName, 'titleCase')}
                     </LegacyStyledText>
-                    <LegacyStyledText as="p" color={COLORS.grey60}>
+                    <LegacyStyledText forwardedAs="p" color={COLORS.grey60}>
                       {i18n.format(liquid.description, 'titleCase')}
                     </LegacyStyledText>
                   </Flex>

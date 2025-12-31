@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useTranslation, Trans } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
+
 import {
   ALIGN_CENTER,
   BORDERS,
@@ -9,8 +10,8 @@ import {
   Icon,
   JUSTIFY_FLEX_START,
   JUSTIFY_SPACE_BETWEEN,
-  SPACING,
   LegacyStyledText,
+  SPACING,
 } from '@opentrons/components'
 
 export const PipetteRecalibrationODDWarning = (): JSX.Element | null => {
@@ -30,13 +31,13 @@ export const PipetteRecalibrationODDWarning = (): JSX.Element | null => {
     >
       <Flex justifyContent={JUSTIFY_FLEX_START}>
         <Icon
-          name="alert-circle"
+          name="ot-alert"
           color={COLORS.yellow50}
           width="45px"
           marginRight={SPACING.spacing12}
-          aria-label="alert-circle_icon"
+          aria-label="ot-alert_icon"
         />
-        <LegacyStyledText as="p">
+        <LegacyStyledText forwardedAs="p">
           <Trans
             t={t}
             i18nKey="pipette_calibrations_differ"

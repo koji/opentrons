@@ -1,12 +1,13 @@
 import type { CreateCommand } from '../../../command/types'
+import type { CommandAnnotation } from '../../../commandAnnotation/types'
 import type {
-  LoadedPipette,
+  CommandPreconditions,
+  Liquid,
   LoadedLabware,
   LoadedModule,
-  Liquid,
+  LoadedPipette,
   RunTimeParameter,
 } from '../../../js'
-import type { CommandAnnotation } from '../../../commandAnnotation/types'
 import type { LabwareDefinition2, RobotType } from '../../../js/types'
 import type { RunTimeCommand } from '../schemaV8'
 
@@ -24,6 +25,36 @@ export interface CommandV8Mixin {
 
 export interface CommandV9Mixin {
   commandSchemaId: 'opentronsCommandSchemaV9'
+  commands: CreateCommand[]
+}
+
+export interface CommandV10Mixin {
+  commandSchemaId: 'opentronsCommandSchemaV10'
+  commands: CreateCommand[]
+}
+
+export interface CommandV11Mixin {
+  commandSchemaId: 'opentronsCommandSchemaV11'
+  commands: CreateCommand[]
+}
+
+export interface CommandV12Mixin {
+  commandSchemaId: 'opentronsCommandSchemaV12'
+  commands: CreateCommand[]
+}
+
+export interface CommandV13Mixin {
+  commandSchemaId: 'opentronsCommandSchemaV13'
+  commands: CreateCommand[]
+}
+
+export interface CommandV14Mixin {
+  commandSchemaId: 'opentronsCommandSchemaV14'
+  commands: CreateCommand[]
+}
+
+export interface CommandV15Mixin {
+  commandSchemaId: 'opentronsCommandSchemaV15'
   commands: CreateCommand[]
 }
 
@@ -100,6 +131,7 @@ export interface ProtocolBase<DesignerApplicationData> {
     category?: string | null | undefined
     subcategory?: string | null | undefined
     tags?: string[]
+    source?: string | null
   }
   designerApplication?: {
     name?: string
@@ -109,14 +141,21 @@ export interface ProtocolBase<DesignerApplicationData> {
 }
 
 // NOTE: must be kept in sync with '../schemas/8.json'
-export type ProtocolFile<
-  DesignerApplicationData = {}
-> = ProtocolBase<DesignerApplicationData> &
-  (OT2RobotMixin | OT3RobotMixin) &
-  LabwareV2Mixin &
-  LiquidV1Mixin &
-  (CommandV8Mixin | CommandV9Mixin) &
-  CommandAnnotationV1Mixin
+export type ProtocolFile<DesignerApplicationData = {}> =
+  ProtocolBase<DesignerApplicationData> &
+    (OT2RobotMixin | OT3RobotMixin) &
+    LabwareV2Mixin &
+    LiquidV1Mixin &
+    (
+      | CommandV8Mixin
+      | CommandV9Mixin
+      | CommandV10Mixin
+      | CommandV11Mixin
+      | CommandV12Mixin
+      | CommandV13Mixin
+      | CommandV14Mixin
+    ) &
+    CommandAnnotationV1Mixin
 
 export type ProtocolStructure = ProtocolBase<{}> &
   RobotStructure &
@@ -144,6 +183,8 @@ export interface ProtocolAnalysisOutput {
   errors: AnalysisError[]
   runTimeParameters: RunTimeParameter[]
   robotType?: RobotType
+  commandAnnotations?: CommandAnnotation[]
+  commandPreconditions?: CommandPreconditions
   result: 'ok' | 'not-ok' | 'error' | 'parameter-value-required'
 }
 

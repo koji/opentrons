@@ -1,25 +1,27 @@
-import type * as React from 'react'
-import { describe, it, vi, beforeEach, afterEach } from 'vitest'
 import { screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, it, vi } from 'vitest'
 
-import { mockRecoveryContentProps } from '../../__fixtures__'
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { RetryStep } from '../RetryStep'
+
+import { mockRecoveryContentProps } from '../../__fixtures__'
 import { RECOVERY_MAP } from '../../constants'
+import { RetryStep } from '../RetryStep'
 import { SelectRecoveryOption } from '../SelectRecoveryOption'
+
+import type { ComponentProps } from 'react'
 
 vi.mock('/app/molecules/Command')
 vi.mock('../SelectRecoveryOption')
 
-const render = (props: React.ComponentProps<typeof RetryStep>) => {
+const render = (props: ComponentProps<typeof RetryStep>) => {
   return renderWithProviders(<RetryStep {...props} />, {
     i18nInstance: i18n,
   })[0]
 }
 
 describe('RetryStep', () => {
-  let props: React.ComponentProps<typeof RetryStep>
+  let props: ComponentProps<typeof RetryStep>
 
   beforeEach(() => {
     props = {

@@ -1,7 +1,7 @@
-import type * as React from 'react'
-import { useSelector } from 'react-redux'
 import { useTranslation } from 'react-i18next'
-import { css } from 'styled-components'
+import { useSelector } from 'react-redux'
+import styled from 'styled-components'
+
 import {
   ALIGN_CENTER,
   BORDERS,
@@ -12,22 +12,33 @@ import {
   JUSTIFY_CENTER,
   JUSTIFY_SPACE_AROUND,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   OVERFLOW_WRAP_ANYWHERE,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
+import { labwareImages } from '@opentrons/shared-data'
 
-import { getIsOnDevice } from '/app/redux/config'
 import { Divider } from '/app/atoms/structure'
-import { labwareImages } from '/app/local-resources/labware'
+import { getIsOnDevice } from '/app/redux/config'
+
 import { equipmentImages } from './equipmentImages'
 
+import type { ComponentProps } from 'react'
 import type { StyleProps } from '@opentrons/components'
+
 interface WizardRequiredEquipmentListProps extends StyleProps {
-  equipmentList: Array<React.ComponentProps<typeof RequiredEquipmentCard>>
+  equipmentList: Array<ComponentProps<typeof RequiredEquipmentCard>>
   footer?: string
 }
+
+const StyledEquipmentImage = styled.img<{ isEquipmentImage: boolean }>`
+  max-width: 100%;
+  max-height: 100%;
+  flex: ${props => (props.isEquipmentImage ? '0' : '0 1 5rem')};
+  display: block;
+`
+
 export function WizardRequiredEquipmentList(
   props: WizardRequiredEquipmentListProps
 ): JSX.Element {
@@ -82,7 +93,7 @@ export function WizardRequiredEquipmentList(
       ) : (
         <>
           <LegacyStyledText
-            as="h3"
+            forwardedAs="h3"
             fontWeight={TYPOGRAPHY.fontWeightSemiBold}
             marginBottom={SPACING.spacing8}
           >
@@ -98,7 +109,7 @@ export function WizardRequiredEquipmentList(
           {footer != null ? (
             <LegacyStyledText
               marginTop={SPACING.spacing8}
-              as="label"
+              forwardedAs="label"
               color={COLORS.grey60}
             >
               {footer}
@@ -122,7 +133,7 @@ function RequiredEquipmentCard(props: RequiredEquipmentCardProps): JSX.Element {
 
   let imageSrc: string | null = null
   if (loadName in labwareImages) {
-    imageSrc = labwareImages[loadName as keyof typeof labwareImages]
+    imageSrc = labwareImages[loadName as keyof typeof labwareImages][0]
   } else if (loadName in equipmentImages) {
     imageSrc = equipmentImages[loadName as keyof typeof equipmentImages]
   }
@@ -142,26 +153,21 @@ function RequiredEquipmentCard(props: RequiredEquipmentCardProps): JSX.Element {
             alignItems={ALIGN_CENTER}
             marginRight={SPACING.spacing16}
           >
-            <img
-              css={css`
-                max-width: 100%;
-                max-height: 100%;
-                flex: ${loadName in equipmentImages ? `0` : `0 1 5rem`};
-                display: block;
-              `}
+            <StyledEquipmentImage
+              isEquipmentImage={loadName in equipmentImages}
               src={imageSrc}
               alt={displayName}
             />
           </Flex>
         ) : null}
         <Flex
-          flex="0 1 70%"
+          flex={imageSrc == null ? '0 1 100%' : '0 1 70%'}
           flexDirection={DIRECTION_COLUMN}
           justifyContent={JUSTIFY_SPACE_AROUND}
         >
-          <LegacyStyledText as="p">{displayName}</LegacyStyledText>
+          <LegacyStyledText forwardedAs="p">{displayName}</LegacyStyledText>
           {subtitle != null ? (
-            <LegacyStyledText as="p" color={COLORS.grey50}>
+            <LegacyStyledText forwardedAs="p" color={COLORS.grey50}>
               {subtitle}
             </LegacyStyledText>
           ) : null}

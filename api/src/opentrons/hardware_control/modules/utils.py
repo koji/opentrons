@@ -6,13 +6,19 @@ from opentrons.drivers.rpi_drivers.types import USBPort
 
 from ..execution_manager import ExecutionManager
 
-from .types import ModuleDisconnectedCallback, ModuleType, SpeedStatus
+from .types import (
+    ModuleDisconnectedCallback,
+    ModuleType,
+    SpeedStatus,
+    ModuleErrorCallback,
+)
 from .mod_abc import AbstractModule
 from .tempdeck import TempDeck
 from .magdeck import MagDeck
 from .thermocycler import Thermocycler
 from .heater_shaker import HeaterShaker
 from .absorbance_reader import AbsorbanceReader
+from .flex_stacker import FlexStacker
 
 
 log = logging.getLogger(__name__)
@@ -26,6 +32,7 @@ MODULE_TYPE_BY_NAME = {
     Thermocycler.name(): Thermocycler.MODULE_TYPE,
     HeaterShaker.name(): HeaterShaker.MODULE_TYPE,
     AbsorbanceReader.name(): AbsorbanceReader.MODULE_TYPE,
+    FlexStacker.name(): FlexStacker.MODULE_TYPE,
 }
 
 _MODULE_CLS_BY_TYPE: Dict[ModuleType, Type[AbstractModule]] = {
@@ -34,6 +41,7 @@ _MODULE_CLS_BY_TYPE: Dict[ModuleType, Type[AbstractModule]] = {
     Thermocycler.MODULE_TYPE: Thermocycler,
     HeaterShaker.MODULE_TYPE: HeaterShaker,
     AbsorbanceReader.MODULE_TYPE: AbsorbanceReader,
+    FlexStacker.MODULE_TYPE: FlexStacker,
 }
 
 
@@ -44,9 +52,10 @@ async def build(
     usb_port: USBPort,
     hw_control_loop: asyncio.AbstractEventLoop,
     execution_manager: ExecutionManager,
+    disconnected_callback: ModuleDisconnectedCallback,
+    error_callback: ModuleErrorCallback,
     sim_model: Optional[str] = None,
     sim_serial_number: Optional[str] = None,
-    disconnected_callback: ModuleDisconnectedCallback = None,
 ) -> AbstractModule:
     return await _MODULE_CLS_BY_TYPE[type].build(
         port=port,
@@ -54,9 +63,10 @@ async def build(
         simulating=simulating,
         hw_control_loop=hw_control_loop,
         execution_manager=execution_manager,
+        disconnected_callback=disconnected_callback,
+        error_callback=error_callback,
         sim_model=sim_model,
         sim_serial_number=sim_serial_number,
-        disconnected_callback=disconnected_callback,
     )
 
 

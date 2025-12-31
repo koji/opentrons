@@ -1,20 +1,20 @@
 import { useMutation, useQueryClient } from 'react-query'
+
 import { createMaintenanceRunLabwareDefinition } from '@opentrons/api-client'
+
 import { useHost } from '../api'
+
 import type {
-  UseMutationResult,
-  UseMutationOptions,
   UseMutateAsyncFunction,
+  UseMutationOptions,
+  UseMutationResult,
 } from 'react-query'
-import type {
-  LabwareDefinitionSummary,
-  HostConfig,
-} from '@opentrons/api-client'
-import type { LabwareDefinition2 } from '@opentrons/shared-data'
+import type { LabwareDefinitionSummary } from '@opentrons/api-client'
+import type { LabwareDefinition } from '@opentrons/shared-data'
 
 interface CreateMaintenanceRunLabwareDefinitionMutateParams {
   maintenanceRunId: string
-  labwareDef: LabwareDefinition2
+  labwareDef: LabwareDefinition
 }
 
 export type UseCreateLabwareDefinitionMutationResult = UseMutationResult<
@@ -45,7 +45,7 @@ export function useCreateMaintenanceRunLabwareDefinitionMutation(): UseCreateLab
     CreateMaintenanceRunLabwareDefinitionMutateParams
   >(({ maintenanceRunId, labwareDef }) =>
     createMaintenanceRunLabwareDefinition(
-      host as HostConfig,
+      host!,
       maintenanceRunId,
       labwareDef
     ).then(response => {

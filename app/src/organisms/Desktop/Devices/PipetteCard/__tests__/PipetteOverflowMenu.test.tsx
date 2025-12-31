@@ -1,18 +1,22 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, vi, beforeEach, expect } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import '@testing-library/jest-dom/vitest'
+
+import { isFlexPipette } from '@opentrons/shared-data'
+
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { PipetteOverflowMenu } from '../PipetteOverflowMenu'
 import {
   mockLeftProtoPipette,
   mockPipetteSettingsFieldsMap,
 } from '/app/redux/pipettes/__fixtures__'
-import { isFlexPipette } from '@opentrons/shared-data'
 
-import type { Mount } from '/app/redux/pipettes/types'
+import { PipetteOverflowMenu } from '../PipetteOverflowMenu'
+
+import type { ComponentProps } from 'react'
 import type * as SharedData from '@opentrons/shared-data'
+import type { Mount } from '/app/redux/pipettes/types'
 
 vi.mock('/app/redux/config')
 vi.mock('@opentrons/shared-data', async importOriginal => {
@@ -23,7 +27,7 @@ vi.mock('@opentrons/shared-data', async importOriginal => {
   }
 })
 
-const render = (props: React.ComponentProps<typeof PipetteOverflowMenu>) => {
+const render = (props: ComponentProps<typeof PipetteOverflowMenu>) => {
   return renderWithProviders(<PipetteOverflowMenu {...props} />, {
     i18nInstance: i18n,
   })[0]
@@ -31,7 +35,7 @@ const render = (props: React.ComponentProps<typeof PipetteOverflowMenu>) => {
 
 const LEFT = 'left' as Mount
 describe('PipetteOverflowMenu', () => {
-  let props: React.ComponentProps<typeof PipetteOverflowMenu>
+  let props: ComponentProps<typeof PipetteOverflowMenu>
 
   beforeEach(() => {
     props = {

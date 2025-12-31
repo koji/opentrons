@@ -1,41 +1,27 @@
-import type * as React from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { fireEvent, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
+import { useScrollPosition } from '/app/local-resources/dom-utils'
 import { getLocalRobot } from '/app/redux/discovery'
 import { mockConnectedRobot } from '/app/redux/discovery/__fixtures__'
 import { useNetworkConnection } from '/app/resources/networking/hooks/useNetworkConnection'
-import { NavigationMenu } from '../NavigationMenu'
+
 import { Navigation } from '..'
+import { NavigationMenu } from '../NavigationMenu'
+
+import type { ComponentProps } from 'react'
 
 vi.mock('/app/resources/networking/hooks/useNetworkConnection')
 vi.mock('/app/redux/discovery')
 vi.mock('../NavigationMenu')
+vi.mock('/app/local-resources/dom-utils')
 
 mockConnectedRobot.name = '12345678901234567'
 
-class MockIntersectionObserver {
-  observe = vi.fn()
-  disconnect = vi.fn()
-  unobserve = vi.fn()
-}
-
-Object.defineProperty(window, 'IntersectionObserver', {
-  writable: true,
-  configurable: true,
-  value: MockIntersectionObserver,
-})
-
-Object.defineProperty(global, 'IntersectionObserver', {
-  writable: true,
-  configurable: true,
-  value: MockIntersectionObserver,
-})
-
-const render = (props: React.ComponentProps<typeof Navigation>) => {
+const render = (props: ComponentProps<typeof Navigation>) => {
   return renderWithProviders(
     <MemoryRouter>
       <Navigation {...props} />
@@ -45,7 +31,7 @@ const render = (props: React.ComponentProps<typeof Navigation>) => {
 }
 
 describe('Navigation', () => {
-  let props: React.ComponentProps<typeof Navigation>
+  let props: ComponentProps<typeof Navigation>
   beforeEach(() => {
     props = {}
     vi.mocked(getLocalRobot).mockReturnValue(mockConnectedRobot)
@@ -55,6 +41,10 @@ describe('Navigation', () => {
       isWifiConnected: false,
       isUsbConnected: false,
       connectionStatus: 'Not connected',
+    })
+    vi.mocked(useScrollPosition).mockReturnValue({
+      isScrolled: false,
+      scrollRef: {} as any,
     })
   })
   it('should render text and they have attribute', () => {

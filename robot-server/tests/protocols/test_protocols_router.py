@@ -32,9 +32,9 @@ from opentrons.protocol_reader import (
 
 from robot_server.data_files.data_files_store import (
     DataFilesStore,
-    DataFileInfo,
 )
-from robot_server.data_files.models import DataFile, DataFileSource
+from robot_server.data_files.models import DataFile
+from opentrons_shared_data.data_files import DataFileSource, DataFileInfo, MimeType
 from robot_server.errors.error_responses import ApiError
 from robot_server.protocols.analyses_manager import AnalysesManager
 from robot_server.protocols.protocol_analyzer import ProtocolAnalyzer
@@ -392,7 +392,7 @@ async def test_get_protocol_by_id(
         key="dummy-key-111",
     )
 
-    assert result.content.links == ProtocolLinks.construct(referencingRuns=[])
+    assert result.content.links == ProtocolLinks.model_construct(referencingRuns=[])
     assert result.status_code == 200
 
 
@@ -731,8 +731,11 @@ async def test_create_new_protocol_with_run_time_params(
             id="123",
             name="file.abc",
             file_hash="xyz",
-            source=DataFileSource.UPLOADED,
             created_at=datetime(year=2022, month=2, day=2),
+            mime_type=MimeType.TEXT_CSV,
+            path="data_files/123/file.abc",
+            generated=False,
+            stored=True,
         )
     )
 
@@ -997,8 +1000,11 @@ async def test_create_existing_protocol_with_different_run_time_params(
             id="123",
             name="file.abc",
             file_hash="xyz",
-            source=DataFileSource.UPLOADED,
             created_at=datetime(year=2022, month=2, day=2),
+            mime_type=MimeType.TEXT_CSV,
+            path="data_files/123/file.abc",
+            generated=False,
+            stored=True,
         )
     )
     decoy.when(await file_hasher.hash(files=[buffered_file])).then_return("a_b_c")
@@ -1495,6 +1501,7 @@ async def test_get_protocol_analyses(
         commands=[],
         errors=[],
         liquids=[],
+        liquidClasses=[],
     )
 
     decoy.when(protocol_store.has("protocol-id")).then_return(True)
@@ -1818,8 +1825,11 @@ async def test_update_protocol_analyses_with_new_rtp_values(
             id="123",
             name="foo.csv",
             file_hash="xyz",
-            source=DataFileSource.UPLOADED,
             created_at=datetime(year=2022, month=2, day=2),
+            mime_type=MimeType.TEXT_CSV,
+            path="data_files/123/foo.csv",
+            generated=False,
+            stored=True,
         )
     )
     decoy.when(protocol_store.has(protocol_id="protocol-id")).then_return(True)

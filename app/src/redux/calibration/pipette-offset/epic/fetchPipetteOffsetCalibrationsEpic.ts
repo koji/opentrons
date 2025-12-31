@@ -9,20 +9,21 @@ import type {
   ActionToRequestMapper,
   ResponseToActionMapper,
 } from '../../../robot-api/operators'
-import type { Action, Epic } from '../../../types'
-import type { FetchPipetteOffsetCalibrationsAction } from '../types'
-import type { AllPipetteOffsetCalibrations } from '../../api-types'
 import type { RobotApiErrorResponse } from '../../../robot-api/types'
+import type { Action, Epic } from '../../../types'
+import type { AllPipetteOffsetCalibrations } from '../../api-types'
+import type { FetchPipetteOffsetCalibrationsAction } from '../types'
 
-const mapActionToRequest: ActionToRequestMapper<FetchPipetteOffsetCalibrationsAction> = action => ({
+const mapActionToRequest: ActionToRequestMapper<
+  FetchPipetteOffsetCalibrationsAction
+> = action => ({
   method: GET,
   path: Constants.PIPETTE_OFFSET_CALIBRATIONS_PATH,
 })
 
-const mapResponseToAction: ResponseToActionMapper<FetchPipetteOffsetCalibrationsAction> = (
-  response,
-  originalAction
-) => {
+const mapResponseToAction: ResponseToActionMapper<
+  FetchPipetteOffsetCalibrationsAction
+> = (response, originalAction) => {
   const { host, body, ...responseMeta } = response
   const meta = { ...originalAction.meta, response: responseMeta }
   return response.ok

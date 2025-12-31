@@ -1,10 +1,11 @@
+import { useCalibrationStatusQuery } from '@opentrons/react-api-client'
+
+import { useRobot } from '/app/redux-resources/robots'
 import {
-  DECK_CAL_STATUS_OK,
   DECK_CAL_STATUS_BAD_CALIBRATION,
+  DECK_CAL_STATUS_OK,
 } from '/app/redux/calibration'
 
-import { useCalibrationStatusQuery } from '@opentrons/react-api-client'
-import { useRobot } from '/app/redux-resources/robots'
 import type { DeckCalibrationData } from '@opentrons/api-client'
 
 /**
@@ -14,9 +15,7 @@ import type { DeckCalibrationData } from '@opentrons/api-client'
  * @returns {DeckCalibrationData | null, boolean, boolean}
  *
  */
-export function useDeckCalibrationData(
-  robotName: string | null = null
-): {
+export function useDeckCalibrationData(robotName: string | null = null): {
   deckCalibrationData: DeckCalibrationData | null
   isDeckCalibrated: boolean
   markedBad?: boolean

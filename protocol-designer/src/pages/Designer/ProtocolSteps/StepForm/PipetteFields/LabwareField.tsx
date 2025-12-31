@@ -1,17 +1,21 @@
-import { useSelector } from 'react-redux'
 import { useTranslation } from 'react-i18next'
-import {
-  getDisposalOptions,
-  getLabwareOptions,
-} from '../../../../../ui/labware/selectors'
-import { DropdownStepFormField } from '../../../../../molecules'
+import { useDispatch, useSelector } from 'react-redux'
+
+import { DropdownStepFormField } from '/protocol-designer/components/molecules'
+import { getDisposalOptions } from '/protocol-designer/ui/labware/selectors'
+import { hoverSelection } from '/protocol-designer/ui/steps/actions/actions'
+
+import { useLabwareDropdownOptions } from '../../../utils'
+
 import type { FieldProps } from '../types'
 
 export function LabwareField(props: FieldProps): JSX.Element {
   const { name } = props
-  const { t } = useTranslation('protocol_steps')
+  const { i18n, t } = useTranslation(['protocol_steps', 'application'])
   const disposalOptions = useSelector(getDisposalOptions)
-  const options = useSelector(getLabwareOptions)
+  const options = useLabwareDropdownOptions('labware', false)
+  const dispatch = useDispatch()
+
   const allOptions =
     name === 'dispense_labware'
       ? [...options, ...disposalOptions]
@@ -22,7 +26,14 @@ export function LabwareField(props: FieldProps): JSX.Element {
       {...props}
       name={name}
       options={allOptions}
-      title={t(`select_${name}`)}
+      title={i18n.format(t(`${name}`), 'capitalize')}
+      onEnter={(id: string) => {
+        dispatch(hoverSelection({ id, text: t('application:select') }))
+      }}
+      onExit={() => {
+        dispatch(hoverSelection({ id: null, text: null }))
+      }}
+      width="100%"
     />
   )
 }

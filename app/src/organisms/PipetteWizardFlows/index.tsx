@@ -1,54 +1,58 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useSelector } from 'react-redux'
 import { useTranslation } from 'react-i18next'
+import { useSelector } from 'react-redux'
 import NiceModal, { useModal } from '@ebay/nice-modal-react'
 
+import { RUN_STATUS_FAILED } from '@opentrons/api-client'
 import {
-  useConditionalConfirm,
   COLORS,
   ModalShell,
+  useConditionalConfirm,
+  WizardHeader,
 } from '@opentrons/components'
-import { LEFT, NINETY_SIX_CHANNEL, RIGHT } from '@opentrons/shared-data'
 import {
-  useHost,
-  useDeleteMaintenanceRunMutation,
   ApiHostProvider,
+  useDeleteMaintenanceRunMutation,
+  useHost,
 } from '@opentrons/react-api-client'
+import { LEFT, NINETY_SIX_CHANNEL, RIGHT } from '@opentrons/shared-data'
 
-import { useCreateTargetedMaintenanceRunMutation } from '/app/resources/runs'
+import { getTopPortalEl } from '/app/App/portal'
+import { SimpleWizardBody } from '/app/molecules/SimpleWizardBody'
+import { getIsOnDevice } from '/app/redux/config'
+import { useNotifyDeckConfigurationQuery } from '/app/resources/deck_configuration'
+import { useAttachedPipettesFromInstrumentsQuery } from '/app/resources/instruments'
 import {
   useChainMaintenanceCommands,
   useNotifyCurrentMaintenanceRun,
 } from '/app/resources/maintenance_runs'
-import { getTopPortalEl } from '/app/App/portal'
-import { WizardHeader } from '/app/molecules/WizardHeader'
+import { useCreateTargetedMaintenanceRunMutation } from '/app/resources/runs'
+
 import { FirmwareUpdateModal } from '../FirmwareUpdateModal'
-import { getIsOnDevice } from '/app/redux/config'
-import { SimpleWizardBody } from '/app/molecules/SimpleWizardBody'
-import { useAttachedPipettesFromInstrumentsQuery } from '/app/resources/instruments'
-import { usePipetteFlowWizardHeaderText } from './hooks'
+import { AttachProbe } from './AttachProbe'
+import { AttachWasteChute } from './AttachWasteChute'
+import { BeforeBeginning } from './BeforeBeginning'
+import { Carriage } from './Carriage'
+import { FLOWS, SECTIONS } from './constants'
+import { DetachPipette } from './DetachPipette'
+import { DetachProbe } from './DetachProbe'
+import { ExitModal } from './ExitModal'
 import { getPipetteWizardSteps } from './getPipetteWizardSteps'
 import { getPipetteWizardStepsForProtocol } from './getPipetteWizardStepsForProtocol'
-import { FLOWS, SECTIONS } from './constants'
-import { BeforeBeginning } from './BeforeBeginning'
-import { AttachProbe } from './AttachProbe'
-import { DetachProbe } from './DetachProbe'
-import { Results } from './Results'
-import { ExitModal } from './ExitModal'
-import { MountPipette } from './MountPipette'
-import { DetachPipette } from './DetachPipette'
-import { Carriage } from './Carriage'
+import { usePipetteFlowWizardHeaderText } from './hooks'
 import { MountingPlate } from './MountingPlate'
+import { MountPipette } from './MountPipette'
+import { RemoveWasteChute } from './RemoveWasteChute'
+import { Results } from './Results'
 import { UnskippableModal } from './UnskippableModal'
 
+import type { CommandData, HostConfig } from '@opentrons/api-client'
 import type {
-  LoadedPipette,
   CreateCommand,
+  LoadedPipette,
   PipetteMount,
 } from '@opentrons/shared-data'
-import type { CommandData, HostConfig } from '@opentrons/api-client'
-import { RUN_STATUS_FAILED } from '@opentrons/api-client'
 import type { PipetteWizardFlow, SelectablePipettes } from './types'
 
 const RUN_REFETCH_INTERVAL = 5000
@@ -68,7 +72,7 @@ export const PipetteWizardFlows = (
   const { flowType, mount, closeFlow, selectedPipette, onComplete } = props
   const isOnDevice = useSelector(getIsOnDevice)
   const { t } = useTranslation('pipette_wizard_flows')
-
+  const deckConfig = useNotifyDeckConfigurationQuery()
   const attachedPipettes = useAttachedPipettesFromInstrumentsQuery()
   const memoizedPipetteInfo = useMemo(() => props.pipetteInfo ?? null, [])
   const isGantryEmpty = useMemo(
@@ -79,11 +83,19 @@ export const PipetteWizardFlows = (
   const pipetteWizardSteps = useMemo(
     () =>
       memoizedPipetteInfo == null
-        ? getPipetteWizardSteps(flowType, mount, selectedPipette, isGantryEmpty)
+        ? getPipetteWizardSteps(
+            flowType,
+            mount,
+            selectedPipette,
+            isGantryEmpty,
+            attachedPipettes,
+            deckConfig
+          )
         : getPipetteWizardStepsForProtocol(
             attachedPipettes,
             memoizedPipetteInfo,
-            mount
+            mount,
+            deckConfig
           ),
     []
   )
@@ -113,39 +125,60 @@ export const PipetteWizardFlows = (
   const [createdMaintenanceRunId, setCreatedMaintenanceRunId] = useState<
     string | null
   >(null)
+  const [errorMessage, setShowErrorMessage] = useState<null | string>(null)
   // we should start checking for run deletion only after the maintenance run is created
   // and the useCurrentRun poll has returned that created id
   const [
     monitorMaintenanceRunForDeletion,
     setMonitorMaintenanceRunForDeletion,
   ] = useState<boolean>(false)
+  const isDetachPipettesAndAttach96ChFlow =
+    flowType === FLOWS.ATTACH &&
+    !isGantryEmpty &&
+    selectedPipette === NINETY_SIX_CHANNEL
 
   const goBack = (): void => {
-    setCurrentStepIndex(
-      currentStepIndex !== totalStepCount ? 0 : currentStepIndex
-    )
+    if (currentStepIndex !== totalStepCount) {
+      // The detach pipettes + attach 96ch flow is a compound flow that effectively
+      // has two "checkpoints". As a user passes a checkpoint, pressing "go back"
+      // should return to the most recent checkpoint.
+      if (isDetachPipettesAndAttach96ChFlow) {
+        if (currentStepIndex <= 2) {
+          setCurrentStepIndex(0)
+        } else {
+          const stepIdx =
+            pipetteWizardSteps?.findIndex(
+              step => step.section === SECTIONS.CARRIAGE
+            ) ?? 3 // Safe fallback that at least allows users to proceed.
+
+          setCurrentStepIndex(stepIdx)
+        }
+      } else {
+        setCurrentStepIndex(0)
+      }
+    }
   }
+
   const { data: maintenanceRunData } = useNotifyCurrentMaintenanceRun({
     refetchInterval: RUN_REFETCH_INTERVAL,
     enabled: createdMaintenanceRunId != null,
   })
 
-  const {
-    chainRunCommands,
-    isCommandMutationLoading,
-  } = useChainMaintenanceCommands()
+  const { chainRunCommands, isCommandMutationLoading } =
+    useChainMaintenanceCommands()
 
-  const {
-    createTargetedMaintenanceRun,
-    isLoading: isCreateLoading,
-  } = useCreateTargetedMaintenanceRunMutation(
-    {
-      onSuccess: response => {
-        setCreatedMaintenanceRunId(response.data.id)
+  const { createTargetedMaintenanceRun, isLoading: isCreateLoading } =
+    useCreateTargetedMaintenanceRunMutation(
+      {
+        onSuccess: response => {
+          setCreatedMaintenanceRunId(response.data.id)
+        },
+        onError: error => {
+          setShowErrorMessage(error.message)
+        },
       },
-    },
-    host
-  )
+      host
+    )
 
   // this will close the modal in case the run was deleted by the terminate
   // activity modal on the ODD
@@ -169,7 +202,6 @@ export const PipetteWizardFlows = (
     closeFlow,
   ])
 
-  const [errorMessage, setShowErrorMessage] = useState<null | string>(null)
   const [isExiting, setIsExiting] = useState<boolean>(false)
   const proceed = (): void => {
     if (!isCommandMutationLoading) {
@@ -185,22 +217,23 @@ export const PipetteWizardFlows = (
       onComplete()
     }
     if (maintenanceRunData != null) {
-      deleteMaintenanceRun(maintenanceRunData?.data.id)
+      deleteMaintenanceRun(maintenanceRunData?.data.id, {
+        onSettled: closeFlow,
+      })
+    } else {
+      closeFlow()
     }
-    closeFlow()
   }
 
-  const {
-    deleteMaintenanceRun,
-    isLoading: isDeleteLoading,
-  } = useDeleteMaintenanceRunMutation({
-    onSuccess: () => {
-      closeFlow()
-    },
-    onError: () => {
-      closeFlow()
-    },
-  })
+  const { deleteMaintenanceRun, isLoading: isDeleteLoading } =
+    useDeleteMaintenanceRunMutation({
+      onSuccess: () => {
+        closeFlow()
+      },
+      onError: () => {
+        closeFlow()
+      },
+    })
 
   const handleCleanUpAndClose = (): void => {
     if (maintenanceRunData?.data.id == null) handleClose()
@@ -278,13 +311,19 @@ export const PipetteWizardFlows = (
     />
   )
 
-  let onExit
-  if (currentStep == null) return null
-  let modalContent: JSX.Element = <div>UNASSIGNED STEP</div>
-  if (
+  if (currentStep == null) {
+    return null
+  }
+
+  const isFatalError =
     (isExiting && errorMessage != null) ||
-    maintenanceRunData?.data.status === RUN_STATUS_FAILED
-  ) {
+    maintenanceRunData?.data.status === RUN_STATUS_FAILED ||
+    (errorMessage != null && createdMaintenanceRunId == null)
+
+  let onExit: () => void
+  let modalContent: JSX.Element = <div>UNASSIGNED STEP</div>
+  // These flows often have custom error messaging, so this fallback modal is shown only in specific circumstances.
+  if (isFatalError) {
     modalContent = (
       <SimpleWizardBody
         isSuccess={false}
@@ -302,6 +341,7 @@ export const PipetteWizardFlows = (
         createMaintenanceRun={createTargetedMaintenanceRun}
         createdMaintenanceRunId={createdMaintenanceRunId}
         isCreateLoading={isCreateLoading}
+        deckConfig={deckConfig}
         requiredPipette={requiredPipette}
       />
     )
@@ -314,6 +354,7 @@ export const PipetteWizardFlows = (
         {...currentStep}
         {...calibrateBaseProps}
         isExiting={isExiting}
+        deckConfig={deckConfig}
       />
     )
   } else if (currentStep.section === SECTIONS.DETACH_PROBE) {
@@ -394,18 +435,27 @@ export const PipetteWizardFlows = (
     ) : (
       <MountingPlate {...currentStep} {...calibrateBaseProps} />
     )
+  } else if (currentStep.section === SECTIONS.REMOVE_WASTE_CHUTE) {
+    onExit = confirmExit
+    modalContent = showConfirmExit ? (
+      exitModal
+    ) : (
+      <RemoveWasteChute {...currentStep} {...calibrateBaseProps} />
+    )
+  } else if (currentStep.section === SECTIONS.ATTACH_WASTE_CHUTE) {
+    onExit = confirmExit
+    modalContent = showConfirmExit ? (
+      exitModal
+    ) : (
+      <AttachWasteChute {...currentStep} {...calibrateBaseProps} />
+    )
   }
-
-  let exitWizardButton = onExit
-  if (isCommandMutationLoading || isDeleteLoading) {
-    exitWizardButton = undefined
-  } else if (
-    (errorMessage != null && isExiting) ||
-    maintenanceRunData?.data.status === RUN_STATUS_FAILED
-  ) {
-    exitWizardButton = handleClose
-  } else if (showConfirmExit) {
-    exitWizardButton = handleCleanUpAndClose
+  const buildWizardOnExit = (): (() => void) => {
+    if (isFatalError || showConfirmExit) {
+      return handleCleanUpAndClose
+    } else {
+      return onExit
+    }
   }
 
   const progressBarForCalError =
@@ -413,13 +463,13 @@ export const PipetteWizardFlows = (
 
   const wizardHeader = (
     <WizardHeader
-      exitDisabled={isCommandMutationLoading || isFetchingPipettes}
       title={memoizedWizardTitle}
       currentStep={
         progressBarForCalError ? currentStepIndex - 1 : currentStepIndex
       }
       totalSteps={totalStepCount}
-      onExit={exitWizardButton}
+      onExit={buildWizardOnExit()}
+      exitDisabled={isCommandMutationLoading || isFetchingPipettes}
     />
   )
 

@@ -11,27 +11,28 @@ import {
   Flex,
   Icon,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   Link,
   POSITION_ABSOLUTE,
   SIZE_6,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
 import { ApiHostProvider } from '@opentrons/react-api-client'
+
+import { Divider } from '/app/atoms/structure'
+import { CollapsibleSection } from '/app/molecules/CollapsibleSection'
+import { DevicesEmptyState } from '/app/organisms/Desktop/Devices/DevicesEmptyState'
+import { RobotCard } from '/app/organisms/Desktop/Devices/RobotCard'
 import {
-  getScanning,
   getConnectableRobots,
   getReachableRobots,
+  getScanning,
   getUnreachableRobots,
   OPENTRONS_USB,
 } from '/app/redux/discovery'
 import { appShellRequestor } from '/app/redux/shell/remote'
-import { RobotCard } from '/app/organisms/Desktop/Devices/RobotCard'
-import { DevicesEmptyState } from '/app/organisms/Desktop/Devices/DevicesEmptyState'
-import { CollapsibleSection } from '/app/molecules/CollapsibleSection'
 
-import { Divider } from '/app/atoms/structure'
 import { NewRobotSetupHelp } from './NewRobotSetupHelp'
 import { useFeatureFlag } from '/app/redux/config'
 import { useSearch } from '/app/resources/devices'
@@ -84,7 +85,7 @@ export function DevicesLanding(): JSX.Element {
         marginTop={SPACING.spacing8}
         height="2.25rem"
       >
-        <LegacyStyledText as="h1" id="DevicesLanding_title">
+        <LegacyStyledText forwardedAs="h1" id="DevicesLanding_title">
           {t('devices')}
         </LegacyStyledText>
         <NewRobotSetupHelp />
@@ -164,7 +165,9 @@ function DevicesLoadingState(): JSX.Element {
       marginTop="10vh"
       marginBottom="10vh"
     >
-      <LegacyStyledText as="h1">{t('looking_for_robots')}</LegacyStyledText>
+      <LegacyStyledText forwardedAs="h1">
+        {t('looking_for_robots')}
+      </LegacyStyledText>
       <Icon
         name="ot-spinner"
         aria-label="ot-spinner"

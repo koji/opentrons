@@ -1,11 +1,11 @@
 """Command factories to use in tests as data fixtures."""
+
 from datetime import datetime
 from pydantic import BaseModel
 from typing import Optional, cast, Dict
 
 from opentrons_shared_data.pipette.types import PipetteNameType
 from opentrons.types import MountType
-from opentrons.protocols.models import LabwareDefinition
 from opentrons.protocol_engine import ErrorOccurrence, commands as cmd
 from opentrons.protocol_engine.types import (
     DeckPoint,
@@ -14,11 +14,17 @@ from opentrons.protocol_engine.types import (
     MovementAxis,
     WellLocation,
     LiquidHandlingWellLocation,
-    LabwareLocation,
+    LoadableLabwareLocation,
     DeckSlotLocation,
     LabwareMovementStrategy,
     AddressableOffsetVector,
 )
+
+
+class FixtureModel(BaseModel):
+    """Fixture Model."""
+
+    ...
 
 
 def create_queued_command(
@@ -29,6 +35,10 @@ def create_queued_command(
     params: Optional[BaseModel] = None,
 ) -> cmd.Command:
     """Given command data, build a pending command model."""
+
+    class DummyParams(BaseModel):
+        pass
+
     return cast(
         cmd.Command,
         cmd.BaseCommand(
@@ -37,7 +47,7 @@ def create_queued_command(
             commandType=command_type,
             createdAt=datetime(year=2021, month=1, day=1),
             status=cmd.CommandStatus.QUEUED,
-            params=params or BaseModel(),
+            params=params or DummyParams(),
             intent=intent,
         ),
     )
@@ -59,7 +69,7 @@ def create_running_command(
             createdAt=created_at,
             commandType=command_type,
             status=cmd.CommandStatus.RUNNING,
-            params=params or BaseModel(),
+            params=params or FixtureModel(),
         ),
     )
 
@@ -84,7 +94,7 @@ def create_failed_command(
             completedAt=completed_at,
             commandType=command_type,
             status=cmd.CommandStatus.FAILED,
-            params=params or BaseModel(),
+            params=params or FixtureModel(),
             error=error,
             intent=intent,
         ),
@@ -108,8 +118,8 @@ def create_succeeded_command(
             createdAt=created_at,
             commandType=command_type,
             status=cmd.CommandStatus.SUCCEEDED,
-            params=params or BaseModel(),
-            result=result or BaseModel(),
+            params=params or FixtureModel(),
+            result=result or FixtureModel(),
         ),
     )
 
@@ -122,39 +132,6 @@ def create_comment_command(command_id: str = "command-id") -> cmd.Comment:
 
     return cmd.Comment(
         id=command_id,
-        key="command-key",
-        status=cmd.CommandStatus.SUCCEEDED,
-        createdAt=datetime.now(),
-        params=params,
-        result=result,
-    )
-
-
-def create_load_labware_command(
-    labware_id: str,
-    location: LabwareLocation,
-    definition: LabwareDefinition,
-    offset_id: Optional[str],
-    display_name: Optional[str],
-) -> cmd.LoadLabware:
-    """Create a completed LoadLabware command."""
-    params = cmd.LoadLabwareParams(
-        loadName=definition.parameters.loadName,
-        namespace=definition.namespace,
-        version=definition.version,
-        location=location,
-        labwareId=None,
-        displayName=display_name,
-    )
-
-    result = cmd.LoadLabwareResult(
-        labwareId=labware_id,
-        definition=definition,
-        offsetId=offset_id,
-    )
-
-    return cmd.LoadLabware(
-        id="command-id",
         key="command-key",
         status=cmd.CommandStatus.SUCCEEDED,
         createdAt=datetime.now(),
@@ -193,7 +170,7 @@ def create_load_module_command(
         moduleId=module_id,
         model=model,
         serialNumber=None,
-        definition=ModuleDefinition.construct(),  # type: ignore[call-arg]
+        definition=ModuleDefinition.model_construct(),  # type: ignore[call-arg]
     )
 
     return cmd.LoadModule(
@@ -227,6 +204,29 @@ def create_aspirate_command(
     result = cmd.AspirateResult(volume=volume, position=destination)
 
     return cmd.Aspirate(
+        id="command-id",
+        key="command-key",
+        status=cmd.CommandStatus.SUCCEEDED,
+        createdAt=datetime.now(),
+        params=params,
+        result=result,
+    )
+
+
+def create_aspirate_while_tracking_command(
+    pipette_id: str, volume: float, flow_rate: float, labware_id: str, well_name: str
+) -> cmd.AspirateWhileTracking:
+    """Get a completed Aspirate command."""
+    params = cmd.AspirateWhileTrackingParams(
+        pipetteId=pipette_id,
+        labwareId=labware_id,
+        wellName=well_name,
+        volume=volume,
+        flowRate=flow_rate,
+    )
+    result = cmd.AspirateWhileTrackingResult(volume=volume)
+
+    return cmd.AspirateWhileTracking(
         id="command-id",
         key="command-key",
         status=cmd.CommandStatus.SUCCEEDED,
@@ -303,6 +303,29 @@ def create_dispense_in_place_command(
     result = cmd.DispenseInPlaceResult(volume=volume)
 
     return cmd.DispenseInPlace(
+        id="command-id",
+        key="command-key",
+        status=cmd.CommandStatus.SUCCEEDED,
+        createdAt=datetime.now(),
+        params=params,
+        result=result,
+    )
+
+
+def create_dispense_while_tracking_command(
+    pipette_id: str, volume: float, flow_rate: float, labware_id: str, well_name: str
+) -> cmd.DispenseWhileTracking:
+    """Get a completed DispenseWhileTracking command."""
+    params = cmd.DispenseWhileTrackingParams(
+        pipetteId=pipette_id,
+        labwareId=labware_id,
+        wellName=well_name,
+        volume=volume,
+        flowRate=flow_rate,
+    )
+    result = cmd.DispenseWhileTrackingResult(volume=volume)
+
+    return cmd.DispenseWhileTracking(
         id="command-id",
         key="command-key",
         status=cmd.CommandStatus.SUCCEEDED,
@@ -610,7 +633,7 @@ def create_touch_tip_command(
 
 
 def create_move_labware_command(
-    new_location: LabwareLocation,
+    new_location: LoadableLabwareLocation,
     strategy: LabwareMovementStrategy,
     labware_id: str = "labware-id",
     offset_id: Optional[str] = None,

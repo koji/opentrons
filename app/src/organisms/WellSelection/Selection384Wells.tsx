@@ -1,4 +1,4 @@
-import * as React from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import flatten from 'lodash/flatten'
 
@@ -15,18 +15,16 @@ import {
 
 import { IconButton } from '/app/atoms/buttons/IconButton'
 
+import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import type { WellGroup } from '@opentrons/components'
-import type {
-  LabwareDefinition2,
-  PipetteChannels,
-} from '@opentrons/shared-data'
+import type { LabwareDefinition, PipetteChannels } from '@opentrons/shared-data'
 
 interface Selection384WellsProps {
   allSelectedWells: WellGroup
   channels: PipetteChannels
-  definition: LabwareDefinition2
+  definition: LabwareDefinition
   deselectWells: (wells: string[]) => void
-  labwareRender: React.ReactNode
+  labwareRender: ReactNode
   selectWells: (wellGroup: WellGroup) => unknown
 }
 
@@ -43,18 +41,18 @@ export function Selection384Wells({
   labwareRender,
   selectWells,
 }: Selection384WellsProps): JSX.Element {
-  const [selectBy, setSelectBy] = React.useState<'columns' | 'wells'>('columns')
+  const [selectBy, setSelectBy] = useState<'columns' | 'wells'>('columns')
 
-  const [lastSelectedIndex, setLastSelectedIndex] = React.useState<
-    number | null
-  >(null)
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(
+    null
+  )
 
-  const [startingWellState, setStartingWellState] = React.useState<
+  const [startingWellState, setStartingWellState] = useState<
     Record<StartingWellOption, boolean>
   >({ A1: false, A2: false, B1: false, B2: false })
 
   // to reset last selected index and starting well state on page-level selected well reset
-  React.useEffect(() => {
+  useEffect(() => {
     if (Object.keys(allSelectedWells).length === 0) {
       setLastSelectedIndex(null)
       if (channels === 96) {
@@ -180,8 +178,8 @@ export function Selection384Wells({
 
 interface SelectByProps {
   selectBy: 'columns' | 'wells'
-  setSelectBy: React.Dispatch<React.SetStateAction<'columns' | 'wells'>>
-  setLastSelectedIndex: React.Dispatch<React.SetStateAction<number | null>>
+  setSelectBy: Dispatch<SetStateAction<'columns' | 'wells'>>
+  setLastSelectedIndex: Dispatch<SetStateAction<number | null>>
 }
 
 function SelectBy({
@@ -193,7 +191,10 @@ function SelectBy({
 
   return (
     <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing16}>
-      <LegacyStyledText as="p" fontWeight={TYPOGRAPHY.fontWeightSemiBold}>
+      <LegacyStyledText
+        forwardedAs="p"
+        fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+      >
         {i18n.format(t('select_by'), 'capitalize')}
       </LegacyStyledText>
       <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing8}>
@@ -244,8 +245,8 @@ function StartingWell({
   deselectWells: (wells: string[]) => void
   selectWells: (wellGroup: WellGroup) => void
   startingWellState: Record<StartingWellOption, boolean>
-  setStartingWellState: React.Dispatch<
-    React.SetStateAction<Record<StartingWellOption, boolean>>
+  setStartingWellState: Dispatch<
+    SetStateAction<Record<StartingWellOption, boolean>>
   >
   wells: string[]
 }): JSX.Element {
@@ -255,7 +256,7 @@ function StartingWell({
     channels === 8 ? ['A1', 'B1'] : ['A1', 'A2', 'B1', 'B2']
 
   // on mount, select A1 well group for 96-channel
-  React.useEffect(() => {
+  useEffect(() => {
     // deselect all wells on mount; clears well selection when navigating back within quick transfer flow
     // otherwise, selected wells and lastSelectedIndex pointer will be out of sync
     deselectWells(wells)
@@ -268,7 +269,10 @@ function StartingWell({
 
   return (
     <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing16}>
-      <LegacyStyledText as="p" fontWeight={TYPOGRAPHY.fontWeightSemiBold}>
+      <LegacyStyledText
+        forwardedAs="p"
+        fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+      >
         {i18n.format(t('starting_well'), 'capitalize')}
       </LegacyStyledText>
       <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing8}>
@@ -307,19 +311,17 @@ interface ButtonControlsProps {
 }
 
 function ButtonControls(props: ButtonControlsProps): JSX.Element {
-  const {
-    channels,
-    handleMinus,
-    handlePlus,
-    minusDisabled,
-    plusDisabled,
-  } = props
+  const { channels, handleMinus, handlePlus, minusDisabled, plusDisabled } =
+    props
   const { t, i18n } = useTranslation('quick_transfer')
 
   const addOrRemoveButtons =
     channels !== 96 ? (
       <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing16}>
-        <LegacyStyledText as="p" fontWeight={TYPOGRAPHY.fontWeightSemiBold}>
+        <LegacyStyledText
+          forwardedAs="p"
+          fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+        >
           {i18n.format(
             t(channels === 8 ? 'add_or_remove_columns' : 'add_or_remove'),
             'capitalize'

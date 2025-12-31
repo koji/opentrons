@@ -1,9 +1,9 @@
-import i18n from 'i18next'
-import capitalize from 'lodash/capitalize'
-import startCase from 'lodash/startCase'
 import { initReactI18next } from 'react-i18next'
+import i18n from 'i18next'
+
+import { baseI18nConfig } from '@opentrons/components'
+
 import { resources } from './assets/localization'
-import { titleCase } from '@opentrons/shared-data'
 
 import type { InitOptions } from 'i18next'
 
@@ -28,26 +28,12 @@ export const LANGUAGES: Array<{ name: string; value: Language }> = [
 ]
 
 const i18nConfig: InitOptions = {
+  ...baseI18nConfig,
   resources,
-  lng: 'en',
-  fallbackLng: 'en',
-  debug: process.env.NODE_ENV === 'development',
-  defaultNS: 'shared',
-  interpolation: {
-    escapeValue: false, // not needed for react as it escapes by default
-    format: function (value: string, format, lng) {
-      if (format === 'upperCase') return value.toUpperCase()
-      if (format === 'lowerCase') return value.toLowerCase()
-      if (format === 'capitalize') return capitalize(value)
-      if (format === 'sentenceCase') return startCase(value)
-      if (format === 'titleCase') return titleCase(value)
-      return value
-    },
-  },
+  debug: _NODE_ENV_ === 'development',
   keySeparator: false, // use namespaces and context instead
-  saveMissing: true,
   missingKeyHandler: (lng, ns, key) => {
-    process.env.NODE_ENV === 'test'
+    _NODE_ENV_ === 'test'
       ? console.error(`Missing ${lng} Translation: key={${key}} ns={${ns}}`)
       : console.warn(`Missing ${lng} Translation: key={${key}} ns={${ns}}`)
   },

@@ -1,11 +1,13 @@
 """Tests for RunDataManager."""
+
 from datetime import datetime
 from typing import Optional, List, Dict
-from unittest.mock import sentinel
+from unittest.mock import sentinel, Mock
 
 import pytest
 from decoy import Decoy, matchers
 
+from opentrons_shared_data.data_files import RunFileNameMetadata
 from opentrons.protocol_engine import (
     EngineStatus,
     StateSummary,
@@ -21,19 +23,25 @@ from opentrons.protocol_engine import (
     LabwareOffset,
     Liquid,
 )
-from opentrons.protocol_engine.types import BooleanParameter, CSVParameter
+from opentrons import config
+from opentrons.protocol_engine.types import (
+    BooleanParameter,
+    CSVParameter,
+    CommandPreconditions,
+)
 from opentrons.protocol_runner import RunResult
 
 from opentrons.hardware_control.nozzle_manager import NozzleMap
 
 from opentrons_shared_data.errors.exceptions import InvalidStoredData
-from opentrons_shared_data.labware.labware_definition import LabwareDefinition
+from opentrons_shared_data.labware.labware_definition import LabwareDefinition2
 
 from robot_server.error_recovery.settings.store import ErrorRecoverySettingStore
 from robot_server.protocols.protocol_models import ProtocolKind
 from robot_server.protocols.protocol_store import ProtocolResource
 from robot_server.runs import error_recovery_mapping
 from robot_server.runs.error_recovery_models import ErrorRecoveryRule
+from robot_server.camera.settings.store import CameraSettingStore
 from robot_server.runs.run_data_manager import (
     RunDataManager,
     RunNotCurrentError,
@@ -53,7 +61,12 @@ from robot_server.runs.run_store import (
 from robot_server.service.notifications import RunsPublisher
 from robot_server.service.task_runner import TaskRunner
 from opentrons.protocol_engine.resources import FileProvider
-from robot_server.file_provider.provider import FileProviderWrapper
+from robot_server.file_provider.provider import (
+    FileProviderExecutor,
+)
+from opentrons.protocol_reader import ProtocolSource
+from opentrons.protocol_engine.resources import CameraProvider
+from robot_server.camera.provider import CameraProviderWrapper
 
 
 def mock_notify_publishers() -> None:
@@ -81,6 +94,12 @@ def mock_error_recovery_setting_store(decoy: Decoy) -> ErrorRecoverySettingStore
     return decoy.mock(cls=ErrorRecoverySettingStore)
 
 
+@pytest.fixture
+def mock_camera_setting_store(decoy: Decoy) -> CameraSettingStore:
+    """Get a mock CameraSettingStore."""
+    return decoy.mock(cls=CameraSettingStore)
+
+
 @pytest.fixture()
 def mock_task_runner(decoy: Decoy) -> TaskRunner:
     """Get a mock background TaskRunner."""
@@ -98,13 +117,18 @@ def engine_state_summary() -> StateSummary:
     """Get a StateSummary value object."""
     return StateSummary(
         status=EngineStatus.IDLE,
-        errors=[ErrorOccurrence.construct(id="some-error-id")],  # type: ignore[call-arg]
+        errors=[ErrorOccurrence.model_construct(id="some-error-id")],  # type: ignore[call-arg]
         hasEverEnteredErrorRecovery=False,
-        labware=[LoadedLabware.construct(id="some-labware-id")],  # type: ignore[call-arg]
-        labwareOffsets=[LabwareOffset.construct(id="some-labware-offset-id")],  # type: ignore[call-arg]
-        pipettes=[LoadedPipette.construct(id="some-pipette-id")],  # type: ignore[call-arg]
-        modules=[LoadedModule.construct(id="some-module-id")],  # type: ignore[call-arg]
-        liquids=[Liquid(id="some-liquid-id", displayName="liquid", description="desc")],
+        labware=[LoadedLabware.model_construct(id="some-labware-id")],  # type: ignore[call-arg]
+        labwareOffsets=[LabwareOffset.model_construct(id="some-labware-offset-id")],  # type: ignore[call-arg]
+        pipettes=[LoadedPipette.model_construct(id="some-pipette-id")],  # type: ignore[call-arg]
+        modules=[LoadedModule.model_construct(id="some-module-id")],  # type: ignore[call-arg]
+        liquids=[
+            Liquid.model_construct(
+                id="some-liquid-id", displayName="liquid", description="desc"
+            )
+        ],
+        liquidClasses=[],
         wells=[],
     )
 
@@ -123,7 +147,7 @@ def patch_error_recovery_mapping(decoy: Decoy, monkeypatch: pytest.MonkeyPatch) 
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def run_time_parameters() -> List[pe_types.RunTimeParameter]:
     """Get a RunTimeParameter list."""
     return [
@@ -137,6 +161,24 @@ def run_time_parameters() -> List[pe_types.RunTimeParameter]:
 
 
 @pytest.fixture
+def command_annotations() -> List[pe_types.CommandAnnotation]:
+    """Get a CommandAnnotation list."""
+    return [
+        pe_types.SecondOrderCommandAnnotation(
+            commandKeys=["abc"],
+            params={"abc": "123"},
+            machineReadableName="hello world",
+        )
+    ]
+
+
+@pytest.fixture
+def command_preconditions() -> CommandPreconditions:
+    """Get a CommandPreconditions result."""
+    return CommandPreconditions(isCameraUsed=False)
+
+
+@pytest.fixture
 def mock_nozzle_maps(decoy: Decoy) -> Dict[str, NozzleMap]:
     """Get a mock NozzleMap."""
     mock_nozzle_map = decoy.mock(cls=NozzleMap)
@@ -144,17 +186,31 @@ def mock_nozzle_maps(decoy: Decoy) -> Dict[str, NozzleMap]:
 
 
 @pytest.fixture()
-def mock_file_provider_wrapper(decoy: Decoy) -> FileProviderWrapper:
-    """Return a mock FileProviderWrapper."""
-    return decoy.mock(cls=FileProviderWrapper)
+def mock_file_provider_wrapper(decoy: Decoy) -> FileProviderExecutor:
+    """Return a mock FileProviderExecutor."""
+    return decoy.mock(cls=FileProviderExecutor)
 
 
 @pytest.fixture()
 def mock_file_provider(
-    decoy: Decoy, mock_file_provider_wrapper: FileProviderWrapper
+    decoy: Decoy, mock_file_provider_wrapper: FileProvider
 ) -> FileProvider:
     """Return a mock FileProvider."""
     return decoy.mock(cls=FileProvider)
+
+
+@pytest.fixture()
+def mock_camera_provider_wrapper(decoy: Decoy) -> CameraProviderWrapper:
+    """Return a mock CameraProviderWrapper."""
+    return decoy.mock(cls=CameraProviderWrapper)
+
+
+@pytest.fixture()
+def mock_camera_provider(
+    decoy: Decoy, mock_camera_provider_wrapper: CameraProviderWrapper
+) -> CameraProvider:
+    """Return a mock CameraProvider."""
+    return decoy.mock(cls=CameraProvider)
 
 
 @pytest.fixture
@@ -186,16 +242,20 @@ def subject(
     mock_run_orchestrator_store: RunOrchestratorStore,
     mock_run_store: RunStore,
     mock_error_recovery_setting_store: ErrorRecoverySettingStore,
+    mock_camera_setting_store: CameraSettingStore,
     mock_task_runner: TaskRunner,
     mock_runs_publisher: RunsPublisher,
+    mock_file_provider: FileProvider,
 ) -> RunDataManager:
     """Get a RunDataManager test subject."""
     return RunDataManager(
         run_orchestrator_store=mock_run_orchestrator_store,
         run_store=mock_run_store,
         error_recovery_setting_store=mock_error_recovery_setting_store,
+        camera_setting_store=mock_camera_setting_store,
         task_runner=mock_task_runner,
         runs_publisher=mock_runs_publisher,
+        file_provider=mock_file_provider,
     )
 
 
@@ -204,6 +264,7 @@ async def test_create(
     mock_run_orchestrator_store: RunOrchestratorStore,
     mock_run_store: RunStore,
     mock_error_recovery_setting_store: ErrorRecoverySettingStore,
+    mock_file_provider: FileProvider,
     subject: RunDataManager,
     engine_state_summary: StateSummary,
     run_resource: RunResource,
@@ -211,10 +272,19 @@ async def test_create(
     """It should create an engine and a persisted run resource."""
     run_id = "hello world"
     created_at = datetime(year=2021, month=1, day=1)
+    protocol_source = ProtocolSource(
+        directory=sentinel.directory,
+        main_file=sentinel.main_file,
+        content_hash=sentinel.content_hash,
+        files=[Mock()],
+        robot_type=sentinel.robot_type,
+        config=sentinel.config,
+        metadata={"protocolName": "test_protocol"},
+    )
     protocol = ProtocolResource(
         protocol_id=sentinel.protocol_id,
         created_at=datetime(year=2022, month=2, day=2),
-        source=None,  # type: ignore[arg-type]
+        source=protocol_source,
         protocol_key=None,
         protocol_kind=ProtocolKind.STANDARD,
     )
@@ -226,7 +296,8 @@ async def test_create(
             initial_error_recovery_policy=sentinel.initial_error_recovery_policy,
             protocol=protocol,
             deck_configuration=sentinel.deck_configuration,
-            file_provider=sentinel.file_provider,
+            file_provider=mock_file_provider,
+            camera_provider=sentinel.camera_provider,
             run_time_param_values=sentinel.run_time_param_values,
             run_time_param_paths=sentinel.run_time_param_paths,
             notify_publishers=mock_notify_publishers,
@@ -268,7 +339,7 @@ async def test_create(
         labware_offsets=sentinel.labware_offsets,
         protocol=protocol,
         deck_configuration=sentinel.deck_configuration,
-        file_provider=sentinel.file_provider,
+        camera_provider=sentinel.camera_provider,
         run_time_param_values=sentinel.run_time_param_values,
         run_time_param_paths=sentinel.run_time_param_paths,
         notify_publishers=mock_notify_publishers,
@@ -288,8 +359,19 @@ async def test_create(
         pipettes=engine_state_summary.pipettes,
         modules=engine_state_summary.modules,
         liquids=engine_state_summary.liquids,
+        liquidClasses=engine_state_summary.liquidClasses,
         runTimeParameters=[bool_parameter, file_parameter],
         outputFileIds=engine_state_summary.files,
+    )
+    decoy.verify(
+        mock_file_provider.set_run_metadata(
+            RunFileNameMetadata(
+                robot_name=config.name(),
+                run_id=run_id,
+                run_created_at=created_at,
+                protocol_name="test_protocol",
+            )
+        )
     )
     decoy.verify(
         mock_run_store.insert_csv_rtp(
@@ -304,6 +386,7 @@ async def test_create_engine_error(
     mock_run_store: RunStore,
     mock_error_recovery_setting_store: ErrorRecoverySettingStore,
     mock_file_provider: FileProvider,
+    mock_camera_provider: CameraProvider,
     subject: RunDataManager,
 ) -> None:
     """It should not create a resource if engine creation fails."""
@@ -328,6 +411,7 @@ async def test_create_engine_error(
             protocol=None,
             deck_configuration=[],
             file_provider=mock_file_provider,
+            camera_provider=mock_camera_provider,
             run_time_param_values=None,
             run_time_param_paths=None,
             notify_publishers=mock_notify_publishers,
@@ -342,7 +426,7 @@ async def test_create_engine_error(
             labware_offsets=[],
             protocol=None,
             deck_configuration=[],
-            file_provider=mock_file_provider,
+            camera_provider=mock_camera_provider,
             run_time_param_values=None,
             run_time_param_paths=None,
             notify_publishers=mock_notify_publishers,
@@ -395,6 +479,7 @@ async def test_get_current_run(
         pipettes=engine_state_summary.pipettes,
         modules=engine_state_summary.modules,
         liquids=engine_state_summary.liquids,
+        liquidClasses=engine_state_summary.liquidClasses,
         runTimeParameters=run_time_parameters,
         outputFileIds=engine_state_summary.files,
     )
@@ -438,6 +523,7 @@ async def test_get_historical_run(
         pipettes=engine_state_summary.pipettes,
         modules=engine_state_summary.modules,
         liquids=engine_state_summary.liquids,
+        liquidClasses=engine_state_summary.liquidClasses,
         runTimeParameters=run_time_parameters,
         outputFileIds=engine_state_summary.files,
     )
@@ -482,6 +568,7 @@ async def test_get_historical_run_no_data(
         pipettes=[],
         modules=[],
         liquids=[],
+        liquidClasses=[],
         runTimeParameters=run_time_parameters,
         outputFileIds=[],
     )
@@ -496,13 +583,18 @@ async def test_get_all_runs(
     """It should get all runs, including current and historical."""
     current_run_data = StateSummary(
         status=EngineStatus.IDLE,
-        errors=[ErrorOccurrence.construct(id="current-error-id")],  # type: ignore[call-arg]
+        errors=[ErrorOccurrence.model_construct(id="current-error-id")],  # type: ignore[call-arg]
         hasEverEnteredErrorRecovery=False,
-        labware=[LoadedLabware.construct(id="current-labware-id")],  # type: ignore[call-arg]
-        labwareOffsets=[LabwareOffset.construct(id="current-labware-offset-id")],  # type: ignore[call-arg]
-        pipettes=[LoadedPipette.construct(id="current-pipette-id")],  # type: ignore[call-arg]
-        modules=[LoadedModule.construct(id="current-module-id")],  # type: ignore[call-arg]
-        liquids=[Liquid(id="some-liquid-id", displayName="liquid", description="desc")],
+        labware=[LoadedLabware.model_construct(id="current-labware-id")],  # type: ignore[call-arg]
+        labwareOffsets=[LabwareOffset.model_construct(id="current-labware-offset-id")],  # type: ignore[call-arg]
+        pipettes=[LoadedPipette.model_construct(id="current-pipette-id")],  # type: ignore[call-arg]
+        modules=[LoadedModule.model_construct(id="current-module-id")],  # type: ignore[call-arg]
+        liquids=[
+            Liquid.model_construct(
+                id="some-liquid-id", displayName="liquid", description="desc"
+            )
+        ],
+        liquidClasses=[],
         wells=[],
     )
     current_run_time_parameters: List[pe_types.RunTimeParameter] = [
@@ -516,13 +608,14 @@ async def test_get_all_runs(
 
     historical_run_data = StateSummary(
         status=EngineStatus.STOPPED,
-        errors=[ErrorOccurrence.construct(id="old-error-id")],  # type: ignore[call-arg]
+        errors=[ErrorOccurrence.model_construct(id="old-error-id")],  # type: ignore[call-arg]
         hasEverEnteredErrorRecovery=False,
-        labware=[LoadedLabware.construct(id="old-labware-id")],  # type: ignore[call-arg]
-        labwareOffsets=[LabwareOffset.construct(id="old-labware-offset-id")],  # type: ignore[call-arg]
-        pipettes=[LoadedPipette.construct(id="old-pipette-id")],  # type: ignore[call-arg]
-        modules=[LoadedModule.construct(id="old-module-id")],  # type: ignore[call-arg]
+        labware=[LoadedLabware.model_construct(id="old-labware-id")],  # type: ignore[call-arg]
+        labwareOffsets=[LabwareOffset.model_construct(id="old-labware-offset-id")],  # type: ignore[call-arg]
+        pipettes=[LoadedPipette.model_construct(id="old-pipette-id")],  # type: ignore[call-arg]
+        modules=[LoadedModule.model_construct(id="old-module-id")],  # type: ignore[call-arg]
         liquids=[],
+        liquidClasses=[],
         wells=[],
     )
     historical_run_time_parameters: List[pe_types.RunTimeParameter] = [
@@ -584,6 +677,7 @@ async def test_get_all_runs(
             pipettes=historical_run_data.pipettes,
             modules=historical_run_data.modules,
             liquids=historical_run_data.liquids,
+            liquidClasses=historical_run_data.liquidClasses,
             runTimeParameters=historical_run_time_parameters,
             outputFileIds=historical_run_data.files,
         ),
@@ -601,6 +695,7 @@ async def test_get_all_runs(
             pipettes=current_run_data.pipettes,
             modules=current_run_data.modules,
             liquids=current_run_data.liquids,
+            liquidClasses=current_run_data.liquidClasses,
             runTimeParameters=current_run_time_parameters,
             outputFileIds=current_run_data.files,
         ),
@@ -645,11 +740,14 @@ async def test_update_current(
     decoy: Decoy,
     engine_state_summary: StateSummary,
     run_time_parameters: List[pe_types.RunTimeParameter],
+    command_annotations: List[pe_types.CommandAnnotation],
+    command_preconditions: CommandPreconditions,
     run_resource: RunResource,
     run_command: commands.Command,
     mock_run_orchestrator_store: RunOrchestratorStore,
     mock_run_store: RunStore,
     mock_runs_publisher: RunsPublisher,
+    mock_file_provider: FileProvider,
     subject: RunDataManager,
 ) -> None:
     """It should persist the current run and clear the engine on current=false."""
@@ -660,6 +758,8 @@ async def test_update_current(
             commands=[run_command],
             state_summary=engine_state_summary,
             parameters=run_time_parameters,
+            command_annotations=command_annotations,
+            command_preconditions=command_preconditions,
         )
     )
 
@@ -686,6 +786,10 @@ async def test_update_current(
         mock_runs_publisher.publish_runs_advise_refetch(run_id),
         times=1,
     )
+    decoy.verify(
+        mock_file_provider.clear_run_metadata(),
+        times=1,
+    )
     assert result == Run(
         current=False,
         id=run_resource.run_id,
@@ -700,6 +804,7 @@ async def test_update_current(
         pipettes=engine_state_summary.pipettes,
         modules=engine_state_summary.modules,
         liquids=engine_state_summary.liquids,
+        liquidClasses=engine_state_summary.liquidClasses,
         runTimeParameters=run_time_parameters,
         outputFileIds=engine_state_summary.files,
     )
@@ -757,6 +862,7 @@ async def test_update_current_noop(
         pipettes=engine_state_summary.pipettes,
         modules=engine_state_summary.modules,
         liquids=engine_state_summary.liquids,
+        liquidClasses=engine_state_summary.liquidClasses,
         runTimeParameters=run_time_parameters,
         outputFileIds=engine_state_summary.files,
     )
@@ -783,12 +889,15 @@ async def test_create_archives_existing(
     decoy: Decoy,
     engine_state_summary: StateSummary,
     run_time_parameters: List[pe_types.RunTimeParameter],
+    command_annotations: List[pe_types.CommandAnnotation],
+    command_preconditions: CommandPreconditions,
     run_resource: RunResource,
     run_command: commands.Command,
     mock_run_orchestrator_store: RunOrchestratorStore,
     mock_run_store: RunStore,
     mock_error_recovery_setting_store: ErrorRecoverySettingStore,
     mock_file_provider: FileProvider,
+    mock_camera_provider: CameraProvider,
     subject: RunDataManager,
 ) -> None:
     """It should persist the previously current run when a new run is created."""
@@ -801,6 +910,8 @@ async def test_create_archives_existing(
             commands=[run_command],
             state_summary=engine_state_summary,
             parameters=run_time_parameters,
+            command_annotations=command_annotations,
+            command_preconditions=command_preconditions,
         )
     )
 
@@ -823,6 +934,7 @@ async def test_create_archives_existing(
             initial_error_recovery_policy=sentinel.initial_error_recovery_policy,
             deck_configuration=[],
             file_provider=mock_file_provider,
+            camera_provider=mock_camera_provider,
             run_time_param_values=None,
             run_time_param_paths=None,
             notify_publishers=mock_notify_publishers,
@@ -843,7 +955,7 @@ async def test_create_archives_existing(
         labware_offsets=[],
         protocol=None,
         deck_configuration=[],
-        file_provider=mock_file_provider,
+        camera_provider=mock_camera_provider,
         run_time_param_values=None,
         run_time_param_paths=None,
         notify_publishers=mock_notify_publishers,
@@ -924,16 +1036,28 @@ def test_get_commands_slice_current_run(
     assert expected_command_slice == result
 
 
-def test_get_commands_errors_slice__not_current_run_raises(
+def test_get_commands_errors_slice_historical_run(
     decoy: Decoy,
     subject: RunDataManager,
     mock_run_orchestrator_store: RunOrchestratorStore,
+    mock_run_store: RunStore,
 ) -> None:
     """Should get a sliced command error list from engine store."""
+    expected_commands_errors_result = [ErrorOccurrence.model_construct(id="error-id")]  # type: ignore[call-arg]
+
+    command_error_slice = CommandErrorSlice(
+        cursor=1, total_length=3, commands_errors=expected_commands_errors_result
+    )
+
     decoy.when(mock_run_orchestrator_store.current_run_id).then_return("run-not-id")
 
-    with pytest.raises(RunNotCurrentError):
-        subject.get_command_error_slice("run-id", 1, 2)
+    decoy.when(mock_run_store.get_commands_errors_slice("run-id", 2, 1)).then_return(
+        command_error_slice
+    )
+
+    result = subject.get_command_error_slice("run-id", 1, 2)
+
+    assert command_error_slice == result
 
 
 def test_get_commands_errors_slice_current_run(
@@ -944,7 +1068,7 @@ def test_get_commands_errors_slice_current_run(
 ) -> None:
     """Should get a sliced command error list from engine store."""
     expected_commands_errors_result = [
-        ErrorOccurrence.construct(id="error-id")  # type: ignore[call-arg]
+        ErrorOccurrence.model_construct(id="error-id")  # type: ignore[call-arg]
     ]
 
     command_error_slice = CommandErrorSlice(
@@ -1216,20 +1340,20 @@ async def test_get_current_run_labware_definition(
         mock_run_orchestrator_store.get_loaded_labware_definitions()
     ).then_return(
         [
-            LabwareDefinition.construct(namespace="test_1"),  # type: ignore[call-arg]
-            LabwareDefinition.construct(namespace="test_2"),  # type: ignore[call-arg]
+            LabwareDefinition2.model_construct(namespace="test_1"),  # type: ignore[call-arg]
+            LabwareDefinition2.model_construct(namespace="test_2"),  # type: ignore[call-arg]
         ]
     )
 
     result = subject.get_run_loaded_labware_definitions(run_id="run-id")
 
     assert result == [
-        LabwareDefinition.construct(namespace="test_1"),  # type: ignore[call-arg]
-        LabwareDefinition.construct(namespace="test_2"),  # type: ignore[call-arg]
+        LabwareDefinition2.model_construct(namespace="test_1"),  # type: ignore[call-arg]
+        LabwareDefinition2.model_construct(namespace="test_2"),  # type: ignore[call-arg]
     ]
 
 
-async def test_create_policies_raises_run_not_current(
+async def test_set_error_recovery_rules_raises_run_not_current(
     decoy: Decoy,
     mock_run_orchestrator_store: RunOrchestratorStore,
     subject: RunDataManager,
@@ -1244,7 +1368,7 @@ async def test_create_policies_raises_run_not_current(
         )
 
 
-async def test_create_policies_translates_and_calls_orchestrator(
+async def test_set_error_recovery_rules_translates_and_calls_orchestrator(
     decoy: Decoy,
     mock_run_orchestrator_store: RunOrchestratorStore,
     mock_error_recovery_setting_store: ErrorRecoverySettingStore,
@@ -1269,6 +1393,34 @@ async def test_create_policies_translates_and_calls_orchestrator(
     decoy.verify(
         mock_run_orchestrator_store.set_error_recovery_policy(sentinel.expected_output)
     )
+
+
+async def test_get_error_recovery_rules(
+    decoy: Decoy,
+    mock_run_orchestrator_store: RunOrchestratorStore,
+    subject: RunDataManager,
+) -> None:
+    """It should return the current run's previously-set list of error recovery rules."""
+    # Before there has been any current run, it should raise an exception.
+    with pytest.raises(RunNotCurrentError):
+        subject.get_error_recovery_rules(run_id="whatever")
+
+    # While there is a current run, it should return its list of rules.
+    decoy.when(mock_run_orchestrator_store.current_run_id).then_return(
+        sentinel.current_run_id
+    )
+    subject.set_error_recovery_rules(
+        run_id=sentinel.current_run_id, rules=sentinel.input_rules
+    )
+    assert (
+        subject.get_error_recovery_rules(run_id=sentinel.current_run_id)
+        == sentinel.input_rules
+    )
+
+    # When the run stops being current, it should go back to raising.
+    decoy.when(mock_run_orchestrator_store.current_run_id).then_return(None)
+    with pytest.raises(RunNotCurrentError):
+        subject.get_error_recovery_rules(run_id="whatever")
 
 
 def test_get_nozzle_map_current_run(

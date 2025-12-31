@@ -1,32 +1,33 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import head from 'lodash/head'
 import { css } from 'styled-components'
-import { useTranslation } from 'react-i18next'
 
 import {
   DIRECTION_COLUMN,
   Flex,
+  RadioButton,
+  RESPONSIVENESS,
   SPACING,
   StyledText,
-  RESPONSIVENESS,
-  RadioButton,
 } from '@opentrons/components'
 
 import {
-  ODD_SECTION_TITLE_STYLE,
-  RECOVERY_MAP,
-  ODD_ONLY,
   DESKTOP_ONLY,
   ERROR_KINDS,
+  ODD_ONLY,
+  ODD_SECTION_TITLE_STYLE,
+  RECOVERY_MAP,
 } from '../constants'
-import { SelectRecoveryOption } from './SelectRecoveryOption'
 import {
   RecoveryFooterButtons,
-  RecoverySingleColumnContentWrapper,
   RecoveryRadioGroup,
+  RecoverySingleColumnContentWrapper,
   SkipStepInfo,
 } from '../shared'
+import { SelectRecoveryOption } from './SelectRecoveryOption'
 
+import type { ChangeEvent } from 'react'
 import type { RecoveryContentProps } from '../types'
 
 export function IgnoreErrorSkipStep(props: RecoveryContentProps): JSX.Element {
@@ -41,7 +42,9 @@ export function IgnoreErrorSkipStep(props: RecoveryContentProps): JSX.Element {
       case IGNORE_AND_SKIP.STEPS.SKIP_STEP:
         return <SkipStepInfo {...props} />
       default:
-        console.warn(`${step} in ${route} not explicitly handled. Rerouting.`)
+        console.warn(
+          `IgnoreErrorAndSkipStep: ${step} in ${route} not explicitly handled. Rerouting.`
+        )
         return <SelectRecoveryOption {...props} />
     }
   }
@@ -56,14 +59,11 @@ export function IgnoreErrorStepHome({
 }: RecoveryContentProps): JSX.Element | null {
   const { t } = useTranslation('error_recovery')
   const { ignoreErrorKindThisRun } = recoveryCommands
-  const {
-    proceedNextStep,
-    proceedToRouteAndStep,
-    goBackPrevStep,
-  } = routeUpdateActions
+  const { proceedNextStep, proceedToRouteAndStep, goBackPrevStep } =
+    routeUpdateActions
 
   const [selectedOption, setSelectedOption] = useState<IgnoreOption>(
-    head(IGNORE_OPTIONS_IN_ORDER) as IgnoreOption
+    head(IGNORE_OPTIONS_IN_ORDER)!
   )
 
   // Reset client choice to ignore all errors whenever navigating back to this view. This prevents unexpected
@@ -79,8 +79,8 @@ export function IgnoreErrorStepHome({
     switch (errorKind) {
       case ERROR_KINDS.NO_LIQUID_DETECTED:
         void proceedToRouteAndStep(
-          RECOVERY_MAP.MANUAL_FILL_AND_SKIP.ROUTE,
-          RECOVERY_MAP.MANUAL_FILL_AND_SKIP.STEPS.SKIP
+          RECOVERY_MAP.MANUAL_FILL_AND_RETRY_SAME_TIPS.ROUTE,
+          RECOVERY_MAP.MANUAL_FILL_AND_RETRY_SAME_TIPS.STEPS.SKIP
         )
         break
       default:
@@ -94,8 +94,8 @@ export function IgnoreErrorStepHome({
       switch (errorKind) {
         case ERROR_KINDS.NO_LIQUID_DETECTED:
           void proceedToRouteAndStep(
-            RECOVERY_MAP.MANUAL_FILL_AND_SKIP.ROUTE,
-            RECOVERY_MAP.MANUAL_FILL_AND_SKIP.STEPS.SKIP
+            RECOVERY_MAP.MANUAL_FILL_AND_RETRY_SAME_TIPS.ROUTE,
+            RECOVERY_MAP.MANUAL_FILL_AND_RETRY_SAME_TIPS.STEPS.SKIP
           )
           break
         default:
@@ -141,7 +141,7 @@ export function IgnoreErrorStepHome({
       >
         <RecoveryRadioGroup
           value={selectedOption}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+          onChange={(e: ChangeEvent<HTMLInputElement>) => {
             setSelectedOption(e.currentTarget.value as IgnoreOption)
           }}
           options={IGNORE_OPTIONS_IN_ORDER.map(option => {

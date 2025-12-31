@@ -1,12 +1,12 @@
 """Tests for CommandView.
 
 DEPRECATED: Testing CommandView independently of CommandStore is no longer helpful.
-Add new tests to test_command_state.py, where they can be tested together.
+Try to add new tests to test_command_state.py, where they can be tested together,
+treating CommandState as a private implementation detail.
 """
 
-
 import pytest
-from contextlib import nullcontext as does_not_raise
+from contextlib import nullcontext as does_not_raise, AbstractContextManager
 from datetime import datetime
 from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Type, Union
 
@@ -28,19 +28,17 @@ from opentrons.protocol_engine.state.commands import (
     CommandState,
     CommandView,
     CommandSlice,
-    CommandErrorSlice,
     CommandPointer,
     RunResult,
     QueueStatus,
 )
 
-from opentrons.protocol_engine.state.command_history import CommandEntry
+from opentrons.protocol_engine.state.command_history import CommandEntry, CommandHistory
 
 from opentrons.protocol_engine.errors import ProtocolCommandFailedError, ErrorOccurrence
 
 from opentrons_shared_data.errors.codes import ErrorCodes
 
-from opentrons.protocol_engine.state.command_history import CommandHistory
 from opentrons.protocol_engine.state.update_types import StateUpdate
 
 from .command_fixtures import (
@@ -77,7 +75,6 @@ def get_command_view(  # noqa: C901
     finish_error: Optional[errors.ErrorOccurrence] = None,
     commands: Sequence[cmd.Command] = (),
     latest_command_hash: Optional[str] = None,
-    failed_command_errors: Optional[List[ErrorOccurrence]] = None,
     has_entered_error_recovery: bool = False,
 ) -> CommandView:
     """Get a command view test subject."""
@@ -112,16 +109,18 @@ def get_command_view(  # noqa: C901
         finish_error=finish_error,
         failed_command=failed_command,
         command_error_recovery_types=command_error_recovery_types or {},
-        recovery_target=_RecoveryTargetInfo(
-            command_id=recovery_target_command_id,
-            state_update_if_false_positive=StateUpdate(),
-        )
-        if recovery_target_command_id is not None
-        else None,
+        recovery_target=(
+            _RecoveryTargetInfo(
+                command_id=recovery_target_command_id,
+                state_update_if_false_positive=StateUpdate(),
+            )
+            if recovery_target_command_id is not None
+            else None
+        ),
         run_started_at=run_started_at,
         latest_protocol_command_hash=latest_command_hash,
-        stopped_by_estop=False,
-        failed_command_errors=failed_command_errors or [],
+        stopped_by_async_error=False,
+        is_stopping_because_of_async_error=False,
         has_entered_error_recovery=has_entered_error_recovery,
         error_recovery_policy=_placeholder_error_recovery_policy,
     )
@@ -629,7 +628,10 @@ def test_validate_action_allowed(
     expected_error: Optional[Type[Exception]],
 ) -> None:
     """It should validate allowed play/pause/stop actions."""
-    expectation = pytest.raises(expected_error) if expected_error else does_not_raise()
+    if expected_error is not None:
+        expectation: AbstractContextManager[object] = pytest.raises(expected_error)
+    else:
+        expectation = does_not_raise()
 
     with expectation:
         result = subject.validate_action_allowed(action)
@@ -896,7 +898,7 @@ def test_get_current() -> None:
         created_at=datetime(year=2022, month=2, day=2),
     )
     subject = get_command_view(commands=[command_1, command_2])
-    subject.state.command_history._set_most_recently_completed_command_id(command_1.id)
+    subject._state.command_history._set_most_recently_completed_command_id(command_1.id)
 
     assert subject.get_current() == CommandPointer(
         index=1,
@@ -916,7 +918,7 @@ def test_get_current() -> None:
         created_at=datetime(year=2022, month=2, day=2),
     )
     subject = get_command_view(commands=[command_1, command_2])
-    subject.state.command_history._set_most_recently_completed_command_id(command_1.id)
+    subject._state.command_history._set_most_recently_completed_command_id(command_1.id)
 
     assert subject.get_current() == CommandPointer(
         index=1,
@@ -1003,8 +1005,8 @@ def test_get_slice_default_cursor_failed_command() -> None:
     result = subject.get_slice(cursor=None, length=3, include_fixit_commands=True)
 
     assert result == CommandSlice(
-        commands=[command_3, command_4],
-        cursor=2,
+        commands=[command_2, command_3, command_4],
+        cursor=1,
         total_length=4,
     )
 
@@ -1025,50 +1027,14 @@ def test_get_slice_default_cursor_running() -> None:
     result = subject.get_slice(cursor=None, length=2, include_fixit_commands=True)
 
     assert result == CommandSlice(
-        commands=[command_3, command_4],
-        cursor=2,
+        commands=[command_2, command_3],
+        cursor=1,
         total_length=5,
     )
 
 
-def test_get_errors_slice_empty() -> None:
-    """It should return a slice from the tail if no current command."""
-    subject = get_command_view(failed_command_errors=[])
-    result = subject.get_errors_slice(cursor=0, length=2)
-
-    assert result == CommandErrorSlice(commands_errors=[], cursor=0, total_length=0)
-
-
-def test_get_errors_slice() -> None:
-    """It should return a slice of all command errors."""
-    error_1 = ErrorOccurrence.construct(id="error-id-1")  # type: ignore[call-arg]
-    error_2 = ErrorOccurrence.construct(id="error-id-2")  # type: ignore[call-arg]
-    error_3 = ErrorOccurrence.construct(id="error-id-3")  # type: ignore[call-arg]
-    error_4 = ErrorOccurrence.construct(id="error-id-4")  # type: ignore[call-arg]
-
-    subject = get_command_view(
-        failed_command_errors=[error_1, error_2, error_3, error_4]
-    )
-
-    result = subject.get_errors_slice(cursor=1, length=3)
-
-    assert result == CommandErrorSlice(
-        commands_errors=[error_2, error_3, error_4],
-        cursor=1,
-        total_length=4,
-    )
-
-    result = subject.get_errors_slice(cursor=-3, length=10)
-
-    assert result == CommandErrorSlice(
-        commands_errors=[error_1, error_2, error_3, error_4],
-        cursor=0,
-        total_length=4,
-    )
-
-
 def test_get_slice_without_fixit() -> None:
-    """It should select a cursor based on the running command, if present."""
+    """It should filter out fixit commands when requested."""
     command_1 = create_succeeded_command(command_id="command-id-1")
     command_2 = create_succeeded_command(command_id="command-id-2")
     command_3 = create_running_command(command_id="command-id-3")
@@ -1108,5 +1074,46 @@ def test_get_slice_without_fixit() -> None:
     assert result == CommandSlice(
         commands=[command_1, command_2, command_3, command_4, command_5],
         cursor=0,
+        total_length=5,
+    )
+
+
+def test_get_slice_large_length() -> None:
+    """It should handle cases where length is larger than available commands."""
+    command_1 = create_succeeded_command(command_id="command-id-1")
+    command_2 = create_succeeded_command(command_id="command-id-2")
+    command_3 = create_running_command(command_id="command-id-3")
+
+    subject = get_command_view(
+        commands=[command_1, command_2, command_3],
+        running_command_id="command-id-3",
+    )
+
+    result = subject.get_slice(cursor=None, length=10, include_fixit_commands=True)
+
+    assert result == CommandSlice(
+        commands=[command_1, command_2, command_3],
+        cursor=0,
+        total_length=3,
+    )
+
+
+def test_get_slice_explicit_cursor_with_length() -> None:
+    """It should use the cursor as the start position when explicitly provided."""
+    command_1 = create_succeeded_command(command_id="command-id-1")
+    command_2 = create_succeeded_command(command_id="command-id-2")
+    command_3 = create_succeeded_command(command_id="command-id-3")
+    command_4 = create_succeeded_command(command_id="command-id-4")
+    command_5 = create_succeeded_command(command_id="command-id-5")
+
+    subject = get_command_view(
+        commands=[command_1, command_2, command_3, command_4, command_5],
+    )
+
+    result = subject.get_slice(cursor=1, length=3, include_fixit_commands=True)
+
+    assert result == CommandSlice(
+        commands=[command_2, command_3, command_4],
+        cursor=1,
         total_length=5,
     )

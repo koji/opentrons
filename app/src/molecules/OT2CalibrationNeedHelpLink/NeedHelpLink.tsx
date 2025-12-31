@@ -1,24 +1,26 @@
-import type * as React from 'react'
 import { useTranslation } from 'react-i18next'
+
 import {
-  Flex,
-  Link,
-  Icon,
-  COLORS,
-  TYPOGRAPHY,
-  SIZE_1,
   ALIGN_CENTER,
+  COLORS,
+  Flex,
+  Icon,
+  Link,
+  SIZE_1,
   SPACING,
+  TYPOGRAPHY,
 } from '@opentrons/components'
+
+import type { ComponentProps } from 'react'
 
 const SUPPORT_PAGE_URL = 'https://support.opentrons.com/s/ot2-calibration'
 
-interface NeedHelpLinkProps extends React.ComponentProps<typeof Flex> {
+interface NeedHelpLinkProps extends ComponentProps<typeof Flex> {
   href?: string
 }
 
 export function NeedHelpLink(props: NeedHelpLinkProps): JSX.Element {
-  const { href = SUPPORT_PAGE_URL, flexProps } = props
+  const { href = SUPPORT_PAGE_URL, ...flexProps } = props
   const { t } = useTranslation('robot_calibration')
   return (
     <Flex alignItems={ALIGN_CENTER} {...flexProps}>
@@ -26,7 +28,7 @@ export function NeedHelpLink(props: NeedHelpLinkProps): JSX.Element {
         color={COLORS.grey50}
         size={SIZE_1}
         marginRight={SPACING.spacing4}
-        name="question-mark-circle"
+        name="help"
       />
       <Link
         external

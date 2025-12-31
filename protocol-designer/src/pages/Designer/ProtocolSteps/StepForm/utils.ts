@@ -1,38 +1,42 @@
 import difference from 'lodash/difference'
 import isEqual from 'lodash/isEqual'
+import startCase from 'lodash/startCase'
 import without from 'lodash/without'
+
+import { SINGLE } from '@opentrons/shared-data'
 import {
-  SOURCE_WELL_BLOWOUT_DESTINATION,
   DEST_WELL_BLOWOUT_DESTINATION,
+  SOURCE_WELL_BLOWOUT_DESTINATION,
 } from '@opentrons/step-generation'
-import { ALL, COLUMN } from '@opentrons/shared-data'
-import { getFieldErrors } from '../../../../steplist/fieldLevel'
+
+import { i18n } from '/protocol-designer/assets/localization'
+import { PROFILE_CYCLE } from '/protocol-designer/form-types'
 import {
-  getDisabledFields,
   getDefaultsForStepType,
-} from '../../../../steplist/formLevel'
-import { i18n } from '../../../../assets/localization'
-import { PROFILE_CYCLE } from '../../../../form-types'
+  getDisabledFields,
+} from '/protocol-designer/steplist/formLevel'
+
+import type { DropdownOption } from '@opentrons/components'
 import type { PipetteEntity } from '@opentrons/step-generation'
-import type { Options } from '@opentrons/components'
-import type { ProfileFormError } from '../../../../steplist/formLevel/profileErrors'
-import type { FormWarning } from '../../../../steplist/formLevel/warnings'
-import type { StepFormErrors } from '../../../../steplist/types'
 import type {
   FormData,
+  HydratedFormData,
+  PathOption,
   ProfileItem,
   StepFieldName,
   StepType,
-  PathOption,
-} from '../../../../form-types'
-import type { FormError } from '../../../../steplist/formLevel'
-import type { NozzleType } from '../../../../types'
+} from '/protocol-designer/form-types'
+import type { FormError } from '/protocol-designer/steplist/formLevel'
+import type { ProfileFormError } from '/protocol-designer/steplist/formLevel/profileErrors'
+import type { FormWarning } from '/protocol-designer/steplist/formLevel/warnings'
+import type { StepFormErrors } from '/protocol-designer/steplist/types'
+import type { NozzleType } from '/protocol-designer/types'
 import type { FieldProps, FieldPropsByName, FocusHandlers } from './types'
 
 export function getBlowoutLocationOptionsForForm(args: {
   stepType: StepType
   path?: PathOption | null | undefined
-}): Options {
+}): DropdownOption[] {
   const { stepType, path } = args
   // TODO: Ian 2019-02-21 use i18n for names
   const destOption = {
@@ -104,20 +108,31 @@ export const getDirtyFields = (
   // exclude form "metadata" (not really fields)
   return without(dirtyFields, 'stepType', 'id')
 }
+
+export const getIsErrorOnCurrentPage = (args: {
+  errors: StepFormErrors
+  page: number
+}): boolean => {
+  const { errors, page = 0 } = args
+  return errors.some(error => error.page == null || error.page === page)
+}
+
 export const getVisibleFormErrors = (args: {
   focusedField?: string | null
   dirtyFields: string[]
   errors: StepFormErrors
+  showErrors?: boolean
+  page: number
 }): StepFormErrors => {
-  const { focusedField, dirtyFields, errors } = args
+  const { focusedField, errors, page = 0, showErrors } = args
   return errors.filter(error => {
     const dependentFieldsAreNotFocused = !error.dependentFields.includes(
       // @ts-expect-error(sa, 2021-6-22): focusedField might be undefined
       focusedField
     )
-    const dependentFieldsAreDirty =
-      difference(error.dependentFields, dirtyFields).length === 0
-    return dependentFieldsAreNotFocused && dependentFieldsAreDirty
+
+    const isPageImplicated = error.page != null ? page === error.page : true
+    return isPageImplicated && dependentFieldsAreNotFocused && showErrors
   })
 }
 export const getVisibleFormWarnings = (args: {
@@ -178,17 +193,62 @@ export const getVisibleProfileFormLevelErrors = (args: {
   })
 }
 export const getFieldDefaultTooltip = (name: string, t: any): string =>
-  name != null ? t(`step_fields.defaults.${name}`) : ''
+  name != null ? t(`tooltip:step_fields.defaults.${name}`) : ''
 export const getFieldIndeterminateTooltip = (name: string, t: any): string =>
-  name != null ? t(`step_fields.indeterminate.${name}`) : ''
+  name != null ? t(`tooltip:step_fields.indeterminate.${name}`) : ''
 export const getSingleSelectDisabledTooltip = (
   name: string,
   stepType: string,
   t: any
 ): string =>
   name != null
-    ? t(`step_fields.${stepType}.disabled.${name}`)
-    : t(`step_fields.${stepType}.disabled.$generic`)
+    ? t(`tooltip:step_fields.${stepType}.disabled.${name}`)
+    : t(`tooltip:step_fields.${stepType}.disabled.$generic`)
+
+export const getFieldCaptions = (
+  name: string,
+  t: any,
+  hydratedForm: HydratedFormData
+): string | null => {
+  if (name == null) {
+    return null
+  }
+
+  //  special-casing the volume field to add a max const
+  if (name === 'volume') {
+    let labware
+    if (
+      'dispense_labware' in hydratedForm &&
+      hydratedForm.dispense_labware != null &&
+      hydratedForm.stepType === 'moveLiquid'
+    ) {
+      labware = hydratedForm.dispense_labware
+    } else if (
+      'labware' in hydratedForm &&
+      hydratedForm.labware != null &&
+      hydratedForm.stepType === 'mix'
+    ) {
+      labware = hydratedForm.labware
+    }
+
+    if (labware == null) {
+      return null
+    }
+    const dispenseLabwareMaxVolume =
+      'def' in labware ? labware.def?.wells.A1.totalLiquidVolume : null
+    if (dispenseLabwareMaxVolume != null) {
+      return t(`protocol_steps:captions_for_fields.volume`, {
+        max: dispenseLabwareMaxVolume,
+      })
+    } else {
+      return null
+    }
+  } else {
+    const key = `protocol_steps:captions_for_fields.${name}`
+    const translated = t(key)
+    return translated === `captions_for_fields.${name}` ? null : translated
+  }
+}
 
 // TODO(IL, 2021-03-03): keys for fieldMap are more strictly of TipOffsetFields type,
 // but since utils like addFieldNamePrefix return StepFieldName/string instead
@@ -198,13 +258,17 @@ export function getLabwareFieldForPositioningField(
 ): StepFieldName {
   const fieldMap: Record<StepFieldName, StepFieldName> = {
     aspirate_mmFromBottom: 'aspirate_labware',
-    aspirate_touchTip_mmFromBottom: 'aspirate_labware',
+    aspirate_touchTip_mmFromTop: 'aspirate_labware',
     aspirate_delay_mmFromBottom: 'aspirate_labware',
     dispense_mmFromBottom: 'dispense_labware',
-    dispense_touchTip_mmFromBottom: 'dispense_labware',
+    dispense_touchTip_mmFromTop: 'dispense_labware',
     dispense_delay_mmFromBottom: 'dispense_labware',
     mix_mmFromBottom: 'labware',
-    mix_touchTip_mmFromBottom: 'labware',
+    mix_touchTip_mmFromTop: 'labware',
+    aspirate_retract_mmFromBottom: 'aspirate_labware',
+    dispense_retract_mmFromBottom: 'dispense_labware',
+    aspirate_submerge_mmFromBottom: 'aspirate_labware',
+    dispense_submerge_mmFromBottom: 'dispense_labware',
   }
   return fieldMap[name]
 }
@@ -214,12 +278,10 @@ export const getNozzleType = (
   nozzles: string | null
 ): NozzleType | null => {
   const is8Channel = pipette != null && pipette.spec.channels === 8
-  if (is8Channel) {
+  if (is8Channel && nozzles !== SINGLE) {
     return '8-channel'
-  } else if (nozzles === COLUMN) {
-    return COLUMN
-  } else if (nozzles === ALL) {
-    return ALL
+  } else if (nozzles != null) {
+    return nozzles as NozzleType
   } else {
     return null
   }
@@ -240,10 +302,13 @@ export const makeSingleEditFieldProps = (
   focusHandlers: FocusHandlers,
   formData: FormData,
   handleChangeFormInput: (name: string, value: unknown) => void,
-  hydratedForm: { [key: string]: any }, //  TODO: create real HydratedFormData type
-  t: any
+  hydratedForm: HydratedFormData,
+  t: any,
+  visibleFormErrors: StepFormErrors,
+  showFormErrors: boolean,
+  currentFormIsPresaved: boolean
 ): FieldPropsByName => {
-  const { dirtyFields, blur, focusedField, focus } = focusHandlers
+  const { blur, focus } = focusHandlers
   const fieldNames: string[] = Object.keys(
     getDefaultsForStepType(formData.stepType)
   )
@@ -252,15 +317,20 @@ export const makeSingleEditFieldProps = (
       ? getDisabledFields(hydratedForm).has(name)
       : false
     const value = formData ? formData[name] : null
-    const showErrors = showFieldErrors({
-      name,
-      focusedField,
-      dirtyFields,
-    })
-    const errors = getFieldErrors(name, value)
-    const errorToShow =
-      showErrors && errors.length > 0 ? errors.join(', ') : null
+    const mappedErrorsToField =
+      visibleFormErrors?.length > 0
+        ? getFormErrorsMappedToField(visibleFormErrors)
+        : {}
 
+    //  NOTE: some fields can have multiple errors, but we
+    //  will always just show the first one until they're all
+    //  resolved
+    const error = mappedErrorsToField[name]?.[0]
+    const errorTitle =
+      error != null &&
+      (showFormErrors || (!currentFormIsPresaved && error.showOnReopen))
+        ? error.title
+        : null
     const updateValue = (value: unknown): void => {
       handleChangeFormInput(name, value)
     }
@@ -279,15 +349,18 @@ export const makeSingleEditFieldProps = (
       formData.stepType,
       t
     )
+    const caption = getFieldCaptions(name, t, hydratedForm)
+
     const fieldProps: FieldProps = {
       disabled,
-      errorToShow,
+      errorToShow: errorTitle,
       name,
       updateValue,
       value,
       onFieldBlur,
       onFieldFocus,
       tooltipContent: disabled ? disabledTooltip : defaultTooltip,
+      caption: caption ?? undefined,
     }
     return { ...acc, [name]: fieldProps }
   }, {})
@@ -324,44 +397,67 @@ export const getSaveStepSnackbarText = (
   }
 }
 
-export const capitalizeFirstLetter = (stepName: string): string =>
-  `${stepName.charAt(0).toUpperCase()}${stepName.slice(1)}`
+export const capitalizeFirstLetter = (stepName: string): string => {
+  // Note - this is a special case
+  if (stepName === 'absorbance plate reader') return startCase(stepName)
 
-type ErrorMappedToField = Record<string, FormError>
+  // Note - check is for heater-shaker
+  if (stepName.includes('-')) {
+    return stepName
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join('-')
+  } else {
+    return `${stepName.charAt(0).toUpperCase()}${stepName.slice(1)}`
+  }
+}
+
+export type ErrorMappedToField = Record<string, FormError>
 
 export const getFormErrorsMappedToField = (
   formErrors: StepFormErrors
-): ErrorMappedToField => {
-  return formErrors.reduce<ErrorMappedToField>((acc, error) => {
-    const { dependentFields } = error
+): Record<string, FormError[]> => {
+  return formErrors.reduce<Record<string, FormError[]>>((acc, error) => {
+    const { dependentFields, location } = error
+
     for (const field of dependentFields) {
-      const { showAtField, showAtForm, title } = error
-      if (showAtField == null || showAtForm == null) {
-        console.error(
-          `${title} should wire up where to show error (at form and/or field)`
-        )
+      if (!acc[field]) {
+        acc[field] = []
       }
-      // map each field to only one one error
-      acc[field] = {
-        ...error,
-        showAtField: error.showAtField ?? true,
-        showAtForm: error.showAtForm ?? true,
+      if (location.includes('field')) {
+        acc[field].push({
+          ...error,
+        })
       }
     }
     return acc
   }, {})
 }
 
-export const getFormLevelError = (
-  showFormErrors: boolean,
-  fieldName: string,
-  mappedErrorsToField: ErrorMappedToField,
-  focusedField?: string | null
-): string | null => {
-  return showFormErrors &&
-    focusedField !== fieldName &&
-    mappedErrorsToField[fieldName] &&
-    mappedErrorsToField[fieldName].showAtField
-    ? mappedErrorsToField[fieldName].title
-    : null
+export const getShouldUpdateForLiquidClass = (
+  changedFields: string[],
+  formType: string
+): boolean => {
+  switch (formType) {
+    case 'moveLiquid':
+      return [
+        'aspirate_labware',
+        'aspirate_wells',
+        'pipette',
+        'tipRack',
+        'path',
+        'liquidClass',
+      ].some(field => changedFields.includes(field))
+    case 'mix':
+      return [
+        'labware',
+        'wells',
+        'pipette',
+        'tipRack',
+        'path',
+        'liquidClass',
+      ].some(field => changedFields.includes(field))
+    default:
+      return false
+  }
 }

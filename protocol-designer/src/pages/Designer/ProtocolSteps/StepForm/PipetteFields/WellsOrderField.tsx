@@ -1,27 +1,34 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+
 import {
-  useHoverTooltip,
-  Tooltip,
-  ListButton,
-  StyledText,
-  Flex,
-  SPACING,
-  DIRECTION_COLUMN,
+  ALIGN_CENTER,
   COLORS,
+  DIRECTION_COLUMN,
+  Flex,
+  Icon,
+  ListButton,
+  SPACING,
+  StyledText,
+  Tooltip,
+  useHoverTooltip,
 } from '@opentrons/components'
-import { WellOrderModal } from '../../../../../organisms'
-import type { WellOrderOption } from '../../../../../form-types'
+
+import { WellOrderModal } from '/protocol-designer/components/organisms'
+
+import type { WellOrderOption } from '/protocol-designer/form-types'
+import type { MoveLiquidPrefixType } from '/protocol-designer/resources/types'
 import type { FieldProps } from '../types'
 
 export interface WellsOrderFieldProps {
-  prefix: 'aspirate' | 'dispense' | 'mix'
+  prefix: MoveLiquidPrefixType
   firstName: string
   secondName: string
   updateFirstWellOrder: FieldProps['updateValue']
   updateSecondWellOrder: FieldProps['updateValue']
   firstValue?: WellOrderOption | null
   secondValue?: WellOrderOption | null
+  padding?: string
 }
 
 export function WellsOrderField(props: WellsOrderFieldProps): JSX.Element {
@@ -33,6 +40,7 @@ export function WellsOrderField(props: WellsOrderFieldProps): JSX.Element {
     prefix,
     updateFirstWellOrder,
     updateSecondWellOrder,
+    padding = `0 ${SPACING.spacing16}`,
   } = props
   const { t, i18n } = useTranslation(['form', 'modal', 'protocol_steps'])
   const [isModalOpen, setModalOpen] = useState(false)
@@ -58,7 +66,7 @@ export function WellsOrderField(props: WellsOrderFieldProps): JSX.Element {
       </Tooltip>
       <Flex
         {...targetProps}
-        padding={SPACING.spacing16}
+        padding={padding}
         gridGap={SPACING.spacing8}
         flexDirection={DIRECTION_COLUMN}
       >
@@ -73,11 +81,15 @@ export function WellsOrderField(props: WellsOrderFieldProps): JSX.Element {
           type="noActive"
           width="100%"
           padding={SPACING.spacing12}
+          gridGap={SPACING.spacing8}
+          alignItems={ALIGN_CENTER}
+          testId={`WellsOrderField_ListButton_${prefix}`}
         >
+          <Icon name="well-order" size="1.25rem" />
           <StyledText desktopStyle="bodyDefaultRegular">
-            {t(`step_edit_form.field.well_order.option.${firstValue}`)}
-            {', '}
-            {t(`step_edit_form.field.well_order.option.${secondValue}`)}
+            {`${t(`step_edit_form.field.well_order.option.${firstValue}`)}, ${t(
+              `step_edit_form.field.well_order.option.${secondValue}`
+            )}`}
           </StyledText>
         </ListButton>
       </Flex>

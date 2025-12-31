@@ -1,5 +1,6 @@
-import { useSelector } from 'react-redux'
 import { useTranslation } from 'react-i18next'
+import { useSelector } from 'react-redux'
+
 import {
   ALIGN_CENTER,
   Box,
@@ -7,17 +8,19 @@ import {
   Flex,
   JUSTIFY_FLEX_END,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   Link,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
+
 import { TertiaryButton } from '/app/atoms/buttons'
+import { useIsFlex, useRobot } from '/app/redux-resources/robots'
 import { getRobotApiVersion } from '/app/redux/discovery'
 import { getRobotUpdateDisplayInfo } from '/app/redux/robot-update'
+
 import { UpdateRobotBanner } from '../../../UpdateRobotBanner'
 import { handleUpdateBuildroot } from '../UpdateBuildroot'
-import { useRobot, useIsFlex } from '/app/redux-resources/robots'
 
 import type { State } from '/app/redux/types'
 
@@ -57,17 +60,17 @@ export function RobotServerVersion({
           >
             {t('robot_server_version')}
           </LegacyStyledText>
-          <LegacyStyledText as="p" paddingBottom={SPACING.spacing4}>
+          <LegacyStyledText forwardedAs="p" paddingBottom={SPACING.spacing4}>
             {robotServerVersion != null
               ? `v${robotServerVersion}`
               : t('robot_settings_advanced_unknown')}
           </LegacyStyledText>
           {isFlex ? (
-            <LegacyStyledText as="p" paddingBottom={SPACING.spacing4}>
+            <LegacyStyledText forwardedAs="p" paddingBottom={SPACING.spacing4}>
               {t('branded:robot_server_version_ot3_description')}
             </LegacyStyledText>
           ) : null}
-          <LegacyStyledText as="p">
+          <LegacyStyledText forwardedAs="p">
             {t('shared:view_latest_release_notes')}
             <Link
               external
@@ -80,7 +83,7 @@ export function RobotServerVersion({
         {autoUpdateAction !== 'reinstall' && robot != null ? null : (
           <Flex justifyContent={JUSTIFY_FLEX_END} alignItems={ALIGN_CENTER}>
             <LegacyStyledText
-              as="label"
+              forwardedAs="label"
               color={COLORS.grey50}
               paddingRight={SPACING.spacing16}
             >

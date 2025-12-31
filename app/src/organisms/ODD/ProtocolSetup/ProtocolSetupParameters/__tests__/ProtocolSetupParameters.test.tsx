@@ -1,24 +1,26 @@
-import type * as React from 'react'
-import { when } from 'vitest-when'
-import { it, describe, beforeEach, vi, expect } from 'vitest'
 import { fireEvent, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { when } from 'vitest-when'
+
+import { COLORS } from '@opentrons/components'
 import {
   useCreateProtocolAnalysisMutation,
   useCreateRunMutation,
   useHost,
   useUploadCsvFileMutation,
 } from '@opentrons/react-api-client'
-import { COLORS } from '@opentrons/components'
 
-import { i18n } from '/app/i18n'
 import { renderWithProviders } from '/app/__testing-utils__'
+import { i18n } from '/app/i18n'
+import { useToaster } from '/app/organisms/ToasterOven'
+
+import { ProtocolSetupParameters } from '..'
+import { mockRunTimeParameterData } from '../../__fixtures__'
+import { ChooseCsvFile } from '../ChooseCsvFile'
 import { ChooseEnum } from '../ChooseEnum'
 import { ChooseNumber } from '../ChooseNumber'
-import { ChooseCsvFile } from '../ChooseCsvFile'
-import { mockRunTimeParameterData } from '../../__fixtures__'
-import { useToaster } from '/app/organisms/ToasterOven'
-import { ProtocolSetupParameters } from '..'
 
+import type { ComponentProps } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 import type { HostConfig } from '@opentrons/api-client'
 import type { CompletedProtocolAnalysis } from '@opentrons/shared-data'
@@ -45,27 +47,24 @@ const MOCK_HOST_CONFIG: HostConfig = { hostname: 'MOCK_HOST' }
 const mockCreateProtocolAnalysis = vi.fn()
 const mockUploadCsvFile = vi.fn()
 const mockCreateRun = vi.fn()
-const mockMostRecentAnalysis = ({
+const mockMostRecentAnalysis = {
   commands: [],
   labware: [],
-} as unknown) as CompletedProtocolAnalysis
+} as unknown as CompletedProtocolAnalysis
 const mockMakeSnackbar = vi.fn()
 
-const render = (
-  props: React.ComponentProps<typeof ProtocolSetupParameters>
-) => {
+const render = (props: ComponentProps<typeof ProtocolSetupParameters>) => {
   return renderWithProviders(<ProtocolSetupParameters {...props} />, {
     i18nInstance: i18n,
   })
 }
 
 describe('ProtocolSetupParameters', () => {
-  let props: React.ComponentProps<typeof ProtocolSetupParameters>
+  let props: ComponentProps<typeof ProtocolSetupParameters>
 
   beforeEach(() => {
     props = {
       protocolId: 'mockId',
-      labwareOffsets: [],
       runTimeParameters: mockRunTimeParameterData,
       mostRecentAnalysis: mockMostRecentAnalysis,
     }
@@ -174,11 +173,11 @@ describe('ProtocolSetupParameters', () => {
   })
 
   it('render csv file when a protocol requires a csv file and confirm values button has the disabled style', () => {
-    const mockMostRecentAnalysisForCsv = ({
+    const mockMostRecentAnalysisForCsv = {
       commands: [],
       labware: [],
       result: 'parameter-value-required',
-    } as unknown) as CompletedProtocolAnalysis
+    } as unknown as CompletedProtocolAnalysis
     render({
       ...props,
       runTimeParameters: mockRunTimeParameterData,
@@ -192,11 +191,11 @@ describe('ProtocolSetupParameters', () => {
   })
 
   it('when tapping aria-disabled button, snack bar will show up', () => {
-    const mockMostRecentAnalysisForCsv = ({
+    const mockMostRecentAnalysisForCsv = {
       commands: [],
       labware: [],
       result: 'parameter-value-required',
-    } as unknown) as CompletedProtocolAnalysis
+    } as unknown as CompletedProtocolAnalysis
     render({
       ...props,
       runTimeParameters: mockRunTimeParameterData,

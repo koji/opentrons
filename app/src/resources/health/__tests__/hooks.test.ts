@@ -1,8 +1,12 @@
 import { renderHook } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
 import { useHealthQuery } from '@opentrons/react-api-client'
 
-import { useRobotInitializationStatus, INIT_STATUS } from '../hooks'
+import {
+  INIT_STATUS,
+  useRobotInitializationStatus,
+} from '../useRobotInitializationStatus'
 
 vi.mock('@opentrons/react-api-client')
 

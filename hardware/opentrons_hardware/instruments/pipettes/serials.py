@@ -1,4 +1,5 @@
 """Handle parsing and providing pipette information."""
+
 import re
 from typing import Dict, Tuple
 import struct
@@ -27,14 +28,16 @@ SERIAL_RE = re.compile(RAW_SERIAL_STRING)
 NAME_LOOKUP: Dict[str, PipetteName] = {
     "P1KS": PipetteName.p1000_single,
     "P1KM": PipetteName.p1000_multi,
+    "P1KP": PipetteName.p1000_multi_em,
     "P50S": PipetteName.p50_single,
     "P50M": PipetteName.p50_multi,
     "P1KH": PipetteName.p1000_96,
     "P50H": PipetteName.p50_96,
+    "P2HH": PipetteName.p200_96,
 }
 
 SERIAL_FORMAT_MSG = (
-    f'Serial numbers must have the format PNNNVMMXXXXXX... where NNN is one of {", ".join(NAME_LOOKUP.keys())}, '
+    f"Serial numbers must have the format PNNNVMMXXXXXX... where NNN is one of {', '.join(NAME_LOOKUP.keys())}, "
     "MM is a two-digit model number, and the rest is some serial code."
 )
 

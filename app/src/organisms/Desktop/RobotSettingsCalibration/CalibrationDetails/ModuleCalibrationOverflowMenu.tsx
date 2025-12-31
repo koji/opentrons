@@ -1,5 +1,3 @@
-import { useState, useEffect } from 'react'
-
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -16,27 +14,27 @@ import {
   useMenuHandleClickOutside,
   useOnClickOutside,
 } from '@opentrons/components'
+import { useHost } from '@opentrons/react-api-client'
 
-import { useChainLiveCommands, useRunStatuses } from '/app/resources/runs'
-import { getModulePrepCommands } from '/app/local-resources/modules'
-import { ModuleWizardFlows } from '/app/organisms/ModuleWizardFlows'
-import { getModuleTooHot } from '/app/transformations/modules'
+import { handleModuleWizardFlows } from '/app/organisms/ModuleWizardFlows'
 import { useIsEstopNotDisengaged } from '/app/resources/devices/hooks/useIsEstopNotDisengaged'
+import { getModuleTooHot } from '/app/transformations/modules'
 
 import type { AttachedModule } from '/app/redux/modules/types'
 import type { FormattedPipetteOffsetCalibration } from '..'
+
 interface ModuleCalibrationOverflowMenuProps {
   isCalibrated: boolean
+  isRobotBusy: boolean
   attachedModule: AttachedModule
-  updateRobotStatus: (isRobotBusy: boolean) => void
   formattedPipetteOffsetCalibrations: FormattedPipetteOffsetCalibration[]
   robotName: string
 }
 
 export function ModuleCalibrationOverflowMenu({
   isCalibrated,
+  isRobotBusy,
   attachedModule,
-  updateRobotStatus,
   formattedPipetteOffsetCalibrations,
   robotName,
 }: ModuleCalibrationOverflowMenuProps): JSX.Element {
@@ -45,6 +43,7 @@ export function ModuleCalibrationOverflowMenu({
     'robot_calibration',
     'module_wizard_flows',
   ])
+  const host = useHost()!
 
   const {
     menuOverlay,
@@ -53,8 +52,6 @@ export function ModuleCalibrationOverflowMenu({
     setShowOverflowMenu,
   } = useMenuHandleClickOutside()
 
-  const [showModuleWizard, setShowModuleWizard] = useState<boolean>(false)
-  const { isRunRunning: isRunning } = useRunStatuses()
   const [targetProps, tooltipProps] = useHoverTooltip()
 
   const OverflowMenuRef = useOnClickOutside<HTMLDivElement>({
@@ -62,35 +59,21 @@ export function ModuleCalibrationOverflowMenu({
       setShowOverflowMenu(false)
     },
   })
-  const { chainLiveCommands, isCommandMutationLoading } = useChainLiveCommands()
 
   const requiredAttachOrCalibratePipette =
     formattedPipetteOffsetCalibrations.length === 0 ||
     (formattedPipetteOffsetCalibrations[0].lastCalibrated == null &&
       formattedPipetteOffsetCalibrations[1].lastCalibrated == null)
 
-  const [
-    prepCommandErrorMessage,
-    setPrepCommandErrorMessage,
-  ] = useState<string>('')
-
   const isEstopNotDisengaged = useIsEstopNotDisengaged(robotName)
 
   const handleCalibration = (): void => {
-    chainLiveCommands(getModulePrepCommands(attachedModule), false).catch(
-      (e: Error) => {
-        setPrepCommandErrorMessage(e.message)
-      }
-    )
-    setShowOverflowMenu(false)
-    setShowModuleWizard(true)
+    handleModuleWizardFlows({
+      attachedModule,
+      robotName,
+      host,
+    })
   }
-
-  useEffect(() => {
-    if (isRunning) {
-      updateRobotStatus(true)
-    }
-  }, [isRunning, updateRobotStatus])
 
   return (
     <Flex flexDirection={DIRECTION_COLUMN} position={POSITION_RELATIVE}>
@@ -100,18 +83,6 @@ export function ModuleCalibrationOverflowMenu({
         onClick={handleOverflowClick}
         disabled={isEstopNotDisengaged}
       />
-      {showModuleWizard ? (
-        <ModuleWizardFlows
-          attachedModule={attachedModule}
-          closeFlow={() => {
-            setShowModuleWizard(false)
-          }}
-          isPrepCommandLoading={isCommandMutationLoading}
-          prepCommandErrorMessage={
-            prepCommandErrorMessage === '' ? undefined : prepCommandErrorMessage
-          }
-        />
-      ) : null}
       {showOverflowMenu ? (
         <Flex
           ref={OverflowMenuRef}
@@ -128,7 +99,7 @@ export function ModuleCalibrationOverflowMenu({
           <MenuItem
             onClick={handleCalibration}
             disabled={
-              isRunning ||
+              isRobotBusy ||
               requiredAttachOrCalibratePipette ||
               getModuleTooHot(attachedModule)
             }

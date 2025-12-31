@@ -1,21 +1,22 @@
-import { describe, it, vi, beforeEach, expect } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
-import { screen, fireEvent } from '@testing-library/react'
-import { i18n } from '../../../assets/localization'
+import { fireEvent, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { renderWithProviders } from '../../../__testing-utils__'
-import { loadProtocolFile } from '../../../load-file/actions'
-import { getFileMetadata } from '../../../file-data/selectors'
-import { toggleNewProtocolModal } from '../../../navigation/actions'
-import { useKitchen } from '../../../organisms/Kitchen/hooks'
-import { useAnnouncements } from '../../../organisms/AnnouncementModal/announcements'
 import { getHasOptedIn } from '../../../analytics/selectors'
+import { i18n } from '../../../assets/localization'
+import { useAnnouncements } from '../../../components/organisms/AnnouncementModal/announcements'
+import { useKitchen } from '../../../components/organisms/Kitchen/useKitchen'
+import { getFileMetadata } from '../../../file-data/selectors'
+import { loadProtocolFile } from '../../../load-file/actions'
+import { toggleNewProtocolModal } from '../../../navigation/actions'
 import { Landing } from '../index'
 
 vi.mock('../../../load-file/actions')
 vi.mock('../../../file-data/selectors')
 vi.mock('../../../navigation/actions')
-vi.mock('../../../organisms/AnnouncementModal/announcements')
-vi.mock('../../../organisms/Kitchen/hooks')
+vi.mock('../../../components/organisms/AnnouncementModal/announcements')
+vi.mock('../../../components/organisms/Kitchen/useKitchen')
 vi.mock('../../../analytics/selectors')
 
 const mockMakeSnackbar = vi.fn()
@@ -35,7 +36,10 @@ const render = () => {
 
 describe('Landing', () => {
   beforeEach(() => {
-    vi.mocked(getHasOptedIn).mockReturnValue(false)
+    vi.mocked(getHasOptedIn).mockReturnValue({
+      hasOptedIn: false,
+      appVersion: '8.2.1',
+    })
     vi.mocked(getFileMetadata).mockReturnValue({})
     vi.mocked(loadProtocolFile).mockReturnValue(vi.fn())
     vi.mocked(useAnnouncements).mockReturnValue({} as any)
@@ -55,7 +59,7 @@ describe('Landing', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: 'Create a protocol' }))
     expect(vi.mocked(toggleNewProtocolModal)).toHaveBeenCalled()
-    screen.getByText('Edit existing protocol')
+    screen.getByText('Import existing protocol')
     screen.getByRole('img', { name: 'welcome image' })
   })
 

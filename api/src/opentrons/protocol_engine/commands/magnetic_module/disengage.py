@@ -1,6 +1,5 @@
 """Magnetic Module disengage command request, result, and implementation models."""
 
-
 from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
@@ -83,7 +82,7 @@ class Disengage(BaseCommand[DisengageParams, DisengageResult, ErrorOccurrence]):
 
     commandType: DisengageCommandType = "magneticModule/disengage"
     params: DisengageParams
-    result: Optional[DisengageResult]
+    result: Optional[DisengageResult] = None
 
     _ImplementationCls: Type[DisengageImplementation] = DisengageImplementation
 

@@ -1,6 +1,5 @@
-import type * as React from 'react'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
-import { describe, it, beforeEach, vi, expect } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { LEFT, SINGLE_MOUNT_PIPETTES } from '@opentrons/shared-data'
 
@@ -12,11 +11,15 @@ import {
   mockAttachedPipetteInformation,
 } from '/app/redux/pipettes/__fixtures__'
 import { RUN_ID_1 } from '/app/resources/runs/__fixtures__'
-import { FLOWS } from '../constants'
-import { AttachProbe } from '../AttachProbe'
-import { useNotifyDeckConfigurationQuery } from '/app/resources/deck_configuration'
 
-const render = (props: React.ComponentProps<typeof AttachProbe>) => {
+import { AttachProbe } from '../AttachProbe'
+import { FLOWS } from '../constants'
+
+import type { ComponentProps } from 'react'
+import type { UseQueryResult } from 'react-query'
+import type { DeckConfiguration } from '@opentrons/shared-data'
+
+const render = (props: ComponentProps<typeof AttachProbe>) => {
   return renderWithProviders(<AttachProbe {...props} />, {
     i18nInstance: i18n,
   })[0]
@@ -24,7 +27,17 @@ const render = (props: React.ComponentProps<typeof AttachProbe>) => {
 vi.mock('/app/resources/deck_configuration')
 
 describe('AttachProbe', () => {
-  let props: React.ComponentProps<typeof AttachProbe>
+  const mockDeckConfig = {
+    data: [
+      {
+        cutoutId: 'cutoutD3',
+      } as any,
+    ],
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  } as unknown as UseQueryResult<DeckConfiguration>
+  let props: ComponentProps<typeof AttachProbe>
   beforeEach(() => {
     props = {
       mount: LEFT,
@@ -43,14 +56,8 @@ describe('AttachProbe', () => {
       isExiting: false,
       selectedPipette: SINGLE_MOUNT_PIPETTES,
       isOnDevice: false,
+      deckConfig: mockDeckConfig,
     }
-    vi.mocked(useNotifyDeckConfigurationQuery).mockReturnValue({
-      data: [
-        {
-          cutoutId: 'cutoutD3',
-        } as any,
-      ],
-    } as any)
   })
   it('returns the correct information, buttons work as expected', async () => {
     render(props)
@@ -132,7 +139,7 @@ describe('AttachProbe', () => {
       isRobotMoving: true,
     }
     render(props)
-    screen.getByText('Stand back, Flex 1-Channel 1000 μL is calibrating')
+    screen.getByText('Stand back, Flex 1-Channel 1000 µL is calibrating')
     screen.getByText(
       'The calibration probe will touch the sides of the calibration square in slot C2 to determine its exact position.'
     )
@@ -151,7 +158,7 @@ describe('AttachProbe', () => {
       isRobotMoving: true,
     }
     render(props)
-    screen.getByText('Stand back, Flex 96-Channel 1000 μL is calibrating')
+    screen.getByText('Stand back, Flex 96-Channel 1000 µL is calibrating')
     screen.getByText(
       'The calibration probe will touch the sides of the calibration square in slot C2 to determine its exact position.'
     )
@@ -252,19 +259,5 @@ describe('AttachProbe', () => {
       flowType: FLOWS.ATTACH,
     }
     expect(screen.queryByLabelText('back')).not.toBeInTheDocument()
-  })
-
-  it('renders a waste chute warning when 96 channel and waste chute are attached', () => {
-    props = {
-      ...props,
-      attachedPipettes: {
-        left: mock96ChannelAttachedPipetteInformation,
-        right: null,
-      },
-    }
-    render(props)
-    screen.getByText(
-      'Remove the waste chute from the deck plate adapter before proceeding.'
-    )
   })
 })

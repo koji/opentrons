@@ -7,17 +7,16 @@ import {
   DIRECTION_COLUMN,
   Flex,
   JUSTIFY_CENTER,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
 import { useCreateLiveCommandMutation } from '@opentrons/react-api-client'
 
+import welcomeModalImage from '/app/assets/images/on-device-display/welcome_dashboard_modal.png'
 import { SmallButton } from '/app/atoms/buttons'
 import { OddModal } from '/app/molecules/OddModal'
 import { updateConfigValue } from '/app/redux/config'
-
-import welcomeModalImage from '/app/assets/images/on-device-display/welcome_dashboard_modal.png'
 
 import type { SetStatusBarCreateCommand } from '@opentrons/shared-data'
 import type { Dispatch } from '/app/redux/types'
@@ -75,14 +74,14 @@ export function WelcomeModal({
             height="128px"
           />
           <LegacyStyledText
-            as="h4"
+            forwardedAs="h4"
             fontWeight={TYPOGRAPHY.fontWeightBold}
             textAlign={TYPOGRAPHY.textAlignCenter}
           >
             {t('welcome_to_your_dashboard')}
           </LegacyStyledText>
           <LegacyStyledText
-            as="p"
+            forwardedAs="p"
             fontWeight={TYPOGRAPHY.fontWeightRegular}
             color={COLORS.grey60}
             textAlign={TYPOGRAPHY.textAlignCenter}

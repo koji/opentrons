@@ -1,4 +1,8 @@
 {
+  "commandAnnotations": [],
+  "commandPreconditions": {
+    "isCameraUsed": false
+  },
   "commands": [
     {
       "commandType": "home",
@@ -110,7 +114,13 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "12",
+            "kind": "onAddressableArea"
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -1263,7 +1273,13 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "1",
+            "kind": "onAddressableArea"
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -1356,7 +1372,13 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "5",
+            "kind": "onAddressableArea"
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -2608,7 +2630,13 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "4",
+            "kind": "onAddressableArea"
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -3761,7 +3789,13 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "6",
+            "kind": "onAddressableArea"
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -3778,9 +3812,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -3792,9 +3826,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.83,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -3813,9 +3847,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3847,9 +3881,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3878,11 +3912,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -3910,9 +3945,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -3924,9 +3959,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.83,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -3945,9 +3980,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -3979,9 +4014,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4010,11 +4045,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -4042,9 +4078,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -4056,9 +4092,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.83,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -4077,9 +4113,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4111,9 +4147,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4142,11 +4178,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -4174,9 +4211,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -4188,9 +4225,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.83,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -4209,9 +4246,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4243,9 +4280,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4274,11 +4311,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -4306,9 +4344,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -4320,9 +4358,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.83,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -4341,9 +4379,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4375,9 +4413,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4406,11 +4444,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -4438,9 +4477,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -4452,9 +4491,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.83,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -4473,9 +4512,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4507,9 +4546,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4538,11 +4577,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -4570,9 +4610,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -4584,9 +4624,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.83,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -4605,9 +4645,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4639,9 +4679,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4670,11 +4710,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -4702,9 +4743,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -4716,9 +4757,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.83,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -4737,9 +4778,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4771,9 +4812,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4802,11 +4843,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -4834,9 +4876,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -4848,9 +4890,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.83,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -4869,9 +4911,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4903,9 +4945,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -4934,11 +4976,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -4966,9 +5009,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -4980,9 +5023,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.83,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -5001,9 +5044,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -5035,9 +5078,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -5066,11 +5109,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -5098,9 +5142,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -5112,9 +5156,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.83,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -5133,9 +5177,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -5167,9 +5211,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -5198,11 +5242,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -5230,9 +5275,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -5244,9 +5289,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.83,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -5265,9 +5310,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -5299,9 +5344,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -5330,11 +5375,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -5362,9 +5408,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -5376,9 +5422,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.83,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -5397,9 +5443,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -5431,9 +5477,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -5462,11 +5508,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -5494,9 +5541,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -5508,9 +5555,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.83,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -5529,9 +5576,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -5563,9 +5610,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -5594,11 +5641,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -5626,9 +5674,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -5640,9 +5688,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.83,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -5661,9 +5709,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -5695,9 +5743,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -5726,11 +5774,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -5758,9 +5807,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -5772,9 +5821,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.83,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -5793,9 +5842,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -5827,9 +5876,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -5858,11 +5907,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -5890,9 +5940,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -5904,9 +5954,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.83,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -5925,9 +5975,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -5959,9 +6009,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -5990,11 +6040,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -6022,9 +6073,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -6036,9 +6087,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.83,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -6057,9 +6108,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -6091,9 +6142,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -6122,11 +6173,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -6154,9 +6206,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -6168,9 +6220,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.83,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -6189,9 +6241,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -6223,9 +6275,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -6254,11 +6306,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -6286,9 +6339,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -6300,9 +6353,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.83,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -6321,9 +6374,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -6355,9 +6408,9 @@
         "volume": 100.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -6386,11 +6439,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -6413,12 +6467,7 @@
   },
   "createdAt": "TIMESTAMP",
   "errors": [],
-  "files": [
-    {
-      "name": "OT2_S_v3_P300SGen1_None_Gen1PipetteSimple.json",
-      "role": "main"
-    }
-  ],
+  "files": [],
   "labware": [
     {
       "definitionUri": "opentrons/opentrons_1_trash_1100ml_fixed/1",
@@ -6474,6 +6523,7 @@
       }
     }
   ],
+  "liquidClasses": [],
   "liquids": [],
   "metadata": {
     "author": "",

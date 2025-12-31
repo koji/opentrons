@@ -1,13 +1,15 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { InputField } from '@opentrons/components'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 import { useTrackEventWithRobotSerial } from '/app/redux-resources/analytics'
+
 import { TipPositionEntry } from '../../QuickTransferAdvancedSettings/TipPosition'
+
+import type { ComponentProps } from 'react'
 import type { QuickTransferSummaryState } from '../../types'
 
 vi.mock('/app/redux-resources/analytics')
@@ -21,7 +23,7 @@ vi.mock('@opentrons/components', async importOriginal => {
   }
 })
 
-const render = (props: React.ComponentProps<typeof TipPositionEntry>) => {
+const render = (props: ComponentProps<typeof TipPositionEntry>) => {
   return renderWithProviders(<TipPositionEntry {...props} />, {
     i18nInstance: i18n,
   })
@@ -29,7 +31,7 @@ const render = (props: React.ComponentProps<typeof TipPositionEntry>) => {
 let mockTrackEventWithRobotSerial: any
 
 describe('TipPosition', () => {
-  let props: React.ComponentProps<typeof TipPositionEntry>
+  let props: ComponentProps<typeof TipPositionEntry>
 
   beforeEach(() => {
     props = {
@@ -129,7 +131,7 @@ describe('TipPosition', () => {
     expect(vi.mocked(InputField)).toHaveBeenCalledWith(
       {
         title: 'Distance from bottom of well (mm)',
-        error: 'Value must be between 1-100',
+        error: 'Value must be between 1 to 52',
         readOnly: true,
         type: 'text',
         value: 0,
@@ -152,7 +154,7 @@ describe('TipPosition', () => {
     expect(vi.mocked(InputField)).toHaveBeenCalledWith(
       {
         title: 'Distance from bottom of well (mm)',
-        error: 'Value must be between 1-400',
+        error: 'Value must be between 1 to 202',
         readOnly: true,
         type: 'text',
         value: 0,

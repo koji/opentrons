@@ -9,8 +9,8 @@ import {
   Icon,
   JUSTIFY_CENTER,
   JUSTIFY_FLEX_START,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
@@ -81,7 +81,7 @@ export function ManualIpHostnameItem({
       <Flex justifyContent={JUSTIFY_FLEX_START} alignItems={JUSTIFY_CENTER}>
         <IpItem>
           <LegacyStyledText
-            as="p"
+            forwardedAs="p"
             data-testid="ip-hostname"
             color={discovered ? COLORS.black90 : COLORS.grey40}
           >
@@ -89,7 +89,7 @@ export function ManualIpHostnameItem({
           </LegacyStyledText>
         </IpItem>
         <LegacyStyledText
-          as="label"
+          forwardedAs="label"
           color={COLORS.grey50}
           css={{
             'white-space': 'nowrap',

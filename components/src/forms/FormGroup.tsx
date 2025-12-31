@@ -1,22 +1,24 @@
-import type * as React from 'react'
 import cx from 'classnames'
+
 import { Icon } from '../icons'
 import styles from './forms.module.css'
+
+import type { ReactNode } from 'react'
 import type { HoverTooltipHandlers } from '../tooltips'
 
 export interface FormGroupProps {
   /** text label */
   label?: string
   /** form content */
-  children?: React.ReactNode
+  children?: ReactNode
   /** classes to apply */
-  className?: string | null | undefined
+  className?: string | null
   /** if is included, FormGroup title will use error style. The content of the string is ignored. */
-  error?: string | null | undefined
+  error?: string | null
   /** enable disabled style. Overridden by truthy `error` */
-  disabled?: boolean | null | undefined
+  disabled?: boolean | null
   /** handlers for HoverTooltipComponent */
-  hoverTooltipHandlers?: HoverTooltipHandlers | null | undefined
+  hoverTooltipHandlers?: HoverTooltipHandlers | null
   /** boolean indicating formGroup used in pipette Settings slideout */
   isPipetteSettingsSlideout?: boolean
 }

@@ -1,18 +1,19 @@
-import type * as React from 'react'
 import cx from 'classnames'
-import { Icon } from '../icons'
 
+import { Icon } from '../icons'
 import styles from './forms.module.css'
+
+import type { ChangeEvent } from 'react'
 
 export interface ToggleFieldProps {
   /** change handler */
-  onChange: (event: React.ChangeEvent<HTMLInputElement>) => unknown
+  onChange: (event: ChangeEvent<HTMLInputElement>) => unknown
   /** checkbox is checked if value is true */
   value?: boolean
   /** classes to apply */
   className?: string
   /** classes to apply to inner label text div */
-  labelTextClassName?: string | null | undefined
+  labelTextClassName?: string | null
   /** name of field in form */
   name?: string
   /** label text for toggled off */

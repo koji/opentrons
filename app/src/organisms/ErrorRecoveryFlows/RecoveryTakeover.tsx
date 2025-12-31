@@ -2,21 +2,22 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
-  Flex,
-  SPACING,
-  COLORS,
-  Icon,
-  StyledText,
   AlertPrimaryButton,
+  COLORS,
+  Flex,
+  Icon,
+  SPACING,
+  StyledText,
 } from '@opentrons/components'
-import {
-  RUN_STATUS_AWAITING_RECOVERY,
-  RUN_STATUS_AWAITING_RECOVERY_BLOCKED_BY_OPEN_DOOR,
-  RUN_STATUS_AWAITING_RECOVERY_PAUSED,
-} from '@opentrons/api-client'
 
-import { useUpdateClientDataRecovery } from '/app/resources/client_data'
+import { isRecoveryStatus } from '/app/local-resources/runs/utils'
 import { TakeoverModal } from '/app/organisms/TakeoverModal/TakeoverModal'
+import { useUpdateClientDataRecovery } from '/app/resources/client_data'
+
+import {
+  BANNER_TEXT_CONTAINER_STYLE,
+  BANNER_TEXT_CONTENT_STYLE,
+} from './constants'
 import { RecoveryInterventionModal } from './shared'
 
 import type {
@@ -24,10 +25,6 @@ import type {
   UseUpdateClientDataRecoveryResult,
 } from '/app/resources/client_data'
 import type { ErrorRecoveryFlowsProps } from '.'
-import {
-  BANNER_TEXT_CONTAINER_STYLE,
-  BANNER_TEXT_CONTENT_STYLE,
-} from './constants'
 
 // The takeover view, functionally similar to MaintenanceRunTakeover
 export function RecoveryTakeover(props: {
@@ -42,11 +39,7 @@ export function RecoveryTakeover(props: {
 
   // TODO(jh, 07-29-24): This is likely sufficient for most edge cases, but this does not account for
   // all terminal commands as it should. Revisit this.
-  const isTerminateDisabled = !(
-    runStatus === RUN_STATUS_AWAITING_RECOVERY ||
-    runStatus === RUN_STATUS_AWAITING_RECOVERY_BLOCKED_BY_OPEN_DOOR ||
-    runStatus === RUN_STATUS_AWAITING_RECOVERY_PAUSED
-  )
+  const isTerminateDisabled = !isRecoveryStatus(runStatus)
 
   const buildRecoveryTakeoverProps = (
     intent: ClientDataRecovery['intent']
@@ -120,19 +113,23 @@ export function RecoveryTakeoverDesktop({
 }: RecoveryTakeoverProps): JSX.Element {
   const { t } = useTranslation('error_recovery')
 
+  const buildTitleHeadingDesktop = (): JSX.Element => {
+    return (
+      <StyledText desktopStyle="bodyLargeSemiBold">
+        {t('error_on_robot', { robot: robotName })}
+      </StyledText>
+    )
+  }
+
   return (
     <RecoveryInterventionModal
-      titleHeading={t('error_on_robot', { robot: robotName })}
+      titleHeading={buildTitleHeadingDesktop()}
       desktopType={'desktop-small'}
       isOnDevice={false}
     >
       <Flex css={BANNER_TEXT_CONTAINER_STYLE}>
         <Flex css={BANNER_TEXT_CONTENT_STYLE}>
-          <Icon
-            name="alert-circle"
-            color={COLORS.red50}
-            size={SPACING.spacing40}
-          />
+          <Icon name="ot-alert" color={COLORS.red50} size={SPACING.spacing40} />
           <StyledText desktopStyle="headingSmallBold">{title}</StyledText>
           <StyledText desktopStyle="bodyDefaultRegular">
             {t('another_app_controlling_robot')}

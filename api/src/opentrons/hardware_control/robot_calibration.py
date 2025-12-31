@@ -104,9 +104,7 @@ def migrate_affine_xy_to_attitude(
             [False, False, False, False],
         ]
     )
-    masked_array: np.ma.MaskedArray[
-        Any, np.dtype[np.float64]
-    ] = np.ma.masked_array(  # type: ignore
+    masked_array: np.ma.MaskedArray[Any, np.dtype[np.float64]] = np.ma.masked_array(  # type: ignore
         gantry_cal, ~masked_transform
     )
     attitude_array: linal.DoubleMatrix = np.zeros((3, 3))
@@ -154,7 +152,7 @@ def load_attitude_matrix() -> DeckCalibration:
         return DeckCalibration(
             attitude=calibration_data.attitude,
             source=calibration_data.source,
-            status=types.CalibrationStatus(**calibration_data.status.dict()),
+            status=types.CalibrationStatus(**calibration_data.status.model_dump()),
             last_modified=calibration_data.last_modified,
             pipette_calibrated_with=calibration_data.pipette_calibrated_with,
             tiprack=calibration_data.tiprack,

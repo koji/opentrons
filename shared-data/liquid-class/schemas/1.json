@@ -58,6 +58,20 @@
       "required": ["x", "y", "z"],
       "additionalProperties": false
     },
+    "tipPosition": {
+      "type": "object",
+      "description": "Positional reference and relative offset for where a tip should go.",
+      "properties": {
+        "positionReference": {
+          "$ref": "#/definitions/positionReference"
+        },
+        "offset": {
+          "$ref": "#/definitions/coordinate"
+        }
+      },
+      "required": ["positionReference", "offset"],
+      "additionalProperties": false
+    },
     "touchTip": {
       "type": "object",
       "description": "Shared properties for the touch-tip function.",
@@ -73,7 +87,7 @@
               "type": "number",
               "description": "Offset from the top of the well for touch-tip, in millimeters."
             },
-            "mmToEdge": {
+            "mmFromEdge": {
               "type": "number",
               "description": "Offset away from the the well edge, in millimeters."
             },
@@ -82,7 +96,7 @@
               "description": "Touch-tip speed, in millimeters per second."
             }
           },
-          "required": ["zOffset", "mmToEdge", "speed"],
+          "required": ["zOffset", "mmFromEdge", "speed"],
           "additionalProperties": false
         }
       },
@@ -90,59 +104,70 @@
       "additionalProperties": false
     },
     "airGapByVolume": {
-      "type": "object",
-      "description": "Settings for air gap keyed by target aspiration volume.",
-      "properties": {
-        "default": { "$ref": "#/definitions/positiveNumber" }
+      "type": "array",
+      "description": "Settings for air gap keyed by current volume in the tip.",
+      "items": {
+        "type": "array",
+        "items": { "$ref": "#/definitions/positiveNumber" },
+        "minItems": 2,
+        "maxItems": 2
       },
-      "patternProperties": {
-        "d+": { "$ref": "#/definitions/positiveNumber" }
-      },
-      "required": ["default"]
+      "minItems": 1
     },
     "flowRateByVolume": {
-      "type": "object",
+      "type": "array",
       "description": "Settings for flow rate keyed by target aspiration/dispense volume.",
-      "properties": {
-        "default": { "$ref": "#/definitions/positiveNumber" }
+      "items": {
+        "type": "array",
+        "items": { "$ref": "#/definitions/positiveNumber" },
+        "minItems": 2,
+        "maxItems": 2
       },
-      "patternProperties": {
-        "d+": { "$ref": "#/definitions/positiveNumber" }
-      },
-      "required": ["default"]
+      "minItems": 1
     },
     "pushOutByVolume": {
-      "type": "object",
-      "description": "Settings for pushout keyed by target aspiration volume.",
-      "properties": {
-        "default": { "$ref": "#/definitions/positiveNumber" }
+      "type": "array",
+      "description": "Settings for pushout keyed by target dispense volume.",
+      "items": {
+        "type": "array",
+        "items": { "$ref": "#/definitions/positiveNumber" },
+        "minItems": 2,
+        "maxItems": 2
       },
-      "patternProperties": {
-        "d+": { "$ref": "#/definitions/positiveNumber" }
-      },
-      "required": ["default"]
+      "minItems": 1
     },
     "disposalByVolume": {
-      "type": "object",
-      "description": "Settings for disposal volume keyed by target dispense volume.",
-      "properties": {
-        "default": { "$ref": "#/definitions/positiveNumber" }
+      "type": "array",
+      "description": "Settings for disposal volume, keyed by the total volume aspirated for a multi-dispense.",
+      "items": {
+        "type": "array",
+        "items": { "$ref": "#/definitions/positiveNumber" },
+        "minItems": 2,
+        "maxItems": 2
       },
-      "patternProperties": {
-        "d+": { "$ref": "#/definitions/positiveNumber" }
-      },
-      "required": ["default"]
+      "minItems": 1
     },
     "conditioningByVolume": {
-      "type": "object",
-      "description": "Settings for conditioning volume keyed by target dispense volume.",
-      "properties": {
-        "default": { "$ref": "#/definitions/positiveNumber" }
+      "type": "array",
+      "description": "Settings for conditioning volume keyed by the total volume aspirated for a multi-dispense.",
+      "items": {
+        "type": "array",
+        "items": { "$ref": "#/definitions/positiveNumber" },
+        "minItems": 2,
+        "maxItems": 2
       },
-      "patternProperties": {
-        "d+": { "$ref": "#/definitions/positiveNumber" }
+      "minItems": 1
+    },
+    "correctionByVolume": {
+      "type": "array",
+      "description": "Settings for volume correction, keyed by the total volume in tip after the aspirate/dispense action. The correction value provides additional information about how much the pipette plunger should move to accurately pipette the specified volume when using this liquid class.",
+      "items": {
+        "type": "array",
+        "items": { "type": "number" },
+        "minItems": 2,
+        "maxItems": 2
       },
-      "required": ["default"]
+      "minItems": 1
     },
     "mix": {
       "type": "object",
@@ -186,7 +211,7 @@
             "location": {
               "type": "string",
               "enum": ["source", "destination", "trash"],
-              "description": "Location well or trash entity for blow out."
+              "description": "Location for blow out."
             },
             "flowRate": {
               "$ref": "#/definitions/positiveNumber",
@@ -203,11 +228,8 @@
       "type": "object",
       "description": "Shared properties for the submerge function before aspiration or dispense.",
       "properties": {
-        "positionReference": {
-          "$ref": "#/definitions/positionReference"
-        },
-        "offset": {
-          "$ref": "#/definitions/coordinate"
+        "startPosition": {
+          "$ref": "#/definitions/tipPosition"
         },
         "speed": {
           "$ref": "#/definitions/positiveNumber",
@@ -217,18 +239,15 @@
           "$ref": "#/definitions/delay"
         }
       },
-      "required": ["positionReference", "offset", "speed", "delay"],
+      "required": ["startPosition", "speed", "delay"],
       "additionalProperties": false
     },
     "retractAspirate": {
       "type": "object",
-      "description": "Shared properties for the retract function after aspiration or dispense.",
+      "description": "Shared properties for the retract function after an aspiration.",
       "properties": {
-        "positionReference": {
-          "$ref": "#/definitions/positionReference"
-        },
-        "offset": {
-          "$ref": "#/definitions/coordinate"
+        "endPosition": {
+          "$ref": "#/definitions/tipPosition"
         },
         "speed": {
           "$ref": "#/definitions/positiveNumber",
@@ -244,24 +263,15 @@
           "$ref": "#/definitions/delay"
         }
       },
-      "required": [
-        "positionReference",
-        "offset",
-        "speed",
-        "airGapByVolume",
-        "delay"
-      ],
+      "required": ["endPosition", "speed", "airGapByVolume", "delay"],
       "additionalProperties": false
     },
     "retractDispense": {
       "type": "object",
-      "description": "Shared properties for the retract function after aspiration or dispense.",
+      "description": "Shared properties for the retract function after a dispense.",
       "properties": {
-        "positionReference": {
-          "$ref": "#/definitions/positionReference"
-        },
-        "offset": {
-          "$ref": "#/definitions/coordinate"
+        "endPosition": {
+          "$ref": "#/definitions/tipPosition"
         },
         "speed": {
           "$ref": "#/definitions/positiveNumber",
@@ -281,8 +291,7 @@
         }
       },
       "required": [
-        "positionReference",
-        "offset",
+        "endPosition",
         "speed",
         "airGapByVolume",
         "blowout",
@@ -301,14 +310,14 @@
         "retract": {
           "$ref": "#/definitions/retractAspirate"
         },
-        "positionReference": {
-          "$ref": "#/definitions/positionReference"
-        },
-        "offset": {
-          "$ref": "#/definitions/coordinate"
+        "aspiratePosition": {
+          "$ref": "#/definitions/tipPosition"
         },
         "flowRateByVolume": {
           "$ref": "#/definitions/flowRateByVolume"
+        },
+        "correctionByVolume": {
+          "$ref": "#/definitions/correctionByVolume"
         },
         "preWet": {
           "type": "boolean",
@@ -324,9 +333,9 @@
       "required": [
         "submerge",
         "retract",
-        "positionReference",
-        "offset",
+        "aspiratePosition",
         "flowRateByVolume",
+        "correctionByVolume",
         "preWet",
         "mix",
         "delay"
@@ -343,14 +352,14 @@
         "retract": {
           "$ref": "#/definitions/retractDispense"
         },
-        "positionReference": {
-          "$ref": "#/definitions/positionReference"
-        },
-        "offset": {
-          "$ref": "#/definitions/coordinate"
+        "dispensePosition": {
+          "$ref": "#/definitions/tipPosition"
         },
         "flowRateByVolume": {
           "$ref": "#/definitions/flowRateByVolume"
+        },
+        "correctionByVolume": {
+          "$ref": "#/definitions/correctionByVolume"
         },
         "mix": {
           "$ref": "#/definitions/mix"
@@ -365,9 +374,9 @@
       "required": [
         "submerge",
         "retract",
-        "positionReference",
-        "offset",
+        "dispensePosition",
         "flowRateByVolume",
+        "correctionByVolume",
         "mix",
         "pushOutByVolume",
         "delay"
@@ -384,14 +393,14 @@
         "retract": {
           "$ref": "#/definitions/retractDispense"
         },
-        "positionReference": {
-          "$ref": "#/definitions/positionReference"
-        },
-        "offset": {
-          "$ref": "#/definitions/coordinate"
+        "dispensePosition": {
+          "$ref": "#/definitions/tipPosition"
         },
         "flowRateByVolume": {
           "$ref": "#/definitions/flowRateByVolume"
+        },
+        "correctionByVolume": {
+          "$ref": "#/definitions/correctionByVolume"
         },
         "conditioningByVolume": {
           "$ref": "#/definitions/conditioningByVolume"
@@ -406,10 +415,9 @@
       "required": [
         "submerge",
         "retract",
-        "positionReference",
-        "offset",
+        "dispensePosition",
         "flowRateByVolume",
-        "mix",
+        "correctionByVolume",
         "conditioningByVolume",
         "disposalByVolume",
         "delay"
@@ -426,10 +434,19 @@
       "type": "string",
       "description": "User-readable name of the liquid class."
     },
+    "description": {
+      "type": "string",
+      "description": "User-readable description of the liquid class"
+    },
     "schemaVersion": {
       "description": "Which schema version a liquid class is using",
       "type": "number",
       "enum": [1]
+    },
+    "version": {
+      "description": "Version of the liquid class definition itself (eg water v1/v2/v3). An incrementing integer",
+      "type": "integer",
+      "minimum": 1
     },
     "namespace": {
       "$ref": "#/definitions/safeString"
@@ -478,7 +495,9 @@
   "required": [
     "liquidClassName",
     "displayName",
+    "description",
     "schemaVersion",
+    "version",
     "namespace",
     "byPipette"
   ],

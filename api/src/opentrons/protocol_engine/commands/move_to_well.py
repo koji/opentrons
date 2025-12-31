@@ -1,28 +1,36 @@
 """Move to well command request, result, and implementation models."""
+
 from __future__ import annotations
 from typing import TYPE_CHECKING, Optional, Type
 from typing_extensions import Literal
 
-from ..types import DeckPoint
 from .pipetting_common import (
     PipetteIdMixin,
-    WellLocationMixin,
+)
+from .movement_common import (
+    LiquidHandlingWellLocationMixin,
     MovementMixin,
     DestinationPositionResult,
+    StallOrCollisionError,
+    move_to_well,
 )
-from .command import AbstractCommandImpl, BaseCommand, BaseCommandCreate, SuccessData
-from ..errors.error_occurrence import ErrorOccurrence
-from ..state import update_types
-from ..errors import LabwareIsTipRackError
+from .command import (
+    AbstractCommandImpl,
+    BaseCommand,
+    BaseCommandCreate,
+    SuccessData,
+    DefinedErrorData,
+)
 
 if TYPE_CHECKING:
     from ..execution import MovementHandler
     from ..state.state import StateView
+    from ..resources.model_utils import ModelUtils
 
 MoveToWellCommandType = Literal["moveToWell"]
 
 
-class MoveToWellParams(PipetteIdMixin, WellLocationMixin, MovementMixin):
+class MoveToWellParams(PipetteIdMixin, LiquidHandlingWellLocationMixin, MovementMixin):
     """Payload required to move a pipette to a specific well."""
 
     pass
@@ -35,34 +43,43 @@ class MoveToWellResult(DestinationPositionResult):
 
 
 class MoveToWellImplementation(
-    AbstractCommandImpl[MoveToWellParams, SuccessData[MoveToWellResult]]
+    AbstractCommandImpl[
+        MoveToWellParams,
+        SuccessData[MoveToWellResult] | DefinedErrorData[StallOrCollisionError],
+    ]
 ):
     """Move to well command implementation."""
 
     def __init__(
-        self, state_view: StateView, movement: MovementHandler, **kwargs: object
+        self,
+        state_view: StateView,
+        movement: MovementHandler,
+        model_utils: ModelUtils,
+        **kwargs: object,
     ) -> None:
         self._state_view = state_view
         self._movement = movement
+        self._model_utils = model_utils
 
-    async def execute(self, params: MoveToWellParams) -> SuccessData[MoveToWellResult]:
+    async def execute(
+        self, params: MoveToWellParams
+    ) -> SuccessData[MoveToWellResult] | DefinedErrorData[StallOrCollisionError]:
         """Move the requested pipette to the requested well."""
         pipette_id = params.pipetteId
         labware_id = params.labwareId
         well_name = params.wellName
         well_location = params.wellLocation
+        # TODO(cm): implement move_to_well with meniscus + volume offset
+        if well_location.volumeOffset:
+            if (
+                well_location.volumeOffset != 0
+                and well_location.volumeOffset != "operationVolume"
+            ):
+                raise ValueError("volume offset not supported with MoveToWell")
 
-        state_update = update_types.StateUpdate()
-
-        if (
-            self._state_view.labware.is_tiprack(labware_id)
-            and well_location.volumeOffset
-        ):
-            raise LabwareIsTipRackError(
-                "Cannot specify a WellLocation with a volumeOffset with movement to a tip rack"
-            )
-
-        x, y, z = await self._movement.move_to_well(
+        move_result = await move_to_well(
+            model_utils=self._model_utils,
+            movement=self._movement,
             pipette_id=pipette_id,
             labware_id=labware_id,
             well_name=well_name,
@@ -70,27 +87,25 @@ class MoveToWellImplementation(
             force_direct=params.forceDirect,
             minimum_z_height=params.minimumZHeight,
             speed=params.speed,
+            operation_volume=None,
         )
-        deck_point = DeckPoint.construct(x=x, y=y, z=z)
-        state_update.set_pipette_location(
-            pipette_id=pipette_id,
-            new_labware_id=labware_id,
-            new_well_name=well_name,
-            new_deck_point=deck_point,
-        )
-
-        return SuccessData(
-            public=MoveToWellResult(position=deck_point),
-            state_update=state_update,
-        )
+        if isinstance(move_result, DefinedErrorData):
+            return move_result
+        else:
+            return SuccessData(
+                public=MoveToWellResult(position=move_result.public.position),
+                state_update=move_result.state_update,
+            )
 
 
-class MoveToWell(BaseCommand[MoveToWellParams, MoveToWellResult, ErrorOccurrence]):
+class MoveToWell(
+    BaseCommand[MoveToWellParams, MoveToWellResult, StallOrCollisionError]
+):
     """Move to well command model."""
 
     commandType: MoveToWellCommandType = "moveToWell"
     params: MoveToWellParams
-    result: Optional[MoveToWellResult]
+    result: Optional[MoveToWellResult] = None
 
     _ImplementationCls: Type[MoveToWellImplementation] = MoveToWellImplementation
 

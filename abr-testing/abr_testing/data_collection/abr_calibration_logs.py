@@ -286,32 +286,18 @@ def run(
     ip_json_file = os.path.join(storage_directory, "IPs.json")
     try:
         ip_file = json.load(open(ip_json_file))
+        robot_dict = ip_file.get("ip_address_list")
     except FileNotFoundError:
         print(f"Add .json file with robot IPs to: {storage_directory}.")
         sys.exit()
-    ip_or_all = ""
-    while not ip_or_all:
-        ip_or_all = input("IP Address or ALL: ")
-        calibration_data = []
-        if ip_or_all.upper() == "ALL":
-            ip_address_list = ip_file["ip_address_list"]
-            for ip in ip_address_list:
-                saved_file_path, calibration = read_robot_logs.get_calibration_offsets(
-                    ip, storage_directory
-                )
-                calibration_data.append(calibration)
-        else:
-            try:
-                (
-                    saved_file_path,
-                    calibration,
-                ) = read_robot_logs.get_calibration_offsets(
-                    ip_or_all, storage_directory
-                )
-                calibration_data.append(calibration)
-            except Exception:
-                print("Invalid IP try again")
-                ip_or_all = ""
+    calibration_data = []
+    ip_address_list = list(robot_dict.keys())
+    for ip in ip_address_list:
+        saved_file_path, calibration = read_robot_logs.get_calibration_offsets(
+            ip, storage_directory
+        )
+        calibration_data.append(calibration)
+
     try:
         upload_calibration_offsets(
             calibration_data,
@@ -363,3 +349,4 @@ if __name__ == "__main__":
     folder_name = args.folder_name[0]
     google_sheet_name = args.google_sheet_name[0]
     email = args.email[0]
+    run(storage_directory, folder_name, google_sheet_name, email)

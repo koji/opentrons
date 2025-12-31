@@ -1,72 +1,49 @@
-import { createSelector } from 'reselect'
-import flatMap from 'lodash/flatMap'
 import isEmpty from 'lodash/isEmpty'
 import mapValues from 'lodash/mapValues'
-import map from 'lodash/map'
-import reduce from 'lodash/reduce'
 import uniq from 'lodash/uniq'
-import {
-  FLEX_ROBOT_TYPE,
-  OT2_STANDARD_DECKID,
-  OT2_STANDARD_MODEL,
-  FLEX_STANDARD_DECKID,
-  SPAN7_8_10_11_SLOT,
-} from '@opentrons/shared-data'
+import { createSelector } from 'reselect'
 
-import { COLUMN_4_SLOTS } from '@opentrons/step-generation'
+import { NONE_LIQUID_CLASS_NAME } from '@opentrons/shared-data'
+import {
+  PD_APPLICATION_VERSION,
+  pythonCustomLabwareDict,
+  pythonDefRun,
+  pythonImports,
+  pythonMetadata,
+  pythonRequirements,
+} from '@opentrons/step-generation'
+
 import { selectors as dismissSelectors } from '../../dismiss'
-import { selectors as labwareDefSelectors } from '../../labware-defs'
-import { uuid } from '../../utils'
 import { selectors as ingredSelectors } from '../../labware-ingred/selectors'
 import { selectors as stepFormSelectors } from '../../step-forms'
+// NOTE: getStepGroups is for when we support step grouping in the future
+// import { getStepGroups } from '../../step-forms/selectors'
 import { selectors as uiLabwareSelectors } from '../../ui/labware'
-import { getLoadLiquidCommands } from '../../load-file/migration/utils/getLoadLiquidCommands'
-import { swatchColors } from '../../components/swatchColors'
-import {
-  DEFAULT_MM_FROM_BOTTOM_ASPIRATE,
-  DEFAULT_MM_FROM_BOTTOM_DISPENSE,
-  DEFAULT_MM_TOUCH_TIP_OFFSET_FROM_TOP,
-  DEFAULT_MM_BLOWOUT_OFFSET_FROM_TOP,
-} from '../../constants'
-import { getFileMetadata, getRobotType } from './fileFields'
 import { getInitialRobotState, getRobotStateTimeline } from './commands'
+import { getFileMetadata, getRobotType } from './fileFields'
+import {
+  getLabwareLoadInfo,
+  getModulesLoadInfo,
+  getPipettesLoadInfo,
+} from './utils'
 
 import type {
-  PipetteEntity,
+  Ingredients,
   LabwareEntities,
   PipetteEntities,
-  RobotState,
+  PipetteEntity,
 } from '@opentrons/step-generation'
-import type {
-  LabwareLocation,
-  AddressableAreaName,
-  CommandAnnotationV1Mixin,
-  CommandV8Mixin,
-  CreateCommand,
-  LabwareV2Mixin,
-  LiquidV1Mixin,
-  LoadLabwareCreateCommand,
-  LoadModuleCreateCommand,
-  LoadPipetteCreateCommand,
-  OT2RobotMixin,
-  OT3RobotMixin,
-  PipetteName,
-  ProtocolBase,
-  ProtocolFile,
-} from '@opentrons/shared-data'
+import type { PDPythonFile, PythonDesignerApplication } from '../../file-types'
 import type { LabwareDefByDefURI } from '../../labware-defs'
-import type { Selector } from '../../types'
-import type { DesignerApplicationData } from '../../load-file/migration/utils/getLoadLiquidCommands'
 
-// TODO: BC: 2018-02-21 uncomment this assert, causes test failures
-// console.assert(!isEmpty(process.env.OT_PD_VERSION), 'Could not find application version!')
-if (isEmpty(process.env.OT_PD_VERSION))
+if (isEmpty(_OT_PD_VERSION_))
   console.warn('Could not find application version!')
-const applicationVersion: string = process.env.OT_PD_VERSION || ''
+const applicationVersion: string = _OT_PD_VERSION_ || ''
 // Internal release date: this should never be read programatically,
 // it just helps us humans quickly identify what build a user was using
 // when we look at saved protocols (without requiring us to trace thru git logs)
-const _internalAppBuildDate = process.env.OT_PD_BUILD_DATE
+const _internalAppBuildDate = _OT_PD_BUILD_DATE_
+
 // A labware definition is considered "in use" and should be included in
 // the protocol file if it either...
 // 1. is present on the deck in initial deck setup
@@ -96,320 +73,110 @@ export const getLabwareDefinitionsInUse = (
   )
 }
 
-export const createFile: Selector<ProtocolFile> = createSelector(
+export const createFile = createSelector(
   getFileMetadata,
   getInitialRobotState,
   getRobotStateTimeline,
   getRobotType,
   dismissSelectors.getAllDismissedWarnings,
-  ingredSelectors.getLiquidGroupsById,
   ingredSelectors.getLiquidsByLabwareId,
   stepFormSelectors.getSavedStepForms,
   stepFormSelectors.getOrderedStepIds,
-  stepFormSelectors.getLabwareEntities,
-  stepFormSelectors.getModuleEntities,
-  stepFormSelectors.getPipetteEntities,
   uiLabwareSelectors.getLabwareNicknamesById,
-  labwareDefSelectors.getLabwareDefsByURI,
+  stepFormSelectors.getInvariantContext,
   (
     fileMetadata,
-    initialRobotState,
+    robotState,
     robotStateTimeline,
     robotType,
     dismissedWarnings,
-    ingredients,
     ingredLocations,
     savedStepForms,
     orderedStepIds,
-    labwareEntities,
-    moduleEntities,
-    pipetteEntities,
     labwareNicknamesById,
-    labwareDefsByURI
-  ) => {
-    const { author, description, created } = fileMetadata
-    const name = fileMetadata.protocolName || 'untitled'
-    const lastModified = fileMetadata.lastModified
-    // TODO: Ian 2018-07-10 allow user to save steps in JSON file, even if those
-    // step never have saved forms.
-    // (We could just export the `steps` reducer, but we've sunset it)
+    invariantContext
+  ): PDPythonFile => {
+    const { pipetteEntities, moduleEntities, labwareEntities, liquidEntities } =
+      invariantContext
+
     const savedOrderedStepIds = orderedStepIds.filter(
       stepId => savedStepForms[stepId]
     )
-    const designerApplication = {
-      name: 'opentrons/protocol-designer',
-      version: applicationVersion,
-      data: {
-        _internalAppBuildDate,
-        defaultValues: {
-          // TODO: Ian 2019-06-13 load these into redux and always get them from redux, not constants.js
-          // This `defaultValues` key is not yet read by anything, but is populated here for auditability
-          // and so that later we can do #3587 without a PD migration
-          aspirate_mmFromBottom: DEFAULT_MM_FROM_BOTTOM_ASPIRATE,
-          dispense_mmFromBottom: DEFAULT_MM_FROM_BOTTOM_DISPENSE,
-          touchTip_mmFromTop: DEFAULT_MM_TOUCH_TIP_OFFSET_FROM_TOP,
-          blowout_mmFromTop: DEFAULT_MM_BLOWOUT_OFFSET_FROM_TOP,
+
+    const ingredients: Ingredients = Object.fromEntries(
+      Object.entries(liquidEntities).map(
+        ([liquidId, { pythonName, ...rest }]) => [liquidId, rest]
+      )
+    )
+
+    const allUniqueLiquidClassesFromForms = Array.from(
+      Object.values(savedStepForms).reduce<Set<string>>((acc, stepForm) => {
+        if (
+          'liquidClass' in stepForm &&
+          stepForm.liquidClass != null &&
+          stepForm.liquidClass !== NONE_LIQUID_CLASS_NAME
+        ) {
+          acc.add(stepForm.liquidClass as string)
+        }
+        return acc
+      }, new Set())
+    )
+
+    const designerApplication: PythonDesignerApplication = {
+      robot: {
+        model: robotType,
+      },
+      designerApplication: {
+        name: 'opentrons/protocol-designer',
+        // NOTE: hardcoding in the version like this could be tricky since we
+        // will have to remember to update the version with every release. But this solves
+        // the issues where you have to manually update when importing back to PD, before the release
+        // since using `applicationVersion` means that the version is tied to the release tag.
+        version: PD_APPLICATION_VERSION,
+        data: {
+          pipetteTiprackAssignments: mapValues(
+            pipetteEntities,
+            (
+              p: (typeof pipetteEntities)[keyof typeof pipetteEntities]
+            ): string[] => p.tiprackDefURI
+          ),
+          dismissedWarnings,
+          ingredients,
+          ingredLocations,
+          savedStepForms,
+          orderedStepIds: savedOrderedStepIds,
+          pipettes: getPipettesLoadInfo(pipetteEntities),
+          modules: getModulesLoadInfo(moduleEntities),
+          labware: getLabwareLoadInfo(labwareEntities, labwareNicknamesById),
         },
-        pipetteTiprackAssignments: mapValues(
-          pipetteEntities,
-          (p: typeof pipetteEntities[keyof typeof pipetteEntities]): string[] =>
-            p.tiprackDefURI
+      },
+      metadata: fileMetadata,
+    }
+
+    const pythonProtocol =
+      [
+        // Here are the sections of the Python file:
+        pythonImports(),
+        pythonMetadata({
+          ...fileMetadata,
+          protocolDesigner: applicationVersion,
+          internalAppBuildDate: _internalAppBuildDate,
+        }),
+        pythonRequirements(robotType),
+        pythonDefRun(
+          invariantContext,
+          robotState,
+          robotStateTimeline,
+          ingredLocations,
+          labwareNicknamesById,
+          robotType,
+          allUniqueLiquidClassesFromForms
         ),
-        dismissedWarnings,
-        ingredients,
-        ingredLocations,
-        savedStepForms,
-        orderedStepIds: savedOrderedStepIds,
-      },
-    }
+        pythonCustomLabwareDict(invariantContext.labwareEntities),
+      ]
+        .filter(section => section) // skip any blank sections
+        .join('\n\n') + '\n'
 
-    interface Pipettes {
-      [pipetteId: string]: { name: PipetteName }
-    }
-
-    const pipettes: Pipettes = mapValues(
-      initialRobotState.pipettes,
-      (
-        pipette: typeof initialRobotState.pipettes[keyof typeof initialRobotState.pipettes],
-        pipetteId: string
-      ) => ({
-        name: pipetteEntities[pipetteId].name,
-      })
-    )
-
-    const loadPipetteCommands = map(
-      initialRobotState.pipettes,
-      (
-        pipette: typeof initialRobotState.pipettes[keyof typeof initialRobotState.pipettes],
-        pipetteId: string
-      ): LoadPipetteCreateCommand => {
-        const loadPipetteCommand = {
-          key: uuid(),
-          commandType: 'loadPipette' as const,
-          params: {
-            pipetteName: pipettes[pipetteId].name,
-            mount: pipette.mount,
-            pipetteId: pipetteId,
-          },
-        }
-        return loadPipetteCommand
-      }
-    )
-
-    const liquids: ProtocolFile['liquids'] = reduce(
-      ingredients,
-      (acc, liquidData, liquidId) => {
-        return {
-          ...acc,
-          [liquidId]: {
-            displayName: liquidData.name,
-            description: liquidData.description ?? '',
-            displayColor: liquidData.displayColor ?? swatchColors(liquidId),
-          },
-        }
-      },
-      {}
-    )
-    // initiate "adapter" commands first so we can map through them to get the
-    //  labware that goes on top of it's location
-    const loadAdapterCommands = reduce<
-      RobotState['labware'],
-      LoadLabwareCreateCommand[]
-    >(
-      initialRobotState.labware,
-      (
-        acc,
-        labware: typeof initialRobotState.labware[keyof typeof initialRobotState.labware],
-        labwareId: string
-      ): LoadLabwareCreateCommand[] => {
-        const { def } = labwareEntities[labwareId]
-        const isAdapter = def.allowedRoles?.includes('adapter')
-        if (!isAdapter) return acc
-        const isOnTopOfModule = labware.slot in initialRobotState.modules
-        const namespace = def.namespace
-        const loadName = def.parameters.loadName
-        const version = def.version
-        const loadAdapterCommands = {
-          key: uuid(),
-          commandType: 'loadLabware' as const,
-          params: {
-            displayName: def.metadata.displayName,
-            labwareId,
-            loadName,
-            namespace: namespace,
-            version: version,
-            location: isOnTopOfModule
-              ? { moduleId: labware.slot }
-              : { slotName: labware.slot },
-          },
-        }
-
-        return [...acc, loadAdapterCommands]
-      },
-      []
-    )
-
-    const loadLabwareCommands = reduce<
-      RobotState['labware'],
-      LoadLabwareCreateCommand[]
-    >(
-      initialRobotState.labware,
-      (
-        acc,
-        labware: typeof initialRobotState.labware[keyof typeof initialRobotState.labware],
-        labwareId: string
-      ): LoadLabwareCreateCommand[] => {
-        const { def } = labwareEntities[labwareId]
-        const isAdapter = def.allowedRoles?.includes('adapter')
-        if (isAdapter || def.metadata.displayCategory === 'trash') return acc
-        const isOnTopOfModule = labware.slot in initialRobotState.modules
-        const isOnAdapter =
-          loadAdapterCommands.find(
-            command => command.params.labwareId === labware.slot
-          ) != null
-        const namespace = def.namespace
-        const loadName = def.parameters.loadName
-        const version = def.version
-        const isAddressableAreaName = COLUMN_4_SLOTS.includes(labware.slot)
-
-        let location: LabwareLocation = { slotName: labware.slot }
-        if (isOnTopOfModule) {
-          location = { moduleId: labware.slot }
-        } else if (isOnAdapter) {
-          location = { labwareId: labware.slot }
-        } else if (isAddressableAreaName) {
-          // TODO(bh, 2024-01-02): check slots against addressable areas via the deck definition
-          location = {
-            addressableAreaName: labware.slot as AddressableAreaName,
-          }
-        } else if (labware.slot === 'offDeck') {
-          location = 'offDeck'
-        }
-
-        const loadLabwareCommands = {
-          key: uuid(),
-          commandType: 'loadLabware' as const,
-          params: {
-            displayName:
-              labwareNicknamesById[labwareId] ?? def.metadata.displayName,
-            labwareId: labwareId,
-            loadName,
-            namespace: namespace,
-            version: version,
-            location,
-          },
-        }
-
-        return [...acc, loadLabwareCommands]
-      },
-      []
-    )
-
-    const loadLiquidCommands = getLoadLiquidCommands(
-      ingredients,
-      ingredLocations
-    )
-    const loadModuleCommands = map(
-      initialRobotState.modules,
-      (
-        module: typeof initialRobotState.modules[keyof typeof initialRobotState.modules],
-        moduleId: string
-      ): LoadModuleCreateCommand => {
-        const model = moduleEntities[moduleId].model
-        const loadModuleCommand = {
-          key: uuid(),
-          commandType: 'loadModule' as const,
-          params: {
-            model: model,
-            location: {
-              slotName: module.slot === SPAN7_8_10_11_SLOT ? '7' : module.slot,
-            },
-            moduleId: moduleId,
-          },
-        }
-        return loadModuleCommand
-      }
-    )
-
-    const labwareDefinitions = getLabwareDefinitionsInUse(
-      labwareEntities,
-      pipetteEntities,
-      labwareDefsByURI
-    )
-    const loadCommands: CreateCommand[] = [
-      ...loadPipetteCommands,
-      ...loadModuleCommands,
-      ...loadAdapterCommands,
-      ...loadLabwareCommands,
-      ...loadLiquidCommands,
-    ]
-
-    const nonLoadCommands: CreateCommand[] = flatMap(
-      robotStateTimeline.timeline,
-      timelineFrame => timelineFrame.commands
-    )
-
-    const commands = [...loadCommands, ...nonLoadCommands]
-
-    const flexDeckSpec: OT3RobotMixin = {
-      robot: {
-        model: FLEX_ROBOT_TYPE,
-        deckId: FLEX_STANDARD_DECKID,
-      },
-    }
-    const ot2DeckSpec: OT2RobotMixin = {
-      robot: {
-        model: OT2_STANDARD_MODEL,
-        deckId: OT2_STANDARD_DECKID,
-      },
-    }
-    const deckStructure =
-      robotType === FLEX_ROBOT_TYPE ? flexDeckSpec : ot2DeckSpec
-
-    const labwareV2Mixin: LabwareV2Mixin = {
-      labwareDefinitionSchemaId: 'opentronsLabwareSchemaV2',
-      labwareDefinitions,
-    }
-
-    const liquidV1Mixin: LiquidV1Mixin = {
-      liquidSchemaId: 'opentronsLiquidSchemaV1',
-      liquids,
-    }
-
-    const commandv8Mixin: CommandV8Mixin = {
-      commandSchemaId: 'opentronsCommandSchemaV8',
-      commands,
-    }
-
-    const commandAnnotionaV1Mixin: CommandAnnotationV1Mixin = {
-      commandAnnotationSchemaId: 'opentronsCommandAnnotationSchemaV1',
-      commandAnnotations: [],
-    }
-
-    const protocolBase: ProtocolBase<DesignerApplicationData> = {
-      $otSharedSchema: '#/protocol/schemas/8',
-      schemaVersion: 8,
-      metadata: {
-        protocolName: name,
-        author,
-        description,
-        created,
-        lastModified,
-        // TODO LATER
-        category: null,
-        subcategory: null,
-        tags: [],
-      },
-      designerApplication,
-    }
-
-    return {
-      ...protocolBase,
-      ...deckStructure,
-      ...labwareV2Mixin,
-      ...liquidV1Mixin,
-      ...commandv8Mixin,
-      ...commandAnnotionaV1Mixin,
-    }
+    return { pythonProtocol, designerApplication }
   }
 )

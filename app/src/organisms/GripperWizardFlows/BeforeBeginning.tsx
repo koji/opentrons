@@ -1,27 +1,32 @@
 import { useEffect } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
+
 import { COLORS, LegacyStyledText } from '@opentrons/components'
 import { EXTENSION } from '@opentrons/shared-data'
+
 import { GenericWizardTile } from '/app/molecules/GenericWizardTile'
 import {
   SimpleWizardBody,
   SimpleWizardInProgressBody,
 } from '/app/molecules/SimpleWizardBody'
 import { WizardRequiredEquipmentList } from '/app/molecules/WizardRequiredEquipmentList'
+
 import {
-  GRIPPER_FLOW_TYPES,
-  SCREWDRIVER_LOADNAME,
-  GRIPPER_LOADNAME,
   CAL_PIN_LOADNAME,
+  CALIBRATION_PIN_DISPLAY_NAME,
+  GRIPPER_FLOW_TYPES,
+  GRIPPER_LOADNAME,
+  HEX_SCREWDRIVER_DISPLAY_NAME,
+  SCREWDRIVER_LOADNAME,
 } from './constants'
 
-import type { UseMutateFunction } from 'react-query'
 import type { AxiosError } from 'axios'
-import type { CreateCommand } from '@opentrons/shared-data'
+import type { UseMutateFunction } from 'react-query'
 import type {
   CreateMaintenanceRunData,
   MaintenanceRun,
 } from '@opentrons/api-client'
+import type { CreateCommand } from '@opentrons/shared-data'
 import type { GripperWizardFlowType, GripperWizardStepProps } from './types'
 
 interface BeforeBeginningInfo {
@@ -105,9 +110,9 @@ export const BeforeBeginning = (
   const equipmentInfoByLoadName: {
     [loadName: string]: { displayName: string; subtitle?: string }
   } = {
-    calibration_pin: { displayName: t('calibration_pin') },
+    calibration_pin: { displayName: CALIBRATION_PIN_DISPLAY_NAME },
     hex_screwdriver: {
-      displayName: t('hex_screwdriver'),
+      displayName: HEX_SCREWDRIVER_DISPLAY_NAME,
       subtitle: t('provided_with_robot_use_right_size'),
     },
     [GRIPPER_LOADNAME]: { displayName: t('branded:gripper') },
@@ -144,7 +149,7 @@ export const BeforeBeginning = (
         <Trans
           t={t}
           i18nKey={bodyI18nKey}
-          components={{ block: <LegacyStyledText as="p" /> }}
+          components={{ block: <LegacyStyledText forwardedAs="p" /> }}
         />
       }
       proceedButtonText={t('move_gantry_to_front')}

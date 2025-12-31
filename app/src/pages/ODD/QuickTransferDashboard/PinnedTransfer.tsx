@@ -1,4 +1,4 @@
-import * as React from 'react'
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled, { css } from 'styled-components'
 
@@ -10,16 +10,18 @@ import {
   DIRECTION_ROW,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   OVERFLOW_WRAP_ANYWHERE,
   SPACING,
   TYPOGRAPHY,
   useLongPress,
-  LegacyStyledText,
 } from '@opentrons/components'
 
-import { LongPressModal } from './LongPressModal'
 import { formatTimeWithUtcLabel } from '/app/resources/runs'
 
+import { LongPressModal } from './LongPressModal'
+
+import type { Dispatch, SetStateAction } from 'react'
 import type { UseLongPressResult } from '@opentrons/components'
 import type { ProtocolResource } from '@opentrons/shared-data'
 
@@ -59,7 +61,7 @@ const cardStyleBySize: {
 
 export function PinnedTransfer(props: {
   transfer: ProtocolResource
-  longPress: React.Dispatch<React.SetStateAction<boolean>>
+  longPress: Dispatch<SetStateAction<boolean>>
   setShowDeleteConfirmationModal: (showDeleteConfirmationModal: boolean) => void
   setTargetTransferId: (targetProtocolId: string) => void
   cardSize?: CardSizeType
@@ -83,7 +85,7 @@ export function PinnedTransfer(props: {
       navigate(`/quick-transfer/${transferId}`)
     }
   }
-  React.useEffect(() => {
+  useEffect(() => {
     if (longpress.isLongPressed) {
       longPress(true)
     }
@@ -129,7 +131,7 @@ export function PinnedTransfer(props: {
         width="100%"
         color={COLORS.grey60}
       >
-        <LegacyStyledText as="p">
+        <LegacyStyledText forwardedAs="p">
           {formatTimeWithUtcLabel(transfer.createdAt)}
         </LegacyStyledText>
       </Flex>

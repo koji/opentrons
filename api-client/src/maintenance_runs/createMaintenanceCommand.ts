@@ -1,9 +1,9 @@
-import { POST, request } from '../request'
+import { createAxiosConfig, POST, request } from '../request'
 
 import type { CreateCommand } from '@opentrons/shared-data'
 import type { ResponsePromise } from '../request'
-import type { HostConfig } from '../types'
 import type { CommandData, CreateCommandParams } from '../runs/types'
+import type { HostConfig } from '../types'
 
 export function createMaintenanceCommand(
   config: HostConfig,
@@ -16,6 +16,6 @@ export function createMaintenanceCommand(
     `/maintenance_runs/${maintenanceRunId}/commands`,
     { data },
     config,
-    params
+    params && createAxiosConfig({ params })
   )
 }

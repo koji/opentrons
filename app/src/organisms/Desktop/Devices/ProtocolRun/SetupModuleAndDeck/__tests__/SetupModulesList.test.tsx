@@ -1,32 +1,35 @@
-import type * as React from 'react'
+import { fireEvent, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { when } from 'vitest-when'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
-import { describe, it, beforeEach, expect, vi } from 'vitest'
-import { renderWithProviders } from '/app/__testing-utils__'
+
 import { FLEX_ROBOT_TYPE, OT2_ROBOT_TYPE } from '@opentrons/shared-data'
+
+import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import {
-  mockMagneticModule as mockMagneticModuleFixture,
-  mockHeaterShaker,
-} from '/app/redux/modules/__fixtures__/index'
+import { LocationConflictModal } from '/app/organisms/LocationConflictModal'
+import { ModuleSetupModal } from '/app/organisms/ModuleCard/ModuleSetupModal'
+import { handleModuleWizardFlows } from '/app/organisms/ModuleWizardFlows'
+import { useIsFlex, useRobot } from '/app/redux-resources/robots'
 import {
   mockMagneticModuleGen2,
   mockThermocycler,
 } from '/app/redux/modules/__fixtures__'
-import { useRobot, useIsFlex } from '/app/redux-resources/robots'
+import {
+  mockHeaterShaker,
+  mockMagneticModule as mockMagneticModuleFixture,
+} from '/app/redux/modules/__fixtures__/index'
 import {
   useChainLiveCommands,
-  useRunCalibrationStatus,
   useModuleRenderInfoForProtocolById,
+  useRunCalibrationStatus,
   useUnmatchedModulesForProtocol,
 } from '/app/resources/runs'
-import { ModuleSetupModal } from '/app/organisms/ModuleCard/ModuleSetupModal'
-import { ModuleWizardFlows } from '/app/organisms/ModuleWizardFlows'
-import { OT2MultipleModulesHelp } from '../OT2MultipleModulesHelp'
-import { UnMatchedModuleWarning } from '../UnMatchedModuleWarning'
-import { SetupModulesList } from '../SetupModulesList'
-import { LocationConflictModal } from '/app/organisms/LocationConflictModal'
 
+import { OT2MultipleModulesHelp } from '../OT2MultipleModulesHelp'
+import { SetupModulesList } from '../SetupModulesList'
+import { UnMatchedModuleWarning } from '../UnMatchedModuleWarning'
+
+import type { ComponentProps } from 'react'
 import type { ModuleModel, ModuleType } from '@opentrons/shared-data'
 import type { DiscoveredRobot } from '/app/redux/discovery/types'
 
@@ -49,13 +52,12 @@ const MOCK_SECOND_MAGNETIC_MODULE_COORDS = [100, 200, 0]
 const mockMagneticModule = {
   moduleId: 'someMagneticModule',
   model: 'magneticModuleV2' as ModuleModel,
-  type: 'magneticModuleType' as ModuleType,
+  moduleType: 'magneticModuleType' as ModuleType,
   labwareOffset: { x: 5, y: 5, z: 5 },
   cornerOffsetFromSlot: { x: 1, y: 1, z: 1 },
   calibrationPoint: { x: 0, y: 0 },
   displayName: 'Magnetic Module',
   dimensions: {},
-  twoDimensionalRendering: { children: [] },
   quirks: [],
 }
 
@@ -63,7 +65,7 @@ const mockTCModule = {
   labwareOffset: { x: 3, y: 3, z: 3 },
   moduleId: 'TCModuleId',
   model: 'thermocyclerModuleV1' as ModuleModel,
-  type: 'thermocyclerModuleType' as ModuleType,
+  moduleType: 'thermocyclerModuleType' as ModuleType,
   displayName: 'Thermocycler Module',
 }
 
@@ -77,25 +79,26 @@ const mockCalibratedData = {
   last_modified: '2023-06-01T14:42:20.131798+00:00',
 }
 
-const render = (props: React.ComponentProps<typeof SetupModulesList>) => {
+const render = (props: ComponentProps<typeof SetupModulesList>) => {
   return renderWithProviders(<SetupModulesList {...props} />, {
     i18nInstance: i18n,
   })[0]
 }
 
 describe('SetupModulesList', () => {
-  let props: React.ComponentProps<typeof SetupModulesList>
   let mockChainLiveCommands = vi.fn()
+  let props: ComponentProps<typeof SetupModulesList>
   beforeEach(() => {
     props = {
       robotName: ROBOT_NAME,
       runId: RUN_ID,
+      deckConfigCompatibility: [],
     }
+    mockChainLiveCommands = vi.fn()
+    mockChainLiveCommands.mockResolvedValue(null)
     when(vi.mocked(useRobot))
       .calledWith(ROBOT_NAME)
       .thenReturn({ robotModel: FLEX_ROBOT_TYPE } as DiscoveredRobot)
-    mockChainLiveCommands = vi.fn()
-    mockChainLiveCommands.mockResolvedValue(null)
     vi.mocked(ModuleSetupModal).mockReturnValue(<div>mockModuleSetupModal</div>)
     vi.mocked(UnMatchedModuleWarning).mockReturnValue(
       <div>mock unmatched module Banner</div>
@@ -109,9 +112,7 @@ describe('SetupModulesList', () => {
     when(useRunCalibrationStatus).calledWith(ROBOT_NAME, RUN_ID).thenReturn({
       complete: true,
     })
-    vi.mocked(ModuleWizardFlows).mockReturnValue(
-      <div>mock ModuleWizardFlows</div>
-    )
+
     vi.mocked(useChainLiveCommands).mockReturnValue({
       chainLiveCommands: mockChainLiveCommands,
     } as any)
@@ -216,7 +217,7 @@ describe('SetupModulesList', () => {
         nestedLabwareDef: null,
         nestedLabwareId: null,
         protocolLoadOrder: 0,
-        slotName: '7',
+        slotName: 'B1',
         attachedModuleMatch: mockThermocycler,
       },
     } as any)
@@ -225,10 +226,8 @@ describe('SetupModulesList', () => {
     render(props)
     screen.getByText('Thermocycler Module')
     screen.getByText('A1+B1')
-    fireEvent.click(screen.getByRole('button', { name: 'Calibrate now' }))
-    await waitFor(() => {
-      screen.getByText('mock ModuleWizardFlows')
-    })
+    fireEvent.click(screen.getByRole('button', { name: 'Setup now' }))
+    expect(vi.mocked(handleModuleWizardFlows)).toHaveBeenCalled()
   })
 
   it('should render disabled button when pipette and module are not calibrated', () => {
@@ -259,7 +258,7 @@ describe('SetupModulesList', () => {
     vi.mocked(useIsFlex).mockReturnValue(true)
 
     render(props)
-    expect(screen.getByRole('button', { name: 'Calibrate now' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Setup now' })).toBeDisabled()
   })
 
   it('should render a thermocycler module that is connected, OT3', () => {
@@ -279,7 +278,7 @@ describe('SetupModulesList', () => {
         nestedLabwareDef: null,
         nestedLabwareId: null,
         protocolLoadOrder: 0,
-        slotName: '7',
+        slotName: 'B1',
         attachedModuleMatch: {
           ...mockThermocycler,
           moduleOffset: mockCalibratedData,

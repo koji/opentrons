@@ -1,18 +1,21 @@
-import type * as React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import '@testing-library/jest-dom/vitest'
+
 import { fireEvent, screen } from '@testing-library/react'
 
-import { renderWithProviders } from '../../../testing/utils'
 import { COLORS } from '../../../helix-design-system'
+import { renderWithProviders } from '../../../testing/utils'
 import { LargeButton } from '../LargeButton'
 
-const render = (props: React.ComponentProps<typeof LargeButton>) => {
+import type { ComponentProps } from 'react'
+
+const render = (props: ComponentProps<typeof LargeButton>) => {
   return renderWithProviders(<LargeButton {...props} />)[0]
 }
 
 describe('LargeButton', () => {
-  let props: React.ComponentProps<typeof LargeButton>
+  let props: ComponentProps<typeof LargeButton>
   beforeEach(() => {
     props = {
       onClick: vi.fn(),

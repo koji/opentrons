@@ -3,8 +3,11 @@ opentrons_shared_data.module.types: types requiring typing_extensions
 for modules
 """
 
+import enum
 from typing import Any, Dict, List, Union
 from typing_extensions import Literal, TypedDict
+
+from opentrons_shared_data.labware.types import LocatingFeatures, Extents
 
 SchemaV1 = Literal["1"]
 SchemaV2 = Literal["2"]
@@ -19,6 +22,7 @@ ThermocyclerModuleType = Literal["thermocyclerModuleType"]
 HeaterShakerModuleType = Literal["heaterShakerModuleType"]
 MagneticBlockType = Literal["magneticBlockType"]
 AbsorbanceReaderType = Literal["absorbanceReaderType"]
+FlexStackerModuleType = Literal["flexStackerModuleType"]
 
 ModuleType = Union[
     MagneticModuleType,
@@ -27,6 +31,7 @@ ModuleType = Union[
     HeaterShakerModuleType,
     MagneticBlockType,
     AbsorbanceReaderType,
+    FlexStackerModuleType,
 ]
 
 MagneticModuleModel = Literal["magneticModuleV1", "magneticModuleV2"]
@@ -35,6 +40,7 @@ ThermocyclerModuleModel = Literal["thermocyclerModuleV1", "thermocyclerModuleV2"
 HeaterShakerModuleModel = Literal["heaterShakerModuleV1"]
 MagneticBlockModel = Literal["magneticBlockV1"]
 AbsorbanceReaderModel = Literal["absorbanceReaderV1"]
+FlexStackerModuleModel = Literal["flexStackerModuleV1"]
 
 ModuleModel = Union[
     MagneticModuleModel,
@@ -43,6 +49,7 @@ ModuleModel = Union[
     HeaterShakerModuleModel,
     MagneticBlockModel,
     AbsorbanceReaderModel,
+    FlexStackerModuleModel,
 ]
 
 ModuleSlotTransform = TypedDict(
@@ -65,6 +72,8 @@ ModuleDimensions = TypedDict(
         "footprintYDimension": float,
         "labwareInterfaceXDimension": float,
         "labwareInterfaceYDimension": float,
+        "maxStackerFillHeight": float,
+        "maxStackerRetrievableHeight": float,
     },
     total=False,
 )
@@ -93,6 +102,24 @@ class GripperOffsets(TypedDict):
     dropOffset: NamedOffset
 
 
+class TOFBaseline(TypedDict):
+    extend: Dict[int, List[float]]
+    retract: Dict[int, List[float]]
+
+
+class TOFSensorBaseline(TypedDict):
+    version: str
+    X: TOFBaseline
+    Z: TOFBaseline
+
+
+class ModuleOrientation(enum.Enum):
+    LEFT = "left"
+    RIGHT = "right"
+    CENTER = "center"
+    NOT_APPLICABLE = None
+
+
 # TODO(mc, 2022-03-18): potentially move from typed-dict to Pydantic
 ModuleDefinitionV3 = TypedDict(
     "ModuleDefinitionV3",
@@ -102,6 +129,8 @@ ModuleDefinitionV3 = TypedDict(
         "model": ModuleModel,
         "labwareOffset": ModuleLabwareOffset,
         "cornerOffsetFromSlot": CornerOffsetFromSlot,
+        "features": LocatingFeatures,
+        "extents": Extents,
         "dimensions": ModuleDimensions,
         "calibrationPoint": ModuleCalibrationPointOffsetWithZ,
         "config": Dict[str, int],
@@ -109,9 +138,10 @@ ModuleDefinitionV3 = TypedDict(
         "quirks": List[str],
         "slotTransforms": Dict[str, Dict[str, Dict[str, List[List[float]]]]],
         "compatibleWith": List[ModuleModel],
+        "uniqueModuleData": Dict[str, Any],
         "incompatibleWithDecks": List[str],
-        "twoDimensionalRendering": Dict[str, Any],
         "gripperOffsets": Dict[str, GripperOffsets],
+        "orientation": Dict[str, str],
     },
     total=False,
 )

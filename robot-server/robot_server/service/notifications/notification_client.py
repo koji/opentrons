@@ -1,4 +1,5 @@
 """An interface for managing interactions with the notification broker and relevant lifecycle utilities."""
+
 import contextlib
 import random
 import logging
@@ -67,6 +68,8 @@ class NotificationClient:
         self._client.on_connect = self._on_connect
         self._client.on_disconnect = self._on_disconnect
 
+        self._client.max_queued_messages_set(100)
+
     def connect(self) -> None:
         """Connect the client to the MQTT broker."""
         self._client.on_connect = self._on_connect
@@ -91,8 +94,8 @@ class NotificationClient:
         Args:
             topic: The topic to publish the message on.
         """
-        message = NotifyRefetchBody.construct()
-        payload = message.json()
+        message = NotifyRefetchBody.model_construct()
+        payload = message.model_dump_json()
         self._client.publish(
             topic=topic,
             payload=payload,
@@ -109,8 +112,8 @@ class NotificationClient:
         Args:
             topic: The topic to publish the message on.
         """
-        message = NotifyUnsubscribeBody.construct()
-        payload = message.json()
+        message = NotifyUnsubscribeBody.model_construct()
+        payload = message.model_dump_json()
         self._client.publish(
             topic=topic,
             payload=payload,
@@ -198,7 +201,7 @@ def get_notification_client(
 ) -> NotificationClient:
     """Intended to be used by endpoint functions as a FastAPI dependency."""
     notification_client = _notification_client_accessor.get_from(app_state)
-    assert (
-        notification_client is not None
-    ), "Forgot to initialize notification client as part of server startup?"
+    assert notification_client is not None, (
+        "Forgot to initialize notification client as part of server startup?"
+    )
     return notification_client

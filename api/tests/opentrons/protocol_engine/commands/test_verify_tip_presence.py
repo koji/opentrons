@@ -1,4 +1,5 @@
 """Test verify tip presence commands."""
+
 from decoy import Decoy
 
 from opentrons.protocol_engine.execution import TipHandler
@@ -23,13 +24,13 @@ async def test_verify_tip_presence_implementation(
         expectedState=TipPresenceStatus.PRESENT,
     )
 
-    decoy.when(
-        await tip_handler.verify_tip_presence(
-            pipette_id="pipette-id",
-            expected=TipPresenceStatus.PRESENT,
-        )
-    ).then_return(None)
-
     result = await subject.execute(data)
 
     assert result == SuccessData(public=VerifyTipPresenceResult())
+    decoy.verify(
+        await tip_handler.verify_tip_presence(
+            pipette_id="pipette-id",
+            expected=TipPresenceStatus.PRESENT,
+            follow_singular_sensor=None,
+        )
+    )

@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 
+import { RUN_STATUS_STOPPED } from '@opentrons/api-client'
 import {
   ALIGN_CENTER,
   DIRECTION_COLUMN,
@@ -10,18 +11,32 @@ import {
   useHoverTooltip,
 } from '@opentrons/components'
 
+import { useIsFlex } from '/app/redux-resources/robots'
 import {
-  useTrackEvent,
-  ANALYTICS_PROCEED_TO_MODULE_SETUP_STEP,
+  ANALYTICS_PROCEED_TO_CAMERA_SETUP_STEP,
+  ANALYTICS_PROCEED_TO_LABWARE_OFFSETS_SETUP_STEP,
   ANALYTICS_PROCEED_TO_LABWARE_SETUP_STEP,
+  ANALYTICS_PROCEED_TO_MODULE_SETUP_STEP,
+  ANALYTICS_PROTOCOL_PROCEED,
+  useTrackEvent,
 } from '/app/redux/analytics'
+import {
+  CAMERA_SETUP_STEP_KEY,
+  LABWARE_SETUP_STEP_KEY,
+  LPC_STEP_KEY,
+  MODULE_SETUP_STEP_KEY,
+} from '/app/redux/protocol-runs'
+import {
+  DEFAULT_STATUS_REFETCH_INTERVAL,
+  useNotifyRunQuery,
+  useRunHasStarted,
+} from '/app/resources/runs'
+
 import { SetupDeckCalibration } from './SetupDeckCalibration'
 import { SetupInstrumentCalibration } from './SetupInstrumentCalibration'
 import { SetupTipLengthCalibration } from './SetupTipLengthCalibration'
-import { useRunStatus, useRunHasStarted } from '/app/resources/runs'
-import { RUN_STATUS_STOPPED } from '@opentrons/api-client'
-import { useIsFlex } from '/app/redux-resources/robots'
 
+import type { AnalyticsProtocolProceedButtonText } from '/app/redux/analytics/constants'
 import type { ProtocolCalibrationStatus } from '/app/redux/calibration/types'
 import type { StepKey } from '/app/redux/protocol-runs'
 
@@ -41,15 +56,30 @@ export function SetupRobotCalibration({
   calibrationStatus,
 }: SetupRobotCalibrationProps): JSX.Element {
   const { t } = useTranslation('protocol_setup')
-  const nextStepButtonKey =
-    nextStep === 'module_setup_step'
-      ? ANALYTICS_PROCEED_TO_MODULE_SETUP_STEP
-      : ANALYTICS_PROCEED_TO_LABWARE_SETUP_STEP
+  const nextStepButtonKey: AnalyticsProtocolProceedButtonText = (() => {
+    switch (nextStep) {
+      case MODULE_SETUP_STEP_KEY:
+        return ANALYTICS_PROCEED_TO_MODULE_SETUP_STEP
+      case LPC_STEP_KEY:
+        return ANALYTICS_PROCEED_TO_LABWARE_OFFSETS_SETUP_STEP
+      case LABWARE_SETUP_STEP_KEY:
+        return ANALYTICS_PROCEED_TO_LABWARE_SETUP_STEP
+      case CAMERA_SETUP_STEP_KEY:
+        return ANALYTICS_PROCEED_TO_CAMERA_SETUP_STEP
+      default:
+        return ANALYTICS_PROTOCOL_PROCEED
+    }
+  })()
+
   const [targetProps, tooltipProps] = useHoverTooltip()
   const trackEvent = useTrackEvent()
 
   const runHasStarted = useRunHasStarted(runId)
-  const runStatus = useRunStatus(runId)
+  const { data: runRecord } = useNotifyRunQuery(runId, {
+    refetchInterval: DEFAULT_STATUS_REFETCH_INTERVAL,
+  })
+  const runStatus = runRecord?.data.status ?? null
+
   const isFlex = useIsFlex(robotName)
 
   let tooltipText: string | null = null

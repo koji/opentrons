@@ -1,36 +1,6 @@
-import {
-  getPipetteSpecsV2,
-  getTiprackVolume,
-  getLabwareDefURI,
-} from '@opentrons/shared-data'
-import type { PipetteName } from '@opentrons/shared-data'
-import type { Options, LegacyDropdownOption } from '@opentrons/components'
+import { getLabwareDefURI, getTiprackVolume } from '@opentrons/shared-data'
+
 import type { PipetteEntity } from '@opentrons/step-generation'
-const supportedPipetteNames: PipetteName[] = [
-  'p10_single',
-  'p10_multi',
-  'p50_single',
-  'p50_multi',
-  'p300_single',
-  'p300_multi',
-  'p1000_single',
-]
-// TODO: should a version of pipetteOptions be moved to shared-data,
-// and used for both PD and Run App?
-export const pipetteOptions: Options = supportedPipetteNames
-  .map(name => {
-    const pipette = getPipetteSpecsV2(name)
-    return pipette
-      ? {
-          name: pipette.displayName,
-          value: name as string,
-        }
-      : null
-  })
-  .filter<LegacyDropdownOption>(
-    (option: LegacyDropdownOption | null): option is LegacyDropdownOption =>
-      Boolean(option)
-  )
 
 // NOTE: this is similar to getPipetteWithTipMaxVol, the fns
 export const getPipetteCapacity = (
@@ -39,23 +9,21 @@ export const getPipetteCapacity = (
 ): number => {
   const maxVolume = pipetteEntity.spec.liquids.default.maxVolume
   const tipRackDefs = pipetteEntity.tiprackLabwareDef
-  let chosenTipRack = null
-  for (const def of tipRackDefs) {
-    if (getLabwareDefURI(def) === tipRackDefUri) {
-      chosenTipRack = def
-      break
-    }
-  }
-  const tipRackTipVol = getTiprackVolume(chosenTipRack ?? tipRackDefs[0])
+  const chosenTipRack =
+    tipRackDefs.find(def => getLabwareDefURI(def) === tipRackDefUri) ??
+    tipRackDefs[0]
+  // TODO: Figure out why we were crashing in getTiprackVolume() because we couldn't
+  // find the tiprack def. Maybe tipRackDefUri is null, or tipRackDefs is empty?
+  const tipRackTipVol = chosenTipRack ? getTiprackVolume(chosenTipRack) : null
 
   if (maxVolume != null && tipRackTipVol != null) {
     return Math.min(maxVolume, tipRackTipVol)
   }
   console.assert(
     false,
-    `Expected spec and tiprack def for pipette ${
-      pipetteEntity ? pipetteEntity.id : '???'
-    } and ${tipRackDefUri ?? '???'}`
+    `Expected spec for pipette ${pipetteEntity?.id} and tiprack def for ${
+      tipRackDefUri
+    }. Available tipRackDefs: ${tipRackDefs.map(def => getLabwareDefURI(def))}`
   )
   return NaN
 }

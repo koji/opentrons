@@ -1,8 +1,8 @@
 from enum import Enum
-from typing import Any, List, Optional, Dict
+from typing import Any, List, Optional, Dict, Union
 from typing_extensions import Literal
 
-from pydantic import BaseModel, Field, Extra
+from pydantic import BaseModel, Field, ConfigDict
 
 from opentrons_shared_data.labware.labware_definition import LabwareDefinition
 from opentrons_shared_data.command import known_schema_ids
@@ -18,19 +18,19 @@ from .shared_models import (
 class Command(BaseModel):
     commandType: str
     params: Dict[str, Any]
-    key: Optional[str]
+    key: Optional[str] = None
 
 
 class CommandAnnotation(BaseModel):
     commandKeys: List[str]
     annotationType: str
-
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra="allow")
 
 
 CommandSchemaId = Enum(  # type: ignore[misc]
-    "CommandSchemaId", ((schema_id, schema_id) for schema_id in known_schema_ids())
+    "CommandSchemaId",
+    ((schema_id, schema_id) for schema_id in known_schema_ids()),
+    type=str,
 )
 
 
@@ -50,10 +50,10 @@ class ProtocolSchemaV8(BaseModel):
     labwareDefinitions: Dict[str, LabwareDefinition]
     commandSchemaId: CommandSchemaId
     commands: List[Command]
-    commandAnnotationSchemaId: Literal["opentronsCommandAnnotationSchemaV1"]
+    commandAnnotationSchemaId: Union[
+        Literal["opentronsCommandAnnotationSchemaV1"],
+        Literal["opentronsCommandAnnotationSchemaV2"],
+    ]
     commandAnnotations: List[CommandAnnotation]
-    designerApplication: Optional[DesignerApplication]
-
-    class Config:
-        # added for constructing the class with field name instead of alias
-        allow_population_by_field_name = True
+    designerApplication: Optional[DesignerApplication] = None
+    model_config = ConfigDict(populate_by_name=True)

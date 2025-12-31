@@ -1,15 +1,16 @@
-import type { MutableRefObject } from 'react'
-import { useRef, useCallback } from 'react'
+import { useCallback, useRef } from 'react'
+import head from 'lodash/head'
 import last from 'lodash/last'
 
-import head from 'lodash/head'
-
 import {
+  GRIPPER_MOVE_STEPS,
   INVALID,
   RECOVERY_MAP,
+  STACKER_LATCH_STEPS,
   STEP_ORDER,
-  GRIPPER_MOVE_STEPS,
 } from '../constants'
+
+import type { MutableRefObject } from 'react'
 import type {
   IRecoveryMap,
   RecoveryRoute,
@@ -53,11 +54,8 @@ export interface UseRouteUpdateActionsResult {
 export function useRouteUpdateActions(
   routeUpdateActionsParams: GetRouteUpdateActionsParams
 ): UseRouteUpdateActionsResult {
-  const {
-    recoveryMap,
-    setRecoveryMap,
-    doorStatusUtils,
-  } = routeUpdateActionsParams
+  const { recoveryMap, setRecoveryMap, doorStatusUtils } =
+    routeUpdateActionsParams
   const { route: currentRoute, step: currentStep } = recoveryMap
   const { OPTION_SELECTION, ROBOT_IN_MOTION, ROBOT_DOOR_OPEN } = RECOVERY_MAP
   const { isDoorOpen } = doorStatusUtils
@@ -109,10 +107,14 @@ export function useRouteUpdateActions(
   )
 
   // If the door is permitted on the current step, but the robot is about to move, we need to manually redirect users
-  // to the door modal unless the step is specifically a gripper jaw release step.
+  // to the door modal unless the step is specifically a gripper jaw/stacker latch release step.
   const checkDoorStatus = useCallback((): Promise<void> => {
     return new Promise((resolve, reject) => {
-      if (isDoorOpen && !GRIPPER_MOVE_STEPS.includes(currentStep)) {
+      if (
+        isDoorOpen &&
+        !GRIPPER_MOVE_STEPS.includes(currentStep) &&
+        !STACKER_LATCH_STEPS.includes(currentStep)
+      ) {
         stashedMapRef.current = { route: currentRoute, step: currentStep }
 
         setRecoveryMap({
@@ -142,7 +144,7 @@ export function useRouteUpdateActions(
           const route = robotMovingRoute ?? ROBOT_IN_MOTION.ROUTE
           const step =
             robotMovingRoute != null
-              ? (head(STEP_ORDER[robotMovingRoute]) as RouteStep)
+              ? head(STEP_ORDER[robotMovingRoute])!
               : ROBOT_IN_MOTION.STEPS.IN_MOTION
           setRecoveryMap({ route, step })
         } else {

@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { css } from 'styled-components'
 import { useTranslation } from 'react-i18next'
+import { css } from 'styled-components'
+
 import {
   ALIGN_FLEX_START,
   BORDERS,
@@ -12,30 +13,37 @@ import {
   Flex,
   JUSTIFY_CENTER,
   JUSTIFY_SPACE_BETWEEN,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
 import {
   FLEX_ROBOT_TYPE,
-  FLEX_USB_MODULE_ADDRESSABLE_AREAS,
-  SINGLE_SLOT_FIXTURES,
   getCutoutDisplayName,
   getDeckDefFromRobotType,
   getFixtureDisplayName,
-  TC_MODULE_LOCATION_OT3,
-  THERMOCYCLER_V2_FRONT_FIXTURE,
-  THERMOCYCLER_V2_REAR_FIXTURE,
+  STAGING_AREA_RIGHT_SLOT_FIXTURE,
 } from '@opentrons/shared-data'
-import { StatusLabel } from '/app/atoms/StatusLabel'
-import { TertiaryButton } from '/app/atoms/buttons/TertiaryButton'
-import { LocationConflictModal } from '/app/organisms/LocationConflictModal'
-import { NotConfiguredModal } from './NotConfiguredModal'
-import { getFixtureImage } from './utils'
-import { DeckFixtureSetupInstructionsModal } from '/app/organisms/DeviceDetailsDeckConfiguration/DeckFixtureSetupInstructionsModal'
 
-import type { DeckDefinition } from '@opentrons/shared-data'
-import type { CutoutConfigAndCompatibility } from '/app/resources/deck_configuration/hooks'
+import { TertiaryButton } from '/app/atoms/buttons/TertiaryButton'
+import { StatusLabel } from '/app/atoms/StatusLabel'
+import { DeckFixtureSetupInstructionsModal } from '/app/organisms/DeviceDetailsDeckConfiguration/DeckFixtureSetupInstructionsModal'
+import { LocationConflictModal } from '/app/organisms/LocationConflictModal'
+import { NotConfiguredModal } from '/app/organisms/LocationConflictModal/NotConfiguredModal'
+import {
+  getFilteredDeckConfigFixtureCompatibility,
+  isConflictingFixtureConfigured,
+  isFixtureCompatible,
+} from '/app/resources/deck_configuration/utils'
+
+import { getFixtureImage } from './utils'
+
+import type { TFunction } from 'i18next'
+import type {
+  CutoutConfigAndCompatibility,
+  CutoutFixtureId,
+  DeckDefinition,
+} from '@opentrons/shared-data'
 
 interface SetupFixtureListProps {
   deckConfigCompatibility: CutoutConfigAndCompatibility[]
@@ -51,45 +59,18 @@ export const SetupFixtureList = (props: SetupFixtureListProps): JSX.Element => {
   const { deckConfigCompatibility, robotName } = props
   const deckDef = getDeckDefFromRobotType(FLEX_ROBOT_TYPE)
 
-  const hasTwoLabwareThermocyclerConflicts =
-    deckConfigCompatibility.some(
-      ({ cutoutFixtureId, missingLabwareDisplayName }) =>
-        cutoutFixtureId === THERMOCYCLER_V2_FRONT_FIXTURE &&
-        missingLabwareDisplayName != null
-    ) &&
-    deckConfigCompatibility.some(
-      ({ cutoutFixtureId, missingLabwareDisplayName }) =>
-        cutoutFixtureId === THERMOCYCLER_V2_REAR_FIXTURE &&
-        missingLabwareDisplayName != null
-    )
-
-  // if there are two labware conflicts with the thermocycler, don't show the conflict with the thermocycler rear fixture
-  const filteredDeckConfigCompatibility = deckConfigCompatibility.filter(
-    ({ cutoutFixtureId }) => {
-      return (
-        !hasTwoLabwareThermocyclerConflicts ||
-        !(cutoutFixtureId === THERMOCYCLER_V2_REAR_FIXTURE)
-      )
-    }
-  )
-
+  const filteredDeckConfigCompatibility =
+    getFilteredDeckConfigFixtureCompatibility(deckConfigCompatibility)
   return (
     <>
-      {filteredDeckConfigCompatibility.map(cutoutConfigAndCompatibility => {
-        // filter out all fixtures that only provide usb module addressable areas
-        // (i.e. everything but MagBlockV1 and StagingAreaWithMagBlockV1)
-        // as they're handled in the Modules Table
-        return cutoutConfigAndCompatibility.requiredAddressableAreas.every(
-          raa => FLEX_USB_MODULE_ADDRESSABLE_AREAS.includes(raa)
-        ) ? null : (
-          <FixtureListItem
-            key={cutoutConfigAndCompatibility.cutoutId}
-            deckDef={deckDef}
-            robotName={robotName}
-            {...cutoutConfigAndCompatibility}
-          />
-        )
-      })}
+      {filteredDeckConfigCompatibility.map(cutoutConfigAndCompatibility => (
+        <FixtureListItem
+          key={cutoutConfigAndCompatibility.cutoutId}
+          deckDef={deckDef}
+          robotName={robotName}
+          {...cutoutConfigAndCompatibility}
+        />
+      ))}
     </>
   )
 }
@@ -97,37 +78,38 @@ export const SetupFixtureList = (props: SetupFixtureListProps): JSX.Element => {
 interface FixtureListItemProps extends CutoutConfigAndCompatibility {
   deckDef: DeckDefinition
   robotName: string
+  partialRequiredCutoutFixtureId?: CutoutFixtureId
 }
 
 export function FixtureListItem({
   cutoutId,
   cutoutFixtureId,
   compatibleCutoutFixtureIds,
-  missingLabwareDisplayName,
   deckDef,
   robotName,
+  partialRequiredCutoutFixtureId,
 }: FixtureListItemProps): JSX.Element {
-  const { t } = useTranslation('protocol_setup')
+  const { t } = useTranslation(['protocol_setup', 'deck_configuration'])
 
-  const isCurrentFixtureCompatible =
-    cutoutFixtureId != null &&
-    compatibleCutoutFixtureIds.includes(cutoutFixtureId)
-  const isRequiredSingleSlotMissing = missingLabwareDisplayName != null
-  const isConflictingFixtureConfigured =
-    cutoutFixtureId != null && !SINGLE_SLOT_FIXTURES.includes(cutoutFixtureId)
+  const isCurrentFixtureCompatible = isFixtureCompatible(
+    cutoutFixtureId,
+    compatibleCutoutFixtureIds,
+    partialRequiredCutoutFixtureId
+  )
 
-  const isThermocyclerCurrentFixture =
-    cutoutFixtureId === THERMOCYCLER_V2_FRONT_FIXTURE ||
-    cutoutFixtureId === THERMOCYCLER_V2_REAR_FIXTURE
+  const hasConflict = isConflictingFixtureConfigured(
+    cutoutFixtureId,
+    partialRequiredCutoutFixtureId
+  )
 
   let statusLabel
   if (!isCurrentFixtureCompatible) {
     statusLabel = (
       <StatusLabel
         status={
-          isConflictingFixtureConfigured
-            ? t('location_conflict')
-            : t('not_configured')
+          hasConflict
+            ? t('protocol_setup:location_conflict')
+            : t('protocol_setup:not_configured')
         }
         backgroundColor={COLORS.yellow30}
         iconColor={COLORS.yellow60}
@@ -137,7 +119,7 @@ export function FixtureListItem({
   } else {
     statusLabel = (
       <StatusLabel
-        status={t('configured')}
+        status={t('protocol_setup:configured')}
         backgroundColor={COLORS.green30}
         iconColor={COLORS.green60}
         textColor={COLORS.green60}
@@ -145,18 +127,22 @@ export function FixtureListItem({
     )
   }
 
-  const [
-    showLocationConflictModal,
-    setShowLocationConflictModal,
-  ] = useState<boolean>(false)
-  const [showNotConfiguredModal, setShowNotConfiguredModal] = useState<boolean>(
-    false
-  )
+  const [showLocationConflictModal, setShowLocationConflictModal] =
+    useState<boolean>(false)
+  const [showNotConfiguredModal, setShowNotConfiguredModal] =
+    useState<boolean>(false)
 
-  const [
-    showSetupInstructionsModal,
-    setShowSetupInstructionsModal,
-  ] = useState<boolean>(false)
+  const [showSetupInstructionsModal, setShowSetupInstructionsModal] =
+    useState<boolean>(false)
+
+  const isFourthColumnFixture =
+    (partialRequiredCutoutFixtureId != null &&
+      STAGING_AREA_RIGHT_SLOT_FIXTURE === partialRequiredCutoutFixtureId) ||
+    STAGING_AREA_RIGHT_SLOT_FIXTURE === compatibleCutoutFixtureIds[0]
+
+  const displayLocation = isFourthColumnFixture
+    ? `${getCutoutDisplayName(cutoutId).charAt(0)}4`
+    : getCutoutDisplayName(cutoutId)
 
   return (
     <>
@@ -166,7 +152,9 @@ export function FixtureListItem({
             setShowNotConfiguredModal(false)
           }}
           cutoutId={cutoutId}
-          requiredFixtureId={compatibleCutoutFixtureIds[0]}
+          requiredFixtureId={
+            partialRequiredCutoutFixtureId ?? compatibleCutoutFixtureIds[0]
+          }
         />
       ) : null}
       {showLocationConflictModal ? (
@@ -176,8 +164,9 @@ export function FixtureListItem({
           }}
           cutoutId={cutoutId}
           deckDef={deckDef}
-          missingLabwareDisplayName={missingLabwareDisplayName}
-          requiredFixtureId={compatibleCutoutFixtureIds[0]}
+          requiredFixtureId={
+            partialRequiredCutoutFixtureId ?? compatibleCutoutFixtureIds[0]
+          }
           robotName={robotName}
         />
       ) : null}
@@ -205,10 +194,14 @@ export function FixtureListItem({
                 width="60px"
                 height="54px"
                 src={
-                  // show the current fixture for a missing single slot
-                  isCurrentFixtureCompatible || isRequiredSingleSlotMissing
-                    ? getFixtureImage(cutoutFixtureId)
-                    : getFixtureImage(compatibleCutoutFixtureIds?.[0])
+                  isCurrentFixtureCompatible
+                    ? getFixtureImage(
+                        partialRequiredCutoutFixtureId ?? cutoutFixtureId
+                      )
+                    : getFixtureImage(
+                        partialRequiredCutoutFixtureId ??
+                          compatibleCutoutFixtureIds?.[0]
+                      )
                 }
               />
             ) : null}
@@ -220,9 +213,16 @@ export function FixtureListItem({
                 css={TYPOGRAPHY.pSemiBold}
                 marginLeft={SPACING.spacing20}
               >
-                {isCurrentFixtureCompatible || isRequiredSingleSlotMissing
-                  ? getFixtureDisplayName(cutoutFixtureId)
-                  : getFixtureDisplayName(compatibleCutoutFixtureIds?.[0])}
+                {isCurrentFixtureCompatible
+                  ? getFixtureDisplayName(
+                      t as TFunction,
+                      partialRequiredCutoutFixtureId ?? cutoutFixtureId
+                    )
+                  : getFixtureDisplayName(
+                      t as TFunction,
+                      partialRequiredCutoutFixtureId ??
+                        compatibleCutoutFixtureIds?.[0]
+                    )}
               </LegacyStyledText>
               <Btn
                 marginLeft={SPACING.spacing16}
@@ -238,16 +238,14 @@ export function FixtureListItem({
                   setShowSetupInstructionsModal(true)
                 }}
               >
-                <LegacyStyledText marginLeft={SPACING.spacing4} as="p">
-                  {t('view_setup_instructions')}
+                <LegacyStyledText marginLeft={SPACING.spacing4} forwardedAs="p">
+                  {t('protocol_setup:view_setup_instructions')}
                 </LegacyStyledText>
               </Btn>
             </Flex>
           </Flex>
-          <LegacyStyledText as="p" width="15%">
-            {isThermocyclerCurrentFixture && isRequiredSingleSlotMissing
-              ? TC_MODULE_LOCATION_OT3
-              : getCutoutDisplayName(cutoutId)}
+          <LegacyStyledText forwardedAs="p" width="15%">
+            {displayLocation}
           </LegacyStyledText>
           <Flex
             width="15%"
@@ -259,13 +257,13 @@ export function FixtureListItem({
               <TertiaryButton
                 width="max-content"
                 onClick={() => {
-                  isConflictingFixtureConfigured
+                  hasConflict
                     ? setShowLocationConflictModal(true)
                     : setShowNotConfiguredModal(true)
                 }}
               >
-                <LegacyStyledText as="label" cursor="pointer">
-                  {t('resolve')}
+                <LegacyStyledText forwardedAs="label" cursor="pointer">
+                  {t('protocol_setup:resolve')}
                 </LegacyStyledText>
               </TertiaryButton>
             ) : null}

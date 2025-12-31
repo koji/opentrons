@@ -1,20 +1,21 @@
-import { useRef, useEffect } from 'react'
-import { useSelector } from 'react-redux'
+import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSelector } from 'react-redux'
 
 import {
   COLORS,
   DIRECTION_COLUMN,
   Flex,
+  LegacyStyledText,
   SPACING,
   TYPOGRAPHY,
-  LegacyStyledText,
 } from '@opentrons/components'
 
-import { formatLastModified } from '../CalibrationPanels/utils'
 import { useDeckCalibrationData } from '/app/organisms/Desktop/Devices/hooks'
 import { useRobot } from '/app/redux-resources/robots'
 import * as RobotApi from '/app/redux/robot-api'
+
+import { formatLastModified } from '../CalibrationPanels/utils'
 
 import type { State } from '/app/redux/types'
 
@@ -59,13 +60,16 @@ export function RobotSettingsDeckCalibration({
       paddingY={SPACING.spacing24}
       gridGap={SPACING.spacing8}
     >
-      <LegacyStyledText as="h3" fontWeight={TYPOGRAPHY.fontWeightSemiBold}>
+      <LegacyStyledText
+        forwardedAs="h3"
+        fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+      >
         {t('deck_calibration_title')}
       </LegacyStyledText>
-      <LegacyStyledText as="p">
+      <LegacyStyledText forwardedAs="p">
         {t('deck_calibration_description')}
       </LegacyStyledText>
-      <LegacyStyledText as="label" color={COLORS.grey60}>
+      <LegacyStyledText forwardedAs="label" color={COLORS.grey60}>
         {deckLastModified}
       </LegacyStyledText>
     </Flex>

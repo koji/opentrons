@@ -1,18 +1,20 @@
-import type * as React from 'react'
-import { screen, fireEvent } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { fireEvent, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import '@testing-library/jest-dom/vitest'
 
+import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 import * as Shell from '/app/redux/shell'
-import { renderWithProviders } from '/app/__testing-utils__'
-import { useRemoveActiveAppUpdateToast } from '../../Alerts'
-import { UpdateAppModal, RELEASE_NOTES_URL_BASE } from '..'
 
-import type { State } from '/app/redux/types'
-import type { ShellUpdateState } from '/app/redux/shell/types'
-import type * as ShellState from '/app/redux/shell'
+import { RELEASE_NOTES_URL_BASE, UpdateAppModal } from '..'
+import { useRemoveActiveAppUpdateToast } from '../../Alerts'
+
+import type { ComponentProps } from 'react'
 import type * as Dom from 'react-router-dom'
+import type * as ShellState from '/app/redux/shell'
+import type { ShellUpdateState } from '/app/redux/shell/types'
+import type { State } from '/app/redux/types'
 import type { UpdateAppModalProps } from '..'
 
 vi.mock('/app/redux/shell/update', async importOriginal => {
@@ -35,7 +37,7 @@ vi.mock('../../Alerts')
 
 const getShellUpdateState = Shell.getShellUpdateState
 
-const render = (props: React.ComponentProps<typeof UpdateAppModal>) => {
+const render = (props: ComponentProps<typeof UpdateAppModal>) => {
   return renderWithProviders(<UpdateAppModal {...props} />, {
     i18nInstance: i18n,
     initialState: {
@@ -45,7 +47,7 @@ const render = (props: React.ComponentProps<typeof UpdateAppModal>) => {
 }
 
 describe('UpdateAppModal', () => {
-  let props: React.ComponentProps<typeof UpdateAppModal>
+  let props: ComponentProps<typeof UpdateAppModal>
 
   beforeEach(() => {
     props = {

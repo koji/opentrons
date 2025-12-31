@@ -1,10 +1,12 @@
-import type * as React from 'react'
-import { when } from 'vitest-when'
 import { screen } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { when } from 'vitest-when'
+
 import '@testing-library/jest-dom/vitest'
 
+import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
+import { useIsFlex } from '/app/redux-resources/robots'
 import {
   mockAttachedPipette,
   mockAttachedPipetteInformation,
@@ -13,17 +15,17 @@ import {
   useAttachedPipettes,
   useAttachedPipettesFromInstrumentsQuery,
 } from '/app/resources/instruments'
-import { useIsFlex } from '/app/redux-resources/robots'
-import { renderWithProviders } from '/app/__testing-utils__'
-import { PipetteOffsetCalibrationItems } from '../PipetteOffsetCalibrationItems'
+
 import { OverflowMenu } from '../OverflowMenu'
+import { PipetteOffsetCalibrationItems } from '../PipetteOffsetCalibrationItems'
 import { formatLastCalibrated } from '../utils'
 
+import type { ComponentProps } from 'react'
 import type { Mount } from '@opentrons/components'
 import type { AttachedPipettesByMount } from '/app/redux/pipettes/types'
 
 const render = (
-  props: React.ComponentProps<typeof PipetteOffsetCalibrationItems>
+  props: ComponentProps<typeof PipetteOffsetCalibrationItems>
 ): ReturnType<typeof renderWithProviders> => {
   return renderWithProviders(<PipetteOffsetCalibrationItems {...props} />, {
     i18nInstance: i18n,
@@ -70,10 +72,9 @@ const mockAttachedPipettes: AttachedPipettesByMount = {
   left: mockAttachedPipette,
   right: mockAttachedPipette,
 } as any
-const mockUpdateRobotStatus = vi.fn()
 
 describe('PipetteOffsetCalibrationItems', () => {
-  let props: React.ComponentProps<typeof PipetteOffsetCalibrationItems>
+  let props: ComponentProps<typeof PipetteOffsetCalibrationItems>
 
   beforeEach(() => {
     vi.mocked(useAttachedPipettesFromInstrumentsQuery).mockReturnValue({
@@ -86,7 +87,7 @@ describe('PipetteOffsetCalibrationItems', () => {
     props = {
       robotName: ROBOT_NAME,
       formattedPipetteOffsetCalibrations: mockPipetteOffsetCalibrations,
-      updateRobotStatus: mockUpdateRobotStatus,
+      isRobotBusy: false,
     }
   })
 

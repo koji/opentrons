@@ -1,16 +1,24 @@
 // PD-specific info about labware<>module compatibilty
 import {
+  ABSORBANCE_READER_TYPE,
+  FLEX_STACKER_MODULE_TYPE,
+  HEATERSHAKER_MODULE_TYPE,
+  MAGNETIC_BLOCK_TYPE,
   MAGNETIC_MODULE_TYPE,
   TEMPERATURE_MODULE_TYPE,
   THERMOCYCLER_MODULE_TYPE,
-  HEATERSHAKER_MODULE_TYPE,
-  MAGNETIC_BLOCK_TYPE,
-  ABSORBANCE_READER_TYPE,
 } from '@opentrons/shared-data'
+
+import { RECOMMENDED_LABWARE_BY_MODULE } from '../pages/Designer/DeckSetup/constants'
+
+import type { LabwareDefinition2, ModuleType } from '@opentrons/shared-data'
 import type { LabwareDefByDefURI } from '../labware-defs'
 import type { LabwareOnDeck } from '../step-forms'
-import type { LabwareDefinition2, ModuleType } from '@opentrons/shared-data'
+
 // NOTE: this does not distinguish btw versions. Standard labware only (assumes namespace is 'opentrons')
+
+const PLATE_READER_MAX_LABWARE_Z_MM = 16
+
 export const COMPATIBLE_LABWARE_ALLOWLIST_BY_MODULE_TYPE: Record<
   ModuleType,
   Readonly<string[]>
@@ -59,6 +67,7 @@ export const COMPATIBLE_LABWARE_ALLOWLIST_BY_MODULE_TYPE: Record<
     'opentrons_96_flat_bottom_adapter',
     'opentrons_96_pcr_adapter',
     'opentrons_universal_flat_adapter',
+    'opentrons_universal_flat_adapter_type_b',
   ],
   [MAGNETIC_BLOCK_TYPE]: [
     'nest_96_wellplate_100ul_pcr_full_skirt',
@@ -69,6 +78,9 @@ export const COMPATIBLE_LABWARE_ALLOWLIST_BY_MODULE_TYPE: Record<
   ],
   [ABSORBANCE_READER_TYPE]: [
     'opentrons_flex_lid_absorbance_plate_reader_module',
+  ],
+  [FLEX_STACKER_MODULE_TYPE]: [
+    ...RECOMMENDED_LABWARE_BY_MODULE[FLEX_STACKER_MODULE_TYPE],
   ],
 }
 export const getLabwareIsCompatible = (
@@ -84,69 +96,7 @@ export const getLabwareIsCompatible = (
   return allowlist.includes(def.parameters.loadName)
 }
 
-const DEEP_WELL_ADAPTER_LOADNAME = 'opentrons_96_deep_well_adapter'
-const FLAT_BOTTOM_ADAPTER_LOADNAME = 'opentrons_96_flat_bottom_adapter'
-const PCR_ADAPTER_LOADNAME = 'opentrons_96_pcr_adapter'
-const UNIVERSAL_FLAT_ADAPTER_LOADNAME = 'opentrons_universal_flat_adapter'
-const ALUMINUM_BLOCK_96_LOADNAME = 'opentrons_96_well_aluminum_block'
-const ALUMINUM_FLAT_BOTTOM_PLATE = 'opentrons_aluminum_flat_bottom_plate'
-const TEMP_DEEP_WELL_ADAPTER_LOADNAME =
-  'opentrons_96_deep_well_temp_mod_adapter'
 export const ADAPTER_96_CHANNEL = 'opentrons_flex_96_tiprack_adapter'
-
-export const COMPATIBLE_LABWARE_ALLOWLIST_FOR_ADAPTER: Record<
-  string,
-  string[]
-> = {
-  [TEMP_DEEP_WELL_ADAPTER_LOADNAME]: ['opentrons/nest_96_wellplate_2ml_deep/2'],
-  [DEEP_WELL_ADAPTER_LOADNAME]: ['opentrons/nest_96_wellplate_2ml_deep/2'],
-  [FLAT_BOTTOM_ADAPTER_LOADNAME]: ['opentrons/nest_96_wellplate_200ul_flat/2'],
-  [PCR_ADAPTER_LOADNAME]: [
-    'opentrons/nest_96_wellplate_100ul_pcr_full_skirt/2',
-    'opentrons/opentrons_96_wellplate_200ul_pcr_full_skirt/2',
-    'opentrons/biorad_96_wellplate_200ul_pcr/2',
-  ],
-  [UNIVERSAL_FLAT_ADAPTER_LOADNAME]: [
-    'opentrons/corning_384_wellplate_112ul_flat/2',
-    'opentrons/corning_96_wellplate_360ul_flat/2',
-    //  TODO(jr, 9/18/23): comment this out for now until these labwares are compatible
-    //  with this adapter from the API side
-    // 'opentrons/corning_48_wellplate_1.6ml_flat/2',
-    // 'opentrons/corning_24_wellplate_3.4ml_flat/2',
-    // 'opentrons/corning_12_wellplate_6.9ml_flat/2',
-    // 'opentrons/corning_6_wellplate_16.8ml_flat/2',
-    // 'opentrons/nest_96_wellplate_200ul_flat/2',
-  ],
-  [ALUMINUM_BLOCK_96_LOADNAME]: [
-    'opentrons/biorad_96_wellplate_200ul_pcr/2',
-    'opentrons/nest_96_wellplate_100ul_pcr_full_skirt/2',
-    'opentrons/opentrons_96_wellplate_200ul_pcr_full_skirt/2',
-  ],
-  [ALUMINUM_FLAT_BOTTOM_PLATE]: [
-    'opentrons/corning_384_wellplate_112ul_flat/2',
-    'opentrons/corning_96_wellplate_360ul_flat/2',
-    'opentrons/corning_48_wellplate_1.6ml_flat/2',
-    'opentrons/corning_24_wellplate_3.4ml_flat/2',
-    'opentrons/corning_12_wellplate_6.9ml_flat/2',
-    'opentrons/corning_6_wellplate_16.8ml_flat/2',
-    'opentrons/nest_96_wellplate_200ul_flat/2',
-  ],
-  [ADAPTER_96_CHANNEL]: [
-    'opentrons/opentrons_flex_96_tiprack_50ul/1',
-    'opentrons/opentrons_flex_96_tiprack_200ul/1',
-    'opentrons/opentrons_flex_96_tiprack_1000ul/1',
-    'opentrons/opentrons_flex_96_filtertiprack_50ul/1',
-    'opentrons/opentrons_flex_96_filtertiprack_200ul/1',
-    'opentrons/opentrons_flex_96_filtertiprack_1000ul/1',
-  ],
-}
-
-export const getLabwareCompatibleWithAdapter = (
-  adapterLoadName?: string
-): string[] =>
-  adapterLoadName != null
-    ? COMPATIBLE_LABWARE_ALLOWLIST_FOR_ADAPTER[adapterLoadName]
-    : []
 
 export const getLabwareIsCustom = (
   customLabwares: LabwareDefByDefURI,
@@ -155,77 +105,39 @@ export const getLabwareIsCustom = (
   return labwareOnDeck.labwareDefURI in customLabwares
 }
 
-export const getAdapterLabwareIsAMatch = (
-  labwareId: string,
-  allLabware: LabwareOnDeck[],
-  draggedLabwareLoadname: string
+// This breaks pattern with other module compatibility checks, but it more exactly mirrors Protocol Engine's logic
+// See api/src/opentrons/protocol_engine/state/labware.py for details
+const _getLabwareCompatibleWithAbsorbanceReader = (
+  def: LabwareDefinition2
 ): boolean => {
-  const loadName = Object.values(allLabware).find(lab => lab.id === labwareId)
-    ?.def.parameters.loadName
+  return (
+    Object.entries(def.wells).length === 96 &&
+    !def.parameters.isTiprack &&
+    def.dimensions.zDimension <= PLATE_READER_MAX_LABWARE_Z_MM
+  )
+}
 
-  const flatBottomLabwares = [
-    'corning_384_wellplate_112ul_flat',
-    'corning_96_wellplate_360ul_flat',
-    'corning_6_wellplate_16.8ml_flat',
-    'corning_384_wellplate_112ul_flat',
-    'corning_96_wellplate_360ul_flat',
-    'corning_6_wellplate_16.8ml_flat',
-    'nest_96_wellplate_200ul_flat',
-  ]
+const _getLabwareCompatibleWithFlexStacker = (
+  def: LabwareDefinition2
+): boolean =>
+  RECOMMENDED_LABWARE_BY_MODULE[FLEX_STACKER_MODULE_TYPE].includes(
+    def.parameters.loadName
+  ) ||
+  def.metadata.displayCategory === 'wellPlate' ||
+  def.metadata.displayCategory === 'reservoir'
 
-  const adapter96Tipracks = [
-    'opentrons_flex_96_tiprack_50ul',
-    'opentrons_flex_96_tiprack_200ul',
-    'opentrons_flex_96_tiprack_1000ul',
-    'opentrons_flex_96_filtertiprack_50ul',
-    'opentrons_flex_96_filtertiprack_200ul',
-    'opentrons_flex_96_filtertiprack_1000ul',
-  ]
-
-  const pcrLabwares = [
-    'biorad_96_wellplate_200ul_pcr',
-    'nest_96_wellplate_100ul_pcr_full_skirt',
-    'opentrons_96_wellplate_200ul_pcr_full_skirt',
-  ]
-
-  const deepWellPair =
-    loadName === DEEP_WELL_ADAPTER_LOADNAME &&
-    draggedLabwareLoadname === 'nest_96_wellplate_2ml_deep'
-  const flatBottomPair =
-    loadName === FLAT_BOTTOM_ADAPTER_LOADNAME &&
-    draggedLabwareLoadname === 'nest_96_wellplate_200ul_flat'
-  const pcrPair =
-    loadName === PCR_ADAPTER_LOADNAME &&
-    pcrLabwares.includes(draggedLabwareLoadname)
-  const universalPair =
-    loadName === UNIVERSAL_FLAT_ADAPTER_LOADNAME &&
-    (draggedLabwareLoadname === 'corning_384_wellplate_112ul_flat' ||
-      draggedLabwareLoadname === 'corning_96_wellplate_360ul_flat')
-  const aluminumBlock96Pairs =
-    loadName === ALUMINUM_BLOCK_96_LOADNAME &&
-    pcrLabwares.includes(draggedLabwareLoadname)
-  const aluminumFlatBottomPlatePairs =
-    loadName === ALUMINUM_FLAT_BOTTOM_PLATE &&
-    flatBottomLabwares.includes(draggedLabwareLoadname)
-  const adapter96ChannelPairs =
-    loadName === ADAPTER_96_CHANNEL &&
-    adapter96Tipracks.includes(draggedLabwareLoadname)
-  const tempDeepWellAdapterPairs =
-    loadName === TEMP_DEEP_WELL_ADAPTER_LOADNAME &&
-    draggedLabwareLoadname === 'nest_96_wellplate_2ml_deep'
-
-  if (
-    deepWellPair ||
-    flatBottomPair ||
-    pcrPair ||
-    universalPair ||
-    aluminumBlock96Pairs ||
-    aluminumFlatBottomPlatePairs ||
-    adapter96ChannelPairs ||
-    tempDeepWellAdapterPairs
-  ) {
-    return true
-  } else {
-    return false
+export const getLabwareCompatibleWithModule = (
+  def: LabwareDefinition2,
+  moduleType: ModuleType
+): boolean => {
+  switch (moduleType) {
+    case FLEX_STACKER_MODULE_TYPE:
+      return _getLabwareCompatibleWithFlexStacker(def)
+    case ABSORBANCE_READER_TYPE:
+      return _getLabwareCompatibleWithAbsorbanceReader(def)
+    default:
+      return COMPATIBLE_LABWARE_ALLOWLIST_BY_MODULE_TYPE[moduleType].includes(
+        def.parameters.loadName
+      )
   }
 }

@@ -1,6 +1,6 @@
-import * as React from 'react'
-import { useTranslation } from 'react-i18next'
+import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
 
 import {
   ALIGN_CENTER,
@@ -8,29 +8,36 @@ import {
   DIRECTION_COLUMN,
   Flex,
   InputField,
-  RadioButton,
   POSITION_FIXED,
+  RadioButton,
   SPACING,
+  StyledText,
 } from '@opentrons/components'
 
-import { ANALYTICS_QUICK_TRANSFER_SETTING_SAVED } from '/app/redux/analytics'
 import { getTopPortalEl } from '/app/App/portal'
+import { NumericalKeyboard } from '/app/atoms/SoftwareKeyboard'
+import { i18n } from '/app/i18n'
 import { ChildNavigation } from '/app/organisms/ODD/ChildNavigation'
 import { useTrackEventWithRobotSerial } from '/app/redux-resources/analytics'
-import { ACTIONS } from '../constants'
+import { ANALYTICS_QUICK_TRANSFER_SETTING_SAVED } from '/app/redux/analytics'
 
+import { ACTIONS } from '../constants'
+import {
+  getAspirateAirGapVolumeRange,
+  getDispenseAirGapVolumeRange,
+} from '../utils'
+
+import type { Dispatch } from 'react'
 import type {
-  QuickTransferSummaryState,
-  QuickTransferSummaryAction,
   FlowRateKind,
+  QuickTransferSummaryAction,
+  QuickTransferSummaryState,
 } from '../types'
-import { i18n } from '/app/i18n'
-import { NumericalKeyboard } from '/app/atoms/SoftwareKeyboard'
 
 interface AirGapProps {
   onBack: () => void
   state: QuickTransferSummaryState
-  dispatch: React.Dispatch<QuickTransferSummaryAction>
+  dispatch: Dispatch<QuickTransferSummaryAction>
   kind: FlowRateKind
 }
 
@@ -38,18 +45,18 @@ export function AirGap(props: AirGapProps): JSX.Element {
   const { kind, onBack, state, dispatch } = props
   const { t } = useTranslation('quick_transfer')
   const { trackEventWithRobotSerial } = useTrackEventWithRobotSerial()
-  const keyboardRef = React.useRef(null)
+  const keyboardRef = useRef(null)
 
-  const [airGapEnabled, setAirGapEnabled] = React.useState<boolean>(
+  const [airGapEnabled, setAirGapEnabled] = useState<boolean>(
     kind === 'aspirate'
       ? state.airGapAspirate != null
       : state.airGapDispense != null
   )
-  const [currentStep, setCurrentStep] = React.useState<number>(1)
-  const [volume, setVolume] = React.useState<number | null>(
+  const [currentStep, setCurrentStep] = useState<number>(1)
+  const [volume, setVolume] = useState<number | null>(
     kind === 'aspirate'
-      ? state.airGapAspirate ?? null
-      : state.airGapDispense ?? null
+      ? (state.airGapAspirate ?? null)
+      : (state.airGapDispense ?? null)
   )
 
   const action =
@@ -107,36 +114,18 @@ export function AirGap(props: AirGapProps): JSX.Element {
   const setSaveOrContinueButtonText =
     airGapEnabled && currentStep < 2 ? t('shared:continue') : t('shared:save')
 
-  const maxPipetteVolume = Object.values(state.pipette.liquids)[0].maxVolume
-  const tipVolume = Object.values(state.tipRack.wells)[0].totalLiquidVolume
+  const { min, max } =
+    kind === 'aspirate'
+      ? getAspirateAirGapVolumeRange(state.pipette, state.tipRack)
+      : getDispenseAirGapVolumeRange(
+          state.volume,
+          state?.disposalVolumeDispenseSettings?.volume ?? 0,
+          state.path,
+          state.pipette,
+          state.tipRack
+        )
 
-  // dispense air gap is performed whenever a tip is on its way to the trash, so
-  // we can have the max be at the max tip capacity
-  let maxAvailableCapacity = Math.min(maxPipetteVolume, tipVolume)
-
-  // for aspirate, air gap behaves differently depending on the path
-  if (kind === 'aspirate') {
-    if (state.path === 'single') {
-      // for a single path, air gap capacity is just the difference between the
-      // pipette/tip capacity and the volume per well
-      maxAvailableCapacity =
-        Math.min(maxPipetteVolume, tipVolume) - state.volume
-    } else if (state.path === 'multiAspirate') {
-      // an aspirate air gap for multi aspirate will aspirate an air gap
-      // after each aspirate action, so we need to halve the available capacity for single path
-      // to get the amount available, assuming a min of 2 aspirates per dispense
-      maxAvailableCapacity =
-        (Math.min(maxPipetteVolume, tipVolume) - 2 * state.volume) / 2
-    } else {
-      // aspirate air gap for multi dispense occurs once per asprirate and
-      // available volume is max capacity - volume*3 assuming a min of 2 dispenses
-      // per aspirate plus 1x the volume for disposal
-      maxAvailableCapacity =
-        Math.min(maxPipetteVolume, tipVolume) - state.volume * 3
-    }
-  }
-
-  const volumeRange = { min: 1, max: Math.floor(maxAvailableCapacity) }
+  const volumeRange = { min, max }
   let volumeError = null
   if (volumeRange.min > volumeRange.max) {
     volumeError = t('air_gap_capacity_error')
@@ -160,8 +149,8 @@ export function AirGap(props: AirGapProps): JSX.Element {
       <ChildNavigation
         header={
           kind === 'aspirate'
-            ? t('air_gap_before_aspirating')
-            : t('air_gap_before_dispensing')
+            ? t('air_gap_after_aspirating')
+            : t('air_gap_after_dispensing')
         }
         buttonText={i18n.format(setSaveOrContinueButtonText, 'capitalize')}
         onClickBack={handleClickBackOrExit}
@@ -174,19 +163,26 @@ export function AirGap(props: AirGapProps): JSX.Element {
           marginTop={SPACING.spacing120}
           flexDirection={DIRECTION_COLUMN}
           padding={`${SPACING.spacing16} ${SPACING.spacing60} ${SPACING.spacing40} ${SPACING.spacing60}`}
-          gridGap={SPACING.spacing4}
+          gridGap={SPACING.spacing24}
           width="100%"
         >
-          {enableAirGapDisplayItems.map(displayItem => (
-            <RadioButton
-              key={displayItem.description}
-              isSelected={airGapEnabled === displayItem.option}
-              onChange={displayItem.onClick}
-              buttonValue={displayItem.description}
-              buttonLabel={displayItem.description}
-              radioButtonType="large"
-            />
-          ))}
+          <StyledText oddStyle="level4HeaderRegular">
+            {kind === 'aspirate'
+              ? t('air_gap_description_aspirate')
+              : t('air_gap_description_dispense')}
+          </StyledText>
+          <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing8}>
+            {enableAirGapDisplayItems.map(displayItem => (
+              <RadioButton
+                key={displayItem.description}
+                isSelected={airGapEnabled === displayItem.option}
+                onChange={displayItem.onClick}
+                buttonValue={displayItem.description}
+                buttonLabel={displayItem.description}
+                radioButtonType="large"
+              />
+            ))}
+          </Flex>
         </Flex>
       ) : null}
       {currentStep === 2 ? (

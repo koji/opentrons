@@ -4,30 +4,33 @@ import styled, { css } from 'styled-components'
 import {
   BORDERS,
   COLORS,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
-import { getModuleDisplayName } from '@opentrons/shared-data'
+import {
+  ABSORBANCE_READER_TYPE,
+  getModuleDisplayName,
+} from '@opentrons/shared-data'
 
-import { formatLastCalibrated } from './utils'
 import { ModuleCalibrationOverflowMenu } from './ModuleCalibrationOverflowMenu'
+import { formatLastCalibrated } from './utils'
 
 import type { AttachedModule } from '@opentrons/api-client'
 import type { FormattedPipetteOffsetCalibration } from '..'
 
 interface ModuleCalibrationItemsProps {
   attachedModules: AttachedModule[]
-  updateRobotStatus: (isRobotBusy: boolean) => void
   formattedPipetteOffsetCalibrations: FormattedPipetteOffsetCalibration[]
   robotName: string
+  isRobotBusy: boolean
 }
 
 export function ModuleCalibrationItems({
   attachedModules,
-  updateRobotStatus,
   formattedPipetteOffsetCalibrations,
   robotName,
+  isRobotBusy,
 }: ModuleCalibrationItemsProps): JSX.Element {
   const { t } = useTranslation('device_settings')
 
@@ -41,42 +44,51 @@ export function ModuleCalibrationItems({
         </tr>
       </thead>
       <tbody css={BODY_STYLE}>
-        {attachedModules.map(attachedModule => (
-          <StyledTableRow key={attachedModule.id}>
-            <StyledTableCell>
-              <LegacyStyledText as="p">
-                {getModuleDisplayName(attachedModule.moduleModel)}
-              </LegacyStyledText>
-            </StyledTableCell>
-            <StyledTableCell>
-              <LegacyStyledText as="p">
-                {attachedModule.serialNumber}
-              </LegacyStyledText>
-            </StyledTableCell>
-            <StyledTableCell>
-              <LegacyStyledText as="p">
-                {attachedModule.moduleOffset?.last_modified != null
-                  ? formatLastCalibrated(
-                      attachedModule.moduleOffset?.last_modified
-                    )
-                  : t('not_calibrated_short')}
-              </LegacyStyledText>
-            </StyledTableCell>
-            <StyledTableCell>
-              <ModuleCalibrationOverflowMenu
-                isCalibrated={
-                  attachedModule.moduleOffset?.last_modified != null
-                }
-                attachedModule={attachedModule}
-                updateRobotStatus={updateRobotStatus}
-                formattedPipetteOffsetCalibrations={
-                  formattedPipetteOffsetCalibrations
-                }
-                robotName={robotName}
-              />
-            </StyledTableCell>
-          </StyledTableRow>
-        ))}
+        {attachedModules.map(attachedModule => {
+          const noCalibrationCopy =
+            attachedModule.moduleType === ABSORBANCE_READER_TYPE
+              ? t('no_calibration_required')
+              : t('not_calibrated_short')
+
+          return (
+            <StyledTableRow key={attachedModule.id}>
+              <StyledTableCell>
+                <LegacyStyledText forwardedAs="p">
+                  {getModuleDisplayName(attachedModule.moduleModel)}
+                </LegacyStyledText>
+              </StyledTableCell>
+              <StyledTableCell>
+                <LegacyStyledText forwardedAs="p">
+                  {attachedModule.serialNumber}
+                </LegacyStyledText>
+              </StyledTableCell>
+              <StyledTableCell>
+                <LegacyStyledText forwardedAs="p">
+                  {attachedModule.moduleOffset?.last_modified != null
+                    ? formatLastCalibrated(
+                        attachedModule.moduleOffset?.last_modified
+                      )
+                    : noCalibrationCopy}
+                </LegacyStyledText>
+              </StyledTableCell>
+              <StyledTableCell>
+                {attachedModule.moduleType !== ABSORBANCE_READER_TYPE ? (
+                  <ModuleCalibrationOverflowMenu
+                    isCalibrated={
+                      attachedModule.moduleOffset?.last_modified != null
+                    }
+                    attachedModule={attachedModule}
+                    formattedPipetteOffsetCalibrations={
+                      formattedPipetteOffsetCalibrations
+                    }
+                    robotName={robotName}
+                    isRobotBusy={isRobotBusy}
+                  />
+                ) : null}
+              </StyledTableCell>
+            </StyledTableRow>
+          )
+        })}
       </tbody>
     </StyledTable>
   )

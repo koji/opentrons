@@ -1,26 +1,29 @@
-import { describe, it, beforeEach, afterEach, expect, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import {
+  fixtureP10SingleV2Specs,
+  fixtureP300SingleV2Specs,
+} from '@opentrons/shared-data'
 import {
   fixture_tiprack_10_ul,
   fixture_tiprack_300_ul,
 } from '@opentrons/shared-data/labware/fixtures/2'
 import {
-  SOURCE_WELL_BLOWOUT_DESTINATION,
   DEST_WELL_BLOWOUT_DESTINATION,
+  SOURCE_WELL_BLOWOUT_DESTINATION,
 } from '@opentrons/step-generation'
+
 import {
   dependentFieldsUpdateMoveLiquid,
   updatePatchBlowoutFields,
 } from '../dependentFieldsUpdateMoveLiquid'
-import {
-  fixtureP10SingleV2Specs,
-  fixtureP300SingleV2Specs,
-} from '@opentrons/shared-data'
+
 import type { LabwareDefinition2 } from '@opentrons/shared-data'
 import type {
-  PipetteEntities,
   LabwareEntities,
+  PipetteEntities,
 } from '@opentrons/step-generation'
-import type { FormData } from '../../../../form-types'
+import type { FormData } from '/protocol-designer/form-types'
 
 const fixtureTiprack10ul = fixture_tiprack_10_ul as LabwareDefinition2
 const fixtureTiprack300ul = fixture_tiprack_300_ul as LabwareDefinition2
@@ -37,6 +40,7 @@ beforeEach(() => {
       // @ts-expect-error(sa, 2021-6-15): tiprackModel does not exist on PipetteEntity
       tiprackModel: ['tiprack-10ul'],
       tiprackLabwareDef: [fixtureTiprack10ul],
+      pythonName: 'mockPythonName',
     },
     otherPipetteId: {
       name: 'p300_single_gen2',
@@ -44,6 +48,7 @@ beforeEach(() => {
       // @ts-expect-error(sa, 2021-6-15): tiprackModel does not exist on PipetteEntity
       tiprackModel: ['tiprack-300ul'],
       tiprackLabwareDef: [fixtureTiprack300ul],
+      pythonName: 'mockPythonName',
     },
   }
   labwareEntities = {}
@@ -87,6 +92,7 @@ describe('path should update...', () => {
     const patch = {}
     expect(handleFormHelper(patch, { blah: 'blaaah' })).toEqual({
       path: 'single',
+      tips_selected: [],
     })
   })
   describe('if path is multi and volume*2 + air gap volume exceeds pipette/tip capacity', () => {
@@ -182,14 +188,9 @@ describe('path should update...', () => {
                 volume: '1',
               }
             )
-            const pathPatch =
-              path === expectedPath ? {} : { path: expectedPath }
 
-            const volumeChangeExpected = { volume, ...pathPatch }
-            const airGapChangeExpected = {
-              aspirate_airGap_volume,
-              ...pathPatch,
-            }
+            const volumeChangeExpected = { volume }
+            const airGapChangeExpected = { aspirate_airGap_volume }
             expect(airGapChange).toMatchObject(airGapChangeExpected)
             expect(volumeChange).toMatchObject(volumeChangeExpected)
           })
@@ -253,13 +254,16 @@ describe('disposal volume should update...', () => {
       path: 'single',
       disposalVolume_checkbox: false,
       disposalVolume_volume: null,
+      conditioning_volume: null,
+      conditioning_checkbox: false,
+      tips_selected: [],
     })
   })
 
   it('when volume is raised but disposal vol is still in capacity, do not change (noop case)', () => {
     const patch = { volume: '2.5' }
     const result = handleFormHelper(patch, form)
-    expect(result).toEqual(patch)
+    expect(result).toEqual({ ...patch, tips_selected: [] })
   })
 
   it('when the aspirate > air gap volume is large', () => {
@@ -270,7 +274,7 @@ describe('disposal volume should update...', () => {
       aspirate_airGap_volume: '3',
       volume: '1',
     })
-    expect(result).toEqual({ disposalVolume_volume: '5' })
+    expect(result).toEqual({ disposalVolume_volume: '5', tips_selected: [] })
   })
   it('when the aspirate > air gap volume is increased', () => {
     const patch = { aspirate_airGap_volume: '3' }
@@ -284,6 +288,7 @@ describe('disposal volume should update...', () => {
     expect(result).toEqual({
       aspirate_airGap_volume: '3',
       disposalVolume_volume: '5',
+      tips_selected: [],
     })
   })
   it('skipped when the aspirate > air gap checkbox not checked', () => {
@@ -294,7 +299,7 @@ describe('disposal volume should update...', () => {
       aspirate_airGap_volume: '3',
       volume: '1',
     })
-    expect(result).toEqual({ disposalVolume_volume: '6' })
+    expect(result).toEqual({ disposalVolume_volume: '6', tips_selected: [] })
   })
 
   describe('when volume is raised so that disposal vol must be exactly zero, clear/zero disposal volume fields', () => {
@@ -313,6 +318,8 @@ describe('disposal volume should update...', () => {
         dispense_mix_checkbox: false,
         dispense_mix_times: null,
         dispense_mix_volume: null,
+        blowout_checkbox: false,
+        tips_selected: [],
       })
     })
 
@@ -322,6 +329,7 @@ describe('disposal volume should update...', () => {
       expect(result).toEqual({
         ...patch,
         disposalVolume_volume: '0',
+        tips_selected: [],
       })
     })
   })
@@ -331,17 +339,18 @@ describe('disposal volume should update...', () => {
     expect(result).toEqual({
       volume: '4.6',
       disposalVolume_volume: '0.8',
+      tips_selected: [],
     })
   })
 
   it('clamp excessive disposal volume to max', () => {
     const result = handleFormHelper({ disposalVolume_volume: '9999' }, form)
-    expect(result).toEqual({ disposalVolume_volume: '6' })
+    expect(result).toEqual({ disposalVolume_volume: '6', tips_selected: [] })
   })
 
   it('when disposal volume is a negative number, set to zero', () => {
     const result = handleFormHelper({ disposalVolume_volume: '-2' }, form)
-    expect(result).toEqual({ disposalVolume_volume: '0' })
+    expect(result).toEqual({ disposalVolume_volume: '0', tips_selected: [] })
   })
 
   describe('mix fields should clear...', () => {
@@ -364,6 +373,8 @@ describe('disposal volume should update...', () => {
         aspirate_mix_checkbox: false,
         aspirate_mix_times: null,
         aspirate_mix_volume: null,
+        preWetTip: false,
+        tips_selected: [],
       })
     })
   })
@@ -387,7 +398,7 @@ describe('disposal volume should update...', () => {
     ]
 
     testCases.forEach(({ prevPath, nextPath, incompatible }) => {
-      const patch = { path: nextPath }
+      const patch = { path: nextPath, tips_selected: [] }
       it(`when changing path ${prevPath} → ${nextPath}, arbitrary labware still allowed`, () => {
         // @ts-expect-error(sa, 2021-6-15): missing id and stepType to be valid formData type
         const result = updatePatchBlowoutFields(patch, {
@@ -687,5 +698,16 @@ describe('air gap > dispense volume', () => {
       const result = handleFormHelper(update, form)
       expect(result).toMatchObject(expected)
     })
+  })
+})
+
+describe('change tip', () => {
+  it('should update the tips_selected field when the changeTip field is changed', () => {
+    const form = {
+      changeTip: 'always',
+      tips_selected: [['A1']],
+    }
+    const result = handleFormHelper({ changeTip: 'once' }, form)
+    expect(result.tips_selected).toEqual([])
   })
 })

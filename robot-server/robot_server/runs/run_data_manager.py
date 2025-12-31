@@ -1,21 +1,23 @@
 """Manage current and historical run data."""
+
 from datetime import datetime
-from typing import List, Optional, Callable, Union, Dict
+from typing import Dict, List, Optional, Callable, Union, Mapping, Sequence
 
 from opentrons_shared_data.labware.labware_definition import LabwareDefinition
 from opentrons_shared_data.errors.exceptions import InvalidStoredData, EnumeratedError
+from opentrons_shared_data.data_files import RunFileNameMetadata
 
-from opentrons.hardware_control.nozzle_manager import NozzleMap
-
+from opentrons import config
+from opentrons.types import NozzleMapInterface
 from opentrons.protocol_engine import (
     EngineStatus,
     LabwareOffsetCreate,
+    LegacyLabwareOffsetCreate,
     StateSummary,
     CommandSlice,
     CommandErrorSlice,
     CommandPointer,
     Command,
-    ErrorOccurrence,
 )
 from opentrons.protocol_engine.types import (
     PrimitiveRunTimeParamValuesType,
@@ -23,6 +25,7 @@ from opentrons.protocol_engine.types import (
 )
 
 from robot_server.error_recovery.settings.store import ErrorRecoverySettingStore
+from robot_server.camera.settings.store import CameraSettingStore
 from robot_server.protocols.protocol_store import ProtocolResource
 from robot_server.service.task_runner import TaskRunner
 from robot_server.service.notifications import RunsPublisher
@@ -35,7 +38,9 @@ from .run_models import Run, BadRun, RunDataError
 
 from opentrons.protocol_engine.types import DeckConfigurationType, RunTimeParameter
 from opentrons.protocol_engine.resources.file_provider import FileProvider
-
+from opentrons.protocol_engine.resources.camera_provider import CameraProvider
+from opentrons.protocol_engine.state.module_substates import FlexStackerSubState
+from opentrons.system import camera
 
 _INITIAL_ERROR_RECOVERY_RULES: list[ErrorRecoveryRule] = []
 
@@ -50,7 +55,7 @@ def _build_run(
     # such that this default summary object is not needed
 
     if run_resource.ok and isinstance(state_summary, StateSummary):
-        return Run.construct(
+        return Run.model_construct(
             id=run_resource.run_id,
             protocolId=run_resource.protocol_id,
             createdAt=run_resource.created_at,
@@ -66,13 +71,15 @@ def _build_run(
             completedAt=state_summary.completedAt,
             startedAt=state_summary.startedAt,
             liquids=state_summary.liquids,
+            liquidClasses=state_summary.liquidClasses,
             outputFileIds=state_summary.files,
             runTimeParameters=run_time_parameters,
+            cameraSettings=state_summary.cameraSettings,
         )
 
     errors: List[EnumeratedError] = []
     if isinstance(state_summary, BadStateSummary):
-        state = StateSummary.construct(
+        state = StateSummary.model_construct(
             status=EngineStatus.STOPPED,
             errors=[],
             labware=[],
@@ -80,6 +87,7 @@ def _build_run(
             pipettes=[],
             modules=[],
             liquids=[],
+            liquidClasses=[],
             wells=[],
             files=[],
             hasEverEnteredErrorRecovery=False,
@@ -108,7 +116,7 @@ def _build_run(
             AssertionError("Logic error in parsing invalid run.")
         )
 
-    return BadRun.construct(
+    return BadRun.model_construct(
         dataError=run_loading_error,
         id=run_resource.run_id,
         protocolId=run_resource.protocol_id,
@@ -124,6 +132,7 @@ def _build_run(
         completedAt=state.completedAt,
         startedAt=state.startedAt,
         liquids=state.liquids,
+        liquidClasses=state.liquidClasses,
         runTimeParameters=run_time_parameters,
         outputFileIds=state.files,
         hasEverEnteredErrorRecovery=state.hasEverEnteredErrorRecovery,
@@ -141,7 +150,7 @@ class PreSerializedCommandsNotAvailableError(LookupError):
 class RunDataManager:
     """Collaborator to manage current and historical run data.
 
-    Provides a facade to both an EngineStore (current run) and a RunStore
+    Provides a facade to both a RunOrchestratorStore (current run) and a RunStore
     (historical runs). Returns `Run` response models to the router.
 
     Args:
@@ -154,14 +163,25 @@ class RunDataManager:
         run_orchestrator_store: RunOrchestratorStore,
         run_store: RunStore,
         error_recovery_setting_store: ErrorRecoverySettingStore,
+        camera_setting_store: CameraSettingStore,
         task_runner: TaskRunner,
         runs_publisher: RunsPublisher,
+        file_provider: FileProvider,
     ) -> None:
         self._run_orchestrator_store = run_orchestrator_store
         self._run_store = run_store
+
         self._error_recovery_setting_store = error_recovery_setting_store
+        self._camera_setting_store = camera_setting_store
+        # todo(mm, 2024-11-22): Storing the list of error recovery rules is outside the
+        # responsibilities of this class. It's also clunky for us to store it like this
+        # because we need to remember to clear it whenever the current run changes.
+        # This error recovery mapping stuff probably belongs in RunOrchestratorStore.
+        self._current_run_error_recovery_rules: List[ErrorRecoveryRule] = []
+
         self._task_runner = task_runner
         self._runs_publisher = runs_publisher
+        self._file_provider = file_provider
 
     @property
     def current_run_id(self) -> Optional[str]:
@@ -172,9 +192,9 @@ class RunDataManager:
         self,
         run_id: str,
         created_at: datetime,
-        labware_offsets: List[LabwareOffsetCreate],
+        labware_offsets: Sequence[LabwareOffsetCreate | LegacyLabwareOffsetCreate],
         deck_configuration: DeckConfigurationType,
-        file_provider: FileProvider,
+        camera_provider: CameraProvider,
         run_time_param_values: Optional[PrimitiveRunTimeParamValuesType],
         run_time_param_paths: Optional[CSVRuntimeParamPaths],
         notify_publishers: Callable[[], None],
@@ -187,6 +207,7 @@ class RunDataManager:
             created_at: Creation datetime.
             labware_offsets: Labware offsets to initialize the engine with.
             deck_configuration: A mapping of fixtures to cutout fixtures the deck will be loaded with.
+            camera_provider: Utility for accessing image capture and camera settings.
             notify_publishers: Utilized by the engine to notify publishers of state changes.
             run_time_param_values: Any runtime parameter values to set.
             run_time_param_paths: Any runtime filepath to set.
@@ -211,9 +232,26 @@ class RunDataManager:
             )
 
         error_recovery_is_enabled = self._error_recovery_setting_store.get_is_enabled()
+        self._current_run_error_recovery_rules = _INITIAL_ERROR_RECOVERY_RULES
         initial_error_recovery_policy = (
             error_recovery_mapping.create_error_recovery_policy_from_rules(
-                _INITIAL_ERROR_RECOVERY_RULES, error_recovery_is_enabled
+                self._current_run_error_recovery_rules, error_recovery_is_enabled
+            )
+        )
+
+        protocol_name = (
+            protocol.source.metadata.get(
+                "protocolName", protocol.source.files[0].path.name
+            )
+            if protocol is not None
+            else None
+        )
+        self._file_provider.set_run_metadata(
+            RunFileNameMetadata(
+                robot_name=config.name(),
+                run_id=run_id,
+                run_created_at=created_at,
+                protocol_name=protocol_name,
             )
         )
 
@@ -222,7 +260,8 @@ class RunDataManager:
             labware_offsets=labware_offsets,
             initial_error_recovery_policy=initial_error_recovery_policy,
             deck_configuration=deck_configuration,
-            file_provider=file_provider,
+            file_provider=self._file_provider,
+            camera_provider=camera_provider,
             protocol=protocol,
             run_time_param_values=run_time_param_values,
             run_time_param_paths=run_time_param_paths,
@@ -243,6 +282,16 @@ class RunDataManager:
             get_recovery_target_command=self.get_recovery_target_command,
             get_state_summary=self._get_good_state_summary,
             run_id=run_id,
+        )
+
+        await camera.update_live_stream_status(
+            self._run_orchestrator_store._robot_type,
+            True,
+            camera_provider,
+            state_summary.cameraSettings,
+        )
+        self._run_orchestrator_store.add_camera_capture_image_settings(
+            capture_image_settings=self._camera_setting_store.get_camera_capture_image_settings()
         )
 
         return _build_run(
@@ -365,20 +414,19 @@ class RunDataManager:
         next_current = current if current is False else True
 
         if next_current is False:
-            (
-                commands,
-                state_summary,
-                parameters,
-            ) = await self._run_orchestrator_store.clear()
-            run_resource: Union[
-                RunResource, BadRunResource
-            ] = self._run_store.update_run_state(
-                run_id=run_id,
-                summary=state_summary,
-                commands=commands,
-                run_time_parameters=parameters,
+            run_result = await self._run_orchestrator_store.clear()
+            state_summary = run_result.state_summary
+            parameters = run_result.parameters
+            run_resource: Union[RunResource, BadRunResource] = (
+                self._run_store.update_run_state(
+                    run_id=run_id,
+                    summary=run_result.state_summary,
+                    commands=run_result.commands,
+                    run_time_parameters=run_result.parameters,
+                )
             )
             self._runs_publisher.publish_pre_serialized_commands_notification(run_id)
+            self._file_provider.clear_run_metadata()
         else:
             state_summary = self._run_orchestrator_store.get_state_summary()
             parameters = self._run_orchestrator_store.get_run_time_parameters()
@@ -426,7 +474,7 @@ class RunDataManager:
     def get_command_error_slice(
         self, run_id: str, cursor: int, length: int
     ) -> CommandErrorSlice:
-        """Get a slice of run commands.
+        """Get a slice of run commands errors.
 
         Args:
             run_id: ID of the run.
@@ -440,9 +488,9 @@ class RunDataManager:
             return self._run_orchestrator_store.get_command_error_slice(
                 cursor=cursor, length=length
             )
-
-        # TODO(tz, 8-5-2024): Change this to return to error list from the DB when we implement https://opentrons.atlassian.net/browse/EXEC-655.
-        raise RunNotCurrentError()
+        return self._run_store.get_commands_errors_slice(
+            run_id=run_id, cursor=cursor, length=length
+        )
 
     def get_current_command(self, run_id: str) -> Optional[CommandPointer]:
         """Get the "current" command, if any.
@@ -501,18 +549,32 @@ class RunDataManager:
 
         return self._run_store.get_command(run_id=run_id, command_id=command_id)
 
-    def get_command_errors(self, run_id: str) -> list[ErrorOccurrence]:
+    def get_command_errors_count(self, run_id: str) -> int:
         """Get all command errors."""
         if run_id == self._run_orchestrator_store.current_run_id:
-            return self._run_orchestrator_store.get_command_errors()
+            return len(self._run_orchestrator_store.get_command_errors())
+        return self._run_store.get_command_errors_count(run_id)
 
-        # TODO(tz, 8-5-2024): Change this to return the error list from the DB when we implement https://opentrons.atlassian.net/browse/EXEC-655.
-        raise RunNotCurrentError()
-
-    def get_nozzle_maps(self, run_id: str) -> Dict[str, NozzleMap]:
+    def get_nozzle_maps(self, run_id: str) -> Mapping[str, NozzleMapInterface]:
         """Get current nozzle maps keyed by pipette id."""
         if run_id == self._run_orchestrator_store.current_run_id:
             return self._run_orchestrator_store.get_nozzle_maps()
+
+        raise RunNotCurrentError()
+
+    def get_tip_attached(self, run_id: str) -> Dict[str, bool]:
+        """Get current tip attached states, keyed by pipette id."""
+        if run_id == self._run_orchestrator_store.current_run_id:
+            return self._run_orchestrator_store.get_tip_attached()
+
+        raise RunNotCurrentError()
+
+    def get_flex_stacker_substate(
+        self, run_id: str
+    ) -> Mapping[str, FlexStackerSubState]:
+        """Get current Flex Stacker Substates by module id."""
+        if run_id == self._run_orchestrator_store.current_run_id:
+            return self._run_orchestrator_store.get_flex_stacker_substate()
 
         raise RunNotCurrentError()
 
@@ -534,7 +596,7 @@ class RunDataManager:
     def set_error_recovery_rules(
         self, run_id: str, rules: List[ErrorRecoveryRule]
     ) -> None:
-        """Set the run's error recovery policy.
+        """Set the run's error recovery policy, in robot-server terms.
 
         The input rules get combined with the global error recovery enabled/disabled
         setting, which this method retrieves automatically.
@@ -544,10 +606,19 @@ class RunDataManager:
                 f"Cannot update {run_id} because it is not the current run."
             )
         is_enabled = self._error_recovery_setting_store.get_is_enabled()
+        self._current_run_error_recovery_rules = rules
         mapped_policy = error_recovery_mapping.create_error_recovery_policy_from_rules(
-            rules, is_enabled
+            self._current_run_error_recovery_rules, is_enabled
         )
         self._run_orchestrator_store.set_error_recovery_policy(policy=mapped_policy)
+
+    def get_error_recovery_rules(self, run_id: str) -> List[ErrorRecoveryRule]:
+        """Get the run's error recovery policy."""
+        if run_id != self._run_orchestrator_store.current_run_id:
+            raise RunNotCurrentError(
+                f"Cannot get the error recovery policy of {run_id} because it is not the current run."
+            )
+        return self._current_run_error_recovery_rules
 
     def _get_state_summary(self, run_id: str) -> Union[StateSummary, BadStateSummary]:
         if run_id == self._run_orchestrator_store.current_run_id:

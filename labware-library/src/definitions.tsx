@@ -3,14 +3,15 @@
 import { useLocation } from 'react-router-dom'
 import groupBy from 'lodash/groupBy'
 import uniq from 'lodash/uniq'
+
 import {
-  LABWAREV2_DO_NOT_LIST,
   getAllDefinitions as _getAllDefinitions,
+  LABWAREV2_DO_NOT_LIST,
 } from '@opentrons/shared-data'
 
 import type * as React from 'react'
 import type { LabwareDefinition2 } from '@opentrons/shared-data'
-import type { LabwareList, LabwareDefinition } from './types'
+import type { LabwareDefinition, LabwareList } from './types'
 
 const getOnlyLatestDefs = (labwareList: LabwareList): LabwareList => {
   // group by namespace + loadName
@@ -56,11 +57,7 @@ let definitions: LabwareList | null = null
 
 export function getAllDefinitions(): LabwareList {
   if (!definitions) {
-    const allDefs = _getAllDefs().filter(
-      (d: LabwareDefinition2) =>
-        // eslint-disable-next-line @typescript-eslint/prefer-includes
-        LABWAREV2_DO_NOT_LIST.indexOf(d.parameters.loadName) === -1
-    )
+    const allDefs = Object.values(_getAllDefinitions(LABWAREV2_DO_NOT_LIST))
     definitions = getOnlyLatestDefs(allDefs)
   }
 
@@ -91,16 +88,4 @@ export const DefinitionRoute: React.FC<DefinitionRouteProps> = ({ render }) => {
   // TODO: handle 404 if loadName exists but definition isn't found
 
   return <>{render({ definition })}</>
-}
-
-export const NEW_LABWARE_DEFS = [
-  'thermoscientificnunc_96_wellplate_1300ul',
-  'thermoscientificnunc_96_wellplate_2000ul',
-  'appliedbiosystemsmicroamp_384_wellplate_40ul',
-  'biorad_384_wellplate_50ul',
-]
-
-export function isNewLabware(definition: LabwareDefinition): boolean {
-  const { loadName } = definition.parameters
-  return NEW_LABWARE_DEFS.includes(loadName)
 }

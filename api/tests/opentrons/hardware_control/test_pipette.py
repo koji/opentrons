@@ -5,7 +5,7 @@ from pathlib import Path
 from opentrons_shared_data.errors.exceptions import InvalidLiquidClassName
 from opentrons.calibration_storage import types as cal_types
 from opentrons.types import Point, Mount
-from pytest_lazyfixture import lazy_fixture  # type: ignore[import-untyped]
+from pytest_lazy_fixtures import lf as lazy_fixture
 from opentrons.hardware_control.instruments.ot2 import (
     pipette as ot2_pipette,
     instrument_calibration,
@@ -73,7 +73,10 @@ def hardware_pipette_ot3() -> Callable[
     ) -> ot3_pipette.Pipette:
         return ot3_pipette.Pipette(
             load_pipette_data.load_definition(
-                model.pipette_type, model.pipette_channels, model.pipette_version
+                model.pipette_type,
+                model.pipette_channels,
+                model.pipette_version,
+                model.oem_type,
             ),
             calibration,
             id,
@@ -248,7 +251,7 @@ def test_volume_tracking(
 def test_config_update(
     hardware_pipette_ot2: Callable[
         [Union[str, pipette_definition.PipetteModelVersionType]], ot2_pipette.Pipette
-    ]
+    ],
 ) -> None:
     hw_pipette = hardware_pipette_ot2("p10_single_v1")
     sample_plunger_pos = {"top": 19.5}
@@ -393,7 +396,7 @@ def test_reset_instrument_offset(
 def test_save_instrument_offset_ot2(
     hardware_pipette_ot2: Callable[
         [Union[str, pipette_definition.PipetteModelVersionType]], ot2_pipette.Pipette
-    ]
+    ],
 ) -> None:
     # TODO (lc 10-31-2022) These tests would be much cleaner/easier to mock with
     # an InstrumentCalibrationProvider class (like robot calibration provider)
@@ -410,7 +413,7 @@ def test_save_instrument_offset_ot2(
 def test_save_instrument_offset_ot3(
     hardware_pipette_ot3: Callable[
         [Union[str, pipette_definition.PipetteModelVersionType]], ot3_pipette.Pipette
-    ]
+    ],
 ) -> None:
     # TODO (lc 10-31-2022) These tests would be much cleaner/easier to mock with
     # an InstrumentCalibrationProvider class (like robot calibration provider)
@@ -421,9 +424,10 @@ def test_save_instrument_offset_ot3(
     )
 
     assert hw_pipette.pipette_offset.offset == Point(0, 0, 0)
-    with patch(
-        f"{path_to_calibrations}.save_pipette_offset_calibration"
-    ) as save_cal, patch(f"{path_to_calibrations}.load_pipette_offset") as load_cal:
+    with (
+        patch(f"{path_to_calibrations}.save_pipette_offset_calibration") as save_cal,
+        patch(f"{path_to_calibrations}.load_pipette_offset") as load_cal,
+    ):
         hw_pipette.save_pipette_offset(types.OT3Mount.LEFT, Point(1.0, 2.0, 3.0))
 
         save_cal.assert_called_once_with(
@@ -458,7 +462,7 @@ def test_reload_instrument_cal_ot3(
 def test_tip_type_changing(
     hardware_pipette_ot3: Callable[
         [Union[str, pipette_definition.PipetteModelVersionType]], ot3_pipette.Pipette
-    ]
+    ],
 ) -> None:
     pip = hardware_pipette_ot3(
         pipette_load_name.convert_pipette_model(PipetteModel("p1000_single_v3.3"))
@@ -480,7 +484,7 @@ def test_tip_type_changing(
 def test_liquid_class_changing(
     hardware_pipette_ot3: Callable[
         [Union[str, pipette_definition.PipetteModelVersionType]], ot3_pipette.Pipette
-    ]
+    ],
 ) -> None:
     pip = hardware_pipette_ot3(
         pipette_load_name.convert_pipette_model(PipetteModel("p50_multi_v3.3"))

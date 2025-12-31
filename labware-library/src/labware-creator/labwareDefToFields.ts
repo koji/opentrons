@@ -1,13 +1,25 @@
 import { getUniqueWellProperties } from '@opentrons/shared-data'
+
 import type {
-  Coordinates,
   LabwareDefinition2,
   LabwareWellGroup,
+  Vector3D,
 } from '@opentrons/shared-data'
-import type { LabwareFields, BooleanString } from './fields'
+import type { BooleanString, LabwareFields } from './fields'
 
 // NOTE: this is just String() with some typing for flow
 const boolToBoolString = (b: boolean): BooleanString => (b ? 'true' : 'false')
+
+export function getStackedLabwareZDimension(
+  def: LabwareDefinition2
+): number | null {
+  const zOffset = def.stackingOffsetWithLabware?.[def.parameters.loadName]?.z
+  if (zOffset) {
+    return def.dimensions.zDimension * 2 - zOffset
+  } else {
+    return null
+  }
+}
 
 export function labwareDefToFields(
   def: LabwareDefinition2,
@@ -31,7 +43,7 @@ export function labwareDefToFields(
     metadata,
     totalLiquidVolume,
     xOffsetFromLeft,
-    yOffsetFromTop,
+    yOffsetFromBack,
   } = allUniqueWellGroupProps[0]
 
   const homogeneousWells =
@@ -83,25 +95,27 @@ export function labwareDefToFields(
   const firstGroup: LabwareWellGroup | undefined = def.groups[0]
   const firstGroupBrand = firstGroup?.brand
   const zDimension = def.dimensions.zDimension
+  const stackedLabwareZDimension = getStackedLabwareZDimension(def)
   const compatibleAdapters: Record<string, number> =
     def.stackingOffsetWithLabware != null
       ? Object.entries(
-          def.stackingOffsetWithLabware as Record<string, Coordinates>
+          def.stackingOffsetWithLabware as Record<string, Vector3D>
         ).reduce<Record<string, number>>((acc, [loadName, offset]) => {
           const adapterZDimension = Object.values(adapterDefinitions).find(
             def => def.parameters.loadName === loadName
           )?.dimensions.zDimension
+
           if (adapterZDimension != null) {
             acc[loadName] = adapterZDimension + zDimension - offset.z
           }
-
           return acc
         }, {})
       : {}
+
   const compatibleModules: Record<string, number> =
     def.stackingOffsetWithModule != null
       ? Object.entries(
-          def.stackingOffsetWithModule as Record<string, Coordinates>
+          def.stackingOffsetWithModule as Record<string, Vector3D>
         ).reduce<Record<string, number>>((acc, [moduleModel, offset]) => {
           acc[moduleModel] = zDimension - offset.z
           return acc
@@ -129,7 +143,11 @@ export function labwareDefToFields(
     gridSpacingY: ySpacing == null || ySpacing === 0 ? null : String(ySpacing),
 
     gridOffsetX: String(xOffsetFromLeft),
-    gridOffsetY: String(yOffsetFromTop),
+    gridOffsetY: String(yOffsetFromBack),
+
+    hasLpcQuirk: boolToBoolString(
+      !!def.parameters?.quirks?.includes('noLabwarePositionCheck')
+    ),
 
     homogeneousWells: boolToBoolString(homogeneousWells),
     regularRowSpacing: boolToBoolString(regularRowSpacing),
@@ -153,11 +171,11 @@ export function labwareDefToFields(
     brandId: def.brand.brandId != null ? def.brand.brandId.join(',') : null, // comma-separated values
     groupBrand: firstGroupBrand?.brand,
     groupBrandId: firstGroupBrand?.brandId?.join(',') ?? undefined,
-
     // NOTE: intentionally null these fields, do not import them
     loadName: null,
     displayName: null,
     compatibleAdapters,
     compatibleModules,
+    stackedLabwareZDimension,
   }
 }

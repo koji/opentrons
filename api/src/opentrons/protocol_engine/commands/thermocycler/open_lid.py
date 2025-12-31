@@ -1,4 +1,5 @@
 """Command models to open a Thermocycler's lid."""
+
 from __future__ import annotations
 from typing import Optional, TYPE_CHECKING
 from typing_extensions import Literal, Type
@@ -73,7 +74,7 @@ class OpenLid(BaseCommand[OpenLidParams, OpenLidResult, ErrorOccurrence]):
 
     commandType: OpenLidCommandType = "thermocycler/openLid"
     params: OpenLidParams
-    result: Optional[OpenLidResult]
+    result: Optional[OpenLidResult] = None
 
     _ImplementationCls: Type[OpenLidImpl] = OpenLidImpl
 

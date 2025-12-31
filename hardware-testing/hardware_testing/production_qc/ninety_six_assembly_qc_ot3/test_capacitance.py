@@ -1,6 +1,6 @@
 """Test Capacitance."""
 from asyncio import sleep
-from typing import List, Union, Tuple, Optional, cast
+from typing import List, Union, Tuple, Optional, cast, Literal
 
 from opentrons_hardware.hardware_control.tool_sensors import capacitive_probe
 from opentrons_hardware.firmware_bindings.constants import NodeId, SensorId
@@ -45,6 +45,8 @@ THRESHOLDS = {
     ),
 }
 
+PROBE_POSITIONS = [InstrumentProbeType.PRIMARY, InstrumentProbeType.SECONDARY]
+
 
 def _get_test_tag(probe: InstrumentProbeType, reading: str) -> str:
     return f"{probe.name.lower()}-{reading}"
@@ -53,7 +55,7 @@ def _get_test_tag(probe: InstrumentProbeType, reading: str) -> str:
 def build_csv_lines() -> List[Union[CSVLine, CSVLineRepeating]]:
     """Build CSV Lines."""
     lines: List[Union[CSVLine, CSVLineRepeating]] = list()
-    for p in InstrumentProbeType:
+    for p in PROBE_POSITIONS:
         for r in PROBE_READINGS:
             lines.append(CSVLine(_get_test_tag(p, r), [float, CSVResult]))
             if "mm" in r:
@@ -104,7 +106,9 @@ def _get_hover_and_probe_pos(
     return hover_pos + probe_offset, probe_pos + probe_offset
 
 
-async def run(api: OT3API, report: CSVReport, section: str) -> None:
+async def run(
+    api: OT3API, report: CSVReport, section: str, pipette: Literal[200, 1000]
+) -> None:
     """Run."""
     z_ax = Axis.Z_L
     p_ax = Axis.P_L
@@ -116,7 +120,7 @@ async def run(api: OT3API, report: CSVReport, section: str) -> None:
     if not api.is_simulator:
         ui.get_user_ready("REMOVE everything from the deck")
 
-    for probe in InstrumentProbeType:
+    for probe in PROBE_POSITIONS:
         # store the thresolds (for reference)
         for k in THRESHOLDS.keys():
             report(section, _get_test_tag(probe, f"{k}-min"), [THRESHOLDS[k][0]])

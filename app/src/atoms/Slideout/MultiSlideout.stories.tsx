@@ -1,13 +1,10 @@
 import * as React from 'react'
-import {
-  COLORS,
-  PrimaryBtn,
-  LegacyStyledText,
-  TYPOGRAPHY,
-} from '@opentrons/components'
+
+import { PrimaryButton, StyledText } from '@opentrons/components'
+
 import { MultiSlideout } from './MultiSlideout'
 
-import type { Story, Meta } from '@storybook/react'
+import type { Meta, Story } from '@storybook/react'
 
 export default {
   title: 'App/Atoms/MultiSlideout',
@@ -24,20 +21,15 @@ const Template: Story<React.ComponentProps<typeof MultiSlideout>> = args => {
 
   const children = (
     <>
-      <LegacyStyledText as="p">
+      <StyledText as="p">
         {firstPage ? 'first page body' : 'second page body'}
-      </LegacyStyledText>
+      </StyledText>
 
-      <PrimaryBtn
-        marginTop="28rem"
-        onClick={togglePage}
-        backgroundColor={COLORS.blue50}
-        textTransform={TYPOGRAPHY.textTransformNone}
-      >
-        <LegacyStyledText as="p">
+      <PrimaryButton marginTop="28rem" onClick={togglePage}>
+        <StyledText as="p">
           {firstPage ? 'Go to Second Page' : 'Go to First Page'}
-        </LegacyStyledText>
-      </PrimaryBtn>
+        </StyledText>
+      </PrimaryButton>
     </>
   )
 

@@ -1,6 +1,7 @@
-import * as React from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+
 import {
   BORDERS,
   COLORS,
@@ -8,24 +9,27 @@ import {
   Flex,
   JUSTIFY_CENTER,
   JUSTIFY_SPACE_BETWEEN,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
 import {
-  SINGLE_MOUNT_PIPETTES,
   NINETY_SIX_CHANNEL,
+  SINGLE_MOUNT_PIPETTES,
 } from '@opentrons/shared-data'
-import { PipetteWizardFlows } from '/app/organisms/PipetteWizardFlows'
-import { GripperWizardFlows } from '/app/organisms/GripperWizardFlows'
+
 import { MediumButton } from '/app/atoms/buttons'
-import { FLOWS } from '/app/organisms/PipetteWizardFlows/constants'
+import { GripperWizardFlows } from '/app/organisms/GripperWizardFlows'
 import { GRIPPER_FLOW_TYPES } from '/app/organisms/GripperWizardFlows/constants'
+import { PipetteWizardFlows } from '/app/organisms/PipetteWizardFlows'
+import { FLOWS } from '/app/organisms/PipetteWizardFlows/constants'
 import { formatTimeWithUtcLabel } from '/app/resources/runs'
 
+import type { ComponentProps, MouseEventHandler } from 'react'
 import type { InstrumentData } from '@opentrons/api-client'
-import type { PipetteMount } from '@opentrons/shared-data'
 import type { StyleProps } from '@opentrons/components'
+import type { PipetteMount } from '@opentrons/shared-data'
+
 interface InstrumentInfoProps {
   // NOTE: instrument will only be null while
   // in the middle of detach wizard which occludes
@@ -36,14 +40,14 @@ export const InstrumentInfo = (props: InstrumentInfoProps): JSX.Element => {
   const { t, i18n } = useTranslation('instruments_dashboard')
   const { instrument } = props
   const navigate = useNavigate()
-  const [wizardProps, setWizardProps] = React.useState<
-    | React.ComponentProps<typeof GripperWizardFlows>
-    | React.ComponentProps<typeof PipetteWizardFlows>
+  const [wizardProps, setWizardProps] = useState<
+    | ComponentProps<typeof GripperWizardFlows>
+    | ComponentProps<typeof PipetteWizardFlows>
     | null
   >(null)
 
   const sharedGripperWizardProps: Pick<
-    React.ComponentProps<typeof GripperWizardFlows>,
+    ComponentProps<typeof GripperWizardFlows>,
     'attachedGripper' | 'closeFlow'
   > = {
     attachedGripper: instrument,
@@ -58,7 +62,7 @@ export const InstrumentInfo = (props: InstrumentInfoProps): JSX.Element => {
     instrument.mount !== 'extension' &&
     instrument.data?.channels === 96
 
-  const handleDetach: React.MouseEventHandler = () => {
+  const handleDetach: MouseEventHandler = () => {
     if (instrument != null && instrument.ok) {
       setWizardProps(
         instrument.mount === 'extension'
@@ -85,7 +89,7 @@ export const InstrumentInfo = (props: InstrumentInfoProps): JSX.Element => {
       )
     }
   }
-  const handleRecalibrate: React.MouseEventHandler = () => {
+  const handleRecalibrate: MouseEventHandler = () => {
     if (instrument != null && instrument.ok) {
       setWizardProps(
         instrument.mount === 'extension'
@@ -192,7 +196,7 @@ function InfoItem(props: InfoItemProps): JSX.Element {
       {...props}
     >
       <LegacyStyledText
-        as="h4"
+        forwardedAs="h4"
         fontWeight={TYPOGRAPHY.fontWeightSemiBold}
         fontSize={TYPOGRAPHY.fontSize28}
         textTransform={TYPOGRAPHY.textTransformCapitalize}
@@ -200,7 +204,7 @@ function InfoItem(props: InfoItemProps): JSX.Element {
         {props.label}
       </LegacyStyledText>
       <LegacyStyledText
-        as="h4"
+        forwardedAs="h4"
         color={COLORS.grey60}
         fontSize={TYPOGRAPHY.fontSize28}
         fontWeight={TYPOGRAPHY.fontWeightRegular}

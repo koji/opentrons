@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 
+import { DropTipWizard } from './DropTipWizard'
 import {
   useDropTipLocations,
   useDropTipRouting,
   useDropTipWithType,
 } from './hooks'
-import { DropTipWizard } from './DropTipWizard'
 
-import type { PipetteModelSpecs, RobotType } from '@opentrons/shared-data'
 import type { PipetteData } from '@opentrons/api-client'
+import type { PipetteModelSpecs, RobotType } from '@opentrons/shared-data'
 import type {
   DropTipModalStyle,
   FixitCommandTypeUtils,
@@ -68,9 +68,11 @@ export function DropTipWizardFlows(
   // after it closes.
   useEffect(() => {
     return () => {
-      dropTipWithTypeUtils.dropTipCommands.handleCleanUpAndClose()
+      if (issuedCommandsType === 'setup') {
+        void dropTipWithTypeUtils.dropTipCommands.handleCleanUpAndClose()
+      }
     }
-  }, [])
+  }, [issuedCommandsType])
 
   return (
     <DropTipWizard

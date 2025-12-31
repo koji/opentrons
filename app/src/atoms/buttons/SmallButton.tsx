@@ -1,5 +1,5 @@
-import type * as React from 'react'
 import { css } from 'styled-components'
+
 import {
   ALIGN_CENTER,
   BORDERS,
@@ -14,7 +14,10 @@ import {
   StyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
+
 import { ODD_FOCUS_VISIBLE } from './constants'
+
+import type { MouseEventHandler, ReactNode } from 'react'
 import type { IconName, StyleProps } from '@opentrons/components'
 
 export type SmallButtonTypes =
@@ -28,9 +31,9 @@ export type ButtonCategory = 'default' | 'rounded'
 
 export type IconPlacement = 'startIcon' | 'endIcon'
 interface SmallButtonProps extends StyleProps {
-  onClick: React.MouseEventHandler
+  onClick: MouseEventHandler
   buttonType?: SmallButtonTypes
-  buttonText: React.ReactNode
+  buttonText: ReactNode
   iconPlacement?: IconPlacement | null
   iconName?: IconName | null
   buttonCategory?: ButtonCategory // if not specified, it will be 'default'

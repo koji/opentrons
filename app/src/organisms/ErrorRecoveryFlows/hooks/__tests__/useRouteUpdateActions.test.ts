@@ -1,11 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import {
-  useRouteUpdateActions,
-  getRecoveryRouteNavigation,
-} from '../useRouteUpdateActions'
 import { INVALID, RECOVERY_MAP } from '../../constants'
+import {
+  getRecoveryRouteNavigation,
+  useRouteUpdateActions,
+} from '../useRouteUpdateActions'
 
 import type { Mock } from 'vitest'
 import type { GetRouteUpdateActionsParams } from '../useRouteUpdateActions'
@@ -140,8 +140,8 @@ describe('useRouteUpdateActions', () => {
       doorStatusUtils: { isDoorOpen: true, isProhibitedDoorOpen: false },
       recoveryMap: {
         route: RECOVERY_MAP.MANUAL_REPLACE_AND_RETRY.ROUTE,
-        step:
-          RECOVERY_MAP.MANUAL_REPLACE_AND_RETRY.STEPS.GRIPPER_RELEASE_LABWARE,
+        step: RECOVERY_MAP.MANUAL_REPLACE_AND_RETRY.STEPS
+          .GRIPPER_RELEASE_LABWARE,
       },
     }
 

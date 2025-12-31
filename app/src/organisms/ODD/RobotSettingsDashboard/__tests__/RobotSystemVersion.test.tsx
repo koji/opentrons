@@ -1,20 +1,23 @@
-import type * as React from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import '@testing-library/jest-dom/vitest'
 
-import { i18n } from '/app/i18n'
 import { renderWithProviders } from '/app/__testing-utils__'
+import { i18n } from '/app/i18n'
+
 import { RobotSystemVersion } from '../RobotSystemVersion'
 import { RobotSystemVersionModal } from '../RobotSystemVersionModal'
+
+import type { ComponentProps } from 'react'
 
 vi.mock('/app/redux/shell')
 vi.mock('../RobotSystemVersionModal')
 
 const mockBack = vi.fn()
 
-const render = (props: React.ComponentProps<typeof RobotSystemVersion>) => {
+const render = (props: ComponentProps<typeof RobotSystemVersion>) => {
   return renderWithProviders(
     <MemoryRouter>
       <RobotSystemVersion {...props} />
@@ -26,7 +29,7 @@ const render = (props: React.ComponentProps<typeof RobotSystemVersion>) => {
 }
 
 describe('RobotSystemVersion', () => {
-  let props: React.ComponentProps<typeof RobotSystemVersion>
+  let props: ComponentProps<typeof RobotSystemVersion>
 
   beforeEach(() => {
     props = {

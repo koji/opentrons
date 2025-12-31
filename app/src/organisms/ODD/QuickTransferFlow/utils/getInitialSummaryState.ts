@@ -4,20 +4,22 @@ import {
   WASTE_CHUTE_FIXTURES,
 } from '@opentrons/shared-data'
 
-import type {
-  LabwareDefinition2,
-  PipetteV2Specs,
-  DeckConfiguration,
-} from '@opentrons/shared-data'
 import type { Mount } from '@opentrons/api-client'
 import type {
+  CutoutConfig,
+  DeckConfiguration,
+  LabwareDefinition2,
+  PipetteV2Specs,
+} from '@opentrons/shared-data'
+import type {
+  BlowOutLocation,
+  ChangeTipOptions,
+  PathOption,
   QuickTransferSummaryState,
   TransferType,
-  PathOption,
-  ChangeTipOptions,
 } from '../types'
 
-interface InitialSummaryStateProps {
+export interface InitialSummaryStateProps {
   state: {
     pipette: PipetteV2Specs
     mount: Mount
@@ -28,6 +30,18 @@ interface InitialSummaryStateProps {
     destinationWells: string[]
     transferType: TransferType
     volume: number
+    path: PathOption
+    liquidClassName: string
+    pushOutDispense?: {
+      volume: number
+    }
+    changeTip: ChangeTipOptions
+    dropTipLocation?: CutoutConfig
+    disposalVolumeDispenseSettings?: {
+      volume: number
+      blowOutLocation: BlowOutLocation
+      flowRate: number
+    }
   }
   deckConfig: DeckConfiguration
 }
@@ -48,28 +62,24 @@ export function getInitialSummaryState(
   // this is the max amount of liquid that can be held in the tip at any time
   const maxTipCapacity = Math.min(maxPipetteVolume, tipVolume)
 
-  let path: PathOption = 'single'
+  let path: PathOption = state.path
   // for multiDispense the volume capacity must be at least 3x the volume per well
   // to account for the 1x volume per well disposal volume default
+  // otherwise, we set the path to single
   if (
     state.transferType === 'distribute' &&
-    maxTipCapacity >= state.volume * 3
+    maxTipCapacity < state.volume * 3 &&
+    state.path === 'multiDispense'
   ) {
-    path = 'multiDispense'
+    path = 'single'
     // for multiAspirate the volume capacity must be at least 2x the volume per well
+    // otherwise, we set the path to single
   } else if (
     state.transferType === 'consolidate' &&
-    maxTipCapacity >= state.volume * 2
+    maxTipCapacity < state.volume * 2 &&
+    state.path === 'multiAspirate'
   ) {
-    path = 'multiAspirate'
-  }
-
-  let changeTip: ChangeTipOptions = 'always'
-  if (
-    state.sourceWells.length * state.pipette.channels > 96 ||
-    state.destinationWells.length * state.pipette.channels > 96
-  ) {
-    changeTip = 'once'
+    path = 'single'
   }
 
   const trashConfigCutout = deckConfig.find(
@@ -92,12 +102,24 @@ export function getInitialSummaryState(
     aspirateFlowRate: flowRatesForSupportedTip.defaultAspirateFlowRate.default,
     dispenseFlowRate: flowRatesForSupportedTip.defaultDispenseFlowRate.default,
     path,
-    disposalVolume: path === 'multiDispense' ? state.volume : undefined,
-    blowOut: path === 'multiDispense' ? trashConfigCutout : undefined,
+    disposalVolumeDispenseSettings:
+      path === 'multiDispense'
+        ? state.disposalVolumeDispenseSettings
+        : undefined,
+    blowOutDispense:
+      path !== 'multiDispense'
+        ? {
+            location: trashConfigCutout,
+            flowRate: flowRatesForSupportedTip.defaultDispenseFlowRate.default,
+          }
+        : undefined,
     tipPositionAspirate: 1,
     preWetTip: false,
     tipPositionDispense: 1,
-    changeTip,
-    dropTipLocation: trashConfigCutout,
+    changeTip: state.changeTip,
+    dropTipLocation: state.dropTipLocation ?? trashConfigCutout,
+    liquidClassName: state.liquidClassName,
+    liquidClassValuesInitialized: false,
+    pushOutDispense: state.pushOutDispense,
   }
 }

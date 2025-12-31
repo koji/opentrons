@@ -24,7 +24,7 @@ USB_VID = 0x0403
 USB_PID = 0x6001
 
 
-addrs = {
+crc_reading = {
     "01": "C40B",
     "02": "C438",
     "03": "C5E9",
@@ -38,11 +38,13 @@ addrs = {
     "0A": "48d9",
 }
 
+crc_device_id = {"01": "45C9", "02": "45FA", "03": "442B", "04": "459C", "05": "444D"}
+
 
 class AsairSensorError(Exception):
     """Asair sensor error."""
 
-    def __init__(self, ret_code: str = None) -> None:
+    def __init__(self, ret_code: str = "") -> None:
         """Constructor."""
         super().__init__(ret_code)
 
@@ -75,7 +77,7 @@ class AsairSensorBase(ABC):
 
 
 def BuildAsairSensor(
-    simulate: bool, autosearch: bool = True, port_substr: str = None
+    simulate: bool, autosearch: bool = True, port_substr: str = ""
 ) -> AsairSensorBase:
     """Try to find and return an Asair sensor, if not found return a simulator."""
     ui.print_title("Connecting to Environmental sensor")
@@ -96,7 +98,7 @@ def BuildAsairSensor(
                     ui.print_info(f"Trying to connect to env sensor on port {port}")
                     sensor = AsairSensor.connect(port)
                     ser_id = sensor.get_serial()
-                    if ser_id == " ":
+                    if len(ser_id) == 8:
                         ui.print_info(f"Found env sensor {ser_id} on port {port}")
                         return sensor
                 except:  # noqa: E722
@@ -154,57 +156,63 @@ class AsairSensor(AsairSensorBase):
             )
             raise SerialException(error_msg)
 
-    def get_reading(self) -> Reading:
+    def get_reading(self, retries: int = 5) -> Reading:
         """Get a reading."""
         data_packet = "{}0300000002{}".format(
-            self._sensor_address, addrs[self._sensor_address]
+            self._sensor_address, crc_reading[self._sensor_address]
         )
         log.debug(f"sending {data_packet}")
         command_bytes = codecs.decode(data_packet.encode(), "hex")
         try:
-            self._th_sensor.flushInput()
-            self._th_sensor.flushOutput()
+            self._th_sensor.flushInput()  # type: ignore[attr-defined]
+            self._th_sensor.flushOutput()  # type: ignore[attr-defined]
+
             self._th_sensor.write(command_bytes)
             time.sleep(0.1)
 
-            length = self._th_sensor.inWaiting()
+            length = self._th_sensor.inWaiting()  # type: ignore[attr-defined]
             res = self._th_sensor.read(length)
-            log.debug(f"received {res}")
+            log.debug(f"received {res!r}")
 
-            res = codecs.encode(res, "hex")
-            relative_hum = res[6:10]
-            temp = res[10:14]
-            log.info(f"Temp: {temp}, RelativeHum: {relative_hum}")
+            res_hex = codecs.encode(res, "hex").decode("ascii")
+            relative_hum_str = res_hex[6:10]
+            temp_str = res_hex[10:14]
+            log.info(f"Temp: {temp_str!r}, RelativeHum: {relative_hum_str!r}")
 
-            temp = float(int(temp, 16)) / 10
-            relative_hum = float(int(relative_hum, 16)) / 10
+            temp = float(int(temp_str, 16)) / 10
+            relative_hum = float(int(relative_hum_str, 16)) / 10
+
             return Reading(temperature=temp, relative_humidity=relative_hum)
 
         except (IndexError, ValueError) as e:
             log.exception("Bad value read")
+            if retries > 0:
+                return self.get_reading(retries=retries - 1)
             raise AsairSensorError(str(e))
         except SerialException:
             log.exception("Communication error")
             error_msg = "Asair Sensor not connected. Check if port number is correct."
+            if retries > 0:
+                return self.get_reading(retries=retries - 1)
             raise AsairSensorError(error_msg)
 
     def get_serial(self) -> str:
         """Read the device ID register."""
-        data_packet = "{}0300000002{}".format(
-            self._sensor_address, addrs[self._sensor_address]
+        data_packet = "{}0300080002{}".format(
+            self._sensor_address, crc_device_id[self._sensor_address]
         )
         log.debug(f"sending {data_packet}")
         command_bytes = codecs.decode(data_packet.encode(), "hex")
         try:
-            self._th_sensor.flushInput()
-            self._th_sensor.flushOutput()
+            self._th_sensor.flushInput()  # type: ignore[attr-defined]
+            self._th_sensor.flushOutput()  # type: ignore[attr-defined]
             self._th_sensor.write(command_bytes)
             time.sleep(0.1)
 
-            length = self._th_sensor.inWaiting()
+            length = self._th_sensor.inWaiting()  # type: ignore[attr-defined]
             res = self._th_sensor.read(length)
             res = codecs.encode(res, "hex")
-            log.debug(f"received {res}")
+            log.debug(f"received {res!r}")
             dev_id = res[6:14]
             return dev_id.decode()
 

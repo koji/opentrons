@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+
 import {
   ALIGN_CENTER,
   BORDERS,
@@ -21,7 +22,10 @@ export function OnOffToggle(props: { isOn: boolean }): JSX.Element {
       padding={`${SPACING.spacing12} ${SPACING.spacing4}`}
       borderRadius={BORDERS.borderRadius16}
     >
-      <LegacyStyledText as="h4" fontWeight={TYPOGRAPHY.fontWeightRegular}>
+      <LegacyStyledText
+        forwardedAs="h4"
+        fontWeight={TYPOGRAPHY.fontWeightRegular}
+      >
         {props.isOn ? t('on') : t('off')}
       </LegacyStyledText>
     </Flex>

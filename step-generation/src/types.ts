@@ -1,46 +1,67 @@
 import type {
-  MAGNETIC_MODULE_TYPE,
-  TEMPERATURE_MODULE_TYPE,
-  THERMOCYCLER_MODULE_TYPE,
-  HEATERSHAKER_MODULE_TYPE,
-  MAGNETIC_BLOCK_TYPE,
   ABSORBANCE_READER_TYPE,
   CreateCommand,
+  FLEX_STACKER_MODULE_TYPE,
+  FlexStackerStoredLabwareGroup,
+  HEATERSHAKER_MODULE_TYPE,
+  Height,
   LabwareDefinition2,
-  ModuleType,
-  ModuleModel,
-  PipetteName,
-  NozzleConfigurationStyle,
   LabwareLocation,
+  LabwareMovementStrategy,
+  MAGNETIC_BLOCK_TYPE,
+  MAGNETIC_MODULE_TYPE,
+  ModuleModel,
+  ModuleType,
   PipetteMount as Mount,
+  NozzleConfigurationStyle,
+  PipetteName,
   PipetteV2Specs,
+  PositionReference,
+  ShakeSpeedParams,
+  StackerStoredLabwareDefinitionURIs,
+  TCExtendedProfileParams,
+  TEMPERATURE_MODULE_TYPE,
+  THERMOCYCLER_MODULE_TYPE,
+  Width,
 } from '@opentrons/shared-data'
 import type {
-  AtomicProfileStep,
-  EngageMagnetParams,
-  ModuleOnlyParams,
-} from '@opentrons/shared-data/protocol/types/schemaV4'
-import type { Command } from '@opentrons/shared-data/protocol/types/schemaV5Addendum'
-import type {
-  TEMPERATURE_DEACTIVATED,
-  TEMPERATURE_AT_TARGET,
+  AUTOMATIC,
+  CLEAN,
+  DIRTY,
+  EMPTY,
+  MANUAL,
   TEMPERATURE_APPROACHING_TARGET,
+  TEMPERATURE_AT_TARGET,
+  TEMPERATURE_DEACTIVATED,
 } from './constants'
-import type { ShakeSpeedParams } from '@opentrons/shared-data/protocol/types/schemaV6/command/module'
-
-export type { Command }
 
 // Copied from PD
 export type DeckSlot = string
 type THERMOCYCLER_STATE = 'thermocyclerState'
 type THERMOCYCLER_PROFILE = 'thermocyclerProfile'
+
+export const TOUCHED_PIPETTABLE_LABWARE: 'TOUCHED_PIPETTABLE_LABWARE' =
+  'TOUCHED_PIPETTABLE_LABWARE'
 export interface LabwareTemporalProperties {
-  slot: DeckSlot
+  // a stack of ids from top to bottom
+  stack: string[]
+  // we currently use this property only to track if a lid has been placed on a "pipettable" labware that could presumably contain liquid
+  // we can expand this type in the future to track other types of sterility for various labware types
+  sterility?: typeof TOUCHED_PIPETTABLE_LABWARE
 }
 
 export interface PipetteTemporalProperties {
   mount: Mount
+  //  entityId is either a labwareId or a trashBin/wasteChute id
+  entityId?: string
+  //  primary nozzle's wellName if over a labware
+  wellName?: string
+  //  pipette's nozzle configuration
   nozzles?: NozzleConfigurationStyle
+  //  current tiprack assosciated with pipette
+  tiprackId?: string
+  //  last primary tip well accessed (used for return tip)
+  tipWell?: string
 }
 
 export interface MagneticModuleState {
@@ -58,11 +79,51 @@ export interface TemperatureModuleState {
   status: TemperatureStatus
   targetTemperature: number | null
 }
+
 export interface ThermocyclerModuleState {
   type: typeof THERMOCYCLER_MODULE_TYPE
-  blockTargetTemp: number | null // null means block is deactivated
-  lidTargetTemp: number | null // null means lid is deactivated
-  lidOpen: boolean | null // if false, closed. If null, unknown
+
+  lidTargetTemp: number | null /** null means lid is deactivated. */
+
+  /** What the thermal block is currently doing. */
+  currentBlockActivity:
+    | ProfileBlockActivity
+    | TargetTempBlockActivity
+    | DeactivatedBlockActivity
+
+  /** If false, closed. If null, unknown. */
+  lidOpen: boolean | null
+
+  /** Useful for generating unique task IDs every time a new profile is started. */
+  numProfilesStarted: number
+}
+
+/**
+ * A profile has been started on this Thermocycler
+ * and not yet awaited, so it's possibly still ongoing.
+ */
+export interface ProfileBlockActivity {
+  type: 'profile'
+  /** The steps of the profile that's currently running. */
+  profileElements: TCExtendedProfileParams['profileElements']
+  /**
+   * The ID of the concurrent task that represents this profile.
+   *
+   * `null` for unknown. Theoretically, the task ID is always knowable,
+   * but sometimes it's only available from a startRunExtendedProfile result,
+   * and step-generation only has access to the startRunExtendedProfile params.
+   */
+  taskId: string | null
+}
+
+/** The thermal block is targeting a constant temperature, outside of a profile. */
+export interface TargetTempBlockActivity {
+  type: 'blockTargetTemp'
+  blockTargetTemp: number
+}
+
+export interface DeactivatedBlockActivity {
+  type: 'blockDeactivated'
 }
 
 export interface HeaterShakerModuleState {
@@ -71,12 +132,29 @@ export interface HeaterShakerModuleState {
   targetSpeed: number | null
   latchOpen: boolean | null
 }
+
 export interface MagneticBlockState {
   type: typeof MAGNETIC_BLOCK_TYPE
 }
 
+export interface Initialization {
+  mode: 'single' | 'multi'
+  wavelengths: number[]
+  referenceWavelength?: number
+}
+
 export interface AbsorbanceReaderState {
   type: typeof ABSORBANCE_READER_TYPE
+  lidOpen: boolean | null
+  initialization: Initialization | null
+}
+
+export interface FlexStackerModuleState {
+  type: typeof FLEX_STACKER_MODULE_TYPE
+  storedLabwareDetails: StackerStoredLabwareDefinitionURIs | null
+  // labware in hopper is the bottom up
+  labwareInHopper: FlexStackerStoredLabwareGroup[] | null
+  labwareOnShuttle: FlexStackerStoredLabwareGroup | null
 }
 
 export type ModuleState =
@@ -86,6 +164,7 @@ export type ModuleState =
   | HeaterShakerModuleState
   | MagneticBlockState
   | AbsorbanceReaderState
+  | FlexStackerModuleState
 export interface ModuleTemporalProperties {
   slot: DeckSlot
   moduleState: ModuleState
@@ -95,7 +174,9 @@ export interface LabwareEntity {
   id: string
   labwareDefURI: string
   def: LabwareDefinition2
+  pythonName: string
 }
+
 export interface LabwareEntities {
   [labwareId: string]: LabwareEntity
 }
@@ -104,6 +185,7 @@ export interface ModuleEntity {
   id: string
   type: ModuleType
   model: ModuleModel
+  pythonName: string
 }
 
 export interface ModuleEntities {
@@ -118,6 +200,24 @@ export interface NormalizedPipetteById {
   }
 }
 
+export interface LiquidEntity {
+  displayName: string
+  displayColor: string
+  description: string | null
+  pythonName: string
+  liquidGroupId: string
+  liquidClass?: string | null
+}
+
+export interface LiquidEntities {
+  [liquidId: string]: LiquidEntity
+}
+
+export type Ingredient = Omit<LiquidEntity, 'pythonName'>
+export interface Ingredients {
+  [liquidId: string]: Ingredient
+}
+
 export type AdditionalEquipmentName =
   | 'gripper'
   | 'wasteChute'
@@ -127,23 +227,71 @@ export interface NormalizedAdditionalEquipmentById {
   [additionalEquipmentId: string]: {
     name: AdditionalEquipmentName
     id: string
-    location?: string
+    location: string
+    //  Note: leaving as optional since gripper and stagingArea
+    //  will never need a pythonName
+    pythonName?: string
   }
 }
 
-export type AdditionalEquipmentEntity = NormalizedAdditionalEquipmentById[keyof NormalizedAdditionalEquipmentById]
+export type AdditionalEquipmentEntity =
+  NormalizedAdditionalEquipmentById[keyof NormalizedAdditionalEquipmentById]
 export interface AdditionalEquipmentEntities {
   [additionalEquipmentId: string]: AdditionalEquipmentEntity
 }
 
-export type NormalizedPipette = NormalizedPipetteById[keyof NormalizedPipetteById]
+interface TrashEntity {
+  id: string
+  location: string
+  pythonName: string
+}
+
+export type WasteChuteEntity = TrashEntity
+export interface WasteChuteEntities {
+  [wasteChuteId: string]: WasteChuteEntity
+}
+
+export type TrashBinEntity = TrashEntity
+export interface TrashBinEntities {
+  [trashBinId: string]: TrashBinEntity
+}
+
+export interface StagingAreaEntity {
+  id: string
+  location: string
+}
+export interface StagingAreaEntities {
+  [stagingAreaId: string]: StagingAreaEntity
+}
+
+export interface GripperEntity {
+  id: string
+}
+export interface GripperEntities {
+  [gripperId: string]: GripperEntity
+}
+
+export type NormalizedPipette =
+  NormalizedPipetteById[keyof NormalizedPipetteById]
 
 // "entities" have only properties that are time-invariant
 // when they are de-normalized, the definitions they reference are baked in
+
+// Use this when you need to refer to a particular TYPE of tip rack (such as
+// the opentrons_flex_96_tiprack_200ul). This is used in e.g. the hydrated step
+// forms, where the user selects a tip rack type rather than a specific tip
+// rack on the deck.
+// This interfaces packages together the tip rack URI and the tip rack labware
+// definition for convenience.
+export interface TipRackWithDef extends LabwareDefinition2 {
+  tiprackDefURI: string
+}
+
 // =========== PIPETTES ========
 export type PipetteEntity = NormalizedPipette & {
   tiprackLabwareDef: LabwareDefinition2[]
   spec: PipetteV2Specs
+  pythonName: string
 }
 
 export interface PipetteEntities {
@@ -158,6 +306,8 @@ export type ChangeTipOptions =
   | 'perDest'
   | 'perSource'
 
+export type PathOption = 'single' | 'multiAspirate' | 'multiDispense'
+
 export interface InnerMixArgs {
   volume: number
   times: number
@@ -165,14 +315,19 @@ export interface InnerMixArgs {
 
 export interface InnerDelayArgs {
   seconds: number
-  mmFromBottom: number
 }
 
 interface CommonArgs {
+  /** NOTE: stepNumber probably shouldn't be optional but making it optional
+   * for the sake of not having to make too many changes for PD 8.5.2
+   * this should be refactored to not be optional for PD 8.6.0
+   * making it optional saves a lot of changes in unit tests
+   */
+  stepNumber?: number
   /** Optional user-readable name for this step */
-  name: string | null | undefined
+  name?: string | null
   /** Optional user-readable description/notes for this step */
-  description: string | null | undefined
+  description?: string | null
 }
 
 // ===== Processed form types. Used as args to call command creator fns =====
@@ -193,7 +348,11 @@ export type SharedTransferLikeArgs = CommonArgs & {
   /** Touch tip after every aspirate */
   touchTipAfterAspirate: boolean
   /** Optional offset for touch tip after aspirate (if null, use PD default) */
-  touchTipAfterAspirateOffsetMmFromBottom: number
+  touchTipAfterAspirateOffsetMmFromTop: number
+  /** Optional offset for touch tip after aspirate (if null, use PD default) */
+  touchTipAfterAspirateMmFromEdge: number | null
+  /** Optional speed for touch tip after aspirate (if null, use PD default) */
+  touchTipAfterAspirateSpeed: number | null
   /** changeTip is interpreted differently by different Step types */
   changeTip: ChangeTipOptions
   /** Delay after every aspirate */
@@ -203,7 +362,7 @@ export type SharedTransferLikeArgs = CommonArgs & {
   /** Flow rate in uL/sec for all aspirates */
   aspirateFlowRateUlSec: number
   /** offset from bottom of well in mm */
-  aspirateOffsetFromBottomMm: number
+  aspirateOffsetFromBottomMm: number // TODO: deprecate this
   /** x offset mm */
   aspirateXOffset: number
   /** y offset mm */
@@ -217,15 +376,59 @@ export type SharedTransferLikeArgs = CommonArgs & {
   /** Touch tip in destination well after dispense */
   touchTipAfterDispense: boolean
   /** Optional offset for touch tip after dispense (if null, use PD default) */
-  touchTipAfterDispenseOffsetMmFromBottom: number
+  touchTipAfterDispenseOffsetMmFromTop: number
+  /** Optional offset for touch tip after aspirate (if null, use PD default) */
+  touchTipAfterDispenseMmFromEdge: number | null
+  /** Optional speed for touch tip after dispense (if null, use PD default) */
+  touchTipAfterDispenseSpeed: number | null
   /** Flow rate in uL/sec for all dispenses */
   dispenseFlowRateUlSec: number
   /** offset from bottom of well in mm */
-  dispenseOffsetFromBottomMm: number
+  dispenseOffsetFromBottomMm: number // TODO: deprecate this
   /** x offset mm */
   dispenseXOffset: number
   /** y offset mm */
   dispenseYOffset: number
+  /** will be non-null once introduced to quick transfer */
+  pushOut: number | null
+
+  /** If given, blow out in the specified destination after dispense at the end of each asp-dispense cycle */
+  blowoutLocation: string | null | undefined
+  blowoutFlowRateUlSec: number
+
+  // ===== SETTINGS INTRODUCED WITH LIQUID CLASSES =====
+  liquidClass: string | null // a liquid class name like "water" or null; "none" is not allowed
+  aspiratePositionReference: PositionReference
+  aspirateZOffset: number
+  aspirateSubmergeSpeed: number | null
+  aspirateSubmergeXOffset: number
+  aspirateSubmergeYOffset: number
+  aspirateSubmergeZOffset: number
+  aspirateSubmergePositionReference: PositionReference
+  aspirateSubmergeDelay: InnerDelayArgs | null
+  aspirateRetractSpeed: number | null
+  aspirateRetractXOffset: number
+  aspirateRetractYOffset: number
+  aspirateRetractZOffset: number
+  aspirateRetractPositionReference: PositionReference
+  aspirateRetractDelay: InnerDelayArgs | null
+  dispensePositionReference: PositionReference
+  dispenseZOffset: number
+  dispenseSubmergeSpeed: number | null
+  dispenseSubmergeXOffset: number
+  dispenseSubmergeYOffset: number
+  dispenseSubmergeZOffset: number
+  dispenseSubmergePositionReference: PositionReference
+  dispenseSubmergeDelay: InnerDelayArgs | null
+  dispenseRetractSpeed: number | null
+  dispenseRetractXOffset: number
+  dispenseRetractYOffset: number
+  dispenseRetractZOffset: number
+  dispenseRetractPositionReference: PositionReference
+  dispenseRetractDelay: InnerDelayArgs | null
+  tipTracking: TipTrackingOption
+  tipsSelected: string[][]
+  tiprackSelected: string | null
 }
 
 export type ConsolidateArgs = SharedTransferLikeArgs & {
@@ -233,11 +436,6 @@ export type ConsolidateArgs = SharedTransferLikeArgs & {
 
   sourceWells: string[]
   destWell: string | null
-
-  /** If given, blow out in the specified destination after dispense at the end of each asp-asp-dispense cycle */
-  blowoutLocation: string | null | undefined
-  blowoutFlowRateUlSec: number
-  blowoutOffsetFromTopMm: number
 
   /** Mix in first well in chunk */
   mixFirstAspirate: InnerMixArgs | null | undefined
@@ -250,11 +448,6 @@ export type TransferArgs = SharedTransferLikeArgs & {
 
   sourceWells: string[]
   destWells: string[] | null
-
-  /** If given, blow out in the specified destination after dispense at the end of each asp-dispense cycle */
-  blowoutLocation: string | null | undefined
-  blowoutFlowRateUlSec: number
-  blowoutOffsetFromTopMm: number
 
   /** Mix in first well in chunk */
   mixBeforeAspirate: InnerMixArgs | null | undefined
@@ -270,11 +463,8 @@ export type DistributeArgs = SharedTransferLikeArgs & {
 
   /** Disposal volume is added to the volume of the first aspirate of each asp-asp-disp cycle */
   disposalVolume: number | null | undefined
-  /** pass to blowout **/
-  /** If given, blow out in the specified destination after dispense at the end of each asp-dispense cycle */
-  blowoutLocation: string | null | undefined
-  blowoutFlowRateUlSec: number
-  blowoutOffsetFromTopMm: number
+  /** Volume to condition the tip with during aspiration sequence */
+  conditioningVolume: number | null
 
   /** Mix in first well in chunk */
   mixBeforeAspirate: InnerMixArgs | null | undefined
@@ -293,7 +483,7 @@ export type MixArgs = CommonArgs & {
   times: number
   /** Touch tip after mixing */
   touchTip: boolean
-  touchTipMmFromBottom: number
+  touchTipMmFromTop: number
   /** change tip: see comments in step-generation/mix.js */
   changeTip: ChangeTipOptions
   /** drop tip location entity id */
@@ -303,27 +493,30 @@ export type MixArgs = CommonArgs & {
   blowoutFlowRateUlSec: number
   blowoutOffsetFromTopMm: number
 
-  /** offset from bottom of well in mm */
-  aspirateOffsetFromBottomMm: number
-  dispenseOffsetFromBottomMm: number
+  /**  z offset from bottom of well in mm */
+  offsetFromBottomMm: number
   /** x offset */
-  aspirateXOffset: number
-  dispenseXOffset: number
+  xOffset: number
   /** y offset */
-  aspirateYOffset: number
-  dispenseYOffset: number
+  yOffset: number
   /** flow rates in uL/sec */
+  zOffset: number
+  positionReference: PositionReference
   aspirateFlowRateUlSec: number
   dispenseFlowRateUlSec: number
   /** delays */
   aspirateDelaySeconds: number | null | undefined
   dispenseDelaySeconds: number | null | undefined
+  finalPushOut: number
+  tipTracking: TipTrackingOption
+  tipsSelected: string[][]
+  tiprackSelected: string | null
 }
 
 export type PauseArgs = CommonArgs & {
   commandCreatorFnName: 'delay'
   message?: string
-  wait: number | true
+  seconds?: number
   pauseTemperature?: number | null
   meta:
     | {
@@ -335,34 +528,45 @@ export type PauseArgs = CommonArgs & {
     | undefined
 }
 
-export interface WaitForTemperatureArgs {
-  module: string | null
+export interface WaitForTemperatureArgs extends CommonArgs {
+  moduleId: string
   commandCreatorFnName: 'waitForTemperature'
-  temperature: number
+  celsius: number
   message?: string
 }
 
-export type EngageMagnetArgs = EngageMagnetParams & {
-  module: string
+export interface WaitForModuleTaskArgs extends CommonArgs {
+  commandCreatorFnName: 'waitForModuleTask'
+
+  /** This step will wait for this to happen before moving on. */
+  // Note: Leaving room for this to become a union with stuff like 'temperatureModuleReachedTarget'.
+  waitCondition: 'thermocyclerProfileComplete'
+
+  moduleId: string
+}
+
+export type EngageMagnetArgs = CommonArgs & {
+  height: number
+  moduleId: string
   commandCreatorFnName: 'engageMagnet'
   message?: string
 }
 
-export type DisengageMagnetArgs = ModuleOnlyParams & {
-  module: string
+export type DisengageMagnetArgs = CommonArgs & {
+  moduleId: string
   commandCreatorFnName: 'disengageMagnet'
   message?: string
 }
 
-export interface SetTemperatureArgs {
-  module: string | null
+export interface SetTemperatureArgs extends CommonArgs {
+  moduleId: string
   commandCreatorFnName: 'setTemperature'
-  targetTemperature: number
+  celsius: number
   message?: string
 }
 
-export interface DeactivateTemperatureArgs {
-  module: string | null
+export interface DeactivateTemperatureArgs extends CommonArgs {
+  moduleId: string
   commandCreatorFnName: 'deactivateTemperature'
   message?: string
 }
@@ -373,12 +577,13 @@ export type SetShakeSpeedArgs = ShakeSpeedParams & {
   message?: string
 }
 
-export interface HeaterShakerArgs {
-  module: string | null
+export interface HeaterShakerArgs extends CommonArgs {
+  moduleId: string | null
   rpm: number | null
   commandCreatorFnName: 'heaterShaker'
   targetTemperature: number | null
   latchOpen: boolean
+  timerHours: number | null
   timerMinutes: number | null
   timerSeconds: number | null
   message?: string
@@ -406,23 +611,54 @@ interface ProfileCycleItem {
 // TODO IMMEDIATELY: ProfileStepItem -> ProfileStep, ProfileCycleItem -> ProfileCycle
 export type ProfileItem = ProfileStepItem | ProfileCycleItem
 
-export interface ThermocyclerProfileStepArgs {
-  module: string
+export type ThermocyclerProfileStepArgs = CommonArgs & {
   commandCreatorFnName: THERMOCYCLER_PROFILE
-  blockTargetTempHold: number | null
-  lidOpenHold: boolean
-  lidTargetTempHold: number | null
-  message?: string
-  profileSteps: AtomicProfileStep[]
+
+  moduleId: string
+
+  profileElements: TCExtendedProfileParams['profileElements']
   profileTargetLidTemp: number
   profileVolume: number
+
   meta?: {
     rawProfileItems: ProfileItem[]
   }
+
+  message?: string
+} & (
+    | BlockingThermocyclerProfileStepArgs
+    | ConcurrentThermocyclerProfileStepArgs
+  )
+
+/**
+ * Emits a blocking Thermocycler profile step. The entire profile will complete
+ * before the protocol moves on to the next step.
+ *
+ * In this mode, we can do some extra things immediately after the profile ends,
+ * like open the lid or set final temperatures. ("Hold" steps.)
+ */
+interface BlockingThermocyclerProfileStepArgs {
+  concurrent: false
+  blockTargetTempHold: number | null
+  lidOpenHold: boolean
+  lidTargetTempHold: number | null
 }
 
-export interface ThermocyclerStateStepArgs {
-  module: string
+/**
+ * Emits a concurrent Thermocycler profile step. The protocol will proceed to the next
+ * step immediately after the profile starts, and the profile will continue in the
+ * background.
+ *
+ * Because of limitations in Protocol Engine and the Python Protocol API, this mode lacks
+ * support for running "hold" steps immediately after the profile ends, so those
+ * properties are omitted here.
+ */
+interface ConcurrentThermocyclerProfileStepArgs {
+  concurrent: true
+}
+
+export interface ThermocyclerStateStepArgs extends CommonArgs {
+  moduleId: string
   commandCreatorFnName: THERMOCYCLER_STATE
   blockTargetTemp: number | null
   lidTargetTemp: number | null
@@ -430,11 +666,38 @@ export interface ThermocyclerStateStepArgs {
   message?: string
 }
 
+export interface AbsorbanceReaderInitializeArgs extends CommonArgs {
+  moduleId: string
+  commandCreatorFnName: 'absorbanceReaderInitialize'
+  measureMode: 'single' | 'multi'
+  sampleWavelengths: number[]
+  referenceWavelength?: number | null
+  message?: string
+}
+
+export interface AbsorbanceReaderReadArgs extends CommonArgs {
+  moduleId: string
+  commandCreatorFnName: 'absorbanceReaderRead'
+  fileName: string | null
+  message?: string
+}
+
+export interface AbsorbanceReaderLidArgs extends CommonArgs {
+  moduleId: string
+  commandCreatorFnName: 'absorbanceReaderOpenLid' | 'absorbanceReaderCloseLid'
+  message?: string
+}
+
+export type AbsorbanceReaderArgs =
+  | AbsorbanceReaderInitializeArgs
+  | AbsorbanceReaderReadArgs
+  | AbsorbanceReaderLidArgs
+
 export interface MoveLabwareArgs extends CommonArgs {
   commandCreatorFnName: 'moveLabware'
-  labware: string
-  useGripper: boolean
+  labwareId: string
   newLocation: LabwareLocation
+  strategy: LabwareMovementStrategy
 }
 
 export interface CommentArgs extends CommonArgs {
@@ -442,11 +705,54 @@ export interface CommentArgs extends CommonArgs {
   message: string
 }
 
+export interface CaptureImageArgs extends CommonArgs {
+  commandCreatorFnName: 'captureImage'
+  homeBefore: boolean
+  fileName: string
+  resolution: [Width, Height]
+  zoom: number
+  contrast: number
+  brightness: number
+  saturation: number
+}
+
+export interface FlexStackerEmptyArgs extends CommonArgs {
+  moduleId: string
+  commandCreatorFnName: 'flexStackerEmpty'
+  interventionMessage: string | null
+}
+export interface FlexStackerFillItemsArgs extends CommonArgs {
+  moduleId: string
+  commandCreatorFnName: 'flexStackerFillItems'
+  fillLabwareUri: string | null
+  fillQuantity: number | null
+  interventionMessage: string | null
+}
+export interface FlexStackerStoreArgs extends CommonArgs {
+  moduleId: string
+  commandCreatorFnName: 'flexStackerStore'
+}
+export interface FlexStackerRetrieveArgs extends CommonArgs {
+  moduleId: string
+  commandCreatorFnName: 'flexStackerRetrieve'
+}
+
+export type FlexStackerArgs =
+  | FlexStackerEmptyArgs
+  | FlexStackerFillItemsArgs
+  | FlexStackerRetrieveArgs
+  | FlexStackerStoreArgs
+
 export type CommandCreatorArgs =
+  | AbsorbanceReaderInitializeArgs
+  | AbsorbanceReaderReadArgs
+  | AbsorbanceReaderLidArgs
   | ConsolidateArgs
+  | CaptureImageArgs
   | DistributeArgs
   | MixArgs
   | PauseArgs
+  | WaitForModuleTaskArgs
   | TransferArgs
   | EngageMagnetArgs
   | DisengageMagnetArgs
@@ -458,6 +764,7 @@ export type CommandCreatorArgs =
   | HeaterShakerArgs
   | MoveLabwareArgs
   | CommentArgs
+  | FlexStackerArgs
 
 export interface LocationLiquidState {
   [ingredGroup: string]: { volume: number }
@@ -484,10 +791,15 @@ export interface InvariantContext {
   labwareEntities: LabwareEntities
   moduleEntities: ModuleEntities
   pipetteEntities: PipetteEntities
-  additionalEquipmentEntities: AdditionalEquipmentEntities
+  wasteChuteEntities: WasteChuteEntities
+  trashBinEntities: TrashBinEntities
+  stagingAreaEntities: StagingAreaEntities
+  gripperEntities: GripperEntities
+  liquidEntities: LiquidEntities
   config: Config
 }
 
+export type TipState = typeof CLEAN | typeof DIRTY | typeof EMPTY
 export interface TimelineFrame {
   pipettes: {
     [pipetteId: string]: PipetteTemporalProperties
@@ -501,11 +813,15 @@ export interface TimelineFrame {
   tipState: {
     tipracks: {
       [labwareId: string]: {
-        [wellName: string]: boolean // true if tip is in there
+        [wellName: string]: TipState
       }
     }
     pipettes: {
-      [pipetteId: string]: boolean // true if pipette has tip(s)
+      [pipetteId: string]: {
+        hasTip: boolean
+        /** TODO: tiprackURI is a misnomer: it's a labwareId, not a URI */
+        tiprackURI: string | null
+      }
     }
   }
   liquidState: {
@@ -522,18 +838,25 @@ export interface TimelineFrame {
         [well: string]: LocationLiquidState
       }
     }
-    additionalEquipment: {
-      /** for the waste chute and trash bin */
-      [additionalEquipmentId: string]: LocationLiquidState
+    trashBins: {
+      [trashBinId: string]: LocationLiquidState
+    }
+    wasteChute: {
+      [wasteChuteId: string]: LocationLiquidState
     }
   }
 }
 export type RobotState = TimelineFrame // legacy name alias
 
 export type ErrorType =
+  | 'ABSORBANCE_READER_LID_CLOSED'
+  | 'ABSORBANCE_READER_NO_GRIPPER'
+  | 'ABSORBANCE_READER_NO_INITIALIZATION'
   | 'CANNOT_MOVE_WITH_GRIPPER'
+  | 'CLOSING_THERMOCYCLER_WITH_INVALID_LABWARE_LID'
   | 'DROP_TIP_LOCATION_DOES_NOT_EXIST'
   | 'EQUIPMENT_DOES_NOT_EXIST'
+  | 'FLEX_STACKER_NO_GRIPPER'
   | 'GRIPPER_REQUIRED'
   | 'HEATER_SHAKER_EAST_WEST_LATCH_OPEN'
   | 'HEATER_SHAKER_EAST_WEST_MULTI_CHANNEL'
@@ -542,17 +865,25 @@ export type ErrorType =
   | 'HEATER_SHAKER_LATCH_OPEN'
   | 'HEATER_SHAKER_NORTH_SOUTH__OF_NON_TIPRACK_WITH_MULTI_CHANNEL'
   | 'HEATER_SHAKER_NORTH_SOUTH_EAST_WEST_SHAKING'
+  | 'HOPPER_EMPTY'
+  | 'HOPPER_FULL'
+  | 'INCOMPLETE_PICKUP'
   | 'INSUFFICIENT_TIPS'
   | 'INVALID_SLOT'
-  | 'LABWARE_DISCARDED_IN_WASTE_CHUTE'
+  | 'LABWARE_DISCARDED_IN_TRASH'
   | 'LABWARE_DOES_NOT_EXIST'
   | 'LABWARE_OFF_DECK'
   | 'LABWARE_ON_ANOTHER_ENTITY'
   | 'MISMATCHED_SOURCE_DEST_WELLS'
+  | 'MISMATCHED_STACKER_LABWARE_TYPE'
   | 'MISSING_96_CHANNEL_TIPRACK_ADAPTER'
   | 'MISSING_MODULE'
+  | 'MISSING_PROFILE_STEP'
   | 'MISSING_TEMPERATURE_STEP'
   | 'MODULE_PIPETTE_COLLISION_DANGER'
+  | 'MULTI_ASPIRATE_VOLUME_TOO_HIGH'
+  | 'MULTI_DISPENSE_VOLUME_TOO_HIGH'
+  | 'NEXT_TIPRACK_HAS_LID'
   | 'NO_TIP_ON_PIPETTE'
   | 'NO_TIP_SELECTED'
   | 'PIPETTE_DOES_NOT_EXIST'
@@ -561,9 +892,19 @@ export type ErrorType =
   | 'PIPETTING_INTO_COLUMN_4'
   | 'POSSIBLE_PIPETTE_COLLISION'
   | 'REMOVE_96_CHANNEL_TIPRACK_ADAPTER'
+  | 'RETRACT_BELOW_ASPIRATE'
+  | 'RETRACT_BELOW_DISPENSE'
+  | 'RETURN_TIP_UNAVAILABLE'
+  | 'SHUTTLE_FULL'
+  | 'SHUTTLE_EMPTY'
+  | 'STACK_TOO_HIGH'
+  | 'SUBMERGE_BELOW_ASPIRATE'
+  | 'SUBMERGE_BELOW_DISPENSE'
   | 'TALL_LABWARE_EAST_WEST_OF_HEATER_SHAKER'
   | 'THERMOCYCLER_LID_CLOSED'
   | 'TIP_VOLUME_EXCEEDED'
+  | 'TIPRACK_LID_NOT_ALLOWED_ON_DECK'
+  | 'TOO_MANY_TIPS'
 
 export interface CommandCreatorError {
   message: string
@@ -576,16 +917,25 @@ export type WarningType =
   | 'LABWARE_IN_WASTE_CHUTE_HAS_LIQUID'
   | 'TIPRACK_IN_WASTE_CHUTE_HAS_TIPS'
   | 'TEMPERATURE_IS_POTENTIALLY_UNREACHABLE'
+  | 'WAITING_FOR_NONEXISTENT_TASK'
 
 export interface CommandCreatorWarning {
   message: string
   type: WarningType
 }
 
+interface StepInfo {
+  stepNumber?: number
+  name?: string | null
+  description?: string | null
+}
+
 export interface CommandsAndRobotState {
   commands: CreateCommand[]
   robotState: RobotState
+  stepInfo?: StepInfo
   warnings?: CommandCreatorWarning[]
+  python?: string
 }
 
 export interface CommandCreatorErrorResponse {
@@ -593,9 +943,10 @@ export interface CommandCreatorErrorResponse {
   warnings?: CommandCreatorWarning[]
 }
 
-export interface CommandsAndWarnings {
+export interface CommandsAndWarnings extends StepInfo {
   commands: CreateCommand[]
   warnings?: CommandCreatorWarning[]
+  python?: string
 }
 export type CommandCreatorResult =
   | CommandsAndWarnings
@@ -619,3 +970,18 @@ export interface RobotStateAndWarnings {
   robotState: RobotState
   warnings: CommandCreatorWarning[]
 }
+export interface WellContents {
+  // eg 'A1', 'A2' etc
+  wellName?: string
+  groupIds: string[]
+  ingreds: LocationLiquidState
+  highlighted?: boolean
+  selected?: boolean
+  maxVolume?: number
+}
+
+export interface WellContentsByNumber {
+  [wellName: string]: number
+}
+
+export type TipTrackingOption = typeof AUTOMATIC | typeof MANUAL

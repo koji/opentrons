@@ -1,21 +1,25 @@
-import type * as React from 'react'
 import { screen } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import '@testing-library/jest-dom/vitest'
-import { i18n } from '/app/i18n'
+
 import { renderWithProviders } from '/app/__testing-utils__'
+import { i18n } from '/app/i18n'
+
 import { CompleteUpdateSoftware } from '../CompleteUpdateSoftware'
+
+import type { ComponentProps } from 'react'
 
 vi.mock('/app/redux/robot-admin')
 
-const render = (props: React.ComponentProps<typeof CompleteUpdateSoftware>) => {
+const render = (props: ComponentProps<typeof CompleteUpdateSoftware>) => {
   return renderWithProviders(<CompleteUpdateSoftware {...props} />, {
     i18nInstance: i18n,
   })
 }
 
 describe('CompleteUpdateSoftware', () => {
-  let props: React.ComponentProps<typeof CompleteUpdateSoftware>
+  let props: ComponentProps<typeof CompleteUpdateSoftware>
 
   beforeEach(() => {
     props = {

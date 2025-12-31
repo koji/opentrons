@@ -2,27 +2,28 @@ import { useTranslation } from 'react-i18next'
 import { css } from 'styled-components'
 
 import {
+  ALIGN_CENTER,
   COLORS,
   DIRECTION_COLUMN,
   Flex,
   Icon,
-  StyledText,
-  SPACING,
-  ALIGN_CENTER,
+  JUSTIFY_CENTER,
   JUSTIFY_END,
   PrimaryButton,
-  JUSTIFY_CENTER,
   RESPONSIVENESS,
+  SPACING,
+  StyledText,
 } from '@opentrons/components'
 
 import { SmallButton } from '/app/atoms/buttons'
-import { RecoverySingleColumnContentWrapper } from './shared'
+
 import {
   DESKTOP_ONLY,
   ICON_SIZE_ALERT_INFO_STYLE,
   ODD_ONLY,
   RECOVERY_MAP,
 } from './constants'
+import { RecoverySingleColumnContentWrapper } from './shared'
 
 import type { RecoveryContentProps } from './types'
 
@@ -92,14 +93,12 @@ export function RecoveryDropTipFlowErrors({
   routeUpdateActions,
   getRecoveryOptionCopy,
   errorKind,
+  subMapUtils,
 }: RecoveryContentProps): JSX.Element {
   const { t } = useTranslation('error_recovery')
   const { step } = recoveryMap
-  const {
-    ERROR_WHILE_RECOVERING,
-    OPTION_SELECTION,
-    DROP_TIP_FLOWS,
-  } = RECOVERY_MAP
+  const { ERROR_WHILE_RECOVERING, OPTION_SELECTION, DROP_TIP_FLOWS } =
+    RECOVERY_MAP
   const { selectedRecoveryOption } = currentRecoveryOptionUtils
   const { proceedToRouteAndStep } = routeUpdateActions
 
@@ -107,6 +106,9 @@ export function RecoveryDropTipFlowErrors({
     selectedRecoveryOption,
     errorKind
   )
+
+  // Whenever there is an error during drop tip wizard, reset the submap so properly re-entry routing occurs.
+  subMapUtils.updateSubMap(null)
 
   const buildTitle = (): string => {
     switch (step) {
@@ -191,7 +193,7 @@ export function ErrorContent({
     <RecoverySingleColumnContentWrapper>
       <Flex css={CONTAINER_STYLE}>
         <Icon
-          name="alert-circle"
+          name="ot-alert"
           color={COLORS.red50}
           data-testid="recovery_error_alert_icon"
           css={ICON_SIZE_ALERT_INFO_STYLE}

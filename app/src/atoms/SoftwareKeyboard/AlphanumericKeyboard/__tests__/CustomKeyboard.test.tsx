@@ -1,17 +1,23 @@
-import * as React from 'react'
-import { describe, it, expect, vi } from 'vitest'
+import { useRef } from 'react'
+import { describe, expect, it, vi } from 'vitest'
+
 import '@testing-library/jest-dom/vitest'
+
 import { fireEvent, renderHook, screen } from '@testing-library/react'
+
 import { renderWithProviders } from '/app/__testing-utils__'
+
 import { AlphanumericKeyboard } from '..'
 
-const render = (props: React.ComponentProps<typeof AlphanumericKeyboard>) => {
+import type { ComponentProps } from 'react'
+
+const render = (props: ComponentProps<typeof AlphanumericKeyboard>) => {
   return renderWithProviders(<AlphanumericKeyboard {...props} />)[0]
 }
 
 describe('AlphanumericKeyboard', () => {
   it('should render alphanumeric keyboard - lower case', () => {
-    const { result } = renderHook(() => React.useRef(null))
+    const { result } = renderHook(() => useRef(null))
     const props = {
       onChange: vi.fn(),
       keyboardRef: result.current,
@@ -55,7 +61,7 @@ describe('AlphanumericKeyboard', () => {
     })
   })
   it('should render alphanumeric keyboard - upper case, when clicking ABC key', () => {
-    const { result } = renderHook(() => React.useRef(null))
+    const { result } = renderHook(() => useRef(null))
     const props = {
       onChange: vi.fn(),
       keyboardRef: result.current,
@@ -103,7 +109,7 @@ describe('AlphanumericKeyboard', () => {
   })
 
   it('should render alphanumeric keyboard - numbers, when clicking number key', () => {
-    const { result } = renderHook(() => React.useRef(null))
+    const { result } = renderHook(() => useRef(null))
     const props = {
       onChange: vi.fn(),
       keyboardRef: result.current,
@@ -133,7 +139,7 @@ describe('AlphanumericKeyboard', () => {
   })
 
   it('should render alphanumeric keyboard - lower case when layout is numbers and clicking abc ', () => {
-    const { result } = renderHook(() => React.useRef(null))
+    const { result } = renderHook(() => useRef(null))
     const props = {
       onChange: vi.fn(),
       keyboardRef: result.current,
@@ -182,7 +188,7 @@ describe('AlphanumericKeyboard', () => {
   })
 
   it('should switch each alphanumeric keyboard properly', () => {
-    const { result } = renderHook(() => React.useRef(null))
+    const { result } = renderHook(() => useRef(null))
     const props = {
       onChange: vi.fn(),
       keyboardRef: result.current,

@@ -1,7 +1,9 @@
 import { useSelector } from 'react-redux'
 import Semver from 'semver'
+
 import { useIsFlex } from '/app/redux-resources/robots'
 import { getRobotApiVersionByName } from '/app/redux/discovery'
+
 import { useWifiList } from './useWifiList'
 
 import type { State } from '/app/redux/types'
@@ -17,7 +19,7 @@ export const useCanDisconnect = (robotName: string): boolean => {
 
   const active = wifiList.some(nw => nw.active)
   const supportsDisconnect = Semver.valid(apiVersion)
-    ? isFlex || Semver.gte(apiVersion as string, API_MIN_DISCONNECT_VERSION)
+    ? isFlex || Semver.gte(apiVersion!, API_MIN_DISCONNECT_VERSION)
     : false
 
   return Boolean(active && supportsDisconnect)

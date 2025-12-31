@@ -1,3 +1,4 @@
+import { getRunningStepCountsFrom } from '/app/resources/protocols'
 import { useMostRecentCompletedAnalysis } from '/app/resources/runs'
 
 import { useLastRunProtocolCommand } from './useLastRunProtocolCommand'
@@ -35,21 +36,5 @@ export function useRunningStepCounts(
     commandsData ?? null
   )
 
-  const lastRunAnalysisCommandIndex = analysisCommands.findIndex(
-    c => c.key === lastRunCommandNoFixit?.key
-  )
-
-  const currentStepNumberByAnalysis =
-    lastRunAnalysisCommandIndex === -1 ? null : lastRunAnalysisCommandIndex + 1
-
-  const hasRunDiverged =
-    lastRunCommandNoFixit?.key == null || currentStepNumberByAnalysis == null
-
-  const totalStepCount = !hasRunDiverged ? analysisCommands.length : null
-
-  return {
-    currentStepNumber: currentStepNumberByAnalysis,
-    totalStepCount,
-    hasRunDiverged,
-  }
+  return getRunningStepCountsFrom(analysisCommands, lastRunCommandNoFixit)
 }

@@ -1,32 +1,53 @@
-import { HashRouter } from 'react-router-dom'
+import { useEffect } from 'react'
+import { HashRouter, useLocation } from 'react-router-dom'
+import { useAuth0 } from '@auth0/auth0-react'
+import { useAtom } from 'jotai'
+import styled from 'styled-components'
+
 import {
+  ALIGN_CENTER,
+  COLORS,
   DIRECTION_COLUMN,
   Flex,
   OVERFLOW_AUTO,
-  COLORS,
-  ALIGN_CENTER,
 } from '@opentrons/components'
+
+import { ExitConfirmModal } from '/ai-client/components/molecules/ExitConfirmModal'
+import { Footer } from '/ai-client/components/molecules/Footer'
+import { Header } from '/ai-client/components/molecules/Header'
+import { HeaderWithMeter } from '/ai-client/components/molecules/HeaderWithMeter'
+import { Loading } from '/ai-client/components/molecules/Loading'
+
+import { initializeMixpanel, setMixpanelTracking } from './analytics/mixpanel'
 import { OpentronsAIRoutes } from './OpentronsAIRoutes'
-import { useAuth0 } from '@auth0/auth0-react'
-import { useAtom } from 'jotai'
-import { useEffect } from 'react'
-import { Loading } from './molecules/Loading'
-import { headerWithMeterAtom, mixpanelAtom, tokenAtom } from './resources/atoms'
-import { useGetAccessToken } from './resources/hooks'
-import { initializeMixpanel } from './analytics/mixpanel'
-import { useTrackEvent } from './resources/hooks/useTrackEvent'
-import { Header } from './molecules/Header'
+import {
+  featureFlagsAtom,
+  headerWithMeterAtom,
+  mixpanelAtom,
+  tokenAtom,
+} from './resources/atoms'
 import { CLIENT_MAX_WIDTH } from './resources/constants'
-import { Footer } from './molecules/Footer'
-import { HeaderWithMeter } from './molecules/HeaderWithMeter'
-import styled from 'styled-components'
+import { useGetAccessToken } from './resources/hooks'
+import { useTrackEvent } from './resources/hooks/useTrackEvent'
 
 export function OpentronsAI(): JSX.Element | null {
+  return (
+    <HashRouter>
+      <OpentronsAIApp />
+    </HashRouter>
+  )
+}
+
+function OpentronsAIApp(): JSX.Element | null {
   const { isAuthenticated, isLoading, loginWithRedirect } = useAuth0()
   const [, setToken] = useAtom(tokenAtom)
   const [{ displayHeaderWithMeter, progress }] = useAtom(headerWithMeterAtom)
   const [mixpanelState, setMixpanelState] = useAtom(mixpanelAtom)
   const { getAccessToken } = useGetAccessToken()
+  const [featureFlags, setFeatureFlags] = useAtom(featureFlagsAtom)
+  const location = useLocation()
+  const isOnChatPage = location.pathname === '/chat'
+
   const trackEvent = useTrackEvent()
 
   const fetchAccessToken = async (): Promise<void> => {
@@ -58,6 +79,23 @@ export function OpentronsAI(): JSX.Element | null {
     }
   }, [isAuthenticated])
 
+  // Sync feature flag changes with Mixpanel analytics state
+  useEffect(() => {
+    if (mixpanelState?.isInitialized) {
+      const analyticsEnabled = featureFlags.enableAnalytics ?? true
+      const currentMixpanelState = mixpanelState.analytics.hasOptedIn
+
+      // Only update if there's a difference to avoid unnecessary calls
+      if (analyticsEnabled !== currentMixpanelState) {
+        setMixpanelState({
+          ...mixpanelState,
+          analytics: { hasOptedIn: analyticsEnabled },
+        })
+        setMixpanelTracking(analyticsEnabled)
+      }
+    }
+  }, [featureFlags.enableAnalytics, mixpanelState, setMixpanelState])
+
   if (isLoading) {
     return <Loading />
   }
@@ -66,13 +104,32 @@ export function OpentronsAI(): JSX.Element | null {
     return null
   }
 
+  global.enablePrereleaseMode = () => {
+    setFeatureFlags({ enablePrereleaseMode: true })
+  }
+
   return (
-    <Flex
-      id="opentrons-ai"
-      width={'100%'}
-      height={'100vh'}
-      flexDirection={DIRECTION_COLUMN}
-    >
+    <AppContent
+      displayHeaderWithMeter={displayHeaderWithMeter}
+      progress={progress}
+      isOnChatPage={isOnChatPage}
+    />
+  )
+}
+
+interface AppContentProps {
+  displayHeaderWithMeter: boolean
+  progress: number
+  isOnChatPage: boolean
+}
+
+function AppContent({
+  displayHeaderWithMeter,
+  progress,
+  isOnChatPage,
+}: AppContentProps): JSX.Element {
+  return (
+    <Flex width="100%" height="100vh" flexDirection={DIRECTION_COLUMN}>
       <StickyHeader>
         {displayHeaderWithMeter ? (
           <HeaderWithMeter progressPercentage={progress} />
@@ -82,7 +139,7 @@ export function OpentronsAI(): JSX.Element | null {
       </StickyHeader>
 
       <Flex
-        flex={1}
+        flex="1"
         flexDirection={DIRECTION_COLUMN}
         backgroundColor={COLORS.grey10}
         overflow={OVERFLOW_AUTO}
@@ -91,13 +148,12 @@ export function OpentronsAI(): JSX.Element | null {
           width="100%"
           maxWidth={CLIENT_MAX_WIDTH}
           alignSelf={ALIGN_CENTER}
-          flex={1}
+          flex="1"
         >
-          <HashRouter>
-            <OpentronsAIRoutes />
-          </HashRouter>
+          <ExitConfirmModal />
+          <OpentronsAIRoutes />
         </Flex>
-        <Footer />
+        {!isOnChatPage ? <Footer /> : null}
       </Flex>
     </Flex>
   )

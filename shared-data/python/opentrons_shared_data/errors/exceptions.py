@@ -1,5 +1,18 @@
 """Exception hierarchy for error codes."""
-from typing import Dict, Any, Optional, List, Iterator, Union, Sequence, overload
+
+from __future__ import annotations
+from typing import (
+    Dict,
+    Any,
+    Optional,
+    List,
+    Iterator,
+    Union,
+    Sequence,
+    overload,
+    Type,
+    TypeVar,
+)
 from logging import getLogger
 from traceback import format_exception_only, format_tb
 import inspect
@@ -14,6 +27,18 @@ log = getLogger(__name__)
 
 class EnumeratedError(Exception):
     """The root class of error-code-bearing exceptions."""
+
+    @classmethod
+    def ensure(cls: Type[_ET], exception: Exception) -> _ET:
+        """Ensure that an exception is enumerated.
+
+        If the passed exception is an EnumeratedError, returns it; otherwise, wraps it in an appropriate
+        child class.
+        """
+        if isinstance(exception, cls):
+            return exception
+        else:
+            return PythonException(exception)  # type: ignore[return-value]
 
     def __init__(
         self,
@@ -35,7 +60,7 @@ class EnumeratedError(Exception):
     def __str__(self) -> str:
         """Get a human-readable string."""
         _node = self.detail.get("node")
-        return f'Error {self.code.value.code} {self.code.name} ({self.__class__.__name__}){f": {self.message}" if self.message else ""}{f" ({_node})" if _node else ""}'
+        return f"Error {self.code.value.code} {self.code.name} ({self.__class__.__name__}){f': {self.message}' if self.message else ''}{f' ({_node})' if _node else ''}"
 
     def __eq__(self, other: object) -> bool:
         """Compare if two enumerated errors match."""
@@ -47,6 +72,9 @@ class EnumeratedError(Exception):
             and self.detail == other.detail
             and self.wrapping == other.wrapping
         )
+
+
+_ET = TypeVar("_ET", bound=EnumeratedError, covariant=True)
 
 
 class CommunicationError(EnumeratedError):
@@ -174,7 +202,7 @@ def _exc_harvest_predicate(v: Any) -> bool:
         return False
     # on python 3.11 and up we can check if things are method wrappers, which basic builtin
     # dunders like __add__ are, but until then we can't and also don't know this is real
-    if sys.version_info.minor >= 11 and inspect.ismethodwrapper(v):  # type: ignore[attr-defined]
+    if sys.version_info.minor >= 11 and inspect.ismethodwrapper(v):
         return False
     return True
 
@@ -379,6 +407,28 @@ class StallOrCollisionDetectedError(RoboticsControlError):
         """Build a StallOrCollisionDetectedError."""
         super().__init__(
             ErrorCodes.STALL_OR_COLLISION_DETECTED, message, detail, wrapping
+        )
+
+
+class FlexStackerStallError(RoboticsControlError):
+    """An error indicating that a stall or collision occurred in the flex stacker."""
+
+    def __init__(
+        self,
+        serial: str,
+        axis: str,
+        message: Optional[str] = None,
+        detail: Optional[Dict[str, str]] = None,
+        wrapping: Optional[Sequence[EnumeratedError]] = None,
+    ) -> None:
+        """Build a FlexStackerStallError."""
+        self.serial = serial
+        self.axis = axis
+        super().__init__(
+            ErrorCodes.STACKER_STALL_OR_COLLISION_DETECTED,
+            message,
+            detail,
+            wrapping,
         )
 
 
@@ -740,6 +790,125 @@ class HepaUVFailedError(RoboticsInteractionError):
         super().__init__(ErrorCodes.HEPA_UV_FAILED, message, detail, wrapping)
 
 
+class FlexStackerShuttleMissingError(RoboticsInteractionError):
+    """An error indicating the Flex Stacker shuttle cannot be detected."""
+
+    def __init__(
+        self,
+        serial: str,
+        expected_state: str,
+        shuttle_state: str,
+        message: Optional[str] = None,
+        detail: Optional[Dict[str, str]] = None,
+        wrapping: Optional[Sequence[EnumeratedError]] = None,
+    ) -> None:
+        """Build a FlexStackerStallError."""
+        checked_detail: Dict[str, Any] = detail or {}
+        checked_detail["serial"] = serial
+        checked_detail["expected_state"] = expected_state
+        checked_detail["shuttle_state"] = shuttle_state
+        if message is not None:
+            checked_message = message
+        else:
+            checked_message = (
+                "Flex Stacker shuttle not detected in state "
+                f"{expected_state}, found {shuttle_state}."
+            )
+        super().__init__(
+            ErrorCodes.STACKER_SHUTTLE_MISSING,
+            checked_message,
+            checked_detail,
+            wrapping,
+        )
+
+
+class FlexStackerShuttleLabwareError(RoboticsInteractionError):
+    """An error occurred during Flex Stacker shuttle labware detection."""
+
+    def __init__(
+        self,
+        serial: str,
+        shuttle_state: str,
+        labware_expected: bool,
+        message: Optional[str] = None,
+        detail: Optional[Dict[str, str]] = None,
+        wrapping: Optional[Sequence[EnumeratedError]] = None,
+    ) -> None:
+        """Build a FlexStackerStallError."""
+        checked_detail: Dict[str, Any] = detail or {}
+        checked_detail["serial"] = serial
+        checked_detail["shuttle_state"] = shuttle_state
+        checked_detail["labware_expected"] = labware_expected
+        if message is not None:
+            checked_message = message
+        else:
+            checked_message = (
+                f"Labware {'not' if labware_expected else ''} detected on shuttle"
+            )
+        super().__init__(
+            ErrorCodes.STACKER_SHUTTLE_LABWARE_FAILED,
+            checked_message,
+            checked_detail,
+            wrapping,
+        )
+
+
+class FlexStackerHopperLabwareError(RoboticsInteractionError):
+    """An error occurred when detecting labware inside the Flex Stacker hopper."""
+
+    def __init__(
+        self,
+        serial: str,
+        labware_expected: bool,
+        message: Optional[str] = None,
+        detail: Optional[Dict[str, str]] = None,
+        wrapping: Optional[Sequence[EnumeratedError]] = None,
+    ) -> None:
+        """Build a FlexStackerStallError."""
+        checked_detail: Dict[str, Any] = detail or {}
+        checked_detail["serial"] = serial
+        checked_detail["labware_expected"] = labware_expected
+        if message is not None:
+            checked_message = message
+        else:
+            checked_message = f"Labware {'not' if labware_expected else ''} detected in Flex Stacker hopper"
+        super().__init__(
+            ErrorCodes.STACKER_HOPPER_LABWARE_FAILED,
+            checked_message,
+            checked_detail,
+            wrapping,
+        )
+
+
+class FlexStackerShuttleNotEmptyError(RoboticsInteractionError):
+    """An error occurred when the Flex Stacker Shuttle is not empty when it should be."""
+
+    def __init__(
+        self,
+        serial: str,
+        shuttle_state: str,
+        labware_expected: bool,
+        message: Optional[str] = None,
+        detail: Optional[Dict[str, str]] = None,
+        wrapping: Optional[Sequence[EnumeratedError]] = None,
+    ) -> None:
+        """Build a FlexStackerShuttleNotEmptyError."""
+        checked_detail: Dict[str, Any] = detail or {}
+        checked_detail["serial"] = serial
+        checked_detail["shuttle_state"] = shuttle_state
+        checked_detail["labware_expected"] = labware_expected
+        if message is not None:
+            checked_message = message
+        else:
+            checked_message = f"Flex Stacker {serial} shuttle is not empty."
+        super().__init__(
+            ErrorCodes.STACKER_SHUTTLE_OCCUPIED,
+            checked_message,
+            checked_detail,
+            wrapping,
+        )
+
+
 class FirmwareUpdateRequiredError(RoboticsInteractionError):
     """An error indicating that a firmware update is required."""
 
@@ -1099,7 +1268,7 @@ class InvalidProtocolData(GeneralError):
         self,
         message: Optional[str] = None,
         detail: Optional[Dict[str, str]] = None,
-        wrapping: Optional[Sequence[EnumeratedError]] = None,
+        wrapping: Optional[Sequence[Union[EnumeratedError, BaseException]]] = None,
     ) -> None:
         """Build an InvalidProtocolData."""
         super().__init__(ErrorCodes.INVALID_PROTOCOL_DATA, message, detail, wrapping)

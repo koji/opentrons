@@ -1,24 +1,24 @@
-import { ipcMain } from 'electron'
 import axios from 'axios'
+import { ipcMain } from 'electron'
 import FormData from 'form-data'
 
 import {
-  fetchSerialPortList,
-  SerialPortHttpAgent,
   DEFAULT_PRODUCT_ID,
   DEFAULT_VENDOR_ID,
+  fetchSerialPortList,
+  SerialPortHttpAgent,
 } from '@opentrons/usb-bridge/node-client'
 
-import { createLogger } from './log'
 import { usbRequestsStart, usbRequestsStop } from './config/actions'
 import {
   SYSTEM_INFO_INITIALIZED,
   USB_DEVICE_ADDED,
   USB_DEVICE_REMOVED,
 } from './constants'
+import { createLogger } from './log'
 
-import type { IpcMainInvokeEvent } from 'electron'
 import type { AxiosRequestConfig } from 'axios'
+import type { IpcMainInvokeEvent } from 'electron'
 import type { IPCSafeFormData } from '@opentrons/app/src/redux/shell/types'
 import type { UsbDevice } from '@opentrons/app/src/redux/system-info/types'
 import type { PortInfo } from '@opentrons/usb-bridge/node-client'
@@ -133,11 +133,23 @@ async function usbListener(
       ...config,
       data,
       headers: { ...config.headers, ...formHeaders },
+      // Axios can't create proper blob types on the node layer, so we use
+      // arraybuffer instead.
+      responseType:
+        config.responseType === 'blob' ? 'arraybuffer' : config.responseType,
     })
     usbLog.silly(`${config.method} ${config.url} resolved ok`)
+
+    // Convert ArrayBuffer to regular Array for IPC transfer, since ArrayBuffer
+    //  objects cannot be sent across the IPC reliably.
+    const responseData =
+      config.responseType === 'blob' && response.data instanceof ArrayBuffer
+        ? Array.from(new Uint8Array(response.data))
+        : response.data
+
     return {
       error: null,
-      data: response.data,
+      data: responseData,
       status: response.status,
       statusText: response.statusText,
     }

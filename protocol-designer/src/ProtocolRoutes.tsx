@@ -1,19 +1,25 @@
-import { Route, Navigate, Routes, useNavigate } from 'react-router-dom'
 import { ErrorBoundary } from 'react-error-boundary'
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+
 import { Box } from '@opentrons/components'
-import { Landing } from './pages/Landing'
-import { ProtocolOverview } from './pages/ProtocolOverview'
-import { Liquids } from './pages/Liquids'
-import { Designer } from './pages/Designer'
-import { CreateNewProtocolWizard } from './pages/CreateNewProtocolWizard'
-import { NavigationBar } from './NavigationBar'
-import { Settings } from './pages/Settings'
+
 import {
-  Kitchen,
   FileUploadMessagesModal,
-  LabwareUploadModal,
   GateModal,
-} from './organisms'
+  HintsModal,
+  Kitchen,
+  LabwareUploadModal,
+  Navigation,
+} from './components/organisms'
+import {
+  Designer,
+  Hardware,
+  Landing,
+  Liquids,
+  Onboarding,
+  ProtocolOverview,
+  Settings,
+} from './pages'
 import { ProtocolDesignerAppFallback } from './resources/ProtocolDesignerAppFallback'
 
 import type { RouteProps } from './types'
@@ -38,7 +44,7 @@ const pdRoutes: RouteProps[] = [
     path: '/designer',
   },
   {
-    Component: CreateNewProtocolWizard,
+    Component: Onboarding,
     name: 'Create new protocol',
     navLinkTo: '/createNew',
     path: '/createNew',
@@ -48,6 +54,12 @@ const pdRoutes: RouteProps[] = [
     name: 'Settings',
     navLinkTo: '/settings',
     path: '/settings',
+  },
+  {
+    Component: Hardware,
+    name: 'Hardware',
+    navLinkTo: '/hardware',
+    path: '/hardware',
   },
 ]
 
@@ -59,9 +71,6 @@ export function ProtocolRoutes(): JSX.Element {
     path: '/',
   }
   const allRoutes: RouteProps[] = [...pdRoutes, landingPage]
-  const showGateModal =
-    process.env.NODE_ENV === 'production' || process.env.OT_PD_SHOW_GATE
-
   const navigate = useNavigate()
   const handleReset = (): void => {
     navigate('/', { replace: true })
@@ -72,13 +81,13 @@ export function ProtocolRoutes(): JSX.Element {
       FallbackComponent={ProtocolDesignerAppFallback}
       onReset={handleReset}
     >
-      <NavigationBar />
-
+      <Navigation />
       <Kitchen>
-        <Box width="100%">
-          {showGateModal ? <GateModal /> : null}
+        <Box width="100%" height="100%">
+          <GateModal />
           <LabwareUploadModal />
           <FileUploadMessagesModal />
+          <HintsModal />
           <Routes>
             {allRoutes.map(({ Component, path }: RouteProps) => {
               return <Route key={path} path={path} element={<Component />} />

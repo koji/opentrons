@@ -1,16 +1,15 @@
 import { useMutation, useQueryClient } from 'react-query'
+
 import { createLiveCommand } from '@opentrons/api-client'
+
 import { useHost } from '../api'
+
 import type {
-  UseMutationResult,
-  UseMutationOptions,
   UseMutateAsyncFunction,
+  UseMutationOptions,
+  UseMutationResult,
 } from 'react-query'
-import type {
-  CommandData,
-  HostConfig,
-  CreateCommandParams,
-} from '@opentrons/api-client'
+import type { CommandData, CreateCommandParams } from '@opentrons/api-client'
 import type { CreateCommand } from '@opentrons/shared-data'
 
 export interface CreateLiveCommandMutateParams extends CreateCommandParams {
@@ -46,7 +45,7 @@ export function useCreateLiveCommandMutation(): UseCreateLiveCommandMutationResu
     unknown,
     CreateLiveCommandMutateParams
   >(({ command, waitUntilComplete, timeout }) =>
-    createLiveCommand(host as HostConfig, command, {
+    createLiveCommand(host!, command, {
       waitUntilComplete,
       timeout,
     }).then(response => {

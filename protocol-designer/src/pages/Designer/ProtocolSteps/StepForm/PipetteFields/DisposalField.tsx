@@ -1,30 +1,36 @@
 import { useTranslation } from 'react-i18next'
 import { useSelector } from 'react-redux'
-import { Flex, DIRECTION_COLUMN, SPACING } from '@opentrons/components'
-import { getMaxDisposalVolumeForMultidispense } from '../../../../../steplist/formLevel/handleFormChange/utils'
-import { selectors as stepFormSelectors } from '../../../../../step-forms'
-import { selectors as uiLabwareSelectors } from '../../../../../ui/labware'
+
+import { DIRECTION_COLUMN, Flex, SPACING } from '@opentrons/components'
+
 import {
   CheckboxExpandStepFormField,
   DropdownStepFormField,
   InputStepFormField,
-} from '../../../../../molecules'
+} from '/protocol-designer/components/molecules'
+import { selectors as stepFormSelectors } from '/protocol-designer/step-forms'
+import { getMaxDisposalVolumeForMultiDispense } from '/protocol-designer/steplist/formLevel/handleFormChange/utils'
+import { selectors as uiLabwareSelectors } from '/protocol-designer/ui/labware'
+
 import { getBlowoutLocationOptionsForForm } from '../utils'
 import { FlowRateField } from './FlowRateField'
-import { BlowoutOffsetField } from './BlowoutOffsetField'
 
-import type { PathOption, StepType } from '../../../../../form-types'
+import type {
+  FormData,
+  PathOption,
+  StepType,
+} from '/protocol-designer/form-types'
 import type { FieldPropsByName } from '../types'
 
 interface DisposalFieldProps {
   path: PathOption
   pipette: string | null
+  formData: FormData
   propsForFields: FieldPropsByName
   stepType: StepType
   volume: string | null
   aspirate_airGap_checkbox?: boolean | null
   aspirate_airGap_volume?: string | null
-  tipRack?: string | null
 }
 
 export function DisposalField(props: DisposalFieldProps): JSX.Element {
@@ -36,7 +42,7 @@ export function DisposalField(props: DisposalFieldProps): JSX.Element {
     propsForFields,
     aspirate_airGap_checkbox,
     aspirate_airGap_volume,
-    tipRack,
+    formData,
   } = props
   const { t } = useTranslation(['application', 'form'])
 
@@ -46,7 +52,8 @@ export function DisposalField(props: DisposalFieldProps): JSX.Element {
     path,
     stepType,
   })
-  const maxDisposalVolume = getMaxDisposalVolumeForMultidispense(
+  const tipRack = formData.tipRack
+  const maxDisposalVolume = getMaxDisposalVolumeForMultiDispense(
     {
       aspirate_airGap_checkbox,
       aspirate_airGap_volume,
@@ -70,13 +77,11 @@ export function DisposalField(props: DisposalFieldProps): JSX.Element {
         })
       : ''
 
-  const { value, updateValue } = propsForFields.disposalVolume_checkbox
+  const { value } = propsForFields.disposalVolume_checkbox
   return (
     <CheckboxExpandStepFormField
       title={t('protocol_steps:multi_dispense_options')}
-      checkboxValue={value}
-      isChecked={value === true}
-      checkboxUpdateValue={updateValue}
+      fieldProps={propsForFields.disposalVolume_checkbox}
     >
       {value ? (
         <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing6}>
@@ -92,21 +97,17 @@ export function DisposalField(props: DisposalFieldProps): JSX.Element {
             {...propsForFields.blowout_location}
             options={disposalDestinationOptions}
             title={t('protocol_steps:blowout_location')}
-            addPadding={false}
-            width="16.5rem"
+            padding="0"
+            width="100%"
           />
           <FlowRateField
             {...propsForFields.blowout_flowRate}
             pipetteId={pipette}
             flowRateType="blowout"
             volume={propsForFields.volume?.value ?? 0}
+            padding="0"
             tiprack={propsForFields.tipRack.value}
-          />
-          <BlowoutOffsetField
-            {...propsForFields.blowout_z_offset}
-            sourceLabwareId={propsForFields.aspirate_labware.value}
-            destLabwareId={propsForFields.dispense_labware.value}
-            blowoutLabwareId={propsForFields.blowout_location.value}
+            formData={formData}
           />
         </Flex>
       ) : null}

@@ -1,9 +1,11 @@
 """Command models to execute a Thermocycler profile."""
+
 from __future__ import annotations
-from typing import List, Optional, TYPE_CHECKING, overload, Union
+from typing import List, Optional, TYPE_CHECKING, overload, Union, Any
 from typing_extensions import Literal, Type
 
 from pydantic import BaseModel, Field
+from pydantic.json_schema import SkipJsonSchema
 
 from opentrons.hardware_control.modules.types import ThermocyclerStep, ThermocyclerCycle
 
@@ -21,12 +23,21 @@ if TYPE_CHECKING:
 RunExtendedProfileCommandType = Literal["thermocycler/runExtendedProfile"]
 
 
+def _remove_default(s: dict[str, Any]) -> None:
+    s.pop("default", None)
+
+
 class ProfileStep(BaseModel):
     """An individual step in a Thermocycler extended profile."""
 
     celsius: float = Field(..., description="Target temperature in °C.")
     holdSeconds: float = Field(
         ..., description="Time to hold target temperature in seconds."
+    )
+    rampRate: float | SkipJsonSchema[None] = Field(
+        None,
+        description="How quickly to change temperature in °C/second.",
+        json_schema_extra=_remove_default,
     )
 
 
@@ -45,10 +56,11 @@ class RunExtendedProfileParams(BaseModel):
         ...,
         description="Elements of the profile. Each can be either a step or a cycle.",
     )
-    blockMaxVolumeUl: Optional[float] = Field(
+    blockMaxVolumeUl: float | SkipJsonSchema[None] = Field(
         None,
         description="Amount of liquid in uL of the most-full well"
         " in labware loaded onto the thermocycler.",
+        json_schema_extra=_remove_default,
     )
 
 
@@ -62,21 +74,20 @@ def _transform_profile_step(
     return ThermocyclerStep(
         temperature=thermocycler_state.validate_target_block_temperature(step.celsius),
         hold_time_seconds=step.holdSeconds,
+        ramp_rate=thermocycler_state.validate_ramp_rate(step.rampRate, step.celsius),
     )
 
 
 @overload
 def _transform_profile_element(
     element: ProfileStep, thermocycler_state: ThermocyclerModuleSubState
-) -> ThermocyclerStep:
-    ...
+) -> ThermocyclerStep: ...
 
 
 @overload
 def _transform_profile_element(
     element: ProfileCycle, thermocycler_state: ThermocyclerModuleSubState
-) -> ThermocyclerCycle:
-    ...
+) -> ThermocyclerCycle: ...
 
 
 def _transform_profile_element(
@@ -151,7 +162,7 @@ class RunExtendedProfile(
 
     commandType: RunExtendedProfileCommandType = "thermocycler/runExtendedProfile"
     params: RunExtendedProfileParams
-    result: Optional[RunExtendedProfileResult]
+    result: Optional[RunExtendedProfileResult] = None
 
     _ImplementationCls: Type[RunExtendedProfileImpl] = RunExtendedProfileImpl
 

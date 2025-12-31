@@ -1,11 +1,14 @@
 import type {
   AddressableAreaName,
-  CommonCommandRunTimeInfo,
+  AspirateProperties,
   CommonCommandCreateInfo,
-  LabwareDefinition2,
+  CommonCommandRunTimeInfo,
+  LabwareDefinition,
   LabwareOffset,
-  PipetteName,
   ModuleModel,
+  MultiDispenseProperties,
+  PipetteName,
+  SingleDispenseProperties,
 } from '../../js'
 
 export interface LoadPipetteCreateCommand extends CommonCommandCreateInfo {
@@ -13,8 +16,7 @@ export interface LoadPipetteCreateCommand extends CommonCommandCreateInfo {
   params: LoadPipetteParams
 }
 export interface LoadPipetteRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    Omit<LoadPipetteCreateCommand, 'params'> {
+  extends CommonCommandRunTimeInfo, Omit<LoadPipetteCreateCommand, 'params'> {
   params: LoadPipetteParams & {
     pipetteName: PipetteName
   }
@@ -25,17 +27,31 @@ export interface LoadLabwareCreateCommand extends CommonCommandCreateInfo {
   params: LoadLabwareParams
 }
 export interface LoadLabwareRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    LoadLabwareCreateCommand {
+  extends CommonCommandRunTimeInfo, LoadLabwareCreateCommand {
   result?: LoadLabwareResult
+}
+export interface LoadLidCreateCommand extends CommonCommandCreateInfo {
+  commandType: 'loadLid'
+  params: LoadLidParams
+}
+export interface LoadLidRunTimeCommand
+  extends CommonCommandRunTimeInfo, LoadLidCreateCommand {
+  result?: LoadLidResult
+}
+export interface LoadLidStackCreateCommand extends CommonCommandCreateInfo {
+  commandType: 'loadLidStack'
+  params: LoadLidStackParams
+}
+export interface LoadLidStackRunTimeCommand
+  extends CommonCommandRunTimeInfo, LoadLidStackCreateCommand {
+  result?: LoadLidStackResult
 }
 export interface ReloadLabwareCreateCommand extends CommonCommandCreateInfo {
   commandType: 'reloadLabware'
   params: { labwareId: string }
 }
 export interface ReloadLabwareRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    ReloadLabwareCreateCommand {
+  extends CommonCommandRunTimeInfo, ReloadLabwareCreateCommand {
   result?: ReloadLabwareResult
 }
 export interface MoveLabwareCreateCommand extends CommonCommandCreateInfo {
@@ -43,8 +59,7 @@ export interface MoveLabwareCreateCommand extends CommonCommandCreateInfo {
   params: MoveLabwareParams
 }
 export interface MoveLabwareRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    MoveLabwareCreateCommand {
+  extends CommonCommandRunTimeInfo, MoveLabwareCreateCommand {
   result?: MoveLabwareResult
 }
 export interface LoadModuleCreateCommand extends CommonCommandCreateInfo {
@@ -52,8 +67,7 @@ export interface LoadModuleCreateCommand extends CommonCommandCreateInfo {
   params: LoadModuleParams
 }
 export interface LoadModuleRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    Omit<LoadModuleCreateCommand, 'params'> {
+  extends CommonCommandRunTimeInfo, Omit<LoadModuleCreateCommand, 'params'> {
   params: LoadModuleParams & {
     model: ModuleModel
   }
@@ -64,20 +78,36 @@ export interface LoadLiquidCreateCommand extends CommonCommandCreateInfo {
   params: LoadLiquidParams
 }
 export interface LoadLiquidRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    LoadLiquidCreateCommand {
+  extends CommonCommandRunTimeInfo, LoadLiquidCreateCommand {
   result?: LoadLiquidResult
 }
 
-export interface ConfigureNozzleLayoutCreateCommand
-  extends CommonCommandCreateInfo {
+export interface LoadLiquidClassCreateCommand extends CommonCommandCreateInfo {
+  commandType: 'loadLiquidClass'
+  params: LoadLiquidClassParams
+}
+export interface LoadLiquidClassRunTimeCommand
+  extends CommonCommandRunTimeInfo, LoadLiquidClassCreateCommand {
+  result?: LoadLiquidClassResult
+}
+
+export interface ConfigureNozzleLayoutCreateCommand extends CommonCommandCreateInfo {
   commandType: 'configureNozzleLayout'
   params: ConfigureNozzleLayoutParams
 }
 
 export interface ConfigureNozzleLayoutRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    ConfigureNozzleLayoutCreateCommand {
+  extends CommonCommandRunTimeInfo, ConfigureNozzleLayoutCreateCommand {
+  result?: {}
+}
+
+export interface SetTipStateCreateCommand extends CommonCommandCreateInfo {
+  commandType: 'setTipState'
+  params: SetTipStateParams
+}
+
+export interface SetTipStateRunTimeCommand
+  extends CommonCommandRunTimeInfo, SetTipStateCreateCommand {
   result?: {}
 }
 
@@ -88,7 +118,11 @@ export type SetupRunTimeCommand =
   | ReloadLabwareRunTimeCommand
   | LoadModuleRunTimeCommand
   | LoadLiquidRunTimeCommand
+  | LoadLiquidClassRunTimeCommand
   | MoveLabwareRunTimeCommand
+  | LoadLidRunTimeCommand
+  | LoadLidStackRunTimeCommand
+  | SetTipStateRunTimeCommand
 
 export type SetupCreateCommand =
   | ConfigureNozzleLayoutCreateCommand
@@ -97,14 +131,22 @@ export type SetupCreateCommand =
   | ReloadLabwareCreateCommand
   | LoadModuleCreateCommand
   | LoadLiquidCreateCommand
+  | LoadLiquidClassCreateCommand
   | MoveLabwareCreateCommand
+  | LoadLidCreateCommand
+  | LoadLidStackCreateCommand
+  | SetTipStateCreateCommand
 
 export type LabwareLocation =
   | 'offDeck'
+  | 'systemLocation'
+  | 'wasteChuteLocation'
   | { slotName: string }
   | { moduleId: string }
   | { labwareId: string }
   | { addressableAreaName: AddressableAreaName }
+
+export type LoadedLabwareLocation = LabwareLocation | InStackerHopperLocation
 
 export type OnDeckLabwareLocation =
   | { slotName: string }
@@ -121,6 +163,49 @@ export type NonStackedLocation =
 export interface ModuleLocation {
   slotName: string
 }
+
+export interface InStackerHopperLocation {
+  kind: 'inStackerHopper'
+  moduleId: string
+}
+
+export interface OnLabwareLocationSequenceComponent {
+  kind: 'onLabware'
+  labwareId: string
+  lidId: string | null
+}
+
+export interface OnModuleLocationSequenceComponent {
+  kind: 'onModule'
+  moduleId: string
+}
+
+export interface OnAddressableAreaLocationSequenceComponent {
+  kind: 'onAddressableArea'
+  addressableAreaName: AddressableAreaName
+}
+
+export interface NotOnDeckLocationSequenceComponent {
+  kind: 'notOnDeck'
+  logicalLocationName: 'offDeck' | 'systemLocation' | 'wasteChuteLocation'
+}
+
+export interface OnCutoutFixtureLocationSequenceComponent {
+  kind: 'onCutoutFixture'
+  cutoutId: string
+  possibleCutoutFixtureIds: string[]
+}
+
+export type LocationSequenceComponent =
+  | OnLabwareLocationSequenceComponent
+  | OnModuleLocationSequenceComponent
+  | OnAddressableAreaLocationSequenceComponent
+  | NotOnDeckLocationSequenceComponent
+  | OnCutoutFixtureLocationSequenceComponent
+  | InStackerHopperLocation
+
+export type LabwareLocationSequence = LocationSequenceComponent[]
+
 export interface LoadPipetteParams {
   pipetteName: string
   pipetteId: string
@@ -139,14 +224,16 @@ interface LoadLabwareParams {
 }
 interface LoadLabwareResult {
   labwareId: string
-  definition: LabwareDefinition2
+  definition: LabwareDefinition
   // todo(mm, 2024-08-19): This does not match the server-returned offsetId field.
   // Confirm nothing client-side is trying to use this, then replace it with offsetId.
   offset: LabwareOffset
+  locationSequence?: LabwareLocationSequence
 }
 interface ReloadLabwareResult {
   labwareId: string
   offsetId?: string | null
+  locationSequence?: LabwareLocationSequence
 }
 
 export type LabwareMovementStrategy =
@@ -161,8 +248,10 @@ export interface MoveLabwareParams {
 }
 interface MoveLabwareResult {
   offsetId: string
+  eventualDestinationLocationSequence?: LabwareLocationSequence
+  immediateDestinationLocationSequence?: LabwareLocationSequence
+  originLocationSequence?: LabwareLocationSequence
 }
-
 interface LoadModuleParams {
   moduleId?: string
   location: ModuleLocation
@@ -178,6 +267,23 @@ interface LoadLiquidParams {
 }
 interface LoadLiquidResult {
   liquidId: string
+}
+interface LoadLiquidClassParams {
+  liquidClassId?: string
+  liquidClassRecord: LiquidClassRecord
+}
+
+interface LiquidClassRecord {
+  aspirate: AspirateProperties
+  liquidClassName: string
+  multiDispense?: MultiDispenseProperties
+  pipetteModel: string
+  singleDispense: SingleDispenseProperties
+  tiprack: string
+}
+
+interface LoadLiquidClassResult {
+  liquidClassId: string
 }
 
 export const COLUMN = 'COLUMN'
@@ -198,7 +304,46 @@ interface NozzleConfigurationParams {
   style: NozzleConfigurationStyle
 }
 
-interface ConfigureNozzleLayoutParams {
+export interface ConfigureNozzleLayoutParams {
   pipetteId: string
   configurationParams: NozzleConfigurationParams
+}
+
+interface LoadLidStackParams {
+  location: LabwareLocation
+  loadName: string
+  namespace: string
+  version: number
+  quantity: number
+}
+
+interface LoadLidStackResult {
+  stackLabwareId: string
+  labwareIds: string[]
+  definition?: LabwareDefinition
+  lidStackDefinition: LabwareDefinition
+  location: LabwareLocation
+  stackLocationSequence?: LabwareLocationSequence
+  locationSequences?: LabwareLocationSequence[]
+}
+
+export interface LoadLidParams {
+  location: LabwareLocation
+  loadName: string
+  namespace: string
+  version: number
+}
+
+interface LoadLidResult {
+  labwareId: string
+  definition: LabwareDefinition
+  locationSequence?: LabwareLocationSequence
+}
+
+export type TipWellState = 'clean' | 'used' | 'empty'
+
+export interface SetTipStateParams {
+  labwareId: string
+  wellNames: string[]
+  tipWellState?: TipWellState
 }

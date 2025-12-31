@@ -1,7 +1,7 @@
-import { useRef, useState, useEffect } from 'react'
-import { css } from 'styled-components'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import { css } from 'styled-components'
 
 import {
   ALIGN_CENTER,
@@ -10,24 +10,23 @@ import {
   Flex,
   Icon,
   JUSTIFY_CENTER,
+  LegacyStyledText,
+  Modal,
   PrimaryButton,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
-  Modal,
 } from '@opentrons/components'
 
 import { StatusLabel } from '/app/atoms/StatusLabel'
 import { TaskList } from '/app/molecules/TaskList'
-
 import { useCalibrationTaskList } from '/app/organisms/Desktop/Devices/hooks'
 import { useAttachedPipettes } from '/app/resources/instruments'
 import { useCurrentRunId, useRunHasStarted } from '/app/resources/runs'
 
 import type {
+  DashboardCalDeckInvoker,
   DashboardCalOffsetInvoker,
   DashboardCalTipLengthInvoker,
-  DashboardCalDeckInvoker,
 } from '/app/organisms/Desktop/Devices/hooks'
 
 interface CalibrationTaskListProps {
@@ -47,9 +46,8 @@ export function CalibrationTaskList({
 }: CalibrationTaskListProps): JSX.Element {
   const prevActiveIndex = useRef<[number, number] | null>(null)
   const [hasLaunchedWizard, setHasLaunchedWizard] = useState<boolean>(false)
-  const [showCompletionScreen, setShowCompletionScreen] = useState<boolean>(
-    false
-  )
+  const [showCompletionScreen, setShowCompletionScreen] =
+    useState<boolean>(false)
   const { t } = useTranslation(['robot_calibration', 'device_settings'])
   const navigate = useNavigate()
   const { activeIndex, taskList, taskListStatus } = useCalibrationTaskList(
@@ -134,7 +132,7 @@ export function CalibrationTaskList({
             ) : (
               <Icon name="ot-check" size="3rem" color={COLORS.green50} />
             )}
-            <LegacyStyledText as="h1" marginTop={SPACING.spacing24}>
+            <LegacyStyledText forwardedAs="h1" marginTop={SPACING.spacing24}>
               {exitBeforeDeckConfigCompletion
                 ? t('using_current_calibrations')
                 : t('calibrations_complete')}

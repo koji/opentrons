@@ -1,30 +1,29 @@
-import type * as React from 'react'
-
 import {
   ALIGN_CENTER,
   Btn,
   COLORS,
   Flex,
   Icon,
+  InlineNotification,
   JUSTIFY_CENTER,
+  LegacyStyledText,
   POSITION_ABSOLUTE,
   POSITION_RELATIVE,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
 import { SmallButton } from '/app/atoms/buttons'
-import { InlineNotification } from '/app/atoms/InlineNotification'
 
-import type { InlineNotificationProps } from '/app/atoms/InlineNotification'
+import type { MouseEventHandler, ReactNode } from 'react'
+import type { InlineNotificationProps } from '@opentrons/components'
 
 interface RobotSetupHeaderProps {
   header: string
-  buttonText?: React.ReactNode
+  buttonText?: ReactNode
   inlineNotification?: InlineNotificationProps
-  onClickBack?: React.MouseEventHandler
-  onClickButton?: React.MouseEventHandler
+  onClickBack?: MouseEventHandler
+  onClickButton?: MouseEventHandler
 }
 
 export function RobotSetupHeader({
@@ -52,7 +51,10 @@ export function RobotSetupHeader({
             <Icon name="back" size="3rem" color={COLORS.black90} />
           </Btn>
         ) : null}
-        <LegacyStyledText as="h2" fontWeight={TYPOGRAPHY.fontWeightBold}>
+        <LegacyStyledText
+          forwardedAs="h2"
+          fontWeight={TYPOGRAPHY.fontWeightBold}
+        >
           {header}
         </LegacyStyledText>
         {onClickButton != null && buttonText != null ? (

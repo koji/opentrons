@@ -1,9 +1,10 @@
 """Test instrument context simulation."""
+
 from typing import Callable, cast
 
 import pytest
 from _pytest.fixtures import SubRequest
-from pytest_lazyfixture import lazy_fixture  # type: ignore[import-untyped]
+from pytest_lazy_fixtures import lf as lazy_fixture
 
 from opentrons.protocol_api.core.common import InstrumentCore, LabwareCore
 from opentrons.types import Location, Point
@@ -59,6 +60,7 @@ def test_dispense_no_tip(subject: InstrumentCore) -> None:
             location=location,
             well_core=None,
             in_place=False,
+            correction_volume=0,
             push_out=None,
         )
 
@@ -106,6 +108,7 @@ def test_pick_up_tip_prep_after(
         rate=1,
         flow_rate=1,
         in_place=False,
+        correction_volume=0,
     )
     subject.dispense(
         volume=1,
@@ -114,6 +117,7 @@ def test_pick_up_tip_prep_after(
         location=Location(point=Point(2, 2, 3), labware=None),
         well_core=labware.get_well_core("A2"),
         in_place=False,
+        correction_volume=0,
         push_out=None,
     )
 
@@ -134,6 +138,7 @@ def test_pick_up_tip_prep_after(
         rate=1,
         flow_rate=1,
         in_place=False,
+        correction_volume=0,
     )
     subject.dispense(
         volume=1,
@@ -142,6 +147,7 @@ def test_pick_up_tip_prep_after(
         location=Location(point=Point(2, 2, 3), labware=None),
         well_core=labware.get_well_core("A2"),
         in_place=False,
+        correction_volume=0,
         push_out=None,
     )
 
@@ -173,6 +179,7 @@ def test_aspirate_too_much(
             rate=1,
             flow_rate=1,
             in_place=False,
+            correction_volume=0,
         )
 
 
@@ -224,6 +231,7 @@ def _aspirate(i: InstrumentCore, labware: LabwareCore) -> None:
         rate=10,
         flow_rate=10,
         in_place=False,
+        correction_volume=0,
     )
 
 
@@ -237,6 +245,7 @@ def _aspirate_dispense(i: InstrumentCore, labware: LabwareCore) -> None:
         rate=10,
         flow_rate=10,
         in_place=False,
+        correction_volume=0,
     )
     i.dispense(
         volume=2,
@@ -245,6 +254,7 @@ def _aspirate_dispense(i: InstrumentCore, labware: LabwareCore) -> None:
         location=Location(point=Point(2, 2, 3), labware=None),
         well_core=labware.get_well_core("A2"),
         in_place=False,
+        correction_volume=0,
         push_out=None,
     )
 
@@ -259,11 +269,13 @@ def _aspirate_blowout(i: InstrumentCore, labware: LabwareCore) -> None:
         rate=13,
         flow_rate=13,
         in_place=False,
+        correction_volume=0,
     )
     i.blow_out(
         location=Location(point=Point(1, 2, 3), labware=None),
         well_core=labware.get_well_core("A1"),
         in_place=True,
+        flow_rate=789,
     )
 
 

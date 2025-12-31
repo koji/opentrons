@@ -1,6 +1,7 @@
-import * as React from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDispatch } from 'react-redux'
+
 import {
   ALIGN_CENTER,
   CheckboxField,
@@ -8,17 +9,20 @@ import {
   DIRECTION_ROW,
   Flex,
   JUSTIFY_FLEX_END,
-  Link,
-  PrimaryButton,
-  Modal,
-  SPACING,
   LegacyStyledText,
+  Link,
+  Modal,
+  PrimaryButton,
+  SPACING,
   TEXT_ALIGN_CENTER,
   TYPOGRAPHY,
 } from '@opentrons/components'
+
 import { updateConfigValue } from '/app/redux/config'
-import type { Dispatch } from '/app/redux/types'
+
+import type { ChangeEvent } from 'react'
 import type { UpdateConfigValueAction } from '/app/redux/config/types'
+import type { Dispatch } from '/app/redux/types'
 
 export function setHeaterShakerAttached(
   heaterShakerAttached: boolean
@@ -38,7 +42,7 @@ export const ConfirmAttachmentModal = (
 ): JSX.Element | null => {
   const { isProceedToRunModal, onCloseClick, onConfirmClick } = props
   const { t } = useTranslation(['heater_shaker', 'shared'])
-  const [isDismissed, setIsDismissed] = React.useState<boolean>(false)
+  const [isDismissed, setIsDismissed] = useState<boolean>(false)
   const dispatch = useDispatch<Dispatch>()
 
   const confirmAttached = (): void => {
@@ -81,7 +85,7 @@ export const ConfirmAttachmentModal = (
         }`}
       >
         <CheckboxField
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+          onChange={(e: ChangeEvent<HTMLInputElement>) => {
             setIsDismissed(e.currentTarget.checked)
           }}
           value={isDismissed}

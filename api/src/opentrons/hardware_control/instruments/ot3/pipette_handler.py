@@ -1,4 +1,5 @@
 """Shared code for managing pipette configuration and storage."""
+
 from dataclasses import dataclass
 import logging
 from typing import (
@@ -32,6 +33,7 @@ from opentrons.hardware_control.types import (
     HardwareAction,
     Axis,
     OT3Mount,
+    TipScrapeType,
 )
 from opentrons.hardware_control.constants import (
     SHAKE_OFF_TIPS_SPEED,
@@ -78,6 +80,8 @@ class TipActionMoveSpec:
     speed: Optional[
         float
     ]  # allow speed for a movement to default to its axes' speed settings
+    scrape_axis: Optional[Axis] = None
+    # add a scrape motion in the middle of a tip drop
 
 
 @dataclass(frozen=True)
@@ -237,6 +241,7 @@ class OT3PipetteHandler:
                 "back_compat_names",
                 "supported_tips",
                 "lld_settings",
+                "available_sensors",
             ]
 
             instr_dict = instr.as_dict()
@@ -248,7 +253,7 @@ class OT3PipetteHandler:
             result["current_nozzle_map"] = instr.nozzle_manager.current_configuration
             result["min_volume"] = instr.liquid_class.min_volume
             result["max_volume"] = instr.liquid_class.max_volume
-            result["channels"] = instr._max_channels
+            result["channels"] = instr._max_channels.value
             result["has_tip"] = instr.has_tip
             result["tip_length"] = instr.current_tip_length
             result["aspirate_speed"] = self.plunger_speed(
@@ -275,13 +280,23 @@ class OT3PipetteHandler:
                 alvl: self.plunger_speed(instr, fr, "aspirate")
                 for alvl, fr in instr.aspirate_flow_rates_lookup.items()
             }
-            result[
-                "default_push_out_volume"
-            ] = instr.active_tip_settings.default_push_out_volume
-            result[
-                "pipette_bounding_box_offsets"
-            ] = instr.config.pipette_bounding_box_offsets
+            result["default_push_out_volume"] = (
+                instr.active_tip_settings.default_push_out_volume
+            )
+            result["pipette_bounding_box_offsets"] = (
+                instr.config.pipette_bounding_box_offsets
+            )
             result["lld_settings"] = instr.config.lld_settings
+            result["plunger_positions"] = {
+                "top": instr.plunger_positions.top,
+                "bottom": instr.plunger_positions.bottom,
+                "blow_out": instr.plunger_positions.blow_out,
+                "drop_tip": instr.plunger_positions.drop_tip,
+            }
+            result["shaft_ul_per_mm"] = instr.config.shaft_ul_per_mm
+            result["available_sensors"] = instr.config.available_sensors
+            result["volume_mode"] = instr.liquid_class_name
+            result["available_volume_modes"] = instr.config.liquid_properties
         return cast(PipetteDict, result)
 
     @property
@@ -493,10 +508,19 @@ class OT3PipetteHandler:
         self._ihp_log.debug(f"{action} on {target.name}")
 
     def plunger_position(
-        self, instr: Pipette, ul: float, action: "UlPerMmAction"
+        self,
+        instr: Pipette,
+        ul: float,
+        action: "UlPerMmAction",
+        correction_volume: float = 0.0,
     ) -> float:
-        mm = ul / instr.ul_per_mm(ul, action)
-        position = instr.plunger_positions.bottom - mm
+        if ul == 0:
+            position = instr.plunger_positions.bottom
+        else:
+            multiplier = 1.0 + (correction_volume / ul)
+            mm_dist_from_bottom = ul / instr.ul_per_mm(ul, action)
+            mm_dist_from_bottom_corrected = mm_dist_from_bottom * multiplier
+            position = instr.plunger_positions.bottom - mm_dist_from_bottom_corrected
         return round(position, 6)
 
     def plunger_speed(
@@ -522,6 +546,7 @@ class OT3PipetteHandler:
         mount: OT3Mount,
         volume: Optional[float],
         rate: float,
+        correction_volume: float = 0.0,
     ) -> Optional[LiquidActionSpec]:
         """Check preconditions for aspirate, parse args, and calculate positions.
 
@@ -552,12 +577,15 @@ class OT3PipetteHandler:
         if asp_vol == 0:
             return None
 
-        assert instrument.ok_to_add_volume(
-            asp_vol
-        ), "Cannot aspirate more than pipette max volume"
+        assert instrument.ok_to_add_volume(asp_vol), (
+            "Cannot aspirate more than pipette max volume"
+        )
 
         dist = self.plunger_position(
-            instrument, instrument.current_volume + asp_vol, "aspirate"
+            instr=instrument,
+            ul=instrument.current_volume + asp_vol,
+            action="aspirate",
+            correction_volume=correction_volume,
         )
         speed = self.plunger_speed(
             instrument, instrument.aspirate_flow_rate * rate, "aspirate"
@@ -582,6 +610,8 @@ class OT3PipetteHandler:
         volume: Optional[float],
         rate: float,
         push_out: Optional[float],
+        is_full_dispense: bool,
+        correction_volume: float = 0.0,
     ) -> Optional[LiquidActionSpec]:
         """Check preconditions for dispense, parse args, and calculate positions.
 
@@ -618,12 +648,27 @@ class OT3PipetteHandler:
         # of the OT-2 version of this class. Protocol Engine does its own clamping,
         # so we don't expect this to trigger in practice.
         disp_vol = min(instrument.current_volume, disp_vol)
-        is_full_dispense = numpy.isclose(instrument.current_volume - disp_vol, 0)
+
+        # TODO (Ryan): Remove this check in the future.
+        # we moved this logic up to protocol_engine but replacing with this check to make sure
+        # we don't accidentally call this incorrectly from somewhere else.
+        if not is_full_dispense and numpy.isclose(
+            instrument.current_volume - disp_vol, 0
+        ):
+            raise CommandPreconditionViolated(
+                message="Command created a full-dispense without the full dispense argument",
+                detail={
+                    "command": "dispense",
+                    "current-volume": str(instrument.current_volume),
+                    "dispense-volume": str(disp_vol),
+                },
+            )
 
         if disp_vol == 0:
             return None
 
         if is_full_dispense:
+            disp_vol = instrument.current_volume
             if push_out is None:
                 push_out_ul = instrument.push_out_volume
             else:
@@ -650,7 +695,10 @@ class OT3PipetteHandler:
             )
 
         dist = self.plunger_position(
-            instrument, instrument.current_volume - disp_vol, "dispense"
+            instr=instrument,
+            ul=instrument.current_volume - disp_vol,
+            action="dispense",
+            correction_volume=correction_volume,
         )
         speed = self.plunger_speed(
             instrument, instrument.dispense_flow_rate * rate, "dispense"
@@ -880,6 +928,7 @@ class OT3PipetteHandler:
     def plan_lt_drop_tip(
         self,
         mount: OT3Mount,
+        scrape_tips: TipScrapeType = TipScrapeType.NONE,
     ) -> TipActionSpec:
         instrument = self.get_pipette(mount)
         config = instrument.drop_configurations.plunger_eject
@@ -887,6 +936,20 @@ class OT3PipetteHandler:
             raise CommandPreconditionViolated(
                 f"No plunger-eject drop tip configurations for {instrument.name} on {mount.name}"
             )
+        scrape_move: Optional[TipActionMoveSpec] = None
+        match scrape_tips:
+            case TipScrapeType.LEFT_ONE_COL:
+                scrape_move = TipActionMoveSpec(
+                    distance=-11, currents=None, speed=None, scrape_axis=Axis.X
+                )
+            case TipScrapeType.RIGHT_ONE_COL:
+                scrape_move = TipActionMoveSpec(
+                    distance=11, currents=None, speed=None, scrape_axis=Axis.X
+                )
+            case TipScrapeType.NONE:
+                scrape_move = None
+            case _:
+                scrape_move = None
         drop_seq = [
             TipActionMoveSpec(
                 distance=instrument.plunger_positions.drop_tip,
@@ -905,6 +968,9 @@ class OT3PipetteHandler:
                 },
             ),
         ]
+        if scrape_move:
+            # Add the scrape move before the plunger moves back up
+            drop_seq.insert(1, scrape_move)
 
         return TipActionSpec(
             tip_action_moves=drop_seq,

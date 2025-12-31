@@ -1,5 +1,6 @@
-import { useTranslation, Trans } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 import capitalize from 'lodash/capitalize'
+
 import {
   DIRECTION_COLUMN,
   Flex,
@@ -10,9 +11,12 @@ import {
   TYPOGRAPHY,
 } from '@opentrons/components'
 import { getModuleDisplayName } from '@opentrons/shared-data'
+
 import { OddModal } from '/app/molecules/OddModal'
+
 import type { AttachedModule } from '@opentrons/api-client'
 import type { OddModalHeaderBaseProps } from '/app/molecules/OddModal/types'
+
 export interface IncompatibleModuleODDModalBodyProps {
   modules: AttachedModule[]
 }
@@ -27,7 +31,7 @@ export function IncompatibleModuleODDModalBody({
   return (
     <OddModal header={incompatibleModuleHeader}>
       <Flex flexDirection={DIRECTION_COLUMN} width="100%">
-        <LegacyStyledText as="p" marginBottom={SPACING.spacing32}>
+        <LegacyStyledText forwardedAs="p" marginBottom={SPACING.spacing32}>
           <Trans t={t} i18nKey="remove_before_running_protocol" />
         </LegacyStyledText>
         <Flex
@@ -37,9 +41,9 @@ export function IncompatibleModuleODDModalBody({
           maxHeight="196px"
         >
           {modules.map(module => (
-            <ListItem key={module.id} type="noActive">
+            <ListItem key={module.id} type="default">
               <LegacyStyledText
-                as="p"
+                forwardedAs="p"
                 key={module.id}
                 fontWeight={TYPOGRAPHY.fontWeightSemiBold}
               >

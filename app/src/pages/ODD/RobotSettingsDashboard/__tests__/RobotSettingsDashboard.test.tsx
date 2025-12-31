@@ -1,35 +1,32 @@
-import { vi, it, describe, expect, beforeEach, afterEach } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { fireEvent, screen } from '@testing-library/react'
-import { when } from 'vitest-when'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithProviders } from '/app/__testing-utils__'
-
 import { i18n } from '/app/i18n'
-import { getRobotSettings } from '/app/redux/robot-settings'
-import { getLocalRobot } from '/app/redux/discovery'
-import {
-  getAppLanguage,
-  toggleDevtools,
-  toggleHistoricOffsets,
-  useFeatureFlag,
-} from '/app/redux/config'
-import { mockConnectedRobot } from '/app/redux/discovery/__fixtures__'
 import { Navigation } from '/app/organisms/ODD/Navigation'
 import {
   DeviceReset,
-  TouchScreenSleep,
-  TouchscreenBrightness,
   LanguageSetting,
   NetworkSettings,
   Privacy,
   RobotSystemVersion,
+  TouchscreenBrightness,
+  TouchScreenSleep,
   UpdateChannel,
 } from '/app/organisms/ODD/RobotSettingsDashboard'
+import { CameraPreferences } from '/app/organisms/ODD/RobotSettingsDashboard/CameraPreferences'
+import { getAppLanguage, toggleDevtools } from '/app/redux/config'
+import { getLocalRobot } from '/app/redux/discovery'
+import { mockConnectedRobot } from '/app/redux/discovery/__fixtures__'
+import { getRobotSettings } from '/app/redux/robot-settings'
 import { getRobotUpdateAvailable } from '/app/redux/robot-update'
-import { useNetworkConnection } from '/app/resources/networking'
-import { useLEDLights } from '/app/resources/robot-settings'
 import { useErrorRecoverySettingsToggle } from '/app/resources/errorRecovery'
+import { useNetworkConnection } from '/app/resources/networking'
+import {
+  useDisableStackerSensors,
+  useLEDLights,
+} from '/app/resources/robot-settings'
 
 import { RobotSettingsDashboard } from '../'
 
@@ -52,9 +49,11 @@ vi.mock('/app/organisms/ODD/RobotSettingsDashboard/TouchscreenBrightness')
 vi.mock('/app/organisms/ODD/RobotSettingsDashboard/UpdateChannel')
 vi.mock('/app/organisms/ODD/RobotSettingsDashboard/Privacy')
 vi.mock('/app/organisms/ODD/RobotSettingsDashboard/LanguageSetting')
+vi.mock('/app/organisms/ODD/RobotSettingsDashboard/CameraPreferences')
 
 const mockToggleLights = vi.fn()
 const mockToggleER = vi.fn()
+const mockToggleStackerSensors = vi.fn()
 
 const render = () => {
   return renderWithProviders(
@@ -86,15 +85,16 @@ describe('RobotSettingsDashboard', () => {
       lightsEnabled: false,
       toggleLights: mockToggleLights,
     })
+    vi.mocked(useDisableStackerSensors).mockReturnValue({
+      sensorsDisabled: false,
+      toggleSensors: mockToggleStackerSensors,
+    })
     vi.mocked(useNetworkConnection).mockReturnValue({} as any)
     vi.mocked(useErrorRecoverySettingsToggle).mockReturnValue({
       isEREnabled: true,
       toggleERSettings: mockToggleER,
     })
     vi.mocked(getAppLanguage).mockReturnValue(MOCK_DEFAULT_LANGUAGE)
-    when(vi.mocked(useFeatureFlag))
-      .calledWith('enableLocalization')
-      .thenReturn(true)
   })
 
   afterEach(() => {
@@ -113,7 +113,7 @@ describe('RobotSettingsDashboard', () => {
     screen.getByText('Robot System Version')
     screen.getByText('Network Settings')
     screen.getByText('Status LEDs')
-    screen.getByText('Error Recovery Mode')
+    screen.getByText('Recovery Mode')
     screen.getByText(
       'Control the strip of color lights on the front of the robot.'
     )
@@ -122,9 +122,8 @@ describe('RobotSettingsDashboard', () => {
     screen.getByText('Privacy')
     screen.getByText('Choose what data to share with Opentrons.')
     screen.getByText('Device Reset')
+    screen.getByText('Camera Preferences')
     screen.getByText('Update Channel')
-    screen.getByText('Apply Labware Offsets')
-    screen.getByText('Use stored data when setting up a protocol.')
     screen.getByText('Developer Tools')
     screen.getByText('Access additional logging and feature flags.')
   })
@@ -186,6 +185,30 @@ describe('RobotSettingsDashboard', () => {
     ).toHaveTextContent('Off')
   })
 
+  it('should render disable stacker sensors copy, and calls toggleSensors', () => {
+    render()
+    screen.getByText('Disable Stacker Sensors for Labware Detection')
+
+    const toggle = screen.getByTestId(
+      'RobotSettingButton_disable_stacker_sensors'
+    )
+    expect(toggle).toHaveTextContent('Off')
+
+    fireEvent.click(toggle)
+    expect(mockToggleStackerSensors).toHaveBeenCalled()
+  })
+
+  it('should render on toggle with stacker sensors disabled', () => {
+    vi.mocked(useDisableStackerSensors).mockReturnValue({
+      sensorsDisabled: true,
+      toggleSensors: mockToggleStackerSensors,
+    })
+    render()
+    expect(
+      screen.getByTestId('RobotSettingButton_disable_stacker_sensors')
+    ).toHaveTextContent('On')
+  })
+
   it('should render component when tapping network settings', () => {
     render()
     const button = screen.getByText('Network Settings')
@@ -205,6 +228,13 @@ describe('RobotSettingsDashboard', () => {
     const button = screen.getByText('Touchscreen Brightness')
     fireEvent.click(button)
     expect(vi.mocked(TouchscreenBrightness)).toHaveBeenCalled()
+  })
+
+  it('should render component when tapping camera preferences', () => {
+    render()
+    const button = screen.getByText('Camera Preferences')
+    fireEvent.click(button)
+    expect(vi.mocked(CameraPreferences)).toHaveBeenCalled()
   })
 
   it('should render component when tapping privacy', () => {
@@ -242,13 +272,6 @@ describe('RobotSettingsDashboard', () => {
     expect(
       screen.getByTestId('RobotSettingButton_home_gantry_on_restart')
     ).toHaveTextContent('On')
-  })
-
-  it('should call a mock function when tapping enable historic offset', () => {
-    render()
-    const button = screen.getByText('Apply Labware Offsets')
-    fireEvent.click(button)
-    expect(vi.mocked(toggleHistoricOffsets)).toHaveBeenCalled()
   })
 
   it('should call a mock function when tapping enable dev tools', () => {

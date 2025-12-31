@@ -1,4 +1,5 @@
 """Command models to wait for heating a Thermocycler's block."""
+
 from __future__ import annotations
 from typing import Optional, TYPE_CHECKING
 from typing_extensions import Literal, Type
@@ -77,7 +78,7 @@ class WaitForBlockTemperature(
         "thermocycler/waitForBlockTemperature"
     )
     params: WaitForBlockTemperatureParams
-    result: Optional[WaitForBlockTemperatureResult]
+    result: Optional[WaitForBlockTemperatureResult] = None
 
     _ImplementationCls: Type[WaitForBlockTemperatureImpl] = WaitForBlockTemperatureImpl
 

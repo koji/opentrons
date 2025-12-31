@@ -1,74 +1,41 @@
+import { getTrashBinAddressableAreaName } from '@opentrons/step-generation'
+
+import { getStagingAreaAddressableAreas } from '../../utils'
 import {
-  requiredField,
-  minimumWellCount,
-  nonZero,
-  composeErrors,
-  minFieldValue,
-  maxFieldValue,
-  temperatureRangeFieldValue,
-  realNumber,
-  isTimeFormat,
-  isTimeFormatMinutesSeconds,
-} from './errors'
-import {
-  maskToInteger,
+  composeMaskers,
+  defaultTo,
   maskToFloat,
+  maskToInteger,
   maskToTime,
   numberOrNull,
   onlyPositiveNumbers,
-  defaultTo,
-  composeMaskers,
   trimDecimals,
 } from './processing'
-import {
-  MIN_TEMP_MODULE_TEMP,
-  MAX_TEMP_MODULE_TEMP,
-  MIN_HEATER_SHAKER_MODULE_TEMP,
-  MAX_HEATER_SHAKER_MODULE_TEMP,
-  MIN_TC_BLOCK_TEMP,
-  MAX_TC_BLOCK_TEMP,
-  MIN_TC_LID_TEMP,
-  MAX_TC_LID_TEMP,
-  MIN_TC_DURATION_SECONDS,
-  MAX_TC_DURATION_SECONDS,
-  MIN_HEATER_SHAKER_MODULE_RPM,
-  MAX_HEATER_SHAKER_MODULE_RPM,
-  MIN_HEATER_SHAKER_DURATION_SECONDS,
-  MAX_HEATER_SHAKER_DURATION_SECONDS,
-  MIN_TC_PROFILE_VOLUME,
-  MAX_TC_PROFILE_VOLUME,
-} from '../../constants'
-import { getStagingAreaAddressableAreas } from '../../utils'
-import type {
-  LabwareEntity,
-  PipetteEntity,
-  InvariantContext,
-  LabwareEntities,
-  AdditionalEquipmentEntities,
-  AdditionalEquipmentEntity,
-} from '@opentrons/step-generation'
-import type { ValueMasker, ValueCaster } from './processing'
-import type { StepFieldName } from '../../form-types'
+
 import type {
   AddressableAreaName,
   CutoutId,
   LabwareLocation,
 } from '@opentrons/shared-data'
+import type {
+  InvariantContext,
+  LabwareEntities,
+  PipetteEntity,
+  StagingAreaEntities,
+  TipRackWithDef,
+  TrashBinEntities,
+  WasteChuteEntities,
+} from '@opentrons/step-generation'
+import type {
+  HydratedFormData,
+  LabwareOrAdditionalEquipmentEntity,
+  StepFieldName,
+} from '../../form-types'
+import type { LabwareDefByDefURI } from '../../labware-defs'
+import type { AmalgamateUnion } from '../../utils/utilityTypes'
+import type { ValueCaster, ValueMasker } from './processing'
 
 export type { StepFieldName }
-
-interface LabwareEntityWithTouchTip extends LabwareEntity {
-  isTouchTipAllowed: boolean
-}
-
-interface AdditionalEquipmentEntityWithTouchTip
-  extends AdditionalEquipmentEntity {
-  isTouchTipAllowed: boolean
-}
-
-type LabwareOrAdditionalEquipmentEntity =
-  | LabwareEntityWithTouchTip
-  | AdditionalEquipmentEntityWithTouchTip
 
 const getLabwareOrAdditionalEquipmentEntity = (
   state: InvariantContext,
@@ -83,48 +50,57 @@ const getLabwareOrAdditionalEquipmentEntity = (
       ...state.labwareEntities[id],
       isTouchTipAllowed: !labwareDisallowsTouchTip,
     }
-  } else if (state.additionalEquipmentEntities[id] != null) {
+  } else if (state.wasteChuteEntities[id] != null) {
     return {
-      ...state.additionalEquipmentEntities[id],
+      ...state.wasteChuteEntities[id],
       isTouchTipAllowed: false,
+      name: 'wasteChute',
+    }
+  } else if (state.trashBinEntities[id] != null) {
+    return {
+      ...state.trashBinEntities[id],
+      isTouchTipAllowed: false,
+      name: 'trashBin',
     }
   } else return null
 }
 
-const getIsAdapterLocation = (
+const getIsStackingLocation = (
   newLocation: string,
   labwareEntities: LabwareEntities
 ): boolean => {
-  if (labwareEntities[newLocation] == null) return false
-  return (
-    labwareEntities[newLocation].def.allowedRoles?.includes('adapter') ?? false
-  )
+  return labwareEntities[newLocation] != null
 }
+
 const getIsAdditionalEquipmentLocation = (
   newLocation: string,
-  additionalEquipmentEntities: AdditionalEquipmentEntities
+  wasteChuteEntities: WasteChuteEntities,
+  trashBinEntities: TrashBinEntities,
+  stagingAreaEntities: StagingAreaEntities
 ): boolean => {
-  const wasteChuteEntity = Object.values(additionalEquipmentEntities).find(
-    aE => aE.name === 'wasteChute'
-  )
-  const stagingAreaCutoutIds = Object.values(additionalEquipmentEntities)
-    .filter(aE => aE.name === 'stagingArea')
-    ?.map(equipment => {
+  const stagingAreaCutoutIds = Object.values(stagingAreaEntities).map(
+    equipment => {
       return equipment.location ?? ''
-    })
+    }
+  )
   const stagingAreaAddressableAreaNames = getStagingAreaAddressableAreas(
     stagingAreaCutoutIds as CutoutId[]
   )
-
+  const isNewLocationInTrashBin = Object.values(trashBinEntities).some(
+    trash => trash.location === newLocation
+  )
   const isNewLocationInWasteChute =
-    wasteChuteEntity?.name === 'wasteChute' &&
-    wasteChuteEntity?.location === newLocation
+    Object.values(wasteChuteEntities)[0]?.location === newLocation
 
   const isNewLocationInStagingArea =
     stagingAreaCutoutIds != null &&
     stagingAreaAddressableAreaNames.includes(newLocation as AddressableAreaName)
 
-  return isNewLocationInWasteChute || isNewLocationInStagingArea
+  return (
+    isNewLocationInWasteChute ||
+    isNewLocationInStagingArea ||
+    isNewLocationInTrashBin
+  )
 }
 
 const getLabwareLocation = (
@@ -132,31 +108,41 @@ const getLabwareLocation = (
   newLocationString: string
 ): LabwareLocation | null => {
   const isWasteChuteLocation =
-    Object.values(state.additionalEquipmentEntities).find(
-      aE => aE.location === newLocationString && aE.name === 'wasteChute'
+    Object.values(state.wasteChuteEntities).find(
+      aE => aE.location === newLocationString
+    ) != null
+  const isTrashBinLocation =
+    Object.values(state.trashBinEntities).find(
+      aE => aE.location === newLocationString
     ) != null
 
   if (newLocationString === 'offDeck') {
     return 'offDeck'
-  } else if (newLocationString in state.moduleEntities) {
+  } else if (state.moduleEntities[newLocationString] != null) {
     return { moduleId: newLocationString }
   } else if (
     newLocationString != null &&
-    getIsAdapterLocation(newLocationString, state.labwareEntities)
+    getIsStackingLocation(newLocationString, state.labwareEntities)
   ) {
     return { labwareId: newLocationString }
   } else if (
     getIsAdditionalEquipmentLocation(
       newLocationString,
-      state.additionalEquipmentEntities
+      state.wasteChuteEntities,
+      state.trashBinEntities,
+      state.stagingAreaEntities
     )
   ) {
-    return {
-      addressableAreaName: isWasteChuteLocation
-        ? 'gripperWasteChute'
-        : // TODO(bh, 2024-01-02): check new location against addressable areas via the deck definition
-          (newLocationString as AddressableAreaName),
+    let addressableAreaName: AddressableAreaName =
+      newLocationString as AddressableAreaName
+    if (isWasteChuteLocation) {
+      addressableAreaName = 'gripperWasteChute'
+    } else if (isTrashBinLocation) {
+      addressableAreaName = getTrashBinAddressableAreaName(
+        newLocationString as CutoutId
+      )
     }
+    return { addressableAreaName }
   } else {
     return { slotName: newLocationString }
   }
@@ -169,124 +155,177 @@ const getPipetteEntity = (
   return state.pipetteEntities[id] || null
 }
 
-interface StepFieldHelpers {
-  getErrors?: (arg0: unknown) => string[]
-  maskValue?: ValueMasker
-  castValue?: ValueCaster
-  hydrate?: (state: InvariantContext, id: string) => unknown
+const getTipRackDefinition = (
+  state: InvariantContext,
+  tiprackDefURI: string,
+  allLabwareDefs: LabwareDefByDefURI
+): TipRackWithDef => {
+  return { tiprackDefURI: tiprackDefURI, ...allLabwareDefs[tiprackDefURI] }
 }
-const stepFieldHelperMap: Record<StepFieldName, StepFieldHelpers> = {
-  aspirate_airGap_volume: {
+
+interface StepFieldHelpers<ValueCasterT extends ValueCaster<any, any>> {
+  // todo(mm, 2025-10-09): Refine this type to also parametrize the exact types of the
+  // masked value and hydrated value.
+  maskValue?: ValueMasker
+  hydrate?: (
+    state: InvariantContext,
+    id: string,
+    allLabwareDefs: LabwareDefByDefURI
+  ) => unknown
+  castValue?: ValueCasterT
+}
+
+/**
+ * Construct a `StepFieldHelpers`.
+ *
+ * This is just a pass-through, for the benefit of type-checking the props of each
+ * `StepFieldHelpers` when we construct a bunch of them inside `stepFieldHelperMap`.
+ */
+function stepFieldHelpers<StepFieldHelpersT extends StepFieldHelpers<any>>(
+  input: StepFieldHelpersT
+): StepFieldHelpersT {
+  return input
+}
+
+// The processing steps to perform on each field, if any.
+//
+// Each key should be a `StepFieldName` and each value should be a `StepFieldHelpers`.
+// There's no type annotation up top here because we want TypeScript to infer the exact
+// type of each value separately.
+const stepFieldHelperMap = {
+  aspirate_airGap_volume: stepFieldHelpers({
     maskValue: composeMaskers(
       maskToFloat,
       onlyPositiveNumbers,
       trimDecimals(1)
     ),
     castValue: Number,
-  },
-  message: {
-    getErrors: composeErrors(requiredField),
-  },
-  aspirate_labware: {
-    getErrors: composeErrors(requiredField),
+  }),
+  aspirate_labware: stepFieldHelpers({
     hydrate: getLabwareOrAdditionalEquipmentEntity,
-  },
-  aspirate_mix_times: {
+  }),
+  aspirate_mix_times: stepFieldHelpers({
     maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers, defaultTo(1)),
     castValue: Number,
-  },
-  aspirate_mix_volume: {
+  }),
+  aspirate_mix_volume: stepFieldHelpers({
     maskValue: composeMaskers(
       maskToFloat,
       onlyPositiveNumbers,
       trimDecimals(1)
     ),
     castValue: Number,
-  },
-  aspirate_mmFromBottom: {
-    castValue: Number,
-  },
-  aspirate_wells: {
-    getErrors: composeErrors(requiredField, minimumWellCount(1)),
-    maskValue: defaultTo([]),
-  },
-  dispense_airGap_volume: {
-    maskValue: composeMaskers(
-      maskToFloat,
-      onlyPositiveNumbers,
-      trimDecimals(1)
-    ),
-    castValue: Number,
-  },
-  dispense_labware: {
-    getErrors: composeErrors(requiredField),
-    hydrate: getLabwareOrAdditionalEquipmentEntity,
-  },
-  dispense_mix_times: {
-    maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers, defaultTo(1)),
-    castValue: Number,
-  },
-  dispense_mix_volume: {
-    maskValue: composeMaskers(
-      maskToFloat,
-      onlyPositiveNumbers,
-      trimDecimals(1)
-    ),
-    castValue: Number,
-  },
-  dispense_mmFromBottom: {
-    castValue: Number,
-  },
-  dispense_wells: {
-    getErrors: composeErrors(requiredField, minimumWellCount(0)),
-    maskValue: defaultTo([]),
-  },
-  disposalVolume_volume: {
-    maskValue: composeMaskers(
-      maskToFloat,
-      onlyPositiveNumbers,
-      trimDecimals(1)
-    ),
-    castValue: Number,
-  },
-  labware: {
-    getErrors: composeErrors(requiredField),
-    hydrate: getLabwareOrAdditionalEquipmentEntity,
-  },
-  aspirate_delay_seconds: {
-    maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers, defaultTo(1)),
-    castValue: Number,
-  },
-  aspirate_delay_mmFromBottom: {
+  }),
+  aspirate_mmFromBottom: stepFieldHelpers({
     castValue: numberOrNull,
-  },
-  dispense_delay_seconds: {
+  }),
+  aspirate_wells: stepFieldHelpers({
+    maskValue: defaultTo([]),
+  }),
+  dispense_airGap_volume: stepFieldHelpers({
+    maskValue: composeMaskers(
+      maskToFloat,
+      onlyPositiveNumbers,
+      trimDecimals(1)
+    ),
+    castValue: Number,
+  }),
+  dispense_labware: stepFieldHelpers({
+    hydrate: getLabwareOrAdditionalEquipmentEntity,
+  }),
+  dispense_mix_times: stepFieldHelpers({
     maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers, defaultTo(1)),
     castValue: Number,
-  },
-  dispense_delay_mmFromBottom: {
+  }),
+  dispense_mix_volume: stepFieldHelpers({
+    maskValue: composeMaskers(
+      maskToFloat,
+      onlyPositiveNumbers,
+      trimDecimals(1)
+    ),
+    castValue: Number,
+  }),
+  dispense_mmFromBottom: stepFieldHelpers({
     castValue: numberOrNull,
-  },
-  pauseHour: {
-    maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers),
-  },
-  pauseMinute: {
-    maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers),
-  },
-  pauseSecond: {
-    maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers),
-  },
-  pipette: {
-    getErrors: composeErrors(requiredField),
+  }),
+  dispense_wells: stepFieldHelpers({
+    maskValue: defaultTo([]),
+  }),
+  disposalVolume_volume: stepFieldHelpers({
+    maskValue: composeMaskers(
+      maskToFloat,
+      onlyPositiveNumbers,
+      trimDecimals(1)
+    ),
+    castValue: Number,
+  }),
+  labware: stepFieldHelpers({
+    hydrate: getLabwareOrAdditionalEquipmentEntity,
+  }),
+  aspirate_delay_checkbox: stepFieldHelpers({}),
+  aspirate_delay_seconds: stepFieldHelpers({
+    maskValue: composeMaskers(
+      maskToFloat,
+      onlyPositiveNumbers,
+      trimDecimals(1)
+    ),
+    castValue: Number,
+  }),
+  aspirate_delay_mmFromBottom: stepFieldHelpers({
+    castValue: numberOrNull,
+  }),
+  aspirate_touchTip_speed: stepFieldHelpers({
+    maskValue: composeMaskers(maskToFloat, onlyPositiveNumbers),
+    castValue: Number,
+  }),
+  dispense_touchTip_speed: stepFieldHelpers({
+    maskValue: composeMaskers(maskToFloat, onlyPositiveNumbers),
+    castValue: Number,
+  }),
+  aspirate_touchTip_mmFromEdge: stepFieldHelpers({
+    maskValue: composeMaskers(maskToFloat, onlyPositiveNumbers),
+    castValue: Number,
+  }),
+  dispense_touchTip_mmFromEdge: stepFieldHelpers({
+    maskValue: composeMaskers(maskToFloat, onlyPositiveNumbers),
+    castValue: Number,
+  }),
+  dispense_delay_seconds: stepFieldHelpers({
+    maskValue: composeMaskers(
+      maskToFloat,
+      onlyPositiveNumbers,
+      trimDecimals(1)
+    ),
+    castValue: Number,
+  }),
+  dispense_delay_mmFromBottom: stepFieldHelpers({
+    castValue: numberOrNull,
+  }),
+  aspirate_submerge_delay_seconds: stepFieldHelpers({
+    maskValue: composeMaskers(maskToFloat, onlyPositiveNumbers),
+    castValue: Number,
+  }),
+  aspirate_retract_delay_seconds: stepFieldHelpers({
+    maskValue: composeMaskers(maskToFloat, onlyPositiveNumbers),
+    castValue: Number,
+  }),
+  dispense_submerge_delay_seconds: stepFieldHelpers({
+    maskValue: composeMaskers(maskToFloat, onlyPositiveNumbers),
+    castValue: Number,
+  }),
+  dispense_retract_delay_seconds: stepFieldHelpers({
+    maskValue: composeMaskers(maskToFloat, onlyPositiveNumbers),
+    castValue: Number,
+  }),
+  pipette: stepFieldHelpers({
     hydrate: getPipetteEntity,
-  },
-  times: {
-    getErrors: composeErrors(requiredField),
+  }),
+  tipRack: stepFieldHelpers({ hydrate: getTipRackDefinition }),
+  times: stepFieldHelpers({
     maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers, defaultTo(0)),
     castValue: Number,
-  },
-  volume: {
-    getErrors: composeErrors(requiredField, nonZero),
+  }),
+  volume: stepFieldHelpers({
     maskValue: composeMaskers(
       maskToFloat,
       onlyPositiveNumbers,
@@ -294,207 +333,187 @@ const stepFieldHelperMap: Record<StepFieldName, StepFieldHelpers> = {
       defaultTo(0)
     ),
     castValue: Number,
-  },
-  wells: {
-    getErrors: composeErrors(requiredField, minimumWellCount(1)),
+  }),
+  wells: stepFieldHelpers({
     maskValue: defaultTo([]),
-  },
-  magnetAction: {
-    getErrors: composeErrors(requiredField),
-  },
-  engageHeight: {
-    getErrors: composeErrors(realNumber),
+  }),
+  engageHeight: stepFieldHelpers({
     maskValue: composeMaskers(maskToFloat, trimDecimals(1)),
     castValue: Number,
-  },
-  setTemperature: {
-    getErrors: composeErrors(requiredField),
-  },
-  targetTemperature: {
-    getErrors: composeErrors(
-      minFieldValue(MIN_TEMP_MODULE_TEMP),
-      maxFieldValue(MAX_TEMP_MODULE_TEMP)
-    ),
+  }),
+  targetTemperature: stepFieldHelpers({
     maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers),
     castValue: Number,
-  },
-  targetHeaterShakerTemperature: {
-    getErrors: composeErrors(
-      minFieldValue(MIN_HEATER_SHAKER_MODULE_TEMP),
-      maxFieldValue(MAX_HEATER_SHAKER_MODULE_TEMP)
-    ),
+  }),
+  targetHeaterShakerTemperature: stepFieldHelpers({
     maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers),
     castValue: Number,
-  },
-  targetSpeed: {
-    getErrors: composeErrors(
-      minFieldValue(MIN_HEATER_SHAKER_MODULE_RPM),
-      maxFieldValue(MAX_HEATER_SHAKER_MODULE_RPM)
-    ),
+  }),
+  targetSpeed: stepFieldHelpers({
     maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers),
     castValue: Number,
-  },
-  heaterShakerTimerMinutes: {
-    maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers),
-    castValue: Number,
-  },
-  heaterShakerTimerSeconds: {
-    getErrors: composeErrors(
-      minFieldValue(MIN_HEATER_SHAKER_DURATION_SECONDS),
-      maxFieldValue(MAX_HEATER_SHAKER_DURATION_SECONDS)
-    ),
-    maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers),
-    castValue: Number,
-  },
-  heaterShakerTimer: {
+  }),
+  heaterShakerTimer: stepFieldHelpers({
     maskValue: composeMaskers(maskToTime),
-    getErrors: composeErrors(isTimeFormatMinutesSeconds),
     castValue: String,
-  },
-  pauseAction: {
-    getErrors: composeErrors(requiredField),
-  },
-  pauseTime: {
+  }),
+  pauseTime: stepFieldHelpers({
     maskValue: composeMaskers(maskToTime),
-    getErrors: composeErrors(isTimeFormat),
     castValue: String,
-  },
-  pauseTemperature: {
-    getErrors: composeErrors(
-      minFieldValue(MIN_TEMP_MODULE_TEMP),
-      maxFieldValue(MAX_TEMP_MODULE_TEMP)
-    ),
+  }),
+  pauseTemperature: stepFieldHelpers({
     maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers),
     castValue: Number,
-  },
-  blockTargetTemp: {
-    getErrors: composeErrors(
-      temperatureRangeFieldValue(MIN_TC_BLOCK_TEMP, MAX_TC_BLOCK_TEMP)
-    ),
+  }),
+  blockTargetTemp: stepFieldHelpers({
     maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers),
     castValue: Number,
-  },
-  lidTargetTemp: {
-    getErrors: composeErrors(
-      temperatureRangeFieldValue(MIN_TC_LID_TEMP, MAX_TC_LID_TEMP)
-    ),
+  }),
+  lidTargetTemp: stepFieldHelpers({
     maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers),
     castValue: Number,
-  },
-  profileTargetLidTemp: {
-    getErrors: composeErrors(
-      temperatureRangeFieldValue(MIN_TC_LID_TEMP, MAX_TC_LID_TEMP)
-    ),
-  },
-  profileVolume: {
+  }),
+  profileVolume: stepFieldHelpers({
     maskValue: composeMaskers(maskToFloat, onlyPositiveNumbers),
-    getErrors: composeErrors(
-      minFieldValue(MIN_TC_PROFILE_VOLUME),
-      maxFieldValue(MAX_TC_PROFILE_VOLUME)
-    ),
-  },
-  blockTargetTempHold: {
-    getErrors: composeErrors(
-      temperatureRangeFieldValue(MIN_TC_BLOCK_TEMP, MAX_TC_BLOCK_TEMP)
-    ),
+  }),
+  blockTargetTempHold: stepFieldHelpers({
     maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers),
     castValue: Number,
-  },
-  lidTargetTempHold: {
-    getErrors: composeErrors(
-      temperatureRangeFieldValue(MIN_TC_LID_TEMP, MAX_TC_LID_TEMP)
-    ),
+  }),
+  lidTargetTempHold: stepFieldHelpers({
     maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers),
     castValue: Number,
-  },
-  mix_mmFromBottom: {
-    castValue: Number,
-  },
-  newLocation: {
-    getErrors: composeErrors(requiredField),
+  }),
+  mix_mmFromBottom: stepFieldHelpers({
+    castValue: numberOrNull,
+  }),
+  newLocation: stepFieldHelpers({
     hydrate: getLabwareLocation,
-  },
-  tipRack: {
-    getErrors: composeErrors(requiredField),
-  },
-  aspirate_flowRate: {
+  }),
+  aspirate_flowRate: stepFieldHelpers({
     maskValue: composeMaskers(trimDecimals(1)),
-  },
-  dispense_flowRate: {
+    castValue: numberOrNull,
+  }),
+  dispense_flowRate: stepFieldHelpers({
     maskValue: composeMaskers(trimDecimals(1)),
-  },
-  mix_flowRate: {
+    castValue: numberOrNull,
+  }),
+  mix_flowRate: stepFieldHelpers({
     maskValue: composeMaskers(trimDecimals(1)),
-  },
-}
-const profileFieldHelperMap: Record<string, StepFieldHelpers> = {
-  // profile step fields
-  temperature: {
-    getErrors: composeErrors(
-      requiredField,
-      minFieldValue(MIN_TC_BLOCK_TEMP),
-      maxFieldValue(MAX_TC_BLOCK_TEMP)
+    castValue: numberOrNull,
+  }),
+  blowout_flowRate: stepFieldHelpers({
+    maskValue: composeMaskers(trimDecimals(1)),
+    castValue: numberOrNull,
+  }),
+  pushOut_volume: stepFieldHelpers({
+    maskValue: composeMaskers(
+      maskToFloat,
+      onlyPositiveNumbers,
+      trimDecimals(1)
     ),
-    maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers),
-    castValue: Number,
-  },
-  durationMinutes: {
-    maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers),
-    castValue: Number,
-  },
-  durationSeconds: {
-    getErrors: composeErrors(
-      minFieldValue(MIN_TC_DURATION_SECONDS),
-      maxFieldValue(MAX_TC_DURATION_SECONDS)
+    castValue: numberOrNull,
+  }),
+  aspirate_submerge_speed: stepFieldHelpers({
+    maskValue: composeMaskers(
+      maskToFloat,
+      onlyPositiveNumbers,
+      trimDecimals(1)
     ),
-    maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers),
-    castValue: Number,
-  },
-  // profile cycle fields
-  repetitions: {
-    getErrors: composeErrors(requiredField),
-    maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers),
-    castValue: Number,
-  },
+    castValue: numberOrNull,
+  }),
+  aspirate_retract_speed: stepFieldHelpers({
+    maskValue: composeMaskers(
+      maskToFloat,
+      onlyPositiveNumbers,
+      trimDecimals(1)
+    ),
+    castValue: numberOrNull,
+  }),
+  dispense_submerge_speed: stepFieldHelpers({
+    maskValue: composeMaskers(
+      maskToFloat,
+      onlyPositiveNumbers,
+      trimDecimals(1)
+    ),
+    castValue: numberOrNull,
+  }),
+  dispense_retract_speed: stepFieldHelpers({
+    maskValue: composeMaskers(
+      maskToFloat,
+      onlyPositiveNumbers,
+      trimDecimals(1)
+    ),
+    castValue: numberOrNull,
+  }),
+  conditioning_volume: stepFieldHelpers({
+    maskValue: composeMaskers(maskToFloat, onlyPositiveNumbers),
+    castValue: numberOrNull,
+  }),
 }
-export const getFieldErrors = (
-  name: StepFieldName,
-  value: unknown
-): string[] => {
-  const fieldErrorGetter =
-    stepFieldHelperMap[name] && stepFieldHelperMap[name].getErrors
-  const errors = fieldErrorGetter ? fieldErrorGetter(value) : []
-  return errors
-}
-export const getProfileFieldErrors = (
-  name: string,
-  value: unknown
-): string[] => {
-  const fieldErrorGetter =
-    profileFieldHelperMap[name] && profileFieldHelperMap[name].getErrors
-  const errors = fieldErrorGetter ? fieldErrorGetter(value) : []
-  return errors
-}
-export const castField = (name: StepFieldName, value: unknown): unknown => {
+
+export function castField<
+  FieldNameT extends string | number | symbol,
+  UncastValueT,
+>(name: FieldNameT, value: UncastValueT): GetCastFieldType<FieldNameT> {
   const fieldCaster =
+    // @ts-expect-error - TS doesn't want to let us index stepFieldHelperMap with a
+    // name that it doesn't necessarily contain. It's OK here because it'll just
+    // return undefined in the worst case, which this line handles.
     stepFieldHelperMap[name] && stepFieldHelperMap[name].castValue
   return fieldCaster ? fieldCaster(value) : value
 }
+
 export const maskField = (name: StepFieldName, value: unknown): unknown => {
   const fieldMasker =
+    // @ts-expect-error - TS doesn't want to let us index stepFieldHelperMap with a
+    // name that it doesn't necessarily contain. It's OK here because it'll just
+    // return undefined in the worst case, which this line handles.
     stepFieldHelperMap[name] && stepFieldHelperMap[name].maskValue
   return fieldMasker ? fieldMasker(value) : value
 }
-export const maskProfileField = (name: string, value: unknown): unknown => {
-  const fieldMasker =
-    profileFieldHelperMap[name] && profileFieldHelperMap[name].maskValue
-  return fieldMasker ? fieldMasker(value) : value
-}
+
 export const hydrateField = (
   state: InvariantContext,
   name: StepFieldName,
-  value: string
+  value: string,
+  allLabwareDefs: LabwareDefByDefURI
 ): unknown => {
-  const hydrator = stepFieldHelperMap[name] && stepFieldHelperMap[name].hydrate
-  return hydrator ? hydrator(state, value) : value
+  const hydrator =
+    // @ts-expect-error - TS doesn't want to let us index stepFieldHelperMap with a
+    // name that it doesn't necessarily contain. It's OK here because it'll just
+    // return undefined in the worst case, which this line handles.
+    stepFieldHelperMap[name] && stepFieldHelperMap[name].hydrate
+  return hydrator ? hydrator(state, value, allLabwareDefs) : value
+}
+
+/**
+ * Returns the type that a field would have in `HydratedFormData`,
+ * assuming that field is being accessed on a form type where it actually exists.
+ */
+type GetHydratedFieldType<FieldNameT extends string | number | symbol> =
+  AmalgamateUnion<HydratedFormData> extends {
+    [Key in FieldNameT]: infer HydratedValueT
+  }
+    ? HydratedValueT
+    : never // This should only happen if FieldNameT is an unrecognized field.
+
+/**
+ * Returns the type that a field would have after being passed through `castField`.
+ */
+export type GetCastFieldType<FieldNameT extends string | number | symbol> =
+  typeof stepFieldHelperMap extends {
+    [Key in FieldNameT]: {
+      castValue: (hydratedValue: any) => infer CastValueT
+    }
+  }
+    ? CastValueT
+    : GetHydratedFieldType<FieldNameT>
+
+/**
+ * Returns what a given `HydratedFormData` type would be transformed to
+ * after running `castField` on all of its fields.
+ */
+export type GetCastFormData<HydratedFormDataT extends HydratedFormData> = {
+  [Key in keyof HydratedFormDataT]: GetCastFieldType<Key>
 }

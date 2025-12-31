@@ -3,8 +3,8 @@ import { usePlayRunMutation } from '@opentrons/react-api-client'
 import { RECOVERY_MAP } from '../constants'
 
 import type { RunAction } from '@opentrons/api-client'
-import type { ERUtilsResults } from './useERUtils'
 import type { ErrorRecoveryFlowsProps } from '..'
+import type { ERUtilsResults } from './useERUtils'
 
 export interface RecoveryActionMutationResult {
   resumeRecovery: () => Promise<RunAction>
@@ -15,10 +15,8 @@ export function useRecoveryActionMutation(
   runId: ErrorRecoveryFlowsProps['runId'],
   routeUpdateActions: ERUtilsResults['routeUpdateActions']
 ): RecoveryActionMutationResult {
-  const {
-    mutateAsync,
-    isLoading: isResumeRecoveryLoading,
-  } = usePlayRunMutation()
+  const { mutateAsync, isLoading: isResumeRecoveryLoading } =
+    usePlayRunMutation()
   const { proceedToRouteAndStep } = routeUpdateActions
 
   const resumeRecovery = (): Promise<RunAction> => {

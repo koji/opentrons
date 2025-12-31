@@ -1,6 +1,5 @@
-import type * as React from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSelector, useDispatch } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 
 import {
   ALIGN_CENTER,
@@ -9,24 +8,25 @@ import {
   Flex,
   Icon,
   JUSTIFY_SPACE_BETWEEN,
-  Link,
-  SPACING_AUTO,
-  SPACING,
   LegacyStyledText,
+  Link,
+  SPACING,
+  SPACING_AUTO,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
 import { TertiaryButton } from '/app/atoms/buttons'
+import {
+  ANALYTICS_CHANGE_PATH_TO_PYTHON_DIRECTORY,
+  useTrackEvent,
+} from '/app/redux/analytics'
 import { getPathToPythonOverride, resetConfigValue } from '/app/redux/config'
 import {
-  openPythonInterpreterDirectory,
   changePythonPathOverrideConfig,
+  openPythonInterpreterDirectory,
 } from '/app/redux/protocol-analysis'
-import {
-  useTrackEvent,
-  ANALYTICS_CHANGE_PATH_TO_PYTHON_DIRECTORY,
-} from '/app/redux/analytics'
 
+import type { MouseEventHandler } from 'react'
 import type { Dispatch } from '/app/redux/types'
 
 export function OverridePathToPython(): JSX.Element {
@@ -35,7 +35,9 @@ export function OverridePathToPython(): JSX.Element {
   const dispatch = useDispatch<Dispatch>()
   const trackEvent = useTrackEvent()
 
-  const handleClickPythonDirectoryChange: React.MouseEventHandler<HTMLButtonElement> = _event => {
+  const handleClickPythonDirectoryChange: MouseEventHandler<
+    HTMLButtonElement
+  > = _event => {
     dispatch(changePythonPathOverrideConfig())
     trackEvent({
       name: ANALYTICS_CHANGE_PATH_TO_PYTHON_DIRECTORY,
@@ -53,11 +55,11 @@ export function OverridePathToPython(): JSX.Element {
         >
           {t('override_path_to_python')}
         </LegacyStyledText>
-        <LegacyStyledText as="p" paddingBottom={SPACING.spacing8}>
+        <LegacyStyledText forwardedAs="p" paddingBottom={SPACING.spacing8}>
           {t('branded:opentrons_app_will_use_interpreter')}
         </LegacyStyledText>
         <LegacyStyledText
-          as="h6"
+          forwardedAs="h6"
           textTransform={TYPOGRAPHY.textTransformUppercase}
           color={COLORS.grey50}
           paddingBottom={SPACING.spacing4}
@@ -80,7 +82,9 @@ export function OverridePathToPython(): JSX.Element {
             />
           </Link>
         ) : (
-          <LegacyStyledText as="p">{t('no_specified_folder')}</LegacyStyledText>
+          <LegacyStyledText forwardedAs="p">
+            {t('no_specified_folder')}
+          </LegacyStyledText>
         )}
       </Box>
       {pathToPythonInterpreter !== null ? (

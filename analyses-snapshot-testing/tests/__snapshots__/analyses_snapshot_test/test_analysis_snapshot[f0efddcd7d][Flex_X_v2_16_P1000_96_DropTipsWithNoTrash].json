@@ -1,4 +1,8 @@
 {
+  "commandAnnotations": [],
+  "commandPreconditions": {
+    "isCameraUsed": false
+  },
   "commands": [
     {
       "commandType": "home",
@@ -100,7 +104,21 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "C4",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutoutC3",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "stagingAreaRightSlot",
+              "stagingAreaSlotWithMagneticBlockV1"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -169,7 +187,22 @@
           "version": 1,
           "wells": {}
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "D3",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutoutD3",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "flexStackerModuleV1",
+              "singleRightSlot",
+              "stagingAreaRightSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -456,6 +489,11 @@
               "x": 0,
               "y": 0,
               "z": 121
+            },
+            "opentrons_flex_tiprack_lid": {
+              "x": 0,
+              "y": 0,
+              "z": 0.25
             }
           },
           "stackingOffsetWithModule": {},
@@ -1327,7 +1365,26 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "kind": "onLabware",
+            "labwareId": "UUID"
+          },
+          {
+            "addressableAreaName": "D3",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutoutD3",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "flexStackerModuleV1",
+              "singleRightSlot",
+              "stagingAreaRightSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -1416,12 +1473,7 @@
       ]
     }
   ],
-  "files": [
-    {
-      "name": "Flex_X_v2_16_P1000_96_DropTipsWithNoTrash.py",
-      "role": "main"
-    }
-  ],
+  "files": [],
   "labware": [
     {
       "definitionUri": "opentrons/nest_1_reservoir_290ml/1",
@@ -1448,6 +1500,7 @@
       }
     }
   ],
+  "liquidClasses": [],
   "liquids": [],
   "metadata": {
     "author": "Derek Maggio <derek.maggio@opentrons.com>",

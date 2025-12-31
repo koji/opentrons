@@ -1,13 +1,13 @@
 import { useTranslation } from 'react-i18next'
-import { useSelector, useDispatch } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 
 import {
   ALIGN_CENTER,
   Box,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
@@ -45,7 +45,7 @@ export function ShowLabwareOffsetSnippets(): JSX.Element {
         >
           {t('show_labware_offset_snippets')}
         </LegacyStyledText>
-        <LegacyStyledText as="p">
+        <LegacyStyledText forwardedAs="p">
           {t('branded:show_labware_offset_snippets_description')}
         </LegacyStyledText>
       </Box>

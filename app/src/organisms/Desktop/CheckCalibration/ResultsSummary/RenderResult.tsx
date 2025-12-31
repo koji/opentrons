@@ -1,12 +1,13 @@
 import { useTranslation } from 'react-i18next'
+
 import {
   ALIGN_CENTER,
   COLORS,
   Flex,
   Icon,
+  LegacyStyledText,
   SIZE_1,
   SPACING,
-  LegacyStyledText,
 } from '@opentrons/components'
 
 interface RenderResultProps {
@@ -25,7 +26,7 @@ export const RenderResult = ({ isBadCal }: RenderResultProps): JSX.Element => {
         {isBadCal ? t('recalibration_recommended') : t('good_calibration')}
       </LegacyStyledText>
       <Icon
-        name={isBadCal ? 'alert-circle' : 'check-circle'}
+        name={isBadCal ? 'ot-alert' : 'ot-check'}
         size={SIZE_1}
         color={isBadCal ? COLORS.yellow50 : COLORS.green50}
         marginRight={SPACING.spacing12}

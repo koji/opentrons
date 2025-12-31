@@ -4,13 +4,14 @@ import { useTranslation } from 'react-i18next'
 import {
   Flex,
   JUSTIFY_CENTER,
+  LegacyStyledText,
   Link,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
 import * as Sessions from '/app/redux/sessions'
+
 import { ConfirmCrashRecovery } from './ConfirmCrashRecovery'
 
 import type { CalibrationPanelProps } from './types'
@@ -31,7 +32,9 @@ export function useConfirmCrashRecovery(
       justifyContent={JUSTIFY_CENTER}
       gridGap={SPACING.spacing4}
     >
-      <LegacyStyledText as="p">{t('jog_too_far_or_bend_tip')}</LegacyStyledText>
+      <LegacyStyledText forwardedAs="p">
+        {t('jog_too_far_or_bend_tip')}
+      </LegacyStyledText>
       <Link
         role="button"
         onClick={() => {

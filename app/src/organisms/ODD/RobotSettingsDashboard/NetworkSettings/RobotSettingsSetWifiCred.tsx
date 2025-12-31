@@ -1,18 +1,19 @@
-import type * as React from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { DIRECTION_COLUMN, Flex } from '@opentrons/components'
 
 import { ChildNavigation } from '/app/organisms/ODD/ChildNavigation'
+
 import { SetWifiCred } from '../../NetworkSettings/SetWifiCred'
 
+import type { Dispatch, SetStateAction } from 'react'
 import type { SetSettingOption } from '../types'
 
 interface RobotSettingsSetWifiCredProps {
   handleConnect: () => void
   password: string
   setCurrentOption: SetSettingOption
-  setPassword: React.Dispatch<React.SetStateAction<string>>
+  setPassword: Dispatch<SetStateAction<string>>
 }
 
 /**

@@ -1,5 +1,7 @@
 import { createSelector } from 'reselect'
+
 import { getFlagsFromQueryParams } from './utils'
+
 import type { BaseState, Selector } from '../types'
 import type { Flags } from './types'
 
@@ -12,32 +14,40 @@ export const getFeatureFlagData: Selector<Flags> = createSelector(
     ...queryParamsFlags,
   })
 )
-export const getEnabledPrereleaseMode: Selector<
-  boolean | null | undefined
-> = createSelector(getFeatureFlagData, flags => flags.PRERELEASE_MODE)
+export const getEnabledPrereleaseMode: Selector<boolean | null | undefined> =
+  createSelector(getFeatureFlagData, flags => flags.PRERELEASE_MODE)
 export const getDisableModuleRestrictions: Selector<
   boolean | null | undefined
 > = createSelector(
   getFeatureFlagData,
   flags => flags.OT_PD_DISABLE_MODULE_RESTRICTIONS
 )
-export const getAllowAllTipracks: Selector<boolean> = createSelector(
-  getFeatureFlagData,
-  flags => flags.OT_PD_ALLOW_ALL_TIPRACKS ?? false
-)
-export const getEnableAbsorbanceReader: Selector<boolean> = createSelector(
-  getFeatureFlagData,
-  flags => flags.OT_PD_ENABLE_ABSORBANCE_READER ?? false
-)
 export const getEnableComment: Selector<boolean> = createSelector(
   getFeatureFlagData,
   flags => flags.OT_PD_ENABLE_COMMENT ?? false
 )
-export const getEnableReturnTip: Selector<boolean> = createSelector(
-  getFeatureFlagData,
-  flags => flags.OT_PD_ENABLE_RETURN_TIP ?? false
-)
 export const getEnableHotKeysDisplay: Selector<boolean> = createSelector(
   getFeatureFlagData,
   flags => flags.OT_PD_ENABLE_HOT_KEYS_DISPLAY ?? false
+)
+export const getEnableReactScan: Selector<boolean> = createSelector(
+  getFeatureFlagData,
+  flags => flags.OT_PD_ENABLE_REACT_SCAN ?? false
+)
+export const getEnableMutlipleTempsOT2: Selector<boolean> = createSelector(
+  getFeatureFlagData,
+  flags => flags.OT_PD_ENABLE_MULTIPLE_TEMPS_OT2 ?? false
+)
+export const getEnableStacking: Selector<boolean> = createSelector(
+  getFeatureFlagData,
+  flags => flags.OT_PD_ENABLE_STACKING ?? false
+)
+export const getEnableConcurrentModuleActions: Selector<boolean> =
+  createSelector(
+    getFeatureFlagData,
+    flags => flags.OT_PD_ENABLE_CONCURRENT_MODULE_ACTIONS ?? false
+  )
+export const getEnableByVolumeBuilder: Selector<boolean> = createSelector(
+  getFeatureFlagData,
+  flags => flags.OT_PD_ENABLE_BY_VOLUME_BUILDER ?? false
 )

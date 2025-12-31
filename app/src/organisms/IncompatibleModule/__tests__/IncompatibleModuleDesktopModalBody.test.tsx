@@ -1,21 +1,23 @@
-import type * as React from 'react'
 import { screen } from '@testing-library/react'
-import { describe, it, beforeEach, vi } from 'vitest'
+import { beforeEach, describe, it, vi } from 'vitest'
 import { when } from 'vitest-when'
+
 import '@testing-library/jest-dom/vitest'
+
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { IncompatibleModuleDesktopModalBody } from '../IncompatibleModuleDesktopModalBody'
 import { useIsFlex } from '/app/redux-resources/robots'
+
 import * as Fixtures from '../__fixtures__'
+import { IncompatibleModuleDesktopModalBody } from '../IncompatibleModuleDesktopModalBody'
+
+import type { ComponentProps } from 'react'
 
 vi.mock('/app/redux-resources/robots')
 
 const getRenderer = (isFlex: boolean) => {
   when(useIsFlex).calledWith('otie').thenReturn(isFlex)
-  return (
-    props: React.ComponentProps<typeof IncompatibleModuleDesktopModalBody>
-  ) => {
+  return (props: ComponentProps<typeof IncompatibleModuleDesktopModalBody>) => {
     return renderWithProviders(
       <IncompatibleModuleDesktopModalBody {...props} />,
       {
@@ -26,7 +28,7 @@ const getRenderer = (isFlex: boolean) => {
 }
 
 describe('IncompatibleModuleDesktopModalBody', () => {
-  let props: React.ComponentProps<typeof IncompatibleModuleDesktopModalBody>
+  let props: ComponentProps<typeof IncompatibleModuleDesktopModalBody>
   beforeEach(() => {
     props = {
       modules: [],

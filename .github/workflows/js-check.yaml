@@ -6,23 +6,29 @@ name: 'JS checks'
 on:
   pull_request:
     paths:
-      - '**/*.js'
-      - './.*.js'
-      - '**/*.ts'
-      - '**/*.tsx'
-      - '**/*.json'
-      - '**/*.css'
-      - '**/*.md'
+      - '**.js'
+      - '**.cjs'
+      - '**.mjs'
+      - '**.ts'
+      - '**.cts'
+      - '**.mts'
+      - '**.tsx'
+      - '**.json'
+      - '**.css'
+      - '**.md'
   push:
     paths:
-      - '**/*.js'
-      - './.*.js'
-      - '**/*.ts'
-      - '**/*.tsx'
-      - '**/*.json'
-      - '**/*.md'
+      - '**.js'
+      - '**.cjs'
+      - '**.mjs'
+      - '**.ts'
+      - '**.cts'
+      - '**.mts'
+      - '**.tsx'
+      - '**.json'
+      - '**.css'
+      - '**.md'
       - '.github/workflows/js-check.yaml'
-      - '**/*.css'
   workflow_dispatch:
 
 concurrency:
@@ -39,13 +45,13 @@ env:
 jobs:
   checks:
     name: 'js checks'
-    runs-on: 'ubuntu-22.04'
+    runs-on: 'ubuntu-24.04'
     timeout-minutes: 20
     steps:
-      - uses: 'actions/checkout@v3'
-      - uses: 'actions/setup-node@v3'
+      - uses: 'actions/checkout@v4'
+      - uses: 'actions/setup-node@v6'
         with:
-          node-version: '18.19.0'
+          node-version: '22.21.1'
       - name: 'set complex environment variables'
         id: 'set-vars'
         uses: actions/github-script@v6
@@ -59,7 +65,7 @@ jobs:
           sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
           sudo apt-get update && sudo apt-get install libudev-dev
       - name: 'cache yarn cache'
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ${{ github.workspace }}/.yarn-cache
@@ -90,5 +96,3 @@ jobs:
       - name: 'lint css'
         if: always() && steps.setup-js.outcome == 'success'
         run: make lint-css
-      - name: 'test scripts'
-        run: yarn vitest scripts

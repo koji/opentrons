@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Trans, useTranslation } from 'react-i18next'
-import { useUpdateDeckConfigurationMutation } from '@opentrons/react-api-client'
+
 import {
   ALIGN_CENTER,
   BORDERS,
@@ -12,49 +12,64 @@ import {
   Icon,
   JUSTIFY_END,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
+  Modal,
   PrimaryButton,
   SecondaryButton,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
-  Modal,
 } from '@opentrons/components'
+import { useUpdateDeckConfigurationMutation } from '@opentrons/react-api-client'
 import {
+  FLEX_STACKER_MODULE_V1,
+  FLEX_STACKER_V1_FIXTURE,
+  FLEX_STACKER_WITH_MAG_BLOCK_FIXTURE,
+  FLEX_STACKER_WITH_WASTE_CHUTE_ADAPTER_COVERED_FIXTURE,
+  FLEX_STACKER_WITH_WASTE_CHUTE_ADAPTER_NO_COVER_FIXTURE,
   getCutoutDisplayName,
+  getCutoutFixturesForModuleModel,
   getFixtureDisplayName,
+  getFixtureIdByCutoutIdFromModuleSlotName,
   getModuleDisplayName,
+  MAGNETIC_BLOCK_V1_FIXTURE,
+  SINGLE_LEFT_SLOT_FIXTURE,
+  SINGLE_RIGHT_SLOT_FIXTURE,
   THERMOCYCLER_MODULE_V1,
   THERMOCYCLER_MODULE_V2,
-  getCutoutFixturesForModuleModel,
-  getFixtureIdByCutoutIdFromModuleSlotName,
-  SINGLE_LEFT_SLOT_FIXTURE,
   THERMOCYCLER_V2_FRONT_FIXTURE,
   THERMOCYCLER_V2_REAR_FIXTURE,
+  WASTE_CHUTE_FLEX_STACKER_FIXTURES,
+  WASTE_CHUTE_ONLY_FIXTURES,
+  WASTE_CHUTE_RIGHT_ADAPTER_COVERED_FIXTURE,
+  WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE,
 } from '@opentrons/shared-data'
 
 import { getTopPortalEl } from '/app/App/portal'
-import { OddModal } from '/app/molecules/OddModal'
 import { SmallButton } from '/app/atoms/buttons/SmallButton'
+import { OddModal } from '/app/molecules/OddModal'
 import { useNotifyDeckConfigurationQuery } from '/app/resources/deck_configuration'
 
+import { ChooseModuleToConfigureModal } from './ChooseModuleToConfigureModal'
+import { patchDeckConfigForRequiredFixture } from './patchDeckConfigForRequiredFixture'
+
+import type { TFunction } from 'i18next'
 import type {
   CutoutConfig,
-  CutoutId,
   CutoutFixtureId,
-  ModuleModel,
+  CutoutId,
   DeckDefinition,
+  ModuleModel,
 } from '@opentrons/shared-data'
-import { ChooseModuleToConfigureModal } from './ChooseModuleToConfigureModal'
 
 interface LocationConflictModalProps {
   onCloseClick: () => void
   cutoutId: CutoutId
   deckDef: DeckDefinition
   robotName: string
-  missingLabwareDisplayName?: string | null
   requiredFixtureId?: CutoutFixtureId
   requiredModule?: ModuleModel
   isOnDevice?: boolean
+  moduleSerialNumber?: string
 }
 
 export const LocationConflictModal = (
@@ -64,13 +79,17 @@ export const LocationConflictModal = (
     onCloseClick,
     cutoutId,
     robotName,
-    missingLabwareDisplayName,
     requiredFixtureId,
     requiredModule,
     deckDef,
+    moduleSerialNumber,
     isOnDevice = false,
   } = props
-  const { t, i18n } = useTranslation(['protocol_setup', 'shared'])
+  const { t, i18n } = useTranslation([
+    'protocol_setup',
+    'shared',
+    'deck_configuration',
+  ])
 
   const [showModuleSelect, setShowModuleSelect] = useState(false)
   const deckConfig = useNotifyDeckConfigurationQuery().data ?? []
@@ -78,6 +97,22 @@ export const LocationConflictModal = (
   const deckConfigurationAtLocationFixtureId = deckConfig.find(
     (deckFixture: CutoutConfig) => deckFixture.cutoutId === cutoutId
   )?.cutoutFixtureId
+
+  // skip past fix conflict screen if D3 can remain the same when you attach
+  // a flex stacker module, ie mag block or waste chute only fixture
+  useEffect(() => {
+    if (requiredModule != null && requiredModule === FLEX_STACKER_MODULE_V1) {
+      if (
+        deckConfigurationAtLocationFixtureId != null &&
+        (deckConfigurationAtLocationFixtureId === MAGNETIC_BLOCK_V1_FIXTURE ||
+          WASTE_CHUTE_ONLY_FIXTURES.includes(
+            deckConfigurationAtLocationFixtureId
+          ))
+      ) {
+        setShowModuleSelect(true)
+      }
+    }
+  }, [])
 
   const isThermocyclerRequired =
     requiredModule === THERMOCYCLER_MODULE_V1 ||
@@ -88,23 +123,48 @@ export const LocationConflictModal = (
     deckConfigurationAtLocationFixtureId === THERMOCYCLER_V2_REAR_FIXTURE ||
     deckConfigurationAtLocationFixtureId === THERMOCYCLER_V2_FRONT_FIXTURE
 
-  const currentFixtureDisplayName =
-    deckConfigurationAtLocationFixtureId != null
-      ? getFixtureDisplayName(deckConfigurationAtLocationFixtureId)
-      : ''
+  const getCurrentFixtureDisplayName = (): string => {
+    if (
+      requiredFixtureId === SINGLE_RIGHT_SLOT_FIXTURE &&
+      deckConfigurationAtLocationFixtureId ===
+        FLEX_STACKER_WITH_MAG_BLOCK_FIXTURE
+    ) {
+      return getFixtureDisplayName(t as TFunction, MAGNETIC_BLOCK_V1_FIXTURE)
+    } else if (
+      requiredFixtureId === SINGLE_RIGHT_SLOT_FIXTURE &&
+      (deckConfigurationAtLocationFixtureId ===
+        FLEX_STACKER_WITH_WASTE_CHUTE_ADAPTER_COVERED_FIXTURE ||
+        deckConfigurationAtLocationFixtureId ===
+          FLEX_STACKER_WITH_WASTE_CHUTE_ADAPTER_NO_COVER_FIXTURE)
+    ) {
+      return getFixtureDisplayName(
+        t as TFunction,
+        WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE
+      )
+    } else {
+      return deckConfigurationAtLocationFixtureId != null
+        ? getFixtureDisplayName(
+            t as TFunction,
+            deckConfigurationAtLocationFixtureId
+          )
+        : ''
+    }
+  }
+  const currentFixtureDisplayName = getCurrentFixtureDisplayName()
 
   const handleConfigureModule = (moduleSerialNumber?: string): void => {
     if (requiredModule != null) {
-      const slotName = cutoutId.replace('cutout', '')
+      const slotName = getCutoutDisplayName(cutoutId)
       const moduleFixtures = getCutoutFixturesForModuleModel(
         requiredModule,
         deckDef
       )
-      const moduleFixtureIdByCutoutId = getFixtureIdByCutoutIdFromModuleSlotName(
-        slotName,
-        moduleFixtures,
-        deckDef
-      )
+      const moduleFixtureIdByCutoutId =
+        getFixtureIdByCutoutIdFromModuleSlotName(
+          slotName,
+          moduleFixtures,
+          deckDef
+        )
 
       const newDeckConfig = deckConfig.map(existingCutoutConfig => {
         const replacementCutoutFixtureId =
@@ -113,10 +173,53 @@ export const LocationConflictModal = (
           existingCutoutConfig.cutoutId in moduleFixtureIdByCutoutId &&
           replacementCutoutFixtureId != null
         ) {
-          return {
-            ...existingCutoutConfig,
-            cutoutFixtureId: replacementCutoutFixtureId,
-            opentronsModuleSerialNumber: moduleSerialNumber,
+          if (
+            requiredFixtureId != null &&
+            WASTE_CHUTE_FLEX_STACKER_FIXTURES.includes(requiredFixtureId)
+          ) {
+            // if the required fixture is a combo waste chute fixture, use the required fixture id
+            // instead of the module fixture id
+            return {
+              ...existingCutoutConfig,
+              cutoutFixtureId: requiredFixtureId,
+              opentronsModuleSerialNumber: moduleSerialNumber,
+            }
+          } else if (
+            WASTE_CHUTE_ONLY_FIXTURES.includes(
+              existingCutoutConfig.cutoutFixtureId
+            ) &&
+            replacementCutoutFixtureId === FLEX_STACKER_V1_FIXTURE
+          ) {
+            // if current fixture is a waste chute and we are adding a flex stacker,
+            // don't remove the waste chute
+            const replacementCutoutFixtureId =
+              existingCutoutConfig.cutoutFixtureId ===
+              WASTE_CHUTE_RIGHT_ADAPTER_COVERED_FIXTURE
+                ? FLEX_STACKER_WITH_WASTE_CHUTE_ADAPTER_COVERED_FIXTURE
+                : FLEX_STACKER_WITH_WASTE_CHUTE_ADAPTER_NO_COVER_FIXTURE
+            return {
+              ...existingCutoutConfig,
+              cutoutFixtureId: replacementCutoutFixtureId,
+              opentronsModuleSerialNumber: moduleSerialNumber,
+            }
+          } else if (
+            existingCutoutConfig.cutoutFixtureId ===
+              MAGNETIC_BLOCK_V1_FIXTURE &&
+            replacementCutoutFixtureId === FLEX_STACKER_V1_FIXTURE
+          ) {
+            // if current fixture is a magnetic block and we are adding a flex stacker,
+            // don't remove the mag block
+            return {
+              ...existingCutoutConfig,
+              cutoutFixtureId: FLEX_STACKER_WITH_MAG_BLOCK_FIXTURE,
+              opentronsModuleSerialNumber: moduleSerialNumber,
+            }
+          } else {
+            return {
+              ...existingCutoutConfig,
+              cutoutFixtureId: replacementCutoutFixtureId,
+              opentronsModuleSerialNumber: moduleSerialNumber,
+            }
           }
         } else if (
           isThermocyclerCurrentFixture &&
@@ -145,35 +248,18 @@ export const LocationConflictModal = (
   }
 
   const handleUpdateDeck = (): void => {
-    if (requiredModule != null) {
+    if (requiredModule != null && moduleSerialNumber != null) {
+      // if there is a conflict for a combo fixture that includes a module
+      // and the module is already matched then we can skip the configure module screen
+      handleConfigureModule(moduleSerialNumber)
+    } else if (requiredModule != null) {
       setShowModuleSelect(true)
     } else if (requiredFixtureId != null) {
-      const newRequiredFixtureDeckConfig = deckConfig.map(fixture => {
-        if (fixture.cutoutId === cutoutId) {
-          return {
-            ...fixture,
-            cutoutFixtureId: requiredFixtureId,
-            opentronsModuleSerialNumber: undefined,
-          }
-        } else if (
-          isThermocyclerCurrentFixture &&
-          ((cutoutId === 'cutoutA1' && fixture.cutoutId === 'cutoutB1') ||
-            (cutoutId === 'cutoutB1' && fixture.cutoutId === 'cutoutA1'))
-        ) {
-          /**
-           * special-case for removing current thermocycler:
-           * set paired cutout (B1 for A1, A1 for B1) to single slot left fixture
-           * TODO(bh, 2024-08-29): generalize to remove all entities from FixtureGroup
-           */
-          return {
-            ...fixture,
-            cutoutFixtureId: SINGLE_LEFT_SLOT_FIXTURE,
-            opentronsModuleSerialNumber: undefined,
-          }
-        } else {
-          return fixture
-        }
-      })
+      const newRequiredFixtureDeckConfig = patchDeckConfigForRequiredFixture(
+        deckConfig,
+        cutoutId,
+        requiredFixtureId
+      )
 
       updateDeckConfiguration(newRequiredFixtureDeckConfig)
       onCloseClick()
@@ -183,10 +269,11 @@ export const LocationConflictModal = (
   }
 
   let protocolSpecifiesDisplayName = ''
-  if (missingLabwareDisplayName != null) {
-    protocolSpecifiesDisplayName = missingLabwareDisplayName
-  } else if (requiredFixtureId != null) {
-    protocolSpecifiesDisplayName = getFixtureDisplayName(requiredFixtureId)
+  if (requiredFixtureId != null) {
+    protocolSpecifiesDisplayName = getFixtureDisplayName(
+      t as TFunction,
+      requiredFixtureId
+    )
   } else if (requiredModule != null) {
     protocolSpecifiesDisplayName = getModuleDisplayName(requiredModule)
   }
@@ -236,13 +323,13 @@ export const LocationConflictModal = (
               cutout: displaySlotName,
             }}
             components={{
-              block: <LegacyStyledText as="p" />,
+              block: <LegacyStyledText forwardedAs="p" />,
               strong: <strong />,
             }}
           />
           <Flex flexDirection={DIRECTION_COLUMN}>
             <LegacyStyledText
-              as="p"
+              forwardedAs="p"
               fontWeight={TYPOGRAPHY.fontWeightBold}
               paddingBottom={SPACING.spacing8}
             >
@@ -262,13 +349,13 @@ export const LocationConflictModal = (
                 borderRadius={BORDERS.borderRadius4}
               >
                 <LegacyStyledText
-                  as="p"
+                  forwardedAs="p"
                   fontWeight={TYPOGRAPHY.fontWeightSemiBold}
                 >
                   {t('protocol_specifies')}
                 </LegacyStyledText>
 
-                <LegacyStyledText as="p" color={COLORS.grey60}>
+                <LegacyStyledText forwardedAs="p" color={COLORS.grey60}>
                   {protocolSpecifiesDisplayName}
                 </LegacyStyledText>
               </Flex>
@@ -281,13 +368,13 @@ export const LocationConflictModal = (
                 borderRadius={BORDERS.borderRadius4}
               >
                 <LegacyStyledText
-                  as="p"
+                  forwardedAs="p"
                   fontWeight={TYPOGRAPHY.fontWeightSemiBold}
                 >
                   {t('currently_configured')}
                 </LegacyStyledText>
 
-                <LegacyStyledText as="p" color={COLORS.grey60}>
+                <LegacyStyledText forwardedAs="p" color={COLORS.grey60}>
                   {currentFixtureDisplayName}
                 </LegacyStyledText>
               </Flex>
@@ -322,7 +409,7 @@ export const LocationConflictModal = (
           >
             <Icon name="ot-alert" size="1rem" color={COLORS.yellow50} />
             <LegacyStyledText
-              as="h3"
+              forwardedAs="h3"
               fontWeight={TYPOGRAPHY.fontWeightSemiBold}
             >
               {t('deck_conflict')}
@@ -369,10 +456,13 @@ export const LocationConflictModal = (
                 alignItems={ALIGN_CENTER}
                 borderRadius={BORDERS.borderRadius4}
               >
-                <LegacyStyledText as="label" width={SPACING.spacing120}>
+                <LegacyStyledText
+                  forwardedAs="label"
+                  width={SPACING.spacing120}
+                >
                   {t('protocol_specifies')}
                 </LegacyStyledText>
-                <LegacyStyledText as="label" flex="1">
+                <LegacyStyledText forwardedAs="label" flex="1">
                   {protocolSpecifiesDisplayName}
                 </LegacyStyledText>
               </Flex>
@@ -384,10 +474,13 @@ export const LocationConflictModal = (
                 alignItems={ALIGN_CENTER}
                 borderRadius={BORDERS.borderRadius4}
               >
-                <LegacyStyledText as="label" width={SPACING.spacing120}>
+                <LegacyStyledText
+                  forwardedAs="label"
+                  width={SPACING.spacing120}
+                >
                   {t('currently_configured')}
                 </LegacyStyledText>
-                <LegacyStyledText as="label" flex="1">
+                <LegacyStyledText forwardedAs="label" flex="1">
                   {currentFixtureDisplayName}
                 </LegacyStyledText>
               </Flex>

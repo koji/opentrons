@@ -1,41 +1,34 @@
-import * as React from 'react'
-import { Trans, useTranslation } from 'react-i18next'
+import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { css } from 'styled-components'
-import {
-  CURSOR_POINTER,
-  Banner,
-  LegacyStyledText,
-  SPACING,
-  TYPOGRAPHY,
-} from '@opentrons/components'
-import {
-  NINETY_SIX_CHANNEL,
-  SINGLE_MOUNT_PIPETTES,
-  FLEX_ROBOT_TYPE,
-  LEFT,
-} from '@opentrons/shared-data'
+
+import { InlineNotification } from '@opentrons/components'
 import {
   useCurrentSubsystemUpdateQuery,
   useHost,
 } from '@opentrons/react-api-client'
+import {
+  FLEX_ROBOT_TYPE,
+  LEFT,
+  NINETY_SIX_CHANNEL,
+  SINGLE_MOUNT_PIPETTES,
+} from '@opentrons/shared-data'
+
 import { InstrumentCard } from '/app/molecules/InstrumentCard'
-import { ChoosePipette } from '/app/organisms/PipetteWizardFlows/ChoosePipette'
-import { FLOWS } from '/app/organisms/PipetteWizardFlows/constants'
-import { handlePipetteWizardFlows } from '/app/organisms/PipetteWizardFlows'
 import {
   DropTipWizardFlows,
   useDropTipWizardFlows,
 } from '/app/organisms/DropTipWizardFlows'
+import { handlePipetteWizardFlows } from '/app/organisms/PipetteWizardFlows'
+import { ChoosePipette } from '/app/organisms/PipetteWizardFlows/ChoosePipette'
+import { FLOWS } from '/app/organisms/PipetteWizardFlows/constants'
 
 import { AboutPipetteSlideout } from './AboutPipetteSlideout'
 
-import type {
-  BadPipette,
-  HostConfig,
-  Mount,
-  PipetteData,
-} from '@opentrons/api-client'
+import type { MouseEventHandler } from 'react'
+import type { BadPipette, Mount, PipetteData } from '@opentrons/api-client'
 import type { PipetteModelSpecs } from '@opentrons/shared-data'
+import type { MenuOverlayItemProps } from '/app/molecules/InstrumentCard/MenuOverlay'
 import type {
   PipetteWizardFlow,
   SelectablePipettes,
@@ -48,11 +41,6 @@ interface FlexPipetteCardProps {
   isRunActive: boolean
   isEstopNotDisengaged: boolean
 }
-const BANNER_LINK_CSS = css`
-  text-decoration: ${TYPOGRAPHY.textDecorationUnderline};
-  cursor: ${CURSOR_POINTER};
-  margin-left: ${SPACING.spacing8};
-`
 
 const INSTRUMENT_CARD_STYLE = css`
   p {
@@ -74,17 +62,14 @@ export function FlexPipetteCard({
   isEstopNotDisengaged,
 }: FlexPipetteCardProps): JSX.Element {
   const { t, i18n } = useTranslation(['device_details', 'shared'])
-  const host = useHost() as HostConfig
+  const host = useHost()!
 
-  const [
-    showAboutPipetteSlideout,
-    setShowAboutPipetteSlideout,
-  ] = React.useState<boolean>(false)
-  const [showChoosePipette, setShowChoosePipette] = React.useState(false)
-  const [
-    selectedPipette,
-    setSelectedPipette,
-  ] = React.useState<SelectablePipettes>(SINGLE_MOUNT_PIPETTES)
+  const [showAboutPipetteSlideout, setShowAboutPipetteSlideout] =
+    useState<boolean>(false)
+  const [showChoosePipette, setShowChoosePipette] = useState(false)
+  const [selectedPipette, setSelectedPipette] = useState<SelectablePipettes>(
+    SINGLE_MOUNT_PIPETTES
+  )
   const attachedPipetteIs96Channel =
     attachedPipette?.ok && attachedPipette.instrumentName === 'p1000_96'
   const selectedPipetteForWizard = attachedPipetteIs96Channel
@@ -107,7 +92,7 @@ export function FlexPipetteCard({
       host,
     })
   }
-  const handleChoosePipette: React.MouseEventHandler<HTMLButtonElement> = () => {
+  const handleChoosePipette: MouseEventHandler<HTMLButtonElement> = () => {
     setShowChoosePipette(true)
   }
   const handleAttach = (): void => {
@@ -115,17 +100,15 @@ export function FlexPipetteCard({
     handleLaunchPipetteWizardFlows(FLOWS.ATTACH)
   }
 
-  const handleDetach: React.MouseEventHandler<HTMLButtonElement> = () => {
+  const handleDetach: MouseEventHandler<HTMLButtonElement> = () => {
     handleLaunchPipetteWizardFlows(FLOWS.DETACH)
   }
 
-  const handleCalibrate: React.MouseEventHandler<HTMLButtonElement> = () => {
+  const handleCalibrate: MouseEventHandler<HTMLAnchorElement> = () => {
     handleLaunchPipetteWizardFlows(FLOWS.CALIBRATE)
   }
 
-  const [pollForSubsystemUpdate, setPollForSubsystemUpdate] = React.useState(
-    false
-  )
+  const [pollForSubsystemUpdate, setPollForSubsystemUpdate] = useState(false)
   const subsystem = attachedPipette?.subsystem ?? null
   const { data: subsystemUpdateData } = useCurrentSubsystemUpdateQuery(
     subsystem,
@@ -139,7 +122,7 @@ export function FlexPipetteCard({
   // detected until the update has been done for 5 seconds
   // this gives the instruments endpoint time to start reporting
   // a good instrument
-  React.useEffect(() => {
+  useEffect(() => {
     if (attachedPipette?.ok === false) {
       setPollForSubsystemUpdate(true)
     } else if (
@@ -190,6 +173,7 @@ export function FlexPipetteCard({
             },
           },
         ]
+
   return (
     <>
       {(attachedPipette == null || attachedPipette.ok) &&
@@ -207,27 +191,13 @@ export function FlexPipetteCard({
           banner={
             attachedPipette?.ok &&
             attachedPipette.data.calibratedOffset?.last_modified == null ? (
-              <Banner type="error" marginBottom={SPACING.spacing4} width="100%">
-                {isEstopNotDisengaged ? (
-                  <LegacyStyledText as="p">
-                    {t('calibration_needed_without_link')}
-                  </LegacyStyledText>
-                ) : (
-                  <Trans
-                    t={t}
-                    i18nKey={'calibration_needed'}
-                    components={{
-                      calLink: (
-                        <LegacyStyledText
-                          as="p"
-                          css={BANNER_LINK_CSS}
-                          onClick={handleCalibrate}
-                        />
-                      ),
-                    }}
-                  />
-                )}
-              </Banner>
+              <InlineNotification
+                type="error"
+                message={t('calibration_needed_without_link')}
+                linkText={isEstopNotDisengaged ? undefined : t('calibrate_now')}
+                onLinkClick={isEstopNotDisengaged ? undefined : handleCalibrate}
+                minWidth="12.625rem"
+              />
             ) : null
           }
           label={
@@ -237,7 +207,7 @@ export function FlexPipetteCard({
                   side: mount === LEFT ? t('left') : t('right'),
                 })
           }
-          menuOverlayItems={menuOverlayItems}
+          menuOverlayItems={menuOverlayItems as MenuOverlayItemProps[]}
           isEstopNotDisengaged={isEstopNotDisengaged}
         />
       ) : null}
@@ -248,19 +218,15 @@ export function FlexPipetteCard({
           css={INSTRUMENT_CARD_STYLE}
           description={t('instrument_attached')}
           banner={
-            <Banner
-              type={subsystemUpdateData != null ? 'warning' : 'error'}
-              marginBottom={SPACING.spacing4}
-            >
-              <Trans
-                t={t}
-                i18nKey={
-                  subsystemUpdateData != null
-                    ? 'firmware_update_occurring'
-                    : 'firmware_update_needed'
-                }
-              />
-            </Banner>
+            <InlineNotification
+              type={subsystemUpdateData != null ? 'alert' : 'error'}
+              message={
+                subsystemUpdateData != null
+                  ? t('firmware_update_occurring')
+                  : t('firmware_update_needed')
+              }
+              minWidth="12.625rem"
+            />
           }
           isEstopNotDisengaged={isEstopNotDisengaged}
         />

@@ -1,9 +1,10 @@
-import * as React from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useSelector } from 'react-redux'
-import { css } from 'styled-components'
 import { useTranslation } from 'react-i18next'
+import { useSelector } from 'react-redux'
 import startCase from 'lodash/startCase'
+import { css } from 'styled-components'
+
 import {
   ALIGN_CENTER,
   ALIGN_FLEX_END,
@@ -25,6 +26,7 @@ import {
   RESPONSIVENESS,
   SPACING,
   TYPOGRAPHY,
+  WizardHeader,
 } from '@opentrons/components'
 import {
   EIGHT_CHANNEL,
@@ -33,19 +35,21 @@ import {
   RIGHT,
   SINGLE_MOUNT_PIPETTES,
 } from '@opentrons/shared-data'
-import { i18n } from '/app/i18n'
-import { getIsOnDevice } from '/app/redux/config'
+
 import { getTopPortalEl } from '/app/App/portal'
-import { SmallButton } from '/app/atoms/buttons'
-import { WizardHeader } from '/app/molecules/WizardHeader'
-import { ModalContentOneColSimpleButtons } from '/app/molecules/InterventionModal'
 import singleChannelAndEightChannel from '/app/assets/images/change-pip/1_and_8_channel.png'
 import ninetySixChannel from '/app/assets/images/change-pip/ninety-six-channel.png'
+import { SmallButton } from '/app/atoms/buttons'
+import { i18n } from '/app/i18n'
+import { ModalContentOneColSimpleButtons } from '/app/molecules/InterventionModal'
+import { getIsOnDevice } from '/app/redux/config'
 import { useAttachedPipettesFromInstrumentsQuery } from '/app/resources/instruments'
-import { ExitModal } from './ExitModal'
+
 import { FLOWS } from './constants'
+import { ExitModal } from './ExitModal'
 import { getIsGantryEmpty } from './utils'
 
+import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import type { StyleProps } from '@opentrons/components'
 import type { PipetteMount } from '@opentrons/shared-data'
 import type { SelectablePipettes } from './types'
@@ -108,7 +112,7 @@ const SELECTED_OPTIONS_STYLE = css`
 interface ChoosePipetteProps {
   proceed: () => void
   selectedPipette: SelectablePipettes
-  setSelectedPipette: React.Dispatch<React.SetStateAction<SelectablePipettes>>
+  setSelectedPipette: Dispatch<SetStateAction<SelectablePipettes>>
   exit: () => void
   mount: PipetteMount
 }
@@ -117,10 +121,8 @@ export const ChoosePipette = (props: ChoosePipetteProps): JSX.Element => {
   const isOnDevice = useSelector(getIsOnDevice)
   const { t } = useTranslation(['pipette_wizard_flows', 'shared'])
   const attachedPipettesByMount = useAttachedPipettesFromInstrumentsQuery()
-  const [
-    showExitConfirmation,
-    setShowExitConfirmation,
-  ] = React.useState<boolean>(false)
+  const [showExitConfirmation, setShowExitConfirmation] =
+    useState<boolean>(false)
 
   const bothMounts = getIsGantryEmpty(attachedPipettesByMount)
     ? t('ninety_six_channel', {
@@ -178,14 +180,16 @@ export const ChoosePipette = (props: ChoosePipetteProps): JSX.Element => {
             >
               <ModalContentOneColSimpleButtons
                 headline={t('choose_pipette')}
-                firstButton={{
-                  label: singleMount,
-                  value: SINGLE_MOUNT_PIPETTES,
-                }}
-                secondButton={{
-                  label: bothMounts,
-                  value: NINETY_SIX_CHANNEL,
-                }}
+                buttons={[
+                  {
+                    label: singleMount,
+                    value: SINGLE_MOUNT_PIPETTES,
+                  },
+                  {
+                    label: bothMounts,
+                    value: NINETY_SIX_CHANNEL,
+                  },
+                ]}
                 onSelect={event => {
                   setSelectedPipette(event.target.value as SelectablePipettes)
                 }}
@@ -220,7 +224,9 @@ export const ChoosePipette = (props: ChoosePipetteProps): JSX.Element => {
             justifyContent={JUSTIFY_SPACE_BETWEEN}
           >
             <Flex flexDirection={DIRECTION_COLUMN}>
-              <LegacyStyledText as="h1">{t('choose_pipette')}</LegacyStyledText>
+              <LegacyStyledText forwardedAs="h1">
+                {t('choose_pipette')}
+              </LegacyStyledText>
               <Flex
                 margin={SPACING.spacing40}
                 justifyContent={JUSTIFY_SPACE_AROUND}
@@ -238,7 +244,7 @@ export const ChoosePipette = (props: ChoosePipetteProps): JSX.Element => {
                     alt={singleMount}
                   />
                   <LegacyStyledText
-                    as="h3"
+                    forwardedAs="h3"
                     fontWeight={TYPOGRAPHY.fontWeightSemiBold}
                     textAlign={TYPOGRAPHY.textAlignCenter}
                   >
@@ -258,7 +264,7 @@ export const ChoosePipette = (props: ChoosePipetteProps): JSX.Element => {
                     alt={bothMounts}
                   />
                   <LegacyStyledText
-                    as="h3"
+                    forwardedAs="h3"
                     fontWeight={TYPOGRAPHY.fontWeightSemiBold}
                     textAlign={TYPOGRAPHY.textAlignCenter}
                   >
@@ -281,7 +287,7 @@ export const ChoosePipette = (props: ChoosePipetteProps): JSX.Element => {
 interface PipetteMountOptionProps extends StyleProps {
   isSelected: boolean
   onClick: () => void
-  children: React.ReactNode
+  children: ReactNode
 }
 function PipetteMountOption(props: PipetteMountOptionProps): JSX.Element {
   const { isSelected, onClick, children, ...styleProps } = props

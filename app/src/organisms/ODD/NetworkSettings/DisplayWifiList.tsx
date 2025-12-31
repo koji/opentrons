@@ -12,12 +12,13 @@ import {
   DISPLAY_FLEX,
   Flex,
   Icon,
-  SPACING,
   LegacyStyledText,
+  SPACING,
 } from '@opentrons/components'
 
 import { ODD_FOCUS_VISIBLE } from '/app/atoms/buttons/constants'
 import { RobotSetupHeader } from '/app/organisms/ODD/RobotSetupHeader'
+
 import { DisplaySearchNetwork } from './DisplaySearchNetwork'
 
 import type { WifiNetwork } from '/app/redux/networking/types'
@@ -101,7 +102,7 @@ export function DisplayWifiList({
                 }}
               >
                 <Icon name="wifi" size="2.5rem" />
-                <LegacyStyledText as="h4">{nw.ssid}</LegacyStyledText>
+                <LegacyStyledText forwardedAs="h4">{nw.ssid}</LegacyStyledText>
               </Btn>
             ))
           : null}
@@ -119,7 +120,9 @@ export function DisplayWifiList({
           gridGap={SPACING.spacing4}
         >
           <Icon name="plus" size="2.5rem" color={COLORS.black90} />
-          <LegacyStyledText as="h4">{t('join_other_network')}</LegacyStyledText>
+          <LegacyStyledText forwardedAs="h4">
+            {t('join_other_network')}
+          </LegacyStyledText>
         </Btn>
         {list != null && list.length > 0 ? null : <DisplaySearchNetwork />}
       </Flex>

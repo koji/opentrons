@@ -1,4 +1,8 @@
 {
+  "commandAnnotations": [],
+  "commandPreconditions": {
+    "isCameraUsed": false
+  },
   "commands": [
     {
       "commandType": "home",
@@ -288,13 +292,9 @@
   },
   "createdAt": "TIMESTAMP",
   "errors": [],
-  "files": [
-    {
-      "name": "OT2_S_v2_18_NO_PIPETTES_GoldenRTP_OT2.py",
-      "role": "main"
-    }
-  ],
+  "files": [],
   "labware": [],
+  "liquidClasses": [],
   "liquids": [],
   "metadata": {
     "protocolName": "Golden RTP Examples OT2"

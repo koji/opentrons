@@ -1,10 +1,11 @@
-""" opentrons.calibration_storage.file_operators: functions that
+"""opentrons.calibration_storage.file_operators: functions that
 manipulate the file system.
 
 These methods should only be imported inside the calibration_storage
 module, except in the special case of v2 labware support in
 the v1 API.
 """
+
 import datetime
 import json
 import logging
@@ -103,7 +104,7 @@ def save_to_file(
     directory_path.mkdir(parents=True, exist_ok=True)
     file_path = directory_path / f"{file_name}.json"
     json_data = (
-        data.json()
+        data.model_dump_json()
         if isinstance(data, pydantic.BaseModel)
         else json.dumps(data, cls=encoder)
     )
@@ -112,7 +113,7 @@ def save_to_file(
 
 def serialize_pydantic_model(data: pydantic.BaseModel) -> bytes:
     """Safely serialize data from a Pydantic model into a form suitable for storing on disk."""
-    return data.json(by_alias=True).encode("utf-8")
+    return data.model_dump_json(by_alias=True).encode("utf-8")
 
 
 _ModelT = typing.TypeVar("_ModelT", bound=pydantic.BaseModel)
@@ -133,7 +134,7 @@ def deserialize_pydantic_model(
     Returns `None` if the file is missing or corrupt.
     """
     try:
-        return model.parse_raw(serialized)
+        return model.model_validate_json(serialized)
     except json.JSONDecodeError:
         _log.warning("Data is not valid JSON.", exc_info=True)
         return None

@@ -5,6 +5,8 @@ import copy
 import pathlib
 import sys
 
+import pytest
+
 from .dev_server import DevServer
 from .robot_client import RobotClient
 
@@ -31,12 +33,13 @@ async def run_cli(persistence_directory: pathlib.Path) -> bytes:
         stderr=asyncio.subprocess.PIPE,
     )
     stdout, stderr = await proc.communicate()
-    assert (
-        proc.returncode == 0
-    ), f"Subprocess exited with failure.\nstdout:\n{stdout!r}\nstderr:\n{stderr.decode()}"
+    assert proc.returncode == 0, (
+        f"Subprocess exited with failure.\nstdout:\n{stdout!r}\nstderr:\n{stderr.decode()}"
+    )
     return stdout
 
 
+@pytest.mark.slow
 async def test_deck_configuration_cli(tmp_path: pathlib.Path) -> None:
     """Test that the deck config CLI's output reflects changes made over HTTP."""
     persistence_directory = tmp_path / "persistence_directory"

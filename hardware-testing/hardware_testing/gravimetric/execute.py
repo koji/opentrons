@@ -20,6 +20,8 @@ from .helpers import (
     _sense_liquid_height,
     _pick_up_tip,
     _drop_tip,
+    get_latest_offset_for_labware,
+    _get_offsets_from_ctx,
 )
 from .trial import (
     build_gravimetric_trials,
@@ -54,6 +56,7 @@ import glob
 
 from opentrons.hardware_control.types import StatusBarState
 from hardware_testing.gravimetric.workarounds import get_sync_hw_api
+from opentrons.protocol_api.labware import SET_OFFSET_RESTORED_API_VERSION
 
 _MEASUREMENTS: List[Tuple[str, MeasurementData]] = list()
 
@@ -180,6 +183,11 @@ def _load_labware(ctx: ProtocolContext, cfg: config.GravimetricConfig) -> Labwar
     labware_on_scale = ctx.load_labware(
         cfg.labware_on_scale, location=cfg.slot_scale, namespace=namespace
     )
+    if ctx.api_version >= SET_OFFSET_RESTORED_API_VERSION:
+        offset = get_latest_offset_for_labware(
+            _get_offsets_from_ctx(ctx), labware_on_scale
+        )
+        labware_on_scale.set_offset(offset.x, offset.y, offset.z)
     return labware_on_scale
 
 
@@ -427,8 +435,11 @@ def build_gm_report(
 ) -> report.CSVReport:
     """Build a CSVReport formated for gravimetric tests."""
     ui.print_header("CREATE TEST-REPORT")
+    channels = [0]
+    if pipette_channels == 8 and not increment:
+        channels = [i for i in range(8)]
     test_report = report.create_csv_test_report(
-        test_volumes, pipette_channels, increment, trials, name, run_id=run_id
+        test_volumes, channels, trials, name, run_id=run_id
     )
     test_report.set_tag(pipette_tag)
     test_report.set_operator(operator_name)
@@ -591,7 +602,7 @@ def run(cfg: config.GravimetricConfig, resources: TestResources) -> None:  # noq
     assert resources.recorder is not None
     recorder = resources.recorder
     if resources.ctx.is_simulating():
-        start_sim_mass = {50: 15, 200: 200, 1000: 200}
+        start_sim_mass = {20: 5, 50: 15, 200: 200, 1000: 200}
         resources.recorder.set_simulation_mass(start_sim_mass[cfg.tip_volume])
     os.makedirs(
         f"{resources.test_report.parent}/{resources.test_report._run_id}", exist_ok=True
@@ -643,7 +654,6 @@ def run(cfg: config.GravimetricConfig, resources: TestResources) -> None:  # noq
             _drop_tip(
                 resources.pipette,
                 return_tip=False,
-                minimum_z_height=_minimum_z_height(cfg),
                 offset=_get_channel_offset(cfg, 0),
             )  # always trash calibration tips
         calibration_tip_in_use = False
@@ -744,7 +754,6 @@ def run(cfg: config.GravimetricConfig, resources: TestResources) -> None:  # noq
                         _drop_tip(
                             resources.pipette,
                             cfg.return_tip,
-                            _minimum_z_height(cfg),
                             _get_channel_offset(cfg, run_trial.channel),
                         )
 

@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 import {
   useChainMaintenanceCommands,
   useNotifyCurrentMaintenanceRun,
 } from '/app/resources/maintenance_runs'
 import { useCreateTargetedMaintenanceRunMutation } from '/app/resources/runs'
+
 import { buildLoadPipetteCommand } from './useDropTipCommands'
 
-import type { PipetteModelSpecs } from '@opentrons/shared-data'
 import type { PipetteData } from '@opentrons/api-client'
+import type { PipetteModelSpecs } from '@opentrons/shared-data'
 import type { SetRobotErrorDetailsParams, UseDTWithTypeParams } from '.'
 
 const RUN_REFETCH_INTERVAL_MS = 5000
@@ -78,26 +79,25 @@ function useCreateDropTipMaintenanceRun({
 }: UseCreateDropTipMaintenanceRunParams): void {
   const { chainRunCommands } = useChainMaintenanceCommands()
 
-  const {
-    createTargetedMaintenanceRun,
-  } = useCreateTargetedMaintenanceRunMutation({
-    onSuccess: response => {
-      // The type assertions here are safe, since we only use this command after asserting these
-      const loadPipetteCommand = buildLoadPipetteCommand(
-        instrumentModelName as string,
-        mount as PipetteData['mount']
-      )
+  const { createTargetedMaintenanceRun } =
+    useCreateTargetedMaintenanceRunMutation({
+      onSuccess: response => {
+        // The type assertions here are safe, since we only use this command after asserting these
+        const loadPipetteCommand = buildLoadPipetteCommand(
+          instrumentModelName!,
+          mount!
+        )
 
-      chainRunCommands(response.data.id, [loadPipetteCommand], false)
-        .then(() => {
-          setCreatedMaintenanceRunId(response.data.id)
-        })
-        .catch((error: Error) => error)
-    },
-    onError: (error: Error) => {
-      setErrorDetails({ message: error.message })
-    },
-  })
+        chainRunCommands(response.data.id, [loadPipetteCommand], false)
+          .then(() => {
+            setCreatedMaintenanceRunId(response.data.id)
+          })
+          .catch((error: Error) => error)
+      },
+      onError: (error: Error) => {
+        setErrorDetails({ message: error.message })
+      },
+    })
 
   useEffect(() => {
     if (

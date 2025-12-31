@@ -1,20 +1,21 @@
 // tests for the HostConfig context and hook
-import type * as React from 'react'
-import { vi, it, expect, describe, beforeEach, afterEach } from 'vitest'
-import { when } from 'vitest-when'
 import { Provider } from 'react-redux'
-import { createStore } from 'redux'
 import { renderHook } from '@testing-library/react'
+import { legacy_createStore } from 'redux'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { when } from 'vitest-when'
+
 import { useCurrentProtocol } from '../useCurrentProtocol'
 import { useProtocolMetadata } from '../useProtocolMetadata'
 
 import type { Store } from 'redux'
+import type { FunctionComponent, ReactNode } from 'react'
 import type { State } from '/app/redux/types'
 
 vi.mock('../useCurrentProtocol')
 
 describe('useProtocolMetadata', () => {
-  const store: Store<State> = createStore(vi.fn(), {})
+  const store: Store<State> = legacy_createStore(vi.fn(), {})
 
   when(vi.mocked(useCurrentProtocol))
     .calledWith()
@@ -39,17 +40,12 @@ describe('useProtocolMetadata', () => {
   })
 
   it('should return author, lastUpdated, method, description, and robot type', () => {
-    const wrapper: React.FunctionComponent<{ children: React.ReactNode }> = ({
+    const wrapper: FunctionComponent<{ children: ReactNode }> = ({
       children,
     }) => <Provider store={store}>{children}</Provider>
     const { result } = renderHook(useProtocolMetadata, { wrapper })
-    const {
-      author,
-      lastUpdated,
-      creationMethod,
-      description,
-      robotType,
-    } = result.current
+    const { author, lastUpdated, creationMethod, description, robotType } =
+      result.current
 
     expect(author).toBe('AUTHOR')
     expect(lastUpdated).toBe(123456)

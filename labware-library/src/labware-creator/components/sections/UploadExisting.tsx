@@ -1,7 +1,9 @@
-import type * as React from 'react'
 import { PrimaryButton } from '@opentrons/components'
-import { ImportLabware } from '../ImportLabware'
+
 import styles from '../../styles.module.css'
+import { ImportLabware } from '../ImportLabware'
+
+import type * as React from 'react'
 
 interface Props {
   disabled: boolean
@@ -16,13 +18,8 @@ interface Props {
 }
 
 export const UploadExisting = (props: Props): JSX.Element => {
-  const {
-    disabled,
-    labwareTypeChildFields,
-    lastUploaded,
-    onClick,
-    onUpload,
-  } = props
+  const { disabled, labwareTypeChildFields, lastUploaded, onClick, onUpload } =
+    props
   return (
     <div className={styles.upload_existing_section}>
       <h2 className={styles.setup_heading}>

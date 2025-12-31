@@ -1,6 +1,7 @@
 // sets up the main window ui
-import { app, BrowserWindow } from 'electron'
 import path from 'path'
+import { app, BrowserWindow } from 'electron'
+
 import { sendReadyStatus } from './actions'
 import { getConfig } from './config'
 import { createLogger } from './log'
@@ -24,6 +25,7 @@ const WINDOW_OPTS = {
   width: config.width,
   minWidth: config.minWidth,
   height: config.height,
+  minHeight: config.minHeight,
   frame: false, // hide menubar
   // allow webPreferences to be set at launchtime from config
   webPreferences: Object.assign(
@@ -68,7 +70,13 @@ export function waitForRobotServerAndShowMainWindow(
   mainWindow: BrowserWindow
 ): void {
   mainWindow.show()
-  process.env.NODE_ENV !== 'development' &&
+  mainWindow.webContents.send('window-type', 'odd-main')
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    mainWindow.webContents.send('window-type', 'odd-main')
+  })
+
+  _NODE_ENV_ !== 'development' &&
     setTimeout(function () {
       systemd
         .getisRobotServerReady()

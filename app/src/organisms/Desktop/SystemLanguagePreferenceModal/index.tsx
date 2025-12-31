@@ -17,20 +17,25 @@ import {
 
 import { LANGUAGES } from '/app/i18n'
 import {
+  ANALYTICS_LANGUAGE_UPDATED_DESKTOP_APP_MODAL,
+  useTrackEvent,
+} from '/app/redux/analytics'
+import {
   getAppLanguage,
   getStoredSystemLanguage,
   updateConfigValue,
-  useFeatureFlag,
 } from '/app/redux/config'
 import { getSystemLanguage } from '/app/redux/shell'
 
 import type { DropdownOption } from '@opentrons/components'
 import type { Dispatch } from '/app/redux/types'
 
+type ArrayElement<ArrayType extends readonly unknown[]> =
+  ArrayType extends ReadonlyArray<infer ElementType> ? ElementType : never
+
 export function SystemLanguagePreferenceModal(): JSX.Element | null {
   const { i18n, t } = useTranslation(['app_settings', 'shared', 'branded'])
-  const enableLocalization = useFeatureFlag('enableLocalization')
-
+  const trackEvent = useTrackEvent()
   const [currentOption, setCurrentOption] = useState<DropdownOption>(
     LANGUAGES[0]
   )
@@ -42,11 +47,7 @@ export function SystemLanguagePreferenceModal(): JSX.Element | null {
   const storedSystemLanguage = useSelector(getStoredSystemLanguage)
 
   const showBootModal = appLanguage == null && systemLanguage != null
-  const showUpdateModal =
-    appLanguage != null &&
-    systemLanguage != null &&
-    storedSystemLanguage != null &&
-    systemLanguage !== storedSystemLanguage
+  const [showUpdateModal, setShowUpdateModal] = useState(false)
 
   const title = showUpdateModal
     ? t('system_language_preferences_update')
@@ -68,6 +69,16 @@ export function SystemLanguagePreferenceModal(): JSX.Element | null {
   const handlePrimaryClick = (): void => {
     dispatch(updateConfigValue('language.appLanguage', currentOption.value))
     dispatch(updateConfigValue('language.systemLanguage', systemLanguage))
+    trackEvent({
+      name: ANALYTICS_LANGUAGE_UPDATED_DESKTOP_APP_MODAL,
+      properties: {
+        language: currentOption.value,
+        systemLanguage,
+        modalType: showUpdateModal
+          ? 'systemLanguageUpdateModal'
+          : 'appBootModal',
+      },
+    })
   }
 
   const handleDropdownClick = (value: string): void => {
@@ -83,13 +94,31 @@ export function SystemLanguagePreferenceModal(): JSX.Element | null {
   useEffect(() => {
     if (systemLanguage != null) {
       // prefer match entire locale, then match just language e.g. zh-Hant and zh-CN
-      const matchedSystemLanguageOption =
-        LANGUAGES.find(lng => lng.value === systemLanguage) ??
-        LANGUAGES.find(
-          lng =>
-            new Intl.Locale(lng.value).language ===
-            new Intl.Locale(systemLanguage).language
-        )
+      const matchSystemLanguage: () => ArrayElement<
+        typeof LANGUAGES
+      > | null = () => {
+        try {
+          return (
+            LANGUAGES.find(lng => lng.value === systemLanguage) ??
+            LANGUAGES.find(
+              lng =>
+                new Intl.Locale(lng.value).language ===
+                new Intl.Locale(systemLanguage).language
+            ) ??
+            null
+          )
+        } catch (error: unknown) {
+          // Sometimes the language that we get from the shell will not be something
+          // js i18n can understand. Specifically, some linux systems will have their
+          // locale set to "C" (https://www.gnu.org/software/libc/manual/html_node/Standard-Locales.html)
+          // and that will cause Intl.Locale to throw. In this case, we'll treat it as
+          // unset and fall back to our default.
+          console.log(`Failed to search languages: ${error}`)
+          return null
+        }
+      }
+      const matchedSystemLanguageOption = matchSystemLanguage()
+
       if (matchedSystemLanguageOption != null) {
         // initial current option: set to detected system language
         setCurrentOption(matchedSystemLanguageOption)
@@ -98,10 +127,17 @@ export function SystemLanguagePreferenceModal(): JSX.Element | null {
           void i18n.changeLanguage(systemLanguage)
         }
       }
+      // only show update modal if we support the language their system has updated to
+      setShowUpdateModal(
+        appLanguage != null &&
+          matchedSystemLanguageOption != null &&
+          storedSystemLanguage != null &&
+          systemLanguage !== storedSystemLanguage
+      )
     }
   }, [i18n, systemLanguage, showBootModal])
 
-  return enableLocalization && (showBootModal || showUpdateModal) ? (
+  return showBootModal || showUpdateModal ? (
     <Modal title={title}>
       <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing24}>
         <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing16}>

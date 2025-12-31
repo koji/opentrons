@@ -1,4 +1,5 @@
 """Protocol engine state management."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -9,7 +10,7 @@ from opentrons_shared_data.deck.types import DeckDefinitionV5
 from opentrons_shared_data.robot.types import RobotDefinition
 
 from opentrons.protocol_engine.error_recovery_policy import ErrorRecoveryPolicy
-from opentrons.protocol_engine.types import ModuleOffsetData
+from opentrons.protocol_engine.types import LiquidClassRecordWithId, ModuleOffsetData
 from opentrons.util.change_notifier import ChangeNotifier
 
 from ..resources import DeckFixedLabware
@@ -25,6 +26,7 @@ from .labware import LabwareState, LabwareStore, LabwareView
 from .pipettes import PipetteState, PipetteStore, PipetteView
 from .modules import ModuleState, ModuleStore, ModuleView
 from .liquids import LiquidState, LiquidView, LiquidStore
+from .liquid_classes import LiquidClassState, LiquidClassStore, LiquidClassView
 from .tips import TipState, TipView, TipStore
 from .wells import WellState, WellView, WellStore
 from .geometry import GeometryView
@@ -33,6 +35,13 @@ from .files import FileView, FileState, FileStore
 from .config import Config
 from .state_summary import StateSummary
 from ..types import DeckConfigurationType
+from .tasks import TaskState, TaskView, TaskStore
+from .preconditions import (
+    CommandPreconditionState,
+    CommandPreconditionStore,
+    CommandPreconditionView,
+)
+from .camera import CameraState, CameraView, CameraStore
 
 
 _ParamsT = ParamSpec("_ParamsT")
@@ -49,9 +58,13 @@ class State:
     pipettes: PipetteState
     modules: ModuleState
     liquids: LiquidState
+    liquid_classes: LiquidClassState
     tips: TipState
     wells: WellState
     files: FileState
+    tasks: TaskState
+    preconditions: CommandPreconditionState
+    camera: CameraState
 
 
 class StateView(HasState[State]):
@@ -64,12 +77,16 @@ class StateView(HasState[State]):
     _pipettes: PipetteView
     _modules: ModuleView
     _liquid: LiquidView
+    _liquid_classes: LiquidClassView
     _tips: TipView
     _wells: WellView
     _geometry: GeometryView
     _motion: MotionView
     _files: FileView
     _config: Config
+    _tasks: TaskView
+    _preconditions: CommandPreconditionView
+    _camera: CameraView
 
     @property
     def commands(self) -> CommandView:
@@ -102,6 +119,11 @@ class StateView(HasState[State]):
         return self._liquid
 
     @property
+    def liquid_classes(self) -> LiquidClassView:
+        """Get state view selectors for liquid class state."""
+        return self._liquid_classes
+
+    @property
     def tips(self) -> TipView:
         """Get state view selectors for tip state."""
         return self._tips
@@ -131,11 +153,26 @@ class StateView(HasState[State]):
         """Get ProtocolEngine configuration."""
         return self._config
 
+    @property
+    def preconditions(self) -> CommandPreconditionView:
+        """Get state view selectors for command preconditions."""
+        return self._preconditions
+
+    @property
+    def camera(self) -> CameraView:
+        """Get state view for the Camera."""
+        return self._camera
+
+    @property
+    def tasks(self) -> TaskView:
+        """Get state view selectors for task state."""
+        return self._tasks
+
     def get_summary(self) -> StateSummary:
         """Get protocol run data."""
         error = self._commands.get_error()
         # TODO maybe add summary here for AA
-        return StateSummary.construct(
+        return StateSummary.model_construct(
             status=self._commands.get_status(),
             errors=[] if error is None else [error],
             pipettes=self._pipettes.get_all(),
@@ -148,6 +185,14 @@ class StateView(HasState[State]):
             wells=self._wells.get_all(),
             hasEverEnteredErrorRecovery=self._commands.get_has_entered_recovery_mode(),
             files=self._state.files.file_ids,
+            liquidClasses=[
+                LiquidClassRecordWithId(
+                    liquidClassId=liquid_class_id, **dict(liquid_class_record)
+                )
+                for liquid_class_id, liquid_class_record in self._liquid_classes.get_all().items()
+            ],
+            tasks=self._tasks.get_summary(),
+            cameraSettings=self._camera.get_enablement_settings(),
         )
 
 
@@ -213,9 +258,13 @@ class StateStore(StateView, ActionHandler):
             module_calibration_offsets=module_calibration_offsets,
         )
         self._liquid_store = LiquidStore()
+        self._liquid_class_store = LiquidClassStore()
         self._tip_store = TipStore()
         self._well_store = WellStore()
         self._file_store = FileStore()
+        self._task_store = TaskStore()
+        self._precondition_store = CommandPreconditionStore()
+        self._camera_store = CameraStore()
 
         self._substores: List[HandlesActions] = [
             self._command_store,
@@ -224,9 +273,13 @@ class StateStore(StateView, ActionHandler):
             self._labware_store,
             self._module_store,
             self._liquid_store,
+            self._liquid_class_store,
             self._tip_store,
             self._well_store,
             self._file_store,
+            self._task_store,
+            self._precondition_store,
+            self._camera_store,
         ]
         self._config = config
         self._change_notifier = change_notifier or ChangeNotifier()
@@ -301,6 +354,10 @@ class StateStore(StateView, ActionHandler):
 
         return await self._wait_for(condition=predicate, truthiness_to_wait_for=True)
 
+    def clear_command_history(self) -> None:
+        """Clear CommandHistory state."""
+        self._command_store.clear_history()
+
     async def wait_for_not(
         self,
         condition: Callable[_ParamsT, _ReturnT],
@@ -342,9 +399,13 @@ class StateStore(StateView, ActionHandler):
             pipettes=self._pipette_store.state,
             modules=self._module_store.state,
             liquids=self._liquid_store.state,
+            liquid_classes=self._liquid_class_store.state,
             tips=self._tip_store.state,
             wells=self._well_store.state,
             files=self._file_store.state,
+            tasks=self._task_store.state,
+            preconditions=self._precondition_store.state,
+            camera=self._camera_store.state,
         )
 
     def _initialize_state(self) -> None:
@@ -357,11 +418,15 @@ class StateStore(StateView, ActionHandler):
         self._addressable_areas = AddressableAreaView(state.addressable_areas)
         self._labware = LabwareView(state.labware)
         self._pipettes = PipetteView(state.pipettes)
-        self._modules = ModuleView(state.modules)
+        self._modules = ModuleView(state=state.modules)
         self._liquid = LiquidView(state.liquids)
+        self._liquid_classes = LiquidClassView(state.liquid_classes)
         self._tips = TipView(state.tips)
         self._wells = WellView(state.wells)
         self._files = FileView(state.files)
+        self._tasks = TaskView(state.tasks)
+        self._preconditions = CommandPreconditionView(state.preconditions)
+        self._camera = CameraView(state.camera)
 
         # Derived states
         self._geometry = GeometryView(
@@ -391,8 +456,11 @@ class StateStore(StateView, ActionHandler):
         self._pipettes._state = next_state.pipettes
         self._modules._state = next_state.modules
         self._liquid._state = next_state.liquids
+        self._liquid_classes._state = next_state.liquid_classes
         self._tips._state = next_state.tips
         self._wells._state = next_state.wells
+        self._tasks._state = next_state.tasks
+        self._camera._state = next_state.camera
         self._change_notifier.notify()
         if self._notify_robot_server is not None:
             self._notify_robot_server()

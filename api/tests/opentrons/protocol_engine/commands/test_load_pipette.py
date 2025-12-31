@@ -1,14 +1,21 @@
 """Test load pipette commands."""
+
 from opentrons.protocol_engine.state.update_types import (
     LoadPipetteUpdate,
     PipetteConfigUpdate,
     StateUpdate,
+    PipetteUnknownFluidUpdate,
+    PipetteAspirateReadyUpdate,
 )
 import pytest
 from decoy import Decoy
 
-from opentrons_shared_data.pipette.types import PipetteNameType
+from opentrons_shared_data.pipette.types import (
+    PipetteNameType,
+    LiquidClasses as VolumeModes,
+)
 from opentrons_shared_data.robot.types import RobotType
+from opentrons_shared_data.pipette.pipette_definition import AvailableSensorDefinition
 from opentrons.types import MountType, Point
 
 from opentrons.protocol_engine.errors import InvalidSpecificationForRobotTypeError
@@ -25,6 +32,12 @@ from opentrons.protocol_engine.commands.load_pipette import (
     LoadPipetteImplementation,
 )
 from ..pipette_fixtures import get_default_nozzle_map
+
+
+@pytest.fixture
+def available_sensors() -> AvailableSensorDefinition:
+    """Provide a list of sensors."""
+    return AvailableSensorDefinition(sensors=["pressure", "capacitive", "environment"])
 
 
 @pytest.mark.parametrize(
@@ -48,6 +61,7 @@ async def test_load_pipette_implementation(
     equipment: EquipmentHandler,
     state_view: StateView,
     data: LoadPipetteParams,
+    available_sensors: AvailableSensorDefinition,
 ) -> None:
     """A LoadPipette command should have an execution implementation."""
     subject = LoadPipetteImplementation(equipment=equipment, state_view=state_view)
@@ -68,6 +82,16 @@ async def test_load_pipette_implementation(
         back_left_corner_offset=Point(x=1, y=2, z=3),
         front_right_corner_offset=Point(x=4, y=5, z=6),
         pipette_lld_settings={},
+        plunger_positions={
+            "top": 0.0,
+            "bottom": 5.0,
+            "blow_out": 19.0,
+            "drop_tip": 20.0,
+        },
+        shaft_ul_per_mm=5.0,
+        available_sensors=available_sensors,
+        volume_mode=VolumeModes.default,
+        available_volume_modes_min_vol={},
     )
 
     decoy.when(
@@ -101,6 +125,10 @@ async def test_load_pipette_implementation(
                 serial_number="some-serial-number",
                 config=config_data,
             ),
+            pipette_aspirated_fluid=PipetteUnknownFluidUpdate(pipette_id="some id"),
+            ready_to_aspirate=PipetteAspirateReadyUpdate(
+                pipette_id="some id", ready_to_aspirate=False
+            ),
         ),
     )
 
@@ -109,6 +137,7 @@ async def test_load_pipette_implementation_96_channel(
     decoy: Decoy,
     equipment: EquipmentHandler,
     state_view: StateView,
+    available_sensors: AvailableSensorDefinition,
 ) -> None:
     """A LoadPipette command should have an execution implementation."""
     subject = LoadPipetteImplementation(equipment=equipment, state_view=state_view)
@@ -135,6 +164,16 @@ async def test_load_pipette_implementation_96_channel(
         back_left_corner_offset=Point(x=1, y=2, z=3),
         front_right_corner_offset=Point(x=4, y=5, z=6),
         pipette_lld_settings={},
+        plunger_positions={
+            "top": 0.0,
+            "bottom": 5.0,
+            "blow_out": 19.0,
+            "drop_tip": 20.0,
+        },
+        shaft_ul_per_mm=5.0,
+        available_sensors=available_sensors,
+        volume_mode=VolumeModes.lowVolumeDefault,
+        available_volume_modes_min_vol={},
     )
 
     decoy.when(
@@ -165,6 +204,10 @@ async def test_load_pipette_implementation_96_channel(
                 pipette_id="pipette-id",
                 serial_number="some id",
                 config=config_data,
+            ),
+            pipette_aspirated_fluid=PipetteUnknownFluidUpdate(pipette_id="pipette-id"),
+            ready_to_aspirate=PipetteAspirateReadyUpdate(
+                pipette_id="pipette-id", ready_to_aspirate=False
             ),
         ),
     )

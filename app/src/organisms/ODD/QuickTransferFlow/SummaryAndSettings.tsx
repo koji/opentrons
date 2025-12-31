@@ -1,15 +1,15 @@
-import * as React from 'react'
+import { useReducer, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from 'react-query'
+import { useNavigate } from 'react-router-dom'
+
 import {
-  Flex,
-  SPACING,
-  DIRECTION_COLUMN,
-  DIRECTION_ROW,
-  COLORS,
-  POSITION_FIXED,
   ALIGN_CENTER,
+  COLORS,
+  DIRECTION_COLUMN,
+  Flex,
+  POSITION_FIXED,
+  SPACING,
   Tabs,
 } from '@opentrons/components'
 import {
@@ -18,26 +18,31 @@ import {
   useHost,
 } from '@opentrons/react-api-client'
 
-import { useNotifyDeckConfigurationQuery } from '/app/resources/deck_configuration'
-import {
-  ANALYTICS_QUICK_TRANSFER_TIME_TO_CREATE,
-  ANALYTICS_QUICK_TRANSFER_SAVE_FOR_LATER,
-  ANALYTICS_QUICK_TRANSFER_RUN_NOW,
-} from '/app/redux/analytics'
-import { useTrackEventWithRobotSerial } from '/app/redux-resources/analytics'
 import { ChildNavigation } from '/app/organisms/ODD/ChildNavigation'
-import { Overview } from './Overview'
-import { TipManagement } from './TipManagement'
-import { QuickTransferAdvancedSettings } from './QuickTransferAdvancedSettings'
-import { SaveOrRunModal } from './SaveOrRunModal'
-import { getInitialSummaryState, createQuickTransferFile } from './utils'
-import { quickTransferSummaryReducer } from './reducers'
+import { useTrackEventWithRobotSerial } from '/app/redux-resources/analytics'
+import {
+  ANALYTICS_QUICK_TRANSFER_RUN_NOW,
+  ANALYTICS_QUICK_TRANSFER_SAVE_FOR_LATER,
+  ANALYTICS_QUICK_TRANSFER_TIME_TO_CREATE,
+} from '/app/redux/analytics'
+import { useFeatureFlag } from '/app/redux/config'
+import { useNotifyDeckConfigurationQuery } from '/app/resources/deck_configuration'
 
+import { Aspirate } from './Aspirate'
+import { Dispense } from './Dispense'
+import { Overview } from './Overview'
+import { quickTransferSummaryReducer } from './reducers'
+import { SaveOrRunModal } from './SaveOrRunModal'
+import { initializeSummaryState } from './utils'
+import { createQuickTransferPythonFile } from './utils/createQuickTransferFile'
+
+import type { ComponentProps } from 'react'
 import type { SmallButton } from '/app/atoms/buttons'
 import type { QuickTransferWizardState } from './types'
+import type { InitialSummaryStateProps } from './utils/getInitialSummaryState'
 
 interface SummaryAndSettingsProps {
-  exitButtonProps: React.ComponentProps<typeof SmallButton>
+  exitButtonProps: ComponentProps<typeof SmallButton>
   state: QuickTransferWizardState
   analyticsStartTime: Date
 }
@@ -51,29 +56,20 @@ export function SummaryAndSettings(
   const queryClient = useQueryClient()
   const host = useHost()
   const { t } = useTranslation(['quick_transfer', 'shared'])
-  const [showSaveOrRunModal, setShowSaveOrRunModal] = React.useState<boolean>(
-    false
+  const [showSaveOrRunModal, setShowSaveOrRunModal] = useState<boolean>(false)
+  const enableProtocolContentsLog = useFeatureFlag(
+    'quickTransferProtocolContentsLog'
   )
 
-  const displayCategory: string[] = [
-    'overview',
-    'advanced_settings',
-    'tip_management',
-  ]
-  const [selectedCategory, setSelectedCategory] = React.useState<string>(
-    'overview'
-  )
+  const displayCategory: string[] = ['overview', 'aspirate', 'dispense']
+
+  const [selectedCategory, setSelectedCategory] = useState<string>('overview')
   const deckConfig = useNotifyDeckConfigurationQuery().data ?? []
 
-  const initialSummaryState = getInitialSummaryState({
-    // @ts-expect-error TODO figure out how to make this type non-null as we know
-    // none of these values will be undefined
-    state: wizardFlowState,
-    deckConfig,
-  })
-  const [state, dispatch] = React.useReducer(
+  const [state, dispatch] = useReducer(
     quickTransferSummaryReducer,
-    initialSummaryState
+    { state: wizardFlowState as InitialSummaryStateProps['state'], deckConfig },
+    initializeSummaryState
   )
 
   const { mutateAsync: createProtocolAsync } = useCreateProtocolMutation()
@@ -90,6 +86,8 @@ export function SummaryAndSettings(
     host
   )
 
+  const isMultiTransferDispense = state?.path === 'multiDispense'
+
   const handleClickCreateTransfer = (): void => {
     setShowSaveOrRunModal(true)
     const duration = new Date().getTime() - analyticsStartTime.getTime()
@@ -102,11 +100,13 @@ export function SummaryAndSettings(
   }
 
   const handleClickSave = (protocolName: string): void => {
-    const protocolFile = createQuickTransferFile(
+    const protocolFile = createQuickTransferPythonFile(
       state,
       deckConfig,
-      protocolName
+      protocolName,
+      enableProtocolContentsLog
     )
+
     createProtocolAsync({
       files: [protocolFile],
       protocolKind: 'quick-transfer',
@@ -122,7 +122,13 @@ export function SummaryAndSettings(
   }
 
   const handleClickRun = (): void => {
-    const protocolFile = createQuickTransferFile(state, deckConfig)
+    const protocolFile = createQuickTransferPythonFile(
+      state,
+      deckConfig,
+      undefined,
+      enableProtocolContentsLog
+    )
+
     createProtocolAsync({
       files: [protocolFile],
       protocolKind: 'quick-transfer',
@@ -153,14 +159,10 @@ export function SummaryAndSettings(
         width="100%"
       >
         <Flex
-          gridGap={SPACING.spacing8}
-          height={SPACING.spacing80}
           backgroundColor={COLORS.white}
           width="100%"
-          flexDirection={DIRECTION_ROW}
           position={POSITION_FIXED}
-          top={SPACING.spacing120}
-          marginBottom={SPACING.spacing24}
+          top="7.5rem"
           alignItems={ALIGN_CENTER}
         >
           <Tabs
@@ -175,12 +177,22 @@ export function SummaryAndSettings(
           />
         </Flex>
         {selectedCategory === 'overview' ? <Overview state={state} /> : null}
-        {selectedCategory === 'advanced_settings' ? (
-          <QuickTransferAdvancedSettings state={state} dispatch={dispatch} />
-        ) : null}
-        {selectedCategory === 'tip_management' ? (
-          <TipManagement state={state} dispatch={dispatch} />
-        ) : null}
+        <>
+          {selectedCategory === 'aspirate' ? (
+            <Aspirate
+              state={state}
+              dispatch={dispatch}
+              isMultiTransfer={isMultiTransferDispense}
+            />
+          ) : null}
+          {selectedCategory === 'dispense' ? (
+            <Dispense
+              state={state}
+              dispatch={dispatch}
+              isMultiTransfer={isMultiTransferDispense}
+            />
+          ) : null}
+        </>
       </Flex>
     </Flex>
   )

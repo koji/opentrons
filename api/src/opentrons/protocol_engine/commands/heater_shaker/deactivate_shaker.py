@@ -1,4 +1,5 @@
 """Command models to deactivate shaker for the Heater-Shaker Module."""
+
 from __future__ import annotations
 from typing import Optional, TYPE_CHECKING
 from typing_extensions import Literal, Type
@@ -70,7 +71,7 @@ class DeactivateShaker(
 
     commandType: DeactivateShakerCommandType = "heaterShaker/deactivateShaker"
     params: DeactivateShakerParams
-    result: Optional[DeactivateShakerResult]
+    result: Optional[DeactivateShakerResult] = None
 
     _ImplementationCls: Type[DeactivateShakerImpl] = DeactivateShakerImpl
 

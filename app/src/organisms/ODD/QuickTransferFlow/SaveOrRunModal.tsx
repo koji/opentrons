@@ -1,15 +1,17 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+
 import {
-  SPACING,
   COLORS,
-  LegacyStyledText,
-  Flex,
   DIRECTION_COLUMN,
-  TYPOGRAPHY,
+  Flex,
+  SPACING,
+  StyledText,
 } from '@opentrons/components'
-import { OddModal } from '/app/molecules/OddModal'
+
 import { SmallButton } from '/app/atoms/buttons'
+import { OddModal } from '/app/molecules/OddModal'
+
 import { NameQuickTransfer } from './NameQuickTransfer'
 
 interface SaveOrRunModalProps {
@@ -28,7 +30,7 @@ export const SaveOrRunModal = (props: SaveOrRunModalProps): JSX.Element => {
     <OddModal
       header={{
         title: t('run_quick_transfer_now'),
-        iconName: 'alert-circle',
+        iconName: 'ot-alert',
         iconColor: COLORS.yellow50,
       }}
     >
@@ -37,9 +39,9 @@ export const SaveOrRunModal = (props: SaveOrRunModalProps): JSX.Element => {
         gridGap={SPACING.spacing32}
         width="100%"
       >
-        <LegacyStyledText css={TYPOGRAPHY.bodyTextRegular}>
+        <StyledText oddStyle="bodyTextRegular">
           {t('save_to_run_later')}
-        </LegacyStyledText>
+        </StyledText>
         <Flex gridGap={SPACING.spacing8}>
           <SmallButton
             width="50%"

@@ -1,56 +1,63 @@
 import { useFormikContext } from 'formik'
+
 import {
-  MAGNETIC_BLOCK_V1,
-  THERMOCYCLER_MODULE_V2,
-  getAllDefinitions,
-  getModuleDisplayName,
-} from '@opentrons/shared-data'
-import src from '../../../images/stacking_offsets.svg'
-import {
+  AlertItem,
   ALIGN_CENTER,
+  Box,
   CheckboxField,
   DIRECTION_COLUMN,
   DIRECTION_ROW,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   SPACING,
   TYPOGRAPHY,
-  LegacyStyledText,
-  AlertItem,
-  Box,
 } from '@opentrons/components'
-import { isEveryFieldHidden } from '../../utils'
+import {
+  getAllDefinitions,
+  getModuleDisplayName,
+  MAGNETIC_BLOCK_V1,
+  THERMOCYCLER_MODULE_V2,
+} from '@opentrons/shared-data'
+
+import {
+  STACKING_OFFSET_HOW_TO,
+  STACKING_OFFSET_PURPOSE,
+} from '../../../localization'
 import { makeMaskToDecimal } from '../../fieldMasks'
+import styles from '../../styles.module.css'
+import { isEveryFieldHidden } from '../../utils'
 import { FormAlerts } from '../alerts/FormAlerts'
+import { StackingAlerts } from '../alerts/StackingAlerts'
 import { TextField } from '../TextField'
 import { SectionBody } from './SectionBody'
+
 import type { LabwareDefinition2, ModuleModel } from '@opentrons/shared-data'
 import type { LabwareFields } from '../../fields'
 
-import styles from '../../styles.module.css'
+import src from '../../../images/stacking_offsets.svg'
+import heightOfTwoPlates from '../../images/height_stacked_labware.svg'
 
 const HIGHEST_TC_COMPATIBLE_LABWARE_HEIGHT = 16.06
 const MODULE_MODELS_WITH_NO_ADAPTERS: ModuleModel[] = [
   MAGNETIC_BLOCK_V1,
   THERMOCYCLER_MODULE_V2,
 ]
+const maskTo2Decimal = makeMaskToDecimal(2)
 
 export function StackingOffsets(): JSX.Element | null {
   const labwareDefinitions = getAllDefinitions()
-  const adapterDefinitions = Object.values(
-    labwareDefinitions
-  ).filter(definition => definition.allowedRoles?.includes('adapter'))
+  const adapterDefinitions = Object.values(labwareDefinitions).filter(
+    definition => definition.allowedRoles?.includes('adapter')
+  )
 
   const fieldList: Array<keyof LabwareFields> = [
     'compatibleAdapters',
     'compatibleModules',
+    'stackedLabwareZDimension',
   ]
-  const {
-    values,
-    errors,
-    touched,
-    setFieldValue,
-  } = useFormikContext<LabwareFields>()
+  const { values, errors, touched, setFieldValue } =
+    useFormikContext<LabwareFields>()
 
   if (isEveryFieldHidden(fieldList, values)) {
     return null
@@ -64,6 +71,8 @@ export function StackingOffsets(): JSX.Element | null {
   const isCircular = values.wellShape === 'circular'
   const isReservoir = values.labwareType === 'reservoir'
   const isWellPlate = values.labwareType === 'wellPlate'
+  const isStackableLabware =
+    values.labwareType === 'wellPlate' || values.labwareType === 'tipRack'
   const labwareHeight = values.labwareZDimension
   const has12Columns =
     values.gridColumns != null && parseInt(values.gridColumns) === 12
@@ -145,7 +154,6 @@ export function StackingOffsets(): JSX.Element | null {
   ) {
     return null
   }
-
   return (
     <div className={styles.new_definition_section}>
       <SectionBody label={label} id="StackingOffsets">
@@ -174,30 +182,49 @@ export function StackingOffsets(): JSX.Element | null {
           />
           <div className={styles.flex_row_no_columns}>
             <div className={styles.instructions_column}>
-              <p>
-                Stacking offset is only required for labware that can be placed
-                on an adapter or module. Select the compatible adapters or
-                modules below.
-              </p>
-              <p>
-                Stack the labware onto the adapter or module and then make the
-                required measurement with calipers.
-              </p>
+              <p>{STACKING_OFFSET_PURPOSE}</p>
+              <p>{STACKING_OFFSET_HOW_TO}</p>
             </div>
-            <img src={src} alt="Stacking offset image" />
+            {isStackableLabware && (
+              <>
+                <LegacyStyledText
+                  forwardedAs="h3"
+                  fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+                >
+                  Labware
+                </LegacyStyledText>
+                <img
+                  src={heightOfTwoPlates}
+                  alt="Labware stacking offset image"
+                  style={{ width: '300px', height: 'auto' }}
+                />
+                <div className={styles.form_fields_column}>
+                  <TextField
+                    name="stackedLabwareZDimension"
+                    inputMasks={[maskTo2Decimal]}
+                    units="mm"
+                  />
+                  <StackingAlerts values={values} touched={touched} />
+                </div>
+              </>
+            )}
             {modifiedAdapterDefinitions.length === 0 ? null : (
               <Flex gridGap={SPACING.spacing4} flexDirection={DIRECTION_COLUMN}>
                 <LegacyStyledText
-                  as="h3"
+                  forwardedAs="h3"
                   fontWeight={TYPOGRAPHY.fontWeightSemiBold}
                 >
                   Adapters
                 </LegacyStyledText>
+                <img
+                  src={src}
+                  alt="Stacking offset image"
+                  style={{ width: '300px', height: 'auto' }}
+                />
                 {modifiedAdapterDefinitions.map((definition, index) => {
                   const key = definition.parameters.loadName
                   const fieldName = `compatibleAdapters.${key}`
                   const isChecked = values.compatibleAdapters[key] !== undefined
-
                   return (
                     <Flex
                       flexDirection={DIRECTION_COLUMN}
@@ -220,10 +247,8 @@ export function StackingOffsets(): JSX.Element | null {
                                 ...values.compatibleAdapters,
                               }
                               if (isChecked) {
-                                const {
-                                  [key]: _,
-                                  ...newCompatibleAdapters
-                                } = compatibleAdaptersCopy
+                                const { [key]: _, ...newCompatibleAdapters } =
+                                  compatibleAdaptersCopy
                                 setFieldValue(
                                   'compatibleAdapters',
                                   newCompatibleAdapters
@@ -273,7 +298,7 @@ export function StackingOffsets(): JSX.Element | null {
                 gridGap={SPACING.spacing4}
               >
                 <LegacyStyledText
-                  as="h3"
+                  forwardedAs="h3"
                   fontWeight={TYPOGRAPHY.fontWeightSemiBold}
                 >
                   Modules
@@ -305,10 +330,8 @@ export function StackingOffsets(): JSX.Element | null {
                                 ...values.compatibleModules,
                               }
                               if (isChecked) {
-                                const {
-                                  [model]: _,
-                                  ...newCompatibleModules
-                                } = compatibleModulesCopy
+                                const { [model]: _, ...newCompatibleModules } =
+                                  compatibleModulesCopy
                                 setFieldValue(
                                   'compatibleModules',
                                   newCompatibleModules

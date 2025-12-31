@@ -1,17 +1,25 @@
-import { fireEvent, screen } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
-import { describe, it, vi, beforeEach, afterEach, expect } from 'vitest'
+import { fireEvent, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 import {
-  useTrackEvent,
   ANALYTICS_IMPORT_PROTOCOL_TO_APP,
+  useTrackEvent,
 } from '/app/redux/analytics'
+import { remote } from '/app/redux/shell/remote'
+
 import { ProtocolUploadInput } from '../ProtocolUploadInput'
 
 import type { Mock } from 'vitest'
 
 vi.mock('/app/redux/analytics')
+vi.mock('/app/redux/shell/remote', () => ({
+  remote: {
+    getFilePathFrom: vi.fn(),
+  },
+}))
 
 describe('ProtocolUploadInput', () => {
   let onUpload: Mock
@@ -31,6 +39,7 @@ describe('ProtocolUploadInput', () => {
     onUpload = vi.fn()
     trackEvent = vi.fn()
     vi.mocked(useTrackEvent).mockReturnValue(trackEvent)
+    vi.mocked(remote.getFilePathFrom).mockResolvedValue('mockFileName')
   })
   afterEach(() => {
     vi.resetAllMocks()
@@ -56,16 +65,24 @@ describe('ProtocolUploadInput', () => {
     fireEvent.click(button)
     expect(input.click).toHaveBeenCalled()
   })
-  it('calls onUpload callback on choose file and trigger analytics event', () => {
+  it('calls onUpload callback on choose file and trigger analytics event', async () => {
     render()
     const input = screen.getByTestId('file_input')
-    fireEvent.change(input, {
-      target: { files: [{ path: 'dummyFile', name: 'dummyName' }] },
+
+    const mockFile = new File(['mockContent'], 'mockFileName', {
+      type: 'text/plain',
     })
-    expect(onUpload).toHaveBeenCalled()
-    expect(trackEvent).toHaveBeenCalledWith({
-      name: ANALYTICS_IMPORT_PROTOCOL_TO_APP,
-      properties: { protocolFileName: 'dummyName' },
+
+    fireEvent.change(input, {
+      target: { files: [mockFile] },
+    })
+
+    await vi.waitFor(() => {
+      expect(onUpload).toHaveBeenCalled()
+      expect(trackEvent).toHaveBeenCalledWith({
+        name: ANALYTICS_IMPORT_PROTOCOL_TO_APP,
+        properties: { protocolFileName: 'mockFileName' },
+      })
     })
   })
 })

@@ -1,14 +1,16 @@
 """In-memory storage of ProtocolEngine instances."""
+
 import asyncio
 import logging
 from datetime import datetime
-from typing import List, Optional, Callable
+from typing import Optional, Callable, Sequence
 
 from opentrons.protocol_engine.errors.exceptions import EStopActivatedError
 from opentrons.protocol_engine.types import PostRunHardwareState, DeckConfigurationType
 from opentrons.protocol_engine import (
     DeckType,
     LabwareOffsetCreate,
+    LegacyLabwareOffsetCreate,
     StateSummary,
     CommandSlice,
     CommandPointer,
@@ -146,7 +148,7 @@ class MaintenanceRunOrchestratorStore:
         self,
         run_id: str,
         created_at: datetime,
-        labware_offsets: List[LabwareOffsetCreate],
+        labware_offsets: Sequence[LegacyLabwareOffsetCreate | LabwareOffsetCreate],
         notify_publishers: Callable[[], None],
         deck_configuration: Optional[DeckConfigurationType] = [],
     ) -> StateSummary:
@@ -157,15 +159,16 @@ class MaintenanceRunOrchestratorStore:
             created_at: Run creation datetime
             labware_offsets: Labware offsets to create the run with.
             notify_publishers: Utilized by the engine to notify publishers of state changes.
+            deck_configuration: The deck configuration to use.
 
         Returns:
             The initial equipment and status summary of the engine.
         """
         # Because we will be clearing run orchestrator store before creating a new one,
         # the run orchestrator should be None at this point.
-        assert (
-            self._run_orchestrator is None
-        ), "There is an active maintenance run that was not cleared correctly."
+        assert self._run_orchestrator is None, (
+            "There is an active maintenance run that was not cleared correctly."
+        )
         engine = await create_protocol_engine(
             hardware_api=self._hardware_api,
             config=ProtocolEngineConfig(
@@ -213,10 +216,17 @@ class MaintenanceRunOrchestratorStore:
 
         run_data = self.run_orchestrator.get_state_summary()
         commands = self.run_orchestrator.get_all_commands()
+        preconditions = self.run_orchestrator.get_preconditions()
         self._run_orchestrator = None
         self._created_at = None
 
-        return RunResult(state_summary=run_data, commands=commands, parameters=[])
+        return RunResult(
+            state_summary=run_data,
+            commands=commands,
+            parameters=[],
+            command_annotations=[],
+            command_preconditions=preconditions,
+        )
 
     def get_command_slice(
         self,
@@ -260,7 +270,9 @@ class MaintenanceRunOrchestratorStore:
             command=request, wait_until_complete=wait_until_complete, timeout=timeout
         )
 
-    def add_labware_offset(self, request: LabwareOffsetCreate) -> LabwareOffset:
+    def add_labware_offset(
+        self, request: LegacyLabwareOffsetCreate | LabwareOffsetCreate
+    ) -> LabwareOffset:
         """Add a new labware offset to state."""
         return self.run_orchestrator.add_labware_offset(request)
 

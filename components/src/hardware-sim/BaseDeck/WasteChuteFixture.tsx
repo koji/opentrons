@@ -1,30 +1,39 @@
-import type * as React from 'react'
+import clsx from 'clsx'
 
-import { Icon } from '../../icons'
-import { Flex, Text } from '../../primitives'
+import { PlaceholderStyledText } from '../../atoms'
 import {
-  ALIGN_CENTER,
-  DIRECTION_COLUMN,
-  JUSTIFY_CENTER,
-  TEXT_ALIGN_CENTER,
-} from '../../styles'
-import { SPACING, TYPOGRAPHY } from '../../ui-style-constants'
+  WASTE_CHUTE_HEIGHT,
+  WASTE_CHUTE_WIDTH,
+  WASTE_CHUTE_X,
+  WASTE_CHUTE_Y,
+} from '../../hardware-sim'
 import { COLORS } from '../../helix-design-system'
+import { Icon } from '../../icons'
+import { DeckLabelSet } from '../../organisms'
 import { RobotCoordsForeignObject } from '../Deck/RobotCoordsForeignObject'
+import styles from './basedeck.module.css'
 import { SlotBase } from './SlotBase'
+
+import type { SVGProps } from 'react'
 import type {
-  WASTE_CHUTE_CUTOUT,
   DeckDefinition,
   ModuleType,
+  WASTE_CHUTE_CUTOUT,
 } from '@opentrons/shared-data'
+import type { DeckLabelProps } from '../../molecules'
 
-interface WasteChuteFixtureProps extends React.SVGProps<SVGGElement> {
+const TAG_HEIGHT = 28
+interface WasteChuteFixtureProps extends SVGProps<SVGGElement> {
   cutoutId: typeof WASTE_CHUTE_CUTOUT
   deckDefinition: DeckDefinition
   moduleType?: ModuleType
-  fixtureBaseColor?: React.SVGProps<SVGPathElement>['fill']
+  fixtureBaseColor?: SVGProps<SVGPathElement>['fill']
   wasteChuteColor?: string
   showExtensions?: boolean
+  /** optional prop to highlight the border of the wasteChute */
+  showHighlight?: boolean
+  /** optional tag info to display a tag below the waste */
+  tagInfo?: DeckLabelProps[]
 }
 
 export function WasteChuteFixture(
@@ -35,6 +44,8 @@ export function WasteChuteFixture(
     deckDefinition,
     fixtureBaseColor = COLORS.grey35,
     wasteChuteColor = COLORS.grey50,
+    showHighlight,
+    tagInfo,
     ...restProps
   } = props
 
@@ -64,6 +75,8 @@ export function WasteChuteFixture(
       <WasteChute
         backgroundColor={wasteChuteColor}
         wasteIconColor={fixtureBaseColor}
+        showHighlight={showHighlight}
+        tagInfo={tagInfo}
       />
     </g>
   )
@@ -72,43 +85,70 @@ export function WasteChuteFixture(
 interface WasteChuteProps {
   wasteIconColor: string
   backgroundColor: string
+  showHighlight?: boolean
+  tagInfo?: DeckLabelProps[]
+  //  optional opacity and overlay to change the overlay container over the WasteChute container
+  //  currently used in PD's BlockedSlot for drag/drop
+  overlay?: JSX.Element
+  opacity?: string
 }
 
 /**
  * a deck map foreign object representing the physical location of the waste chute connected to the deck
  */
 export function WasteChute(props: WasteChuteProps): JSX.Element {
-  const { wasteIconColor, backgroundColor } = props
+  const {
+    wasteIconColor,
+    backgroundColor,
+    showHighlight,
+    tagInfo,
+    overlay,
+    opacity,
+  } = props
 
   return (
-    <RobotCoordsForeignObject
-      width={130}
-      height={138}
-      x={322}
-      y={-51}
-      flexProps={{ flex: '1' }}
-      foreignObjectProps={{ flex: '1' }}
-    >
-      <Flex
-        alignItems={ALIGN_CENTER}
-        backgroundColor={backgroundColor}
-        borderRadius="6px"
-        color={wasteIconColor}
-        flexDirection={DIRECTION_COLUMN}
-        gridGap={SPACING.spacing4}
-        justifyContent={JUSTIFY_CENTER}
-        padding={SPACING.spacing8}
-        width="100%"
+    <>
+      <RobotCoordsForeignObject
+        width={WASTE_CHUTE_WIDTH}
+        height={WASTE_CHUTE_HEIGHT}
+        x={WASTE_CHUTE_X}
+        y={-51}
+        flexProps={{ flex: '1' }}
+        foreignObjectProps={{ opacity: opacity ?? 1, flex: '1' }}
       >
-        <Icon name="trash" color={wasteIconColor} height="2rem" />
-        <Text
-          color={COLORS.white}
-          textAlign={TEXT_ALIGN_CENTER}
-          css={TYPOGRAPHY.bodyTextSemiBold}
-        >
-          Waste chute
-        </Text>
-      </Flex>
-    </RobotCoordsForeignObject>
+        {overlay != null ? (
+          overlay
+        ) : (
+          <div
+            className={clsx(styles.waste_chute_fixture_container, {
+              [styles.waste_chute_fixture_container_highlight]: showHighlight,
+            })}
+            style={{
+              backgroundColor,
+              color: wasteIconColor,
+            }}
+          >
+            <Icon name="trash" color={wasteIconColor} height="2rem" />
+            <div className={styles.waste_chute_copy_container}>
+              <PlaceholderStyledText
+                desktopStyle="bodyRegularSemiBold"
+                color={COLORS.white}
+              >
+                Waste chute
+              </PlaceholderStyledText>
+            </div>
+          </div>
+        )}
+      </RobotCoordsForeignObject>
+      {tagInfo != null && tagInfo.length > 0 ? (
+        <DeckLabelSet
+          width={WASTE_CHUTE_WIDTH}
+          height={WASTE_CHUTE_HEIGHT}
+          x={WASTE_CHUTE_X}
+          y={WASTE_CHUTE_Y - TAG_HEIGHT}
+          deckLabels={tagInfo}
+        />
+      ) : null}
+    </>
   )
 }

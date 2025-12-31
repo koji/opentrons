@@ -1,32 +1,31 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, it, vi } from 'vitest'
 import { when } from 'vitest-when'
-import { describe, it, beforeEach, vi, afterEach } from 'vitest'
 
-import { TRASH_BIN_ADAPTER_FIXTURE } from '@opentrons/shared-data'
 import { DeckConfigurator } from '@opentrons/components'
 import {
   useModulesQuery,
   useUpdateDeckConfigurationMutation,
 } from '@opentrons/react-api-client'
+import { TRASH_BIN_ADAPTER_FIXTURE } from '@opentrons/shared-data'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { useRunStatuses } from '/app/resources/runs'
 import { useIsRobotViewable } from '/app/redux-resources/robots'
-import { DeckFixtureSetupInstructionsModal } from '../DeckFixtureSetupInstructionsModal'
+import { useDeckConfigurationEditingTools } from '/app/resources/deck_configuration/hooks/useDeckConfigurationEditingTools'
+import { useNotifyDeckConfigurationQuery } from '/app/resources/deck_configuration/useNotifyDeckConfigurationQuery'
 import { useIsEstopNotDisengaged } from '/app/resources/devices/hooks/useIsEstopNotDisengaged'
-import { DeviceDetailsDeckConfiguration } from '../'
 import { useNotifyCurrentMaintenanceRun } from '/app/resources/maintenance_runs'
-import {
-  useDeckConfigurationEditingTools,
-  useNotifyDeckConfigurationQuery,
-} from '/app/resources/deck_configuration'
+import { useRunStatuses } from '/app/resources/runs'
 
+import { DeviceDetailsDeckConfiguration } from '../'
+import { DeckFixtureSetupInstructionsModal } from '../DeckFixtureSetupInstructionsModal'
+
+import type { ComponentProps } from 'react'
 import type { UseQueryResult } from 'react-query'
 import type { MaintenanceRun } from '@opentrons/api-client'
-import type { DeckConfiguration } from '@opentrons/shared-data'
 import type * as OpentronsComponents from '@opentrons/components'
+import type { DeckConfiguration } from '@opentrons/shared-data'
 
 vi.mock('@opentrons/components', async importOriginal => {
   const actual = await importOriginal<typeof OpentronsComponents>()
@@ -41,7 +40,10 @@ vi.mock('/app/resources/runs')
 vi.mock('/app/redux-resources/robots')
 vi.mock('/app/resources/maintenance_runs')
 vi.mock('/app/resources/devices/hooks/useIsEstopNotDisengaged')
-vi.mock('/app/resources/deck_configuration')
+vi.mock(
+  '/app/resources/deck_configuration/hooks/useDeckConfigurationEditingTools'
+)
+vi.mock('/app/resources/deck_configuration/useNotifyDeckConfigurationQuery')
 
 const mockDeckConfig = [
   {
@@ -62,7 +64,7 @@ const mockCurrnetMaintenanceRun = {
 } as MaintenanceRun
 
 const render = (
-  props: React.ComponentProps<typeof DeviceDetailsDeckConfiguration>
+  props: ComponentProps<typeof DeviceDetailsDeckConfiguration>
 ) => {
   return renderWithProviders(<DeviceDetailsDeckConfiguration {...props} />, {
     i18nInstance: i18n,
@@ -70,7 +72,7 @@ const render = (
 }
 
 describe('DeviceDetailsDeckConfiguration', () => {
-  let props: React.ComponentProps<typeof DeviceDetailsDeckConfiguration>
+  let props: ComponentProps<typeof DeviceDetailsDeckConfiguration>
 
   beforeEach(() => {
     props = {
@@ -110,7 +112,7 @@ describe('DeviceDetailsDeckConfiguration', () => {
 
   it('should render text and button', () => {
     render(props)
-    screen.getByText('otie deck configuration')
+    screen.getByText('Deck Configuration')
     screen.getByRole('button', { name: 'Setup Instructions' })
     screen.getByText('Location')
     screen.getByText('Deck hardware')

@@ -1,19 +1,21 @@
-import type * as React from 'react'
 import cx from 'classnames'
+
 import { Icon } from '../icons'
 import styles from './forms.module.css'
+
+import type { ChangeEventHandler, FocusEventHandler, ReactNode } from 'react'
 
 export interface RadioOption {
   name: string
   value: string
-  children?: React.ReactNode
+  children?: ReactNode
 }
 
 export interface RadioGroupProps {
   /** blur handler */
-  onBlur?: React.FocusEventHandler<HTMLInputElement>
+  onBlur?: FocusEventHandler<HTMLInputElement>
   /** change handler */
-  onChange: React.ChangeEventHandler
+  onChange: ChangeEventHandler
   /** value that is checked */
   value?: string
   /** Array of {name, value} data with optional children */
@@ -23,9 +25,9 @@ export interface RadioGroupProps {
   /** classes to apply to outer div */
   className?: string
   /** classes to apply to inner label text div */
-  labelTextClassName?: string | null | undefined
+  labelTextClassName?: string | null
   /** if is included, RadioGroup will use error style. The content of the string is ignored. */
-  error?: string | null | undefined
+  error?: string | null
   /** 'name' attr of input */
   name?: string
   /** optional prop to turn radio field blue when checked */

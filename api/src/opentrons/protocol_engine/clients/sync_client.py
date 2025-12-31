@@ -67,6 +67,48 @@ class SyncClient:
 
     @overload
     def execute_command_without_recovery(
+        self, params: commands.CreateTimerParams
+    ) -> commands.CreateTimerResult:
+        pass
+
+    @overload
+    def execute_command_without_recovery(
+        self, params: commands.temperature_module.SetTargetTemperatureParams
+    ) -> commands.temperature_module.SetTargetTemperatureResult:
+        pass
+
+    @overload
+    def execute_command_without_recovery(
+        self, params: commands.thermocycler.StartRunExtendedProfileParams
+    ) -> commands.thermocycler.StartRunExtendedProfileResult:
+        pass
+
+    @overload
+    def execute_command_without_recovery(
+        self, params: commands.heater_shaker.SetTargetTemperatureParams
+    ) -> commands.heater_shaker.SetTargetTemperatureResult:
+        pass
+
+    @overload
+    def execute_command_without_recovery(
+        self, params: commands.heater_shaker.SetShakeSpeedParams
+    ) -> commands.heater_shaker.SetShakeSpeedResult:
+        pass
+
+    @overload
+    def execute_command_without_recovery(
+        self, params: commands.thermocycler.SetTargetBlockTemperatureParams
+    ) -> commands.thermocycler.SetTargetBlockTemperatureResult:
+        pass
+
+    @overload
+    def execute_command_without_recovery(
+        self, params: commands.thermocycler.SetTargetLidTemperatureParams
+    ) -> commands.thermocycler.SetTargetLidTemperatureResult:
+        pass
+
+    @overload
+    def execute_command_without_recovery(
         self, params: commands.LoadModuleParams
     ) -> commands.LoadModuleResult:
         pass
@@ -79,6 +121,18 @@ class SyncClient:
 
     @overload
     def execute_command_without_recovery(
+        self, params: commands.LoadLidStackParams
+    ) -> commands.LoadLidStackResult:
+        pass
+
+    @overload
+    def execute_command_without_recovery(
+        self, params: commands.LoadLidParams
+    ) -> commands.LoadLidResult:
+        pass
+
+    @overload
+    def execute_command_without_recovery(
         self, params: commands.LiquidProbeParams
     ) -> commands.LiquidProbeResult:
         pass
@@ -87,6 +141,18 @@ class SyncClient:
     def execute_command_without_recovery(
         self, params: commands.TryLiquidProbeParams
     ) -> commands.TryLiquidProbeResult:
+        pass
+
+    @overload
+    def execute_command_without_recovery(
+        self, params: commands.LoadLiquidClassParams
+    ) -> commands.LoadLiquidClassResult:
+        pass
+
+    @overload
+    def execute_command_without_recovery(
+        self, params: commands.GetNextTipParams
+    ) -> commands.GetNextTipResult:
         pass
 
     def execute_command_without_recovery(
@@ -119,23 +185,12 @@ class SyncClient:
             "add_addressable_area", addressable_area_name=addressable_area_name
         )
 
-    def add_absorbance_reader_lid(self, module_id: str, lid_id: str) -> None:
-        """Add an absorbance reader lid to the module state."""
-        self._transport.call_method(
-            "add_absorbance_reader_lid", module_id=module_id, lid_id=lid_id
-        )
-
     def add_liquid(
         self, name: str, color: Optional[str], description: Optional[str]
     ) -> Liquid:
         """Add a liquid to the engine."""
-        return self._transport.call_method("add_liquid", name=name, color=color, description=description)  # type: ignore[no-any-return]
-
-    def reset_tips(self, labware_id: str) -> None:
-        """Reset a labware's tip tracking state.."""
-        self._transport.call_method(
-            "reset_tips",
-            labware_id=labware_id,
+        return self._transport.call_method(   # type: ignore[no-any-return]
+            "add_liquid", name=name, color=color, description=description
         )
 
     def add_labware_offset(self, request: LabwareOffsetCreate) -> None:

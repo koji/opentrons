@@ -1,11 +1,14 @@
-import { getModuleDef2 } from '@opentrons/shared-data'
+import { getModuleDef, locationIsOffDeck } from '@opentrons/shared-data'
 
-import { getNextRobotStateAndWarnings } from '../getNextRobotStateAndWarnings'
 import { MODULE_INITIAL_STATE_BY_TYPE } from '../constants'
-import { constructInvariantContextFromRunCommands } from './constructInvariantContextFromRunCommands'
-import { makeInitialRobotState } from './misc'
+import { getNextRobotStateAndWarnings } from '../getNextRobotStateAndWarnings'
+import { getStackForLabwareLocation, makeInitialRobotState } from './misc'
 
-import type { RunTimeCommand } from '@opentrons/shared-data'
+import type {
+  LabwareLocationSequence,
+  OnLabwareLocationSequenceComponent,
+  RunTimeCommand,
+} from '@opentrons/shared-data'
 import type {
   InvariantContext,
   RobotState,
@@ -21,9 +24,9 @@ interface ResultingTimelineFrame {
   invariantContext: InvariantContext
 }
 export function getResultingTimelineFrameFromRunCommands(
-  commands: RunTimeCommand[]
+  commands: RunTimeCommand[],
+  invariantContext: InvariantContext
 ): ResultingTimelineFrame {
-  const invariantContext = constructInvariantContextFromRunCommands(commands)
   const pipetteLocations = commands.reduce<RobotState['pipettes']>(
     (acc, command) => {
       if (command.commandType === 'loadPipette' && command.result != null) {
@@ -38,26 +41,15 @@ export function getResultingTimelineFrameFromRunCommands(
     },
     {}
   )
-
-  const labwareLocations = commands.reduce<RobotState['labware']>(
+  const moduleLocations = commands.reduce<RobotState['modules']>(
     (acc, command) => {
-      if (command.commandType === 'loadLabware' && command.result != null) {
-        let slot
-        if (command.params.location === 'offDeck') {
-          slot = command.params.location
-        } else if ('slotName' in command.params.location) {
-          slot = command.params.location.slotName
-        } else if ('moduleId' in command.params.location) {
-          slot = command.params.location.moduleId
-        } else if ('labwareId' in command.params.location) {
-          slot = command.params.location.labwareId
-        } else {
-          slot = command.params.location.addressableAreaName
-        }
+      if (command.commandType === 'loadModule' && command.result != null) {
+        const moduleType = getModuleDef(command.params.model).moduleType
         return {
           ...acc,
-          [command.result.labwareId]: {
-            slot: slot,
+          [command.result.moduleId]: {
+            slot: command.params.location.slotName,
+            moduleState: MODULE_INITIAL_STATE_BY_TYPE[moduleType],
           },
         }
       }
@@ -65,15 +57,71 @@ export function getResultingTimelineFrameFromRunCommands(
     },
     {}
   )
-  const moduleLocations = commands.reduce<RobotState['modules']>(
+
+  const labwareLocations = commands.reduce<RobotState['labware']>(
     (acc, command) => {
-      if (command.commandType === 'loadModule' && command.result != null) {
-        const moduleType = getModuleDef2(command.params.model).moduleType
+      if (command.commandType === 'loadLidStack' && command.result != null) {
+        const { result } = command
+        const locationSequences = result.locationSequences
+        const labwareIds = result.labwareIds
+
+        if (locationSequences != null) {
+          const sequenceMap = locationSequences.reduce(
+            (acc: Record<string, LabwareLocationSequence>, subArray) => {
+              const firstLabware:
+                | OnLabwareLocationSequenceComponent
+                | undefined = subArray.find(
+                (item): item is OnLabwareLocationSequenceComponent =>
+                  item.kind === 'onLabware'
+              )
+              if (firstLabware != null) {
+                acc[firstLabware.labwareId] = subArray
+              }
+              return acc
+            },
+            {}
+          )
+          const labwareStacks = labwareIds.reduce(
+            (acc: Record<string, { stack: string[] }>, id) => {
+              const sequence = sequenceMap[id]
+              if (sequence != null) {
+                acc[id] = { stack: getStackForLabwareLocation(sequence) }
+              }
+              return acc
+            },
+            {}
+          )
+          return {
+            ...acc,
+            ...labwareStacks,
+          }
+        }
+      } else if (
+        (command.commandType === 'loadLabware' ||
+          command.commandType === 'loadLid') &&
+        command.result != null
+      ) {
+        const stack = [command.result.labwareId]
+        if (locationIsOffDeck(command.params.location)) {
+          stack.push(command.params.location)
+        } else if ('slotName' in command.params.location) {
+          stack.push(command.params.location.slotName)
+        } else if ('moduleId' in command.params.location) {
+          stack.push(
+            command.params.location.moduleId,
+            moduleLocations[command.params.location.moduleId].slot
+          )
+        } else if ('labwareId' in command.params.location) {
+          const labwareId = command.params.location.labwareId
+          const labwareIdStack = acc[labwareId].stack
+          stack.push(labwareId, ...labwareIdStack)
+        } else {
+          stack.push(command.params.location.addressableAreaName)
+        }
         return {
           ...acc,
-          [command.result.moduleId]: {
-            slot: command.params.location.slotName,
-            moduleState: MODULE_INITIAL_STATE_BY_TYPE[moduleType],
+          [command.result.labwareId]: {
+            stack,
           },
         }
       }

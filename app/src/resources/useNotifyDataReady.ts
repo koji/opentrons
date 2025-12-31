@@ -1,25 +1,26 @@
-import { useRef, useState, useEffect, useCallback } from 'react'
-
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDispatch } from 'react-redux'
 
 import { useHost } from '@opentrons/react-api-client'
 
-import { appShellListener } from '/app/redux/shell/remote'
-import { notifySubscribeAction } from '/app/redux/shell'
 import {
-  useTrackEvent,
   ANALYTICS_NOTIFICATION_PORT_BLOCK_ERROR,
+  useTrackEvent,
 } from '/app/redux/analytics'
 import { useFeatureFlag } from '/app/redux/config'
+import { notifySubscribeAction } from '/app/redux/shell'
+import { appShellListener } from '/app/redux/shell/remote'
 
 import type { UseQueryOptions } from 'react-query'
 import type { HostConfig } from '@opentrons/api-client'
-import type { NotifyTopic, NotifyResponseData } from '/app/redux/shell/types'
+import type { NotifyResponseData, NotifyTopic } from '/app/redux/shell/types'
 
 export type HTTPRefetchFrequency = 'once' | null
 
-export interface QueryOptionsWithPolling<TData, TError = Error>
-  extends UseQueryOptions<TData, TError> {
+export interface QueryOptionsWithPolling<
+  TData,
+  TError = Error,
+> extends UseQueryOptions<TData, TError> {
   forceHttpPolling?: boolean
 }
 
@@ -58,7 +59,11 @@ export function useNotifyDataReady<TData, TError = Error>({
   const forcePollingFF = useFeatureFlag('forceHttpPolling')
   const seenHostname = useRef<string | null>(null)
   const [refetch, setRefetch] = useState<HTTPRefetchFrequency>(null)
-  const [isNotifyEnabled, setIsNotifyEnabled] = useState(true)
+  const [pendingRefetch, setPendingRefetch] = useState(false)
+  const [
+    hasEncounteredNotificationsError,
+    setHasEncounteredNotificationsError,
+  ] = useState(false)
 
   const { enabled, staleTime, forceHttpPolling } = options
 
@@ -80,8 +85,6 @@ export function useNotifyDataReady<TData, TError = Error>({
       })
       dispatch(notifySubscribeAction(hostname, topic))
       seenHostname.current = hostname
-    } else {
-      setIsNotifyEnabled(false)
     }
 
     return () => {
@@ -98,7 +101,7 @@ export function useNotifyDataReady<TData, TError = Error>({
 
   const onDataEvent = useCallback((data: NotifyResponseData): void => {
     if (data === 'ECONNFAILED' || data === 'ECONNREFUSED') {
-      setIsNotifyEnabled(false)
+      setHasEncounteredNotificationsError(true)
       if (data === 'ECONNREFUSED') {
         doTrackEvent({
           name: ANALYTICS_NOTIFICATION_PORT_BLOCK_ERROR,
@@ -106,20 +109,36 @@ export function useNotifyDataReady<TData, TError = Error>({
         })
       }
     } else if ('refetch' in data || 'unsubscribe' in data) {
-      setRefetch('once')
+      setRefetch(currentRefetch => {
+        // A refetch is already in progress, mark that we need to do another
+        // one after the current refetch resolves.
+        if (currentRefetch === 'once') {
+          setPendingRefetch(true)
+          return currentRefetch
+        }
+        // No refetch is in progress, start one immediately.
+        else {
+          return 'once'
+        }
+      })
     }
   }, [])
 
   const notifyOnSettled = useCallback(
     (data: TData | undefined, error: TError | null) => {
       if (refetch === 'once') {
-        setRefetch(null)
+        setRefetch(pendingRefetch ? 'once' : null)
+        // We only ever need to queue up one additional refetch to get the latest
+        // data, so it's safe to the pending to false as soon as the refetch settles.
+        setPendingRefetch(false)
       }
       options.onSettled?.(data, error)
     },
-    [refetch, options.onSettled]
+    [refetch, pendingRefetch, options.onSettled]
   )
 
+  const isNotifyEnabled =
+    shouldUseNotifications && !hasEncounteredNotificationsError
   const queryOptionsNotify = {
     ...options,
     onSettled: isNotifyEnabled ? notifyOnSettled : options.onSettled,

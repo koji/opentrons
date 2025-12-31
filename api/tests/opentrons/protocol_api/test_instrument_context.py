@@ -1,4 +1,5 @@
 """Tests for the InstrumentContext public interface."""
+
 import inspect
 import pytest
 from collections import OrderedDict
@@ -6,8 +7,8 @@ from datetime import datetime
 from typing import ContextManager, Optional, Any
 from unittest.mock import sentinel
 
-from decoy import Decoy
-from pytest_lazyfixture import lazy_fixture  # type: ignore[import-untyped]
+from decoy import Decoy, matchers
+from pytest_lazy_fixtures import lf as lazy_fixture
 
 from opentrons.protocol_engine.commands.pipetting_common import LiquidNotFoundError
 from opentrons.protocol_engine.errors.error_occurrence import (
@@ -15,8 +16,14 @@ from opentrons.protocol_engine.errors.error_occurrence import (
 )
 
 from opentrons.legacy_broker import LegacyBroker
+from opentrons.protocols.advanced_control.transfers.common import (
+    TransferTipPolicyV2,
+    TransferTipPolicyV2Type,
+)
+from opentrons.protocols.advanced_control.transfers import (
+    transfer_liquid_utils as mock_tx_liquid_utils,
+)
 
-from opentrons.protocol_engine.errors.exceptions import TipNotAttachedError
 from tests.opentrons.protocol_api.partial_tip_configurations import (
     PipetteReliantNozzleConfigSpec,
     PIPETTE_RELIANT_TEST_SPECS,
@@ -26,11 +33,6 @@ from tests.opentrons.protocol_api.partial_tip_configurations import (
     InstrumentCoreNozzleConfigSpec,
     INSTRUMENT_CORE_NOZZLE_LAYOUT_TEST_SPECS,
     ExpectedCoreArgs,
-)
-from tests.opentrons.protocol_engine.pipette_fixtures import (
-    NINETY_SIX_COLS,
-    NINETY_SIX_MAP,
-    NINETY_SIX_ROWS,
 )
 from opentrons.protocols.api_support import instrument as mock_instrument_support
 from opentrons.protocols.api_support.types import APIVersion
@@ -46,28 +48,38 @@ from opentrons.protocol_api import (
     Labware,
     Well,
     labware,
-    validation as mock_validation,
+    LiquidClass,
 )
-from opentrons.protocol_api.validation import WellTarget, PointTarget
-from opentrons.protocol_api.core.common import InstrumentCore, ProtocolCore
+from opentrons.protocol_api.core.common import (
+    InstrumentCore,
+    ProtocolCore,
+    WellCore,
+    LabwareCore,
+)
+from opentrons.protocol_api.core.core_map import LoadedCoreMap
 from opentrons.protocol_api.core.legacy.legacy_instrument_core import (
     LegacyInstrumentCore,
 )
 
 from opentrons.hardware_control.nozzle_manager import NozzleMap
 from opentrons.protocol_api.disposal_locations import TrashBin, WasteChute
-from opentrons_shared_data.pipette.pipette_definition import ValidNozzleMaps
-from opentrons.types import Location, Mount, Point
+from opentrons.types import (
+    Location,
+    Mount,
+    Point,
+    NozzleMapInterface,
+    MeniscusTrackingTarget,
+)
 
+from opentrons_shared_data.pipette.pipette_definition import ValidNozzleMaps
 from opentrons_shared_data.errors.exceptions import (
     CommandPreconditionViolated,
 )
-
-
-@pytest.fixture(autouse=True)
-def _mock_validation_module(decoy: Decoy, monkeypatch: pytest.MonkeyPatch) -> None:
-    for name, func in inspect.getmembers(mock_validation, inspect.isfunction):
-        monkeypatch.setattr(mock_validation, name, decoy.mock(func=func))
+from opentrons_shared_data.liquid_classes.liquid_class_definition import (
+    LiquidClassSchemaV1,
+)
+from opentrons_shared_data.robot.types import RobotType
+from . import versions_at_or_above, versions_between
 
 
 @pytest.fixture(autouse=True)
@@ -84,12 +96,18 @@ def _mock_labware_module(decoy: Decoy, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(labware, name, decoy.mock(func=func))
 
 
+@pytest.fixture(autouse=True)
+def _mock_transfer_liquid_utils(decoy: Decoy, monkeypatch: pytest.MonkeyPatch) -> None:
+    for name, func in inspect.getmembers(mock_tx_liquid_utils, inspect.isfunction):
+        monkeypatch.setattr(mock_tx_liquid_utils, name, decoy.mock(func=func))
+
+
 @pytest.fixture
 def mock_instrument_core(decoy: Decoy) -> InstrumentCore:
     """Get a mock instrument implementation core."""
     instrument_core = decoy.mock(cls=InstrumentCore)
     decoy.when(instrument_core.get_mount()).then_return(Mount.LEFT)
-
+    decoy.when(instrument_core._pressure_supported_by_pipette()).then_return(True)
     # we need to add this for the mock of liquid_presence detection to actually work
     # this replaces the mock with a a property again
     instrument_core._liquid_presence_detection = False  # type: ignore[attr-defined]
@@ -121,6 +139,12 @@ def mock_protocol_core(decoy: Decoy) -> ProtocolCore:
 
 
 @pytest.fixture
+def mock_core_map(decoy: Decoy) -> LoadedCoreMap:
+    """Get a mock LoadedCoreMap."""
+    return decoy.mock(cls=LoadedCoreMap)
+
+
+@pytest.fixture
 def mock_broker(decoy: Decoy) -> LegacyBroker:
     """Get a mock command message broker."""
     return decoy.mock(cls=LegacyBroker)
@@ -142,6 +166,7 @@ def api_version() -> APIVersion:
 def subject(
     mock_instrument_core: InstrumentCore,
     mock_protocol_core: ProtocolCore,
+    mock_core_map: LoadedCoreMap,
     mock_broker: LegacyBroker,
     mock_trash: Labware,
     api_version: APIVersion,
@@ -155,6 +180,7 @@ def subject(
         tip_racks=[],
         trash=mock_trash,
         requested_as="requested-pipette-name",
+        core_map=mock_core_map,
     )
 
 
@@ -244,6 +270,7 @@ def test_move_to(
             force_direct=False,
             minimum_z_height=None,
             speed=None,
+            check_for_movement_conflicts=False,
         ),
         times=1,
     )
@@ -265,6 +292,7 @@ def test_move_to_well(
             force_direct=False,
             minimum_z_height=None,
             speed=None,
+            check_for_movement_conflicts=False,
         ),
         times=1,
     )
@@ -312,24 +340,22 @@ def test_aspirate(
     mock_protocol_core: ProtocolCore,
 ) -> None:
     """It should aspirate to a well."""
+    # Before PR #12105, this function tested calling aspirate(location=Well).
+    # Then this function was changed to call aspirate(location=Location), but that's
+    # the same thing that test_aspirate_well_location() is testing for.
+    # So we're restoring this function to test for aspirate(location=Well).
     mock_well = decoy.mock(cls=Well)
     bottom_location = Location(point=Point(1, 2, 3), labware=mock_well)
-    input_location = Location(point=Point(2, 2, 2), labware=None)
     last_location = Location(point=Point(9, 9, 9), labware=None)
     decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
 
     decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(
         last_location
     )
-    decoy.when(
-        mock_validation.validate_location(
-            location=input_location, last_location=last_location
-        )
-    ).then_return(WellTarget(well=mock_well, location=None, in_place=False))
     decoy.when(mock_well.bottom(z=1.0)).then_return(bottom_location)
     decoy.when(mock_instrument_core.get_aspirate_flow_rate(1.23)).then_return(5.67)
 
-    subject.aspirate(volume=42.0, location=input_location, rate=1.23)
+    subject.aspirate(volume=42.0, location=mock_well, rate=1.23)
 
     decoy.verify(
         mock_instrument_core.aspirate(
@@ -339,7 +365,10 @@ def test_aspirate(
             volume=42.0,
             rate=1.23,
             flow_rate=5.67,
-            is_meniscus=None,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
         ),
         times=1,
     )
@@ -360,11 +389,6 @@ def test_aspirate_well_location(
     decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(
         last_location
     )
-    decoy.when(
-        mock_validation.validate_location(
-            location=input_location, last_location=last_location
-        )
-    ).then_return(WellTarget(well=mock_well, location=input_location, in_place=False))
     decoy.when(mock_instrument_core.get_aspirate_flow_rate(1.23)).then_return(5.67)
 
     subject.aspirate(volume=42.0, location=input_location, rate=1.23)
@@ -377,7 +401,10 @@ def test_aspirate_well_location(
             volume=42.0,
             rate=1.23,
             flow_rate=5.67,
-            is_meniscus=None,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
         ),
         times=1,
     )
@@ -392,7 +419,9 @@ def test_aspirate_meniscus_well_location(
     """It should aspirate to a well."""
     mock_well = decoy.mock(cls=Well)
     input_location = Location(
-        point=Point(2, 2, 2), labware=mock_well, _ot_internal_is_meniscus=True
+        point=Point(2, 2, 2),
+        labware=mock_well,
+        _meniscus_tracking=MeniscusTrackingTarget.START,
     )
     last_location = Location(point=Point(9, 9, 9), labware=None)
     decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
@@ -400,11 +429,6 @@ def test_aspirate_meniscus_well_location(
     decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(
         last_location
     )
-    decoy.when(
-        mock_validation.validate_location(
-            location=input_location, last_location=last_location
-        )
-    ).then_return(WellTarget(well=mock_well, location=input_location, in_place=False))
     decoy.when(mock_instrument_core.get_aspirate_flow_rate(1.23)).then_return(5.67)
 
     subject.aspirate(volume=42.0, location=input_location, rate=1.23)
@@ -417,10 +441,192 @@ def test_aspirate_meniscus_well_location(
             volume=42.0,
             rate=1.23,
             flow_rate=5.67,
-            is_meniscus=True,
+            meniscus_tracking=MeniscusTrackingTarget.START,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
         ),
         times=1,
     )
+
+
+def test_dynamic_aspirate_meniscus(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should aspirate to a well."""
+    mock_well = decoy.mock(cls=Well)
+    input_location = Location(
+        point=Point(2, 2, 2),
+        labware=mock_well,
+        _meniscus_tracking=MeniscusTrackingTarget.START,
+    )
+    end_location = Location(
+        point=Point(2, 2, 3),
+        labware=mock_well,
+        _meniscus_tracking=MeniscusTrackingTarget.END,
+    )
+    last_location = Location(point=Point(9, 9, 9), labware=None)
+    decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
+
+    decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(
+        last_location
+    )
+    decoy.when(mock_instrument_core.get_aspirate_flow_rate(1.23)).then_return(5.67)
+
+    subject.aspirate(
+        volume=42.0, location=input_location, rate=1.23, end_location=end_location
+    )
+
+    decoy.verify(
+        mock_instrument_core.aspirate(
+            location=input_location,
+            well_core=mock_well._core,
+            in_place=False,
+            volume=42.0,
+            rate=1.23,
+            flow_rate=5.67,
+            meniscus_tracking=MeniscusTrackingTarget.START,
+            end_location=end_location,
+            end_meniscus_tracking=MeniscusTrackingTarget.END,
+            movement_delay=None,
+        ),
+        times=1,
+    )
+
+
+def test_dynamic_aspirate_meniscus_old(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should aspirate to a well."""
+    mock_well = decoy.mock(cls=Well)
+    input_location = Location(
+        point=Point(2, 2, 2),
+        labware=mock_well,
+        _meniscus_tracking=MeniscusTrackingTarget.DYNAMIC,
+    )
+    last_location = Location(point=Point(9, 9, 9), labware=None)
+    decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
+
+    decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(
+        last_location
+    )
+    decoy.when(mock_instrument_core.get_aspirate_flow_rate(1.23)).then_return(5.67)
+
+    subject.aspirate(volume=42.0, location=input_location, rate=1.23)
+
+    decoy.verify(
+        mock_instrument_core.aspirate(
+            location=Location(
+                point=Point(2, 2, 2),
+                labware=mock_well,
+                _meniscus_tracking=MeniscusTrackingTarget.START,
+            ),
+            well_core=mock_well._core,
+            in_place=False,
+            volume=42.0,
+            rate=1.23,
+            flow_rate=5.67,
+            meniscus_tracking=MeniscusTrackingTarget.START,
+            end_location=Location(
+                point=Point(2, 2, 2),
+                labware=mock_well,
+                _meniscus_tracking=MeniscusTrackingTarget.END,
+            ),
+            end_meniscus_tracking=MeniscusTrackingTarget.END,
+            movement_delay=None,
+        ),
+        times=1,
+    )
+
+
+def test_dynamic_aspirate(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should aspirate to a well."""
+    mock_well = decoy.mock(cls=Well)
+    input_location = Location(point=Point(2, 2, 2), labware=mock_well)
+    end_location = Location(point=Point(2, 2, 3), labware=mock_well)
+    last_location = Location(point=Point(9, 9, 9), labware=None)
+    decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
+
+    decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(
+        last_location
+    )
+    decoy.when(mock_instrument_core.get_aspirate_flow_rate(1.23)).then_return(5.67)
+
+    subject.aspirate(
+        volume=42.0, location=input_location, rate=1.23, end_location=end_location
+    )
+
+    decoy.verify(
+        mock_instrument_core.aspirate(
+            location=input_location,
+            well_core=mock_well._core,
+            in_place=False,
+            volume=42.0,
+            rate=1.23,
+            flow_rate=5.67,
+            meniscus_tracking=None,
+            end_location=end_location,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+        times=1,
+    )
+
+
+def test_dynamic_aspirate_validation(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should aspirate to a well."""
+    mock_well = decoy.mock(cls=Well)
+    mock_well_2 = decoy.mock(cls=Well)
+    input_location = Location(point=Point(2, 2, 2), labware=mock_well)
+    end_location = Location(point=Point(2, 2, 3), labware=mock_well_2)
+    last_location = Location(point=Point(9, 9, 9), labware=None)
+    decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
+
+    decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(
+        last_location
+    )
+    decoy.when(mock_instrument_core.get_aspirate_flow_rate(1.23)).then_return(5.67)
+
+    with pytest.raises(ValueError):
+        # Raises if the locations are in different wells
+        subject.aspirate(
+            volume=42.0, location=input_location, rate=1.23, end_location=end_location
+        )
+
+    with pytest.raises(ValueError):
+        # Raises if end location but not location
+        subject.aspirate(volume=42.0, rate=1.23, end_location=end_location)
+
+    with pytest.raises(ValueError):
+        # Raises if location is well
+        subject.aspirate(
+            volume=42.0, location=mock_well, rate=1.23, end_location=end_location
+        )
+
+    with pytest.raises(ValueError):
+        # Raises if end location is well
+        subject.aspirate(
+            volume=42.0,
+            location=input_location,
+            rate=1.23,
+            end_location=mock_well,  # type: ignore[arg-type]
+        )
 
 
 def test_aspirate_from_coordinates(
@@ -431,17 +637,12 @@ def test_aspirate_from_coordinates(
 ) -> None:
     """It should aspirate from given coordinates."""
     input_location = Location(point=Point(2, 2, 2), labware=None)
-    last_location = Location(point=Point(9, 9, 9), labware=None)
+    last_location = input_location  # to demonstrate in_place=True
     decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
 
     decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(
         last_location
     )
-    decoy.when(
-        mock_validation.validate_location(
-            location=input_location, last_location=last_location
-        )
-    ).then_return(PointTarget(location=input_location, in_place=True))
     decoy.when(mock_instrument_core.get_aspirate_flow_rate(1.23)).then_return(5.67)
 
     subject.aspirate(volume=42.0, location=input_location, rate=1.23)
@@ -454,7 +655,10 @@ def test_aspirate_from_coordinates(
             volume=42.0,
             rate=1.23,
             flow_rate=5.67,
-            is_meniscus=None,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
         ),
         times=1,
     )
@@ -466,15 +670,49 @@ def test_aspirate_raises_no_location(
     subject: InstrumentContext,
     mock_protocol_core: ProtocolCore,
 ) -> None:
-    """Shound raise a RuntimeError error."""
+    """Should raise a RuntimeError error."""
     decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
     decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(None)
 
-    decoy.when(
-        mock_validation.validate_location(location=None, last_location=None)
-    ).then_raise(mock_validation.NoLocationError())
     with pytest.raises(RuntimeError):
         subject.aspirate(location=None)
+
+
+def test_aspirate_flow_rate(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should aspirate with absolute_flow_rate."""
+    decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
+    last_location = Location(point=Point(9, 9, 9), labware=None)
+    decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(
+        last_location
+    )
+    decoy.when(mock_instrument_core.get_aspirate_flow_rate()).then_return(400)
+
+    subject.aspirate(volume=30, flow_rate=600)
+
+    decoy.verify(
+        mock_instrument_core.aspirate(
+            location=last_location,
+            well_core=None,
+            in_place=True,
+            volume=30,
+            rate=1.5,  # requested flow_rate is 1.5 times default of 400
+            flow_rate=600,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+        times=1,
+    )
+
+    # Should raise if both `rate` and `flow_rate` are specified:
+    with pytest.raises(ValueError):
+        subject.aspirate(volume=30, rate=1.5, flow_rate=600)
 
 
 def test_blow_out_to_well(
@@ -486,24 +724,20 @@ def test_blow_out_to_well(
     """It should blow out to a well."""
     mock_well = decoy.mock(cls=Well)
     top_location = Location(point=Point(1, 2, 3), labware=mock_well)
-    input_location = Location(point=Point(2, 2, 2), labware=None)
     last_location = Location(point=Point(9, 9, 9), labware=None)
     decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
-
     decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(
         last_location
     )
-    decoy.when(
-        mock_validation.validate_location(
-            location=input_location, last_location=last_location
-        )
-    ).then_return(WellTarget(well=mock_well, location=None, in_place=False))
     decoy.when(mock_well.top()).then_return(top_location)
-    subject.blow_out(location=input_location)
+    subject.blow_out(location=mock_well, flow_rate=123)
 
     decoy.verify(
         mock_instrument_core.blow_out(
-            location=top_location, well_core=mock_well._core, in_place=False
+            location=top_location,
+            well_core=mock_well._core,
+            in_place=False,
+            flow_rate=123,
         ),
         times=1,
     )
@@ -517,25 +751,65 @@ def test_blow_out_to_well_location(
 ) -> None:
     """It should blow out to a well location."""
     mock_well = decoy.mock(cls=Well)
-    input_location = Location(point=Point(2, 2, 2), labware=None)
+    input_location = Location(point=Point(2, 2, 2), labware=mock_well)
     last_location = Location(point=Point(9, 9, 9), labware=None)
     decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
-
     decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(
         last_location
     )
-    decoy.when(
-        mock_validation.validate_location(
-            location=input_location, last_location=last_location
-        )
-    ).then_return(WellTarget(well=mock_well, location=input_location, in_place=False))
-    subject.blow_out(location=input_location)
+    subject.blow_out(location=input_location, flow_rate=123)
 
     decoy.verify(
         mock_instrument_core.blow_out(
-            location=input_location, well_core=mock_well._core, in_place=False
+            location=input_location,
+            well_core=mock_well._core,
+            in_place=False,
+            flow_rate=123,
         ),
         times=1,
+    )
+
+
+def test_blow_out_to_well_meniscus_location(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should blow out to a well location."""
+    liquid_height = 10.0
+    well_bottom = Point(2, 2, 2)
+    relative_height = 3
+    mock_well = decoy.mock(cls=Well)
+    input_location_absolute = Location(
+        point=well_bottom + Point(0, 0, liquid_height) + Point(0, 0, relative_height),
+        labware=mock_well,
+    )
+    decoy.when(mock_well.current_liquid_height()).then_return(liquid_height)
+    decoy.when(mock_well.bottom(liquid_height + relative_height)).then_return(
+        Location(
+            point=well_bottom + Point(0, 0, liquid_height + relative_height),
+            labware=mock_well,
+        )
+    )
+
+    input_location = Location(
+        point=Point(0, 0, relative_height),
+        labware=mock_well,
+        _meniscus_tracking=MeniscusTrackingTarget.END,
+    )
+    last_location = Location(point=Point(9, 9, 9), labware=None)
+    decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
+    decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(
+        last_location
+    )
+    subject.blow_out(location=input_location, flow_rate=123)
+
+    mock_instrument_core.blow_out(
+        location=input_location_absolute,
+        well_core=mock_well._core,
+        in_place=False,
+        flow_rate=123,
     )
 
 
@@ -546,29 +820,98 @@ def test_blow_out_to_location(
     mock_protocol_core: ProtocolCore,
 ) -> None:
     """It should blow out to a location."""
-    mock_well = decoy.mock(cls=Well)
-    input_location = Location(point=Point(2, 2, 2), labware=mock_well)
-    last_location = Location(point=Point(9, 9, 9), labware=None)
-    point_target = PointTarget(location=input_location, in_place=True)
+    input_location = Location(point=Point(2, 2, 2), labware=None)
+    last_location = input_location  # to demonstrate how we set in_place=True
     decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
-
     decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(
         last_location
     )
-    decoy.when(
-        mock_validation.validate_location(
-            location=input_location, last_location=last_location
-        )
-    ).then_return(point_target)
 
-    subject.blow_out(location=input_location)
+    subject.blow_out(location=input_location, flow_rate=123)
 
     decoy.verify(
         mock_instrument_core.blow_out(
-            location=input_location, well_core=None, in_place=True
+            location=input_location, well_core=None, in_place=True, flow_rate=123
         ),
         times=1,
     )
+
+
+@pytest.mark.parametrize("api_version", versions_at_or_above(APIVersion(2, 24)))
+def test_blow_out_with_trash_last_location(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should blow out into a previously accessed disposal location."""
+    mock_chute = decoy.mock(cls=WasteChute)
+    decoy.when(mock_instrument_core.get_mount()).then_return(Mount.LEFT)
+    decoy.when(mock_instrument_core.get_blow_out_flow_rate(1.0)).then_return(111)
+    decoy.when(mock_protocol_core.get_last_location(mount=Mount.LEFT)).then_return(
+        mock_chute
+    )
+
+    subject.blow_out()
+
+    decoy.verify(
+        mock_instrument_core.blow_out(
+            location=mock_chute, well_core=None, in_place=True, flow_rate=111
+        ),
+        times=1,
+    )
+
+
+def test_blow_out_uses_previously_set_flow_rate(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should blow out to a well."""
+    mock_well = decoy.mock(cls=Well)
+    top_location = Location(point=Point(1, 2, 3), labware=mock_well)
+    last_location = Location(point=Point(9, 9, 9), labware=None)
+    decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
+    decoy.when(mock_instrument_core.get_blow_out_flow_rate(1.0)).then_return(111)
+    decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(
+        last_location
+    )
+    decoy.when(mock_well.top()).then_return(top_location)
+    subject.blow_out(location=mock_well)
+    decoy.verify(
+        mock_instrument_core.blow_out(
+            location=top_location,
+            well_core=mock_well._core,
+            in_place=False,
+            flow_rate=111,
+        ),
+        times=1,
+    )
+
+
+@pytest.mark.parametrize(
+    "api_version",
+    versions_between(
+        low_exclusive_bound=APIVersion(2, 13), high_inclusive_bound=APIVersion(2, 23)
+    ),
+)
+def test_blow_out_with_trash_last_location_raises_earlier_api(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should raise if a trash is the last accessed location and on 2.23."""
+    mock_trash = decoy.mock(cls=TrashBin)
+    decoy.when(mock_instrument_core.get_mount()).then_return(Mount.LEFT)
+    decoy.when(mock_protocol_core.get_last_location(mount=Mount.LEFT)).then_return(
+        mock_trash
+    )
+    with pytest.raises(
+        RuntimeError, match="blow out is called without an explicit location"
+    ):
+        subject.blow_out()
 
 
 def test_blow_out_raises_no_location(
@@ -581,9 +924,6 @@ def test_blow_out_raises_no_location(
     decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
     decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(None)
 
-    decoy.when(
-        mock_validation.validate_location(location=None, last_location=None)
-    ).then_raise(mock_validation.NoLocationError())
     with pytest.raises(RuntimeError):
         subject.blow_out(location=None)
 
@@ -909,28 +1249,32 @@ def test_return_tip(
     decoy: Decoy, mock_instrument_core: InstrumentCore, subject: InstrumentContext
 ) -> None:
     """It should pick up a tip and return it."""
+    mock_tiprack_core = decoy.mock(cls=LabwareCore)
+    mock_tiprack = decoy.mock(cls=Labware)
+    mock_well_core = decoy.mock(cls=WellCore)
+    subject._core_map = {mock_tiprack_core: mock_tiprack}  # type: ignore[assignment]
     mock_well = decoy.mock(cls=Well)
     top_location = Location(point=Point(1, 2, 3), labware=mock_well)
-    decoy.when(mock_well.top()).then_return(top_location)
 
-    subject.pick_up_tip(mock_well)
+    decoy.when(mock_well_core.get_display_name()).then_return("bar")
+    decoy.when(mock_well_core.get_name()).then_return("foo")
+    decoy.when(mock_well.top()).then_return(top_location)
+    decoy.when(mock_instrument_core.has_tip()).then_return(True)
+    decoy.when(mock_instrument_core.get_tip_origin()).then_return(
+        (mock_tiprack_core, mock_well_core)
+    )
+
     subject.return_tip()
 
     decoy.verify(
-        mock_instrument_core.pick_up_tip(
-            location=top_location,
-            well_core=mock_well._core,
-            presses=None,
-            increment=None,
-            prep_after=True,
-        ),
         mock_instrument_core.drop_tip(
             location=None,
-            well_core=mock_well._core,
+            well_core=mock_well_core,
             home_after=None,
             alternate_drop_location=False,
-        ),
+        )
     )
+    decoy.when(mock_instrument_core.get_tip_origin()).then_return(None)
 
     with pytest.raises(TypeError, match="Last tip location"):
         subject.return_tip()
@@ -944,17 +1288,12 @@ def test_dispense_with_location(
 ) -> None:
     """It should dispense to a given location."""
     input_location = Location(point=Point(2, 2, 2), labware=None)
-    last_location = Location(point=Point(9, 9, 9), labware=None)
+    last_location = input_location  # to demonstrate in_place=True
     decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
 
     decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(
         last_location
     )
-    decoy.when(
-        mock_validation.validate_location(
-            location=input_location, last_location=last_location
-        )
-    ).then_return(PointTarget(location=input_location, in_place=True))
     decoy.when(mock_instrument_core.get_dispense_flow_rate(1.23)).then_return(5.67)
 
     subject.dispense(volume=42.0, location=input_location, rate=1.23)
@@ -968,7 +1307,10 @@ def test_dispense_with_location(
             rate=1.23,
             flow_rate=5.67,
             push_out=None,
-            is_meniscus=None,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
         ),
         times=1,
     )
@@ -982,18 +1324,13 @@ def test_dispense_with_well_location(
 ) -> None:
     """It should dispense to a well location."""
     mock_well = decoy.mock(cls=Well)
-    input_location = Location(point=Point(2, 2, 2), labware=None)
+    input_location = Location(point=Point(2, 2, 2), labware=mock_well)
     last_location = Location(point=Point(9, 9, 9), labware=None)
     decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
 
     decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(
         last_location
     )
-    decoy.when(
-        mock_validation.validate_location(
-            location=input_location, last_location=last_location
-        )
-    ).then_return(WellTarget(well=mock_well, location=input_location, in_place=False))
     decoy.when(mock_instrument_core.get_dispense_flow_rate(1.23)).then_return(3.0)
 
     subject.dispense(volume=42.0, location=input_location, rate=1.23, push_out=7)
@@ -1007,7 +1344,10 @@ def test_dispense_with_well_location(
             rate=1.23,
             flow_rate=3.0,
             push_out=7,
-            is_meniscus=None,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
         ),
         times=1,
     )
@@ -1022,22 +1362,16 @@ def test_dispense_with_well(
     """It should dispense to a well."""
     mock_well = decoy.mock(cls=Well)
     bottom_location = Location(point=Point(1, 2, 3), labware=mock_well)
-    input_location = Location(point=Point(2, 2, 2), labware=None)
     last_location = Location(point=Point(9, 9, 9), labware=None)
     decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
 
     decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(
         last_location
     )
-    decoy.when(
-        mock_validation.validate_location(
-            location=input_location, last_location=last_location
-        )
-    ).then_return(WellTarget(well=mock_well, location=None, in_place=False))
     decoy.when(mock_well.bottom(z=1.0)).then_return(bottom_location)
     decoy.when(mock_instrument_core.get_dispense_flow_rate(1.23)).then_return(5.67)
 
-    subject.dispense(volume=42.0, location=input_location, rate=1.23, push_out=None)
+    subject.dispense(volume=42.0, location=mock_well, rate=1.23, push_out=None)
 
     decoy.verify(
         mock_instrument_core.dispense(
@@ -1048,7 +1382,10 @@ def test_dispense_with_well(
             rate=1.23,
             flow_rate=5.67,
             push_out=None,
-            is_meniscus=None,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
         ),
         times=1,
     )
@@ -1064,11 +1401,190 @@ def test_dispense_raises_no_location(
     decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
     decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(None)
 
-    decoy.when(
-        mock_validation.validate_location(location=None, last_location=None)
-    ).then_raise(mock_validation.NoLocationError())
     with pytest.raises(RuntimeError):
         subject.dispense(location=None)
+
+
+def test_dynamic_dispense_meniscus(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should dispense to a well."""
+    mock_well = decoy.mock(cls=Well)
+    input_location = Location(
+        point=Point(2, 2, 2),
+        labware=mock_well,
+        _meniscus_tracking=MeniscusTrackingTarget.START,
+    )
+    end_location = Location(
+        point=Point(2, 2, 3),
+        labware=mock_well,
+        _meniscus_tracking=MeniscusTrackingTarget.END,
+    )
+    last_location = Location(point=Point(9, 9, 9), labware=None)
+    decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
+
+    decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(
+        last_location
+    )
+    decoy.when(mock_instrument_core.get_dispense_flow_rate(1.23)).then_return(5.67)
+
+    subject.dispense(
+        volume=42.0, location=input_location, rate=1.23, end_location=end_location
+    )
+
+    decoy.verify(
+        mock_instrument_core.dispense(
+            location=input_location,
+            well_core=mock_well._core,
+            in_place=False,
+            volume=42.0,
+            rate=1.23,
+            flow_rate=5.67,
+            push_out=None,
+            meniscus_tracking=MeniscusTrackingTarget.START,
+            end_location=end_location,
+            end_meniscus_tracking=MeniscusTrackingTarget.END,
+            movement_delay=None,
+        ),
+        times=1,
+    )
+
+
+def test_dynamic_dispense_meniscus_old(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should dispense to a well."""
+    mock_well = decoy.mock(cls=Well)
+    input_location = Location(
+        point=Point(2, 2, 2),
+        labware=mock_well,
+        _meniscus_tracking=MeniscusTrackingTarget.DYNAMIC,
+    )
+    last_location = Location(point=Point(9, 9, 9), labware=None)
+    decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
+
+    decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(
+        last_location
+    )
+    decoy.when(mock_instrument_core.get_dispense_flow_rate(1.23)).then_return(5.67)
+
+    subject.dispense(volume=42.0, location=input_location, rate=1.23)
+
+    decoy.verify(
+        mock_instrument_core.dispense(
+            location=Location(
+                point=Point(2, 2, 2),
+                labware=mock_well,
+                _meniscus_tracking=MeniscusTrackingTarget.START,
+            ),
+            well_core=mock_well._core,
+            in_place=False,
+            volume=42.0,
+            rate=1.23,
+            flow_rate=5.67,
+            push_out=None,
+            meniscus_tracking=MeniscusTrackingTarget.START,
+            end_location=Location(
+                point=Point(2, 2, 2),
+                labware=mock_well,
+                _meniscus_tracking=MeniscusTrackingTarget.END,
+            ),
+            end_meniscus_tracking=MeniscusTrackingTarget.END,
+            movement_delay=None,
+        ),
+        times=1,
+    )
+
+
+def test_dynamic_dispense(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should dispense to a well."""
+    mock_well = decoy.mock(cls=Well)
+    input_location = Location(point=Point(2, 2, 2), labware=mock_well)
+    end_location = Location(point=Point(2, 2, 3), labware=mock_well)
+    last_location = Location(point=Point(9, 9, 9), labware=None)
+    decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
+
+    decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(
+        last_location
+    )
+    decoy.when(mock_instrument_core.get_dispense_flow_rate(1.23)).then_return(5.67)
+
+    subject.dispense(
+        volume=42.0, location=input_location, rate=1.23, end_location=end_location
+    )
+
+    decoy.verify(
+        mock_instrument_core.dispense(
+            location=input_location,
+            well_core=mock_well._core,
+            in_place=False,
+            volume=42.0,
+            rate=1.23,
+            flow_rate=5.67,
+            push_out=None,
+            meniscus_tracking=None,
+            end_location=end_location,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+        times=1,
+    )
+
+
+def test_dynamic_dispense_validation(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should dispense to a well."""
+    mock_well = decoy.mock(cls=Well)
+    mock_well_2 = decoy.mock(cls=Well)
+    input_location = Location(point=Point(2, 2, 2), labware=mock_well)
+    end_location = Location(point=Point(2, 2, 3), labware=mock_well_2)
+    last_location = Location(point=Point(9, 9, 9), labware=None)
+    decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
+
+    decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(
+        last_location
+    )
+    decoy.when(mock_instrument_core.get_dispense_flow_rate(1.23)).then_return(5.67)
+
+    with pytest.raises(ValueError):
+        # Raises if the locations are in different wells
+        subject.dispense(
+            volume=42.0, location=input_location, rate=1.23, end_location=end_location
+        )
+
+    with pytest.raises(ValueError):
+        # Raises if end location but not location
+        subject.dispense(volume=42.0, rate=1.23, end_location=end_location)
+
+    with pytest.raises(ValueError):
+        # Raises if location is well
+        subject.dispense(
+            volume=42.0, location=mock_well, rate=1.23, end_location=end_location
+        )
+
+    with pytest.raises(ValueError):
+        # Raises if end location is well
+        subject.dispense(
+            volume=42.0,
+            location=input_location,
+            rate=1.23,
+            end_location=mock_well,  # type: ignore[arg-type]
+        )
 
 
 @pytest.mark.parametrize("api_version", [APIVersion(2, 14)])
@@ -1082,11 +1598,46 @@ def test_dispense_push_out_on_not_allowed_version(
     decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
     decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(None)
 
-    decoy.when(
-        mock_validation.validate_location(location=None, last_location=None)
-    ).then_raise(mock_validation.NoLocationError())
     with pytest.raises(APIVersionError):
         subject.dispense(push_out=3)
+
+
+def test_dispense_flow_rate(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should dispense with absolute_flow_rate."""
+    decoy.when(mock_instrument_core.get_mount()).then_return(Mount.RIGHT)
+    last_location = Location(point=Point(9, 9, 9), labware=None)
+    decoy.when(mock_protocol_core.get_last_location(Mount.RIGHT)).then_return(
+        last_location
+    )
+    decoy.when(mock_instrument_core.get_dispense_flow_rate()).then_return(400)
+
+    subject.dispense(volume=30, flow_rate=600)
+
+    decoy.verify(
+        mock_instrument_core.dispense(
+            location=last_location,
+            well_core=None,
+            volume=30,
+            rate=1.5,  # requested flow_rate is 1.5 times default of 400
+            flow_rate=600,
+            in_place=True,
+            push_out=None,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+        times=1,
+    )
+
+    # Should raise if both `rate` and `flow_rate` are specified:
+    with pytest.raises(ValueError):
+        subject.dispense(volume=30, rate=1.5, flow_rate=600)
 
 
 def test_touch_tip(
@@ -1105,6 +1656,8 @@ def test_touch_tip(
 
     decoy.when(mock_well.parent.quirks).then_return([])
 
+    # touch_tip() with the old `radius` argument:
+
     subject.touch_tip(mock_well, radius=0.123, v_offset=4.56, speed=42.0)
 
     decoy.verify(
@@ -1114,8 +1667,49 @@ def test_touch_tip(
             radius=0.123,
             z_offset=4.56,
             speed=42.0,
+            mm_from_edge=None,
         )
     )
+
+    # touch_tip() with the new `mm_from_edge` argument:
+
+    subject.touch_tip(mock_well, v_offset=4.56, speed=42.0, mm_from_edge=0.5)
+
+    decoy.verify(
+        mock_instrument_core.touch_tip(
+            location=Location(point=Point(1, 2, 3), labware=mock_well),
+            well_core=mock_well._core,
+            radius=1,
+            z_offset=4.56,
+            speed=42.0,
+            mm_from_edge=0.5,
+        )
+    )
+
+    # `radius` and `mm_from_edge` are mutually exclusive, should raise if both specified:
+    with pytest.raises(ValueError):
+        subject.touch_tip(
+            mock_well, radius=0.75, v_offset=4.56, speed=42.0, mm_from_edge=0.5
+        )
+
+
+def test_touch_tip_raises_if_trash_last_location(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should raise if the last location was a trash bin or waste chute."""
+    decoy.when(mock_instrument_core.has_tip()).then_return(True)
+    mock_trash = decoy.mock(cls=TrashBin)
+    decoy.when(mock_protocol_core.get_last_location()).then_return(mock_trash)
+    with pytest.raises(RuntimeError, match="not valid for touch tip"):
+        subject.touch_tip()
+
+    mock_chute = decoy.mock(cls=WasteChute)
+    decoy.when(mock_protocol_core.get_last_location()).then_return(mock_chute)
+    with pytest.raises(RuntimeError, match="not valid for touch tip"):
+        subject.touch_tip()
 
 
 def test_return_height(
@@ -1287,9 +1881,6 @@ def test_dispense_0_volume_means_dispense_everything(
 ) -> None:
     """It should dispense all liquid to a well."""
     input_location = Location(point=Point(2, 2, 2), labware=None)
-    decoy.when(
-        mock_validation.validate_location(location=input_location, last_location=None)
-    ).then_return(mock_validation.PointTarget(location=input_location, in_place=False))
     decoy.when(mock_instrument_core.get_current_volume()).then_return(100)
     decoy.when(mock_instrument_core.get_dispense_flow_rate(1.23)).then_return(5.67)
     subject.dispense(volume=0, location=input_location, rate=1.23, push_out=None)
@@ -1303,7 +1894,10 @@ def test_dispense_0_volume_means_dispense_everything(
             rate=1.23,
             flow_rate=5.67,
             push_out=None,
-            is_meniscus=None,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
         ),
         times=1,
     )
@@ -1318,9 +1912,6 @@ def test_dispense_0_volume_means_dispense_nothing(
 ) -> None:
     """It should dispense no liquid to a well."""
     input_location = Location(point=Point(2, 2, 2), labware=None)
-    decoy.when(
-        mock_validation.validate_location(location=input_location, last_location=None)
-    ).then_return(mock_validation.PointTarget(location=input_location, in_place=False))
     decoy.when(mock_instrument_core.get_dispense_flow_rate(1.23)).then_return(5.67)
     subject.dispense(volume=0, location=input_location, rate=1.23, push_out=None)
 
@@ -1333,7 +1924,10 @@ def test_dispense_0_volume_means_dispense_nothing(
             rate=1.23,
             flow_rate=5.67,
             push_out=None,
-            is_meniscus=None,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
         ),
         times=1,
     )
@@ -1356,11 +1950,6 @@ def test_aspirate_0_volume_means_aspirate_everything(
         last_location
     )
 
-    decoy.when(
-        mock_validation.validate_location(
-            location=input_location, last_location=last_location
-        )
-    ).then_return(WellTarget(well=mock_well, location=input_location, in_place=False))
     decoy.when(mock_instrument_core.get_aspirate_flow_rate(1.23)).then_return(5.67)
     decoy.when(mock_instrument_core.get_available_volume()).then_return(200)
     subject.aspirate(volume=0, location=input_location, rate=1.23)
@@ -1373,7 +1962,10 @@ def test_aspirate_0_volume_means_aspirate_everything(
             volume=200,
             rate=1.23,
             flow_rate=5.67,
-            is_meniscus=None,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
         ),
         times=1,
     )
@@ -1396,11 +1988,6 @@ def test_aspirate_0_volume_means_aspirate_nothing(
         last_location
     )
 
-    decoy.when(
-        mock_validation.validate_location(
-            location=input_location, last_location=last_location
-        )
-    ).then_return(WellTarget(well=mock_well, location=input_location, in_place=False))
     decoy.when(mock_instrument_core.get_aspirate_flow_rate(1.23)).then_return(5.67)
 
     subject.aspirate(volume=0, location=input_location, rate=1.23)
@@ -1413,10 +2000,71 @@ def test_aspirate_0_volume_means_aspirate_nothing(
             volume=0,
             rate=1.23,
             flow_rate=5.67,
-            is_meniscus=None,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
         ),
         times=1,
     )
+
+
+@pytest.mark.parametrize("api_version", versions_at_or_above(APIVersion(2, 24)))
+def test_dispense_with_trash_last_location(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should dispense into a previously accessed trash."""
+    mock_trash = decoy.mock(cls=TrashBin)
+    decoy.when(mock_instrument_core.get_mount()).then_return(Mount.LEFT)
+    decoy.when(mock_protocol_core.get_last_location(mount=Mount.LEFT)).then_return(
+        mock_trash
+    )
+    decoy.when(mock_instrument_core.get_dispense_flow_rate(4.5)).then_return(6.7)
+    subject.dispense(volume=12.3, rate=4.5)
+
+    decoy.verify(
+        mock_instrument_core.dispense(
+            location=mock_trash,
+            well_core=None,
+            in_place=True,
+            volume=12.3,
+            rate=4.5,
+            flow_rate=6.7,
+            push_out=None,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+        times=1,
+    )
+
+
+@pytest.mark.parametrize(
+    "api_version",
+    versions_between(
+        low_exclusive_bound=APIVersion(2, 13), high_inclusive_bound=APIVersion(2, 23)
+    ),
+)
+def test_dispense_with_trash_last_location_raises_earlier_api(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should raise if a trash is the last accessed location and on 2.23."""
+    mock_trash = decoy.mock(cls=TrashBin)
+    decoy.when(mock_instrument_core.get_mount()).then_return(Mount.LEFT)
+    decoy.when(mock_protocol_core.get_last_location(mount=Mount.LEFT)).then_return(
+        mock_trash
+    )
+    with pytest.raises(
+        RuntimeError, match="dispense is called without an explicit location"
+    ):
+        subject.dispense(volume=12.3, rate=4.5)
 
 
 @pytest.mark.parametrize("api_version", [APIVersion(2, 20)])
@@ -1479,8 +2127,15 @@ def test_measure_liquid_height(
         original_error=lnfe,
         message=f"{lnfe.errorType}: {lnfe.detail}",
     )
+    decoy.when(mock_well.current_liquid_height()).then_return(123)
     decoy.when(
-        mock_instrument_core.liquid_probe_without_recovery(
+        mock_instrument_core.liquid_probe_with_recovery(
+            mock_well._core, mock_well.top()
+        )
+    )
+    assert subject.measure_liquid_height(mock_well) == 123
+    decoy.when(
+        mock_instrument_core.liquid_probe_with_recovery(
             mock_well._core, mock_well.top()
         )
     ).then_raise(errorToRaise)
@@ -1489,60 +2144,12 @@ def test_measure_liquid_height(
     assert pcfe.value is errorToRaise
 
 
-def test_96_tip_config_valid(
-    decoy: Decoy, mock_instrument_core: InstrumentCore, subject: InstrumentContext
-) -> None:
-    """It should error when there's no tips on the correct corner nozzles."""
-    nozzle_map = NozzleMap.build(
-        physical_nozzles=NINETY_SIX_MAP,
-        physical_rows=NINETY_SIX_ROWS,
-        physical_columns=NINETY_SIX_COLS,
-        starting_nozzle="A5",
-        back_left_nozzle="A5",
-        front_right_nozzle="H5",
-        valid_nozzle_maps=ValidNozzleMaps(maps={"Column12": NINETY_SIX_COLS["5"]}),
-    )
-    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(nozzle_map)
-    decoy.when(mock_instrument_core.get_active_channels()).then_return(96)
-    with pytest.raises(TipNotAttachedError):
-        subject._96_tip_config_valid()
-
-
-def test_96_tip_config_invalid(
-    decoy: Decoy, mock_instrument_core: InstrumentCore, subject: InstrumentContext
-) -> None:
-    """It should return True when there are tips on the correct corner nozzles."""
-    nozzle_map = NozzleMap.build(
-        physical_nozzles=NINETY_SIX_MAP,
-        physical_rows=NINETY_SIX_ROWS,
-        physical_columns=NINETY_SIX_COLS,
-        starting_nozzle="A1",
-        back_left_nozzle="A1",
-        front_right_nozzle="H12",
-        valid_nozzle_maps=ValidNozzleMaps(
-            maps={
-                "Full": sum(
-                    [
-                        NINETY_SIX_ROWS["A"],
-                        NINETY_SIX_ROWS["B"],
-                        NINETY_SIX_ROWS["C"],
-                        NINETY_SIX_ROWS["D"],
-                        NINETY_SIX_ROWS["E"],
-                        NINETY_SIX_ROWS["F"],
-                        NINETY_SIX_ROWS["G"],
-                        NINETY_SIX_ROWS["H"],
-                    ],
-                    [],
-                )
-            }
-        ),
-    )
-    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(nozzle_map)
-    decoy.when(mock_instrument_core.get_active_channels()).then_return(96)
-    assert subject._96_tip_config_valid() is True
-
-
-@pytest.mark.parametrize("api_version", [APIVersion(2, 21)])
+@pytest.mark.parametrize(
+    "api_version",
+    versions_between(
+        low_exclusive_bound=APIVersion(2, 13), high_inclusive_bound=APIVersion(2, 21)
+    ),
+)
 def test_mix_no_lpd(
     decoy: Decoy,
     mock_instrument_core: InstrumentCore,
@@ -1553,47 +2160,99 @@ def test_mix_no_lpd(
     mock_well = decoy.mock(cls=Well)
 
     bottom_location = Location(point=Point(1, 2, 3), labware=mock_well)
-    input_location = Location(point=Point(2, 2, 2), labware=None)
+    top_location = Location(point=Point(3, 2, 1), labware=None)
     last_location = Location(point=Point(9, 9, 9), labware=None)
 
     decoy.when(mock_protocol_core.get_last_location(Mount.LEFT)).then_return(
-        last_location
+        # We start at last_location, then we're at bottom_location for the
+        # subsequent dispenses/aspirates
+        last_location,
+        bottom_location,
     )
-    decoy.when(
-        mock_validation.validate_location(
-            location=input_location, last_location=last_location
-        )
-    ).then_return(WellTarget(well=mock_well, location=None, in_place=False))
-    decoy.when(
-        mock_validation.validate_location(location=None, last_location=last_location)
-    ).then_return(WellTarget(well=mock_well, location=None, in_place=False))
     decoy.when(mock_well.bottom(z=1.0)).then_return(bottom_location)
+    decoy.when(mock_well.top()).then_return(top_location)
     decoy.when(mock_instrument_core.get_aspirate_flow_rate(1.23)).then_return(5.67)
     decoy.when(mock_instrument_core.get_dispense_flow_rate(1.23)).then_return(5.67)
     decoy.when(mock_instrument_core.has_tip()).then_return(True)
     decoy.when(mock_instrument_core.get_current_volume()).then_return(0.0)
 
-    subject.mix(repetitions=10, volume=10.0, location=input_location, rate=1.23)
+    subject.mix(repetitions=10, volume=10.0, location=mock_well, rate=1.23)
     decoy.verify(
-        mock_instrument_core.aspirate(),  # type: ignore[call-arg]
-        ignore_extra_args=True,
-        times=10,
-    )
-    decoy.verify(
-        mock_instrument_core.dispense(),  # type: ignore[call-arg]
-        ignore_extra_args=True,
+        mock_instrument_core.aspirate(
+            bottom_location,
+            mock_well._core,
+            10.0,
+            1.23,
+            5.67,
+            matchers.Anything(),  # first one is not in_place, the other 9 are in_place
+            None,
+            None,
+            None,
+            movement_delay=None,
+        ),
         times=10,
     )
 
+    # Slight differences in dispense push-out logic for 2.14 and 2.15 api levels
+    if subject.api_version < APIVersion(2, 16):
+        decoy.verify(
+            mock_instrument_core.dispense(
+                bottom_location,
+                mock_well._core,
+                10.0,
+                1.23,
+                5.67,
+                True,
+                None,
+                None,
+                None,
+                None,
+                movement_delay=None,
+            ),
+            times=10,
+        )
+    else:
+        decoy.verify(
+            mock_instrument_core.dispense(
+                location=bottom_location,
+                well_core=mock_well._core,
+                volume=10.0,
+                rate=1.23,
+                flow_rate=5.67,
+                in_place=True,
+                push_out=0.0,
+                meniscus_tracking=None,
+                end_location=None,
+                end_meniscus_tracking=None,
+                movement_delay=None,
+            ),
+            times=9,
+        )
+        decoy.verify(
+            mock_instrument_core.dispense(
+                location=bottom_location,
+                well_core=mock_well._core,
+                volume=10.0,
+                rate=1.23,
+                flow_rate=5.67,
+                in_place=True,
+                push_out=None,
+                meniscus_tracking=None,
+                end_location=None,
+                end_meniscus_tracking=None,
+                movement_delay=None,
+            ),
+            times=1,
+        )
+
     decoy.verify(
-        mock_instrument_core.liquid_probe_with_recovery(),  # type: ignore[call-arg]
-        ignore_extra_args=True,
+        mock_instrument_core.liquid_probe_with_recovery(mock_well._core, top_location),
         times=0,
     )
 
 
 @pytest.mark.ot3_only
-@pytest.mark.parametrize("api_version", [APIVersion(2, 21)])
+@pytest.mark.parametrize("api_version", versions_at_or_above(APIVersion(2, 21)))
 def test_mix_with_lpd(
     decoy: Decoy,
     mock_instrument_core: InstrumentCore,
@@ -1603,41 +2262,2148 @@ def test_mix_with_lpd(
     """It should aspirate/dispense to a well several times and do 1 lpd."""
     mock_well = decoy.mock(cls=Well)
     bottom_location = Location(point=Point(1, 2, 3), labware=mock_well)
-    input_location = Location(point=Point(2, 2, 2), labware=None)
+    top_location = Location(point=Point(3, 2, 1), labware=None)
+    last_location = Location(point=Point(9, 9, 9), labware=None)
+
+    decoy.when(mock_protocol_core.get_last_location(Mount.LEFT)).then_return(
+        # We start at last_location, then we're at bottom_location for the
+        # subsequent dispenses/aspirates
+        last_location,
+        bottom_location,
+    )
+    decoy.when(mock_well.bottom(z=1.0)).then_return(bottom_location)
+    decoy.when(mock_well.top()).then_return(top_location)
+    decoy.when(mock_instrument_core.get_aspirate_flow_rate(1.23)).then_return(5.67)
+    decoy.when(mock_instrument_core.get_dispense_flow_rate(1.23)).then_return(5.67)
+    decoy.when(mock_instrument_core.has_tip()).then_return(True)
+    decoy.when(mock_instrument_core.get_has_clean_tip()).then_return(True)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0.0)
+    decoy.when(mock_instrument_core.nozzle_configuration_valid_for_lld()).then_return(
+        True
+    )
+
+    subject.liquid_presence_detection = True
+    subject.mix(repetitions=10, volume=10.0, location=mock_well, rate=1.23)
+    decoy.verify(
+        mock_instrument_core.aspirate(
+            bottom_location,
+            mock_well._core,
+            10.0,
+            1.23,
+            5.67,
+            matchers.Anything(),  # first one is not in_place, the other 9 are in_place
+            None,
+            None,
+            None,
+            movement_delay=None,
+        ),
+        times=10,
+    )
+    decoy.verify(
+        mock_instrument_core.dispense(
+            location=bottom_location,
+            well_core=mock_well._core,
+            volume=10.0,
+            rate=1.23,
+            flow_rate=5.67,
+            in_place=True,
+            push_out=0.0,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+        times=9,
+    )
+    decoy.verify(
+        mock_instrument_core.dispense(
+            location=bottom_location,
+            well_core=mock_well._core,
+            volume=10.0,
+            rate=1.23,
+            flow_rate=5.67,
+            in_place=True,
+            push_out=None,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+        times=1,
+    )
+    decoy.verify(
+        mock_instrument_core.liquid_probe_with_recovery(mock_well._core, top_location),
+        times=1,
+    )
+
+
+def test_mix_with_flow_rates(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should mix with aspirate_flow_rate and dispense_flow_rate."""
+    mock_well = decoy.mock(cls=Well)
+    input_location = Location(point=Point(2, 2, 2), labware=mock_well)
+    decoy.when(mock_protocol_core.get_last_location(Mount.LEFT)).then_return(
+        input_location,
+    )  # last location same as input_location, so in_place should be true
+    decoy.when(mock_instrument_core.get_aspirate_flow_rate()).then_return(100.0)
+    decoy.when(mock_instrument_core.get_dispense_flow_rate()).then_return(100.0)
+    decoy.when(mock_instrument_core.has_tip()).then_return(True)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0.0)
+
+    subject.mix(
+        repetitions=1,
+        volume=10.0,
+        location=input_location,
+        aspirate_flow_rate=300.0,
+        dispense_flow_rate=400.0,
+    )
+    decoy.verify(
+        mock_instrument_core.aspirate(
+            location=input_location,
+            well_core=mock_well._core,
+            volume=10.0,
+            rate=3.0,  # requested aspirate_flow_rate is 3x default flow rate of 100
+            flow_rate=300.0,
+            in_place=True,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+        mock_instrument_core.dispense(
+            location=input_location,
+            well_core=mock_well._core,
+            volume=10.0,
+            rate=4.0,  # requested dispense_flow_rate is 4x default flow rate of 100
+            flow_rate=400.0,
+            in_place=True,
+            push_out=None,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+    )
+
+    # Should fail if you try to set both rate and aspirate_flow_rate/dispense_flow_rate:
+    with pytest.raises(ValueError):
+        subject.mix(
+            repetitions=1,
+            volume=10.0,
+            location=input_location,
+            rate=1.23,
+            aspirate_flow_rate=300.0,
+            dispense_flow_rate=400.0,
+        )
+
+    # Bonus: If you only set aspirate_flow_rate, the dispense should use the pipette's
+    # default flow rate:
+    decoy.when(mock_instrument_core.get_aspirate_flow_rate(1)).then_return(100.0)
+    decoy.when(mock_instrument_core.get_dispense_flow_rate(1)).then_return(100.0)
+    subject.mix(
+        repetitions=1,
+        volume=10.0,
+        location=input_location,
+        aspirate_flow_rate=300.0,
+    )
+    decoy.verify(
+        mock_instrument_core.aspirate(
+            location=input_location,
+            well_core=mock_well._core,
+            volume=10.0,
+            rate=3.0,  # requested aspirate_flow_rate is 3x default flow rate of 100
+            flow_rate=300.0,
+            in_place=True,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+        mock_instrument_core.dispense(
+            location=input_location,
+            well_core=mock_well._core,
+            volume=10.0,
+            rate=1.0,
+            flow_rate=100.0,  # the default dispense flow rate
+            in_place=True,
+            push_out=None,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+    )
+
+
+def test_mix_with_delay_and_final_push_out(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should delay after the aspirate/dispense and emit the specified push out for the final dispense in a mix."""
+    mock_well = decoy.mock(cls=Well)
+    input_location = Location(point=Point(2, 2, 2), labware=mock_well)
+    decoy.when(mock_protocol_core.get_last_location(Mount.LEFT)).then_return(
+        input_location,
+    )  # last location same as input_location, so in_place should be true
+    decoy.when(mock_instrument_core.get_aspirate_flow_rate(1)).then_return(4.56)
+    decoy.when(mock_instrument_core.get_dispense_flow_rate(1)).then_return(5.67)
+    decoy.when(mock_instrument_core.has_tip()).then_return(True)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0.0)
+
+    subject.mix(
+        repetitions=2,
+        volume=10.0,
+        location=input_location,
+        aspirate_delay=3,
+        dispense_delay=4,
+        final_push_out=2,
+    )
+    decoy.verify(
+        mock_instrument_core.aspirate(
+            location=input_location,
+            well_core=mock_well._core,
+            volume=10.0,
+            rate=1,
+            flow_rate=4.56,
+            in_place=True,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+        mock_protocol_core.delay(3, msg=None),  # aspirate delay
+        mock_instrument_core.dispense(
+            location=input_location,
+            well_core=mock_well._core,
+            volume=10.0,
+            rate=1,
+            flow_rate=5.67,
+            in_place=True,
+            push_out=0.0,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+        mock_protocol_core.delay(4, msg=None),  # dispense delay
+        mock_instrument_core.aspirate(
+            location=input_location,
+            well_core=mock_well._core,
+            volume=10.0,
+            rate=1,
+            flow_rate=4.56,
+            in_place=True,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+        mock_protocol_core.delay(3, msg=None),  # aspirate delay
+        mock_instrument_core.dispense(
+            location=input_location,
+            well_core=mock_well._core,
+            volume=10.0,
+            rate=1,
+            flow_rate=5.67,
+            in_place=True,
+            push_out=2,  # final push out
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+        mock_protocol_core.delay(4, msg=None),  # dispense delay
+    )
+
+
+def test_dynamic_mix_without_endpoints(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should mix with aspirate_flow_rate and dispense_flow_rate."""
+    mock_well = decoy.mock(cls=Well)
+    start_location = Location(point=Point(2, 2, 2), labware=mock_well)
+    aspirate_location = Location(point=Point(2, 2, 1), labware=mock_well)
+    dispense_location = Location(point=Point(2, 2, 3), labware=mock_well)
+    decoy.when(mock_protocol_core.get_last_location(Mount.LEFT)).then_return(
+        start_location,
+        aspirate_location,
+        dispense_location,
+        aspirate_location,
+        dispense_location,
+    )
+    decoy.when(mock_instrument_core.get_aspirate_flow_rate(1.0)).then_return(100.0)
+    decoy.when(mock_instrument_core.get_dispense_flow_rate(1.0)).then_return(100.0)
+    decoy.when(mock_instrument_core.has_tip()).then_return(True)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0.0)
+
+    subject.dynamic_mix(
+        repetitions=2,
+        volume=10.0,
+        aspirate_start_location=aspirate_location,
+        dispense_start_location=dispense_location,
+    )
+    decoy.verify(
+        mock_instrument_core.aspirate(
+            location=aspirate_location,
+            well_core=mock_well._core,
+            volume=10.0,
+            rate=1.0,
+            flow_rate=100.0,
+            in_place=False,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+        mock_instrument_core.dispense(
+            location=dispense_location,
+            well_core=mock_well._core,
+            volume=10.0,
+            rate=1.0,
+            flow_rate=100.0,
+            in_place=False,
+            push_out=0.0,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+        mock_instrument_core.aspirate(
+            location=aspirate_location,
+            well_core=mock_well._core,
+            volume=10.0,
+            rate=1.0,
+            flow_rate=100.0,
+            in_place=False,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+        mock_instrument_core.dispense(
+            location=dispense_location,
+            well_core=mock_well._core,
+            volume=10.0,
+            rate=1.0,
+            flow_rate=100.0,
+            in_place=False,
+            push_out=None,
+            meniscus_tracking=None,
+            end_location=None,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+    )
+
+
+def test_dynamic_mix_with_endpoints(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should mix with aspirate_flow_rate and dispense_flow_rate."""
+    mock_well = decoy.mock(cls=Well)
+    start_location = Location(point=Point(2, 2, 2), labware=mock_well)
+    aspirate_location = Location(point=Point(2, 2, 1), labware=mock_well)
+    dispense_location = Location(point=Point(2, 2, 3), labware=mock_well)
+    aspirate_end_location = Location(point=Point(2, 2, 1), labware=mock_well)
+    dispense_end_location = Location(point=Point(2, 2, 3), labware=mock_well)
+    decoy.when(mock_protocol_core.get_last_location(Mount.LEFT)).then_return(
+        start_location,
+        aspirate_end_location,
+        dispense_end_location,
+        aspirate_end_location,
+        dispense_end_location,
+    )
+    decoy.when(mock_instrument_core.get_aspirate_flow_rate(1.0)).then_return(100.0)
+    decoy.when(mock_instrument_core.get_dispense_flow_rate(1.0)).then_return(100.0)
+    decoy.when(mock_instrument_core.has_tip()).then_return(True)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0.0)
+
+    subject.dynamic_mix(
+        repetitions=2,
+        volume=10.0,
+        aspirate_start_location=aspirate_location,
+        dispense_start_location=dispense_location,
+        aspirate_end_location=aspirate_end_location,
+        dispense_end_location=dispense_end_location,
+    )
+    decoy.verify(
+        mock_instrument_core.aspirate(
+            location=aspirate_location,
+            well_core=mock_well._core,
+            volume=10.0,
+            rate=1.0,
+            flow_rate=100.0,
+            in_place=False,
+            meniscus_tracking=None,
+            end_location=aspirate_end_location,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+        mock_instrument_core.dispense(
+            location=dispense_location,
+            well_core=mock_well._core,
+            volume=10.0,
+            rate=1.0,
+            flow_rate=100.0,
+            in_place=False,
+            push_out=0.0,
+            meniscus_tracking=None,
+            end_location=dispense_end_location,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+        mock_instrument_core.aspirate(
+            location=aspirate_location,
+            well_core=mock_well._core,
+            volume=10.0,
+            rate=1.0,
+            flow_rate=100.0,
+            in_place=False,
+            meniscus_tracking=None,
+            end_location=aspirate_end_location,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+        mock_instrument_core.dispense(
+            location=dispense_location,
+            well_core=mock_well._core,
+            volume=10.0,
+            rate=1.0,
+            flow_rate=100.0,
+            in_place=False,
+            push_out=None,
+            meniscus_tracking=None,
+            end_location=dispense_end_location,
+            end_meniscus_tracking=None,
+            movement_delay=None,
+        ),
+    )
+
+
+def test_dynamic_mix_with_delay(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should mix with aspirate_flow_rate and dispense_flow_rate."""
+    mock_well = decoy.mock(cls=Well)
+    start_location = Location(point=Point(2, 2, 2), labware=mock_well)
+    aspirate_location = Location(point=Point(2, 2, 1), labware=mock_well)
+    dispense_location = Location(point=Point(2, 2, 3), labware=mock_well)
+    aspirate_end_location = Location(point=Point(2, 2, 1), labware=mock_well)
+    dispense_end_location = Location(point=Point(2, 2, 3), labware=mock_well)
+    decoy.when(mock_protocol_core.get_last_location(Mount.LEFT)).then_return(
+        start_location,
+        aspirate_end_location,
+        dispense_end_location,
+        aspirate_end_location,
+        dispense_end_location,
+    )
+    decoy.when(mock_instrument_core.get_aspirate_flow_rate(1.0)).then_return(100.0)
+    decoy.when(mock_instrument_core.get_dispense_flow_rate(1.0)).then_return(100.0)
+    decoy.when(mock_instrument_core.has_tip()).then_return(True)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0.0)
+
+    subject.dynamic_mix(
+        repetitions=2,
+        volume=10.0,
+        aspirate_start_location=aspirate_location,
+        dispense_start_location=dispense_location,
+        aspirate_end_location=aspirate_end_location,
+        dispense_end_location=dispense_end_location,
+        movement_delay=3.14,
+    )
+    decoy.verify(
+        mock_instrument_core.aspirate(
+            location=aspirate_location,
+            well_core=mock_well._core,
+            volume=10.0,
+            rate=1.0,
+            flow_rate=100.0,
+            in_place=False,
+            meniscus_tracking=None,
+            end_location=aspirate_end_location,
+            end_meniscus_tracking=None,
+            movement_delay=3.14,
+        ),
+        mock_instrument_core.dispense(
+            location=dispense_location,
+            well_core=mock_well._core,
+            volume=10.0,
+            rate=1.0,
+            flow_rate=100.0,
+            in_place=False,
+            push_out=0.0,
+            meniscus_tracking=None,
+            end_location=dispense_end_location,
+            end_meniscus_tracking=None,
+            movement_delay=3.14,
+        ),
+        mock_instrument_core.aspirate(
+            location=aspirate_location,
+            well_core=mock_well._core,
+            volume=10.0,
+            rate=1.0,
+            flow_rate=100.0,
+            in_place=False,
+            meniscus_tracking=None,
+            end_location=aspirate_end_location,
+            end_meniscus_tracking=None,
+            movement_delay=3.14,
+        ),
+        mock_instrument_core.dispense(
+            location=dispense_location,
+            well_core=mock_well._core,
+            volume=10.0,
+            rate=1.0,
+            flow_rate=100.0,
+            in_place=False,
+            push_out=None,
+            meniscus_tracking=None,
+            end_location=dispense_end_location,
+            end_meniscus_tracking=None,
+            movement_delay=3.14,
+        ),
+    )
+
+
+def test_dynamic_mix_arg_checking(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+) -> None:
+    """It should mix with aspirate_flow_rate and dispense_flow_rate."""
+    mock_well = decoy.mock(cls=Well)
+    mock_well_2 = decoy.mock(cls=Well)
+    aspirate_location = Location(point=Point(2, 2, 1), labware=mock_well)
+    dispense_location = Location(point=Point(2, 2, 3), labware=mock_well_2)
+    decoy.when(mock_instrument_core.get_aspirate_flow_rate(1.0)).then_return(100.0)
+    decoy.when(mock_instrument_core.get_dispense_flow_rate(1.0)).then_return(100.0)
+    decoy.when(mock_instrument_core.has_tip()).then_return(True)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0.0)
+
+    # Raises error when aspirate and dispense are in different wells
+    with pytest.raises(ValueError):
+        subject.dynamic_mix(
+            repetitions=2,
+            volume=10.0,
+            aspirate_start_location=aspirate_location,
+            dispense_start_location=dispense_location,
+        )
+    aspirate_location = Location(point=Point(2, 2, 1), labware=mock_well)
+    dispense_location = Location(point=Point(2, 2, 3), labware=mock_well)
+    aspirate_end_location = Location(point=Point(2, 2, 1), labware=mock_well_2)
+    dispense_end_location = Location(point=Point(2, 2, 3), labware=mock_well_2)
+    # Raises error when aspirate start and end are in different wells
+    with pytest.raises(ValueError):
+        subject.dynamic_mix(
+            repetitions=2,
+            volume=10.0,
+            aspirate_start_location=aspirate_location,
+            dispense_start_location=dispense_location,
+            aspirate_end_location=aspirate_end_location,
+        )
+    # Raises error when dispense start and end are in different wells
+    with pytest.raises(ValueError):
+        subject.dynamic_mix(
+            repetitions=2,
+            volume=10.0,
+            aspirate_start_location=aspirate_location,
+            dispense_start_location=dispense_location,
+            dispense_end_location=dispense_end_location,
+        )
+
+
+@pytest.mark.ot3_only
+@pytest.mark.parametrize("clean,expected", [(True, 1), (False, 0)])
+def test_aspirate_with_lpd(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    mock_protocol_core: ProtocolCore,
+    clean: bool,
+    expected: int,
+) -> None:
+    """It should aspirate/dispense to a well several times and do 1 lpd."""
+    mock_well = decoy.mock(cls=Well)
+    bottom_location = Location(point=Point(1, 2, 3), labware=mock_well)
+    top_location = Location(point=Point(3, 2, 1), labware=None)
     last_location = Location(point=Point(9, 9, 9), labware=None)
 
     decoy.when(mock_protocol_core.get_last_location(Mount.LEFT)).then_return(
         last_location
     )
-    decoy.when(
-        mock_validation.validate_location(
-            location=input_location, last_location=last_location
-        )
-    ).then_return(WellTarget(well=mock_well, location=None, in_place=False))
-    decoy.when(
-        mock_validation.validate_location(location=None, last_location=last_location)
-    ).then_return(WellTarget(well=mock_well, location=None, in_place=False))
     decoy.when(mock_well.bottom(z=1.0)).then_return(bottom_location)
+    decoy.when(mock_well.top()).then_return(top_location)
     decoy.when(mock_instrument_core.get_aspirate_flow_rate(1.23)).then_return(5.67)
     decoy.when(mock_instrument_core.get_dispense_flow_rate(1.23)).then_return(5.67)
     decoy.when(mock_instrument_core.has_tip()).then_return(True)
+    decoy.when(mock_instrument_core.get_has_clean_tip()).then_return(clean)
     decoy.when(mock_instrument_core.get_current_volume()).then_return(0.0)
+    decoy.when(mock_instrument_core.nozzle_configuration_valid_for_lld()).then_return(
+        True
+    )
 
     subject.liquid_presence_detection = True
-    subject.mix(repetitions=10, volume=10.0, location=input_location, rate=1.23)
+    subject.aspirate(volume=10.0, location=mock_well, rate=1.23)
     decoy.verify(
-        mock_instrument_core.aspirate(),  # type: ignore[call-arg]
-        ignore_extra_args=True,
-        times=10,
+        mock_instrument_core.aspirate(
+            bottom_location,
+            mock_well._core,
+            10.0,
+            1.23,
+            5.67,
+            False,
+            None,
+            None,
+            None,
+            movement_delay=None,
+        ),
+        times=1,
     )
     decoy.verify(
-        mock_instrument_core.dispense(),  # type: ignore[call-arg]
-        ignore_extra_args=True,
-        times=10,
+        mock_instrument_core.liquid_probe_with_recovery(mock_well._core, top_location),
+        times=expected,
     )
 
+
+@pytest.mark.parametrize(
+    "api_version",
+    versions_between(
+        low_exclusive_bound=APIVersion(2, 13), high_inclusive_bound=APIVersion(2, 21)
+    ),
+)
+def test_air_gap_uses_aspirate(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    mock_protocol_core: ProtocolCore,
+    subject: InstrumentContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """It should use its own aspirate function to aspirate air."""
+    mock_well = decoy.mock(cls=Well)
+    top_location = Location(point=Point(9, 9, 14), labware=mock_well)
+    last_location = Location(point=Point(9, 9, 9), labware=mock_well)
+    mock_aspirate = decoy.mock(func=subject.aspirate)
+    mock_move_to = decoy.mock(func=subject.move_to)
+    monkeypatch.setattr(subject, "aspirate", mock_aspirate)
+    monkeypatch.setattr(subject, "move_to", mock_move_to)
+
+    decoy.when(mock_instrument_core.has_tip()).then_return(True)
+    decoy.when(mock_protocol_core.get_last_location()).then_return(last_location)
+    decoy.when(mock_well.top(z=5.0)).then_return(top_location)
+    subject.air_gap(volume=10, height=5)
+
+    decoy.verify(mock_move_to(top_location, publish=False))
+    decoy.verify(mock_aspirate(10))
+
+
+@pytest.mark.parametrize("api_version", versions_at_or_above(APIVersion(2, 22)))
+def test_air_gap_uses_air_gap(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    mock_protocol_core: ProtocolCore,
+    subject: InstrumentContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """It should use its own aspirate function to aspirate air."""
+    mock_well = decoy.mock(cls=Well)
+    top_location = Location(point=Point(9, 9, 14), labware=mock_well)
+    last_location = Location(point=Point(9, 9, 9), labware=mock_well)
+    mock_move_to = decoy.mock(func=subject.move_to)
+    monkeypatch.setattr(subject, "move_to", mock_move_to)
+
+    decoy.when(mock_instrument_core.has_tip()).then_return(True)
+    decoy.when(mock_protocol_core.get_last_location()).then_return(last_location)
+    decoy.when(mock_well.top(z=5.0)).then_return(top_location)
+    decoy.when(mock_instrument_core.get_aspirate_flow_rate()).then_return(11)
+
+    subject.air_gap(volume=10, height=5)
+
+    decoy.verify(mock_move_to(top_location, publish=False))
+    decoy.verify(mock_instrument_core.prepare_to_aspirate())
+    decoy.verify(mock_instrument_core.air_gap_in_place(10, 11))
+
+
+def test_air_gap_in_place(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """It should air gap in place when in_place=True."""
+    decoy.when(mock_instrument_core.has_tip()).then_return(True)
+    decoy.when(mock_instrument_core.get_aspirate_flow_rate()).then_return(11)
+    monkeypatch.setattr(subject, "move_to", None)  # pipette should not move
+
+    subject.air_gap(volume=10, in_place=True)
+
+    decoy.verify(mock_instrument_core.air_gap_in_place(10, 11))
+
+    # Should not allow height if in_place=True is specified.
+    with pytest.raises(ValueError):
+        subject.air_gap(volume=10, height=2, in_place=True)
+    # height=0 is also not allowed when in_place=True.
+    with pytest.raises(ValueError):
+        subject.air_gap(volume=10, height=0, in_place=True)
+
+
+@pytest.mark.parametrize("api_version", versions_at_or_above(APIVersion(2, 24)))
+def test_air_gap_has_rate(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    mock_protocol_core: ProtocolCore,
+    subject: InstrumentContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """It should use its own rate param."""
+    mock_well = decoy.mock(cls=Well)
+    top_location = Location(point=Point(9, 9, 14), labware=mock_well)
+    last_location = Location(point=Point(9, 9, 9), labware=mock_well)
+    mock_move_to = decoy.mock(func=subject.move_to)
+    monkeypatch.setattr(subject, "move_to", mock_move_to)
+
+    decoy.when(mock_instrument_core.has_tip()).then_return(True)
+    decoy.when(mock_protocol_core.get_last_location()).then_return(last_location)
+    decoy.when(mock_well.top(z=5.0)).then_return(top_location)
+    decoy.when(mock_instrument_core.get_aspirate_flow_rate()).then_return(100)
+
+    subject.air_gap(volume=10, height=5, rate=1.2)
+
+    decoy.verify(mock_move_to(top_location, publish=False))
+    decoy.verify(mock_instrument_core.prepare_to_aspirate())
     decoy.verify(
-        mock_instrument_core.liquid_probe_with_recovery(),  # type: ignore[call-arg]
-        ignore_extra_args=True,
-        times=1,
+        mock_instrument_core.air_gap_in_place(10, 120)
+    )  # 120 is from the flow_rate calculated from the rate * aspirate_flow_rate param
+
+
+@pytest.mark.parametrize("api_version", versions_at_or_above(APIVersion(2, 24)))
+def test_air_gap_has_flow_rate(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    mock_protocol_core: ProtocolCore,
+    subject: InstrumentContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """It should use its own flow_rate param."""
+    mock_well = decoy.mock(cls=Well)
+    top_location = Location(point=Point(9, 9, 14), labware=mock_well)
+    last_location = Location(point=Point(9, 9, 9), labware=mock_well)
+    mock_move_to = decoy.mock(func=subject.move_to)
+    monkeypatch.setattr(subject, "move_to", mock_move_to)
+
+    decoy.when(mock_instrument_core.has_tip()).then_return(True)
+    decoy.when(mock_protocol_core.get_last_location()).then_return(last_location)
+    decoy.when(mock_well.top(z=5.0)).then_return(top_location)
+
+    subject.air_gap(volume=10, height=5, flow_rate=100)
+
+    decoy.verify(mock_move_to(top_location, publish=False))
+    decoy.verify(mock_instrument_core.prepare_to_aspirate())
+    decoy.verify(
+        mock_instrument_core.air_gap_in_place(10, 100)
+    )  # 100 is the flow_rate param
+
+
+def test_air_gap_has_flow_rate_and_rate(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    mock_protocol_core: ProtocolCore,
+    subject: InstrumentContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """It raise an error when rate and flow_rate are specified."""
+    mock_well = decoy.mock(cls=Well)
+    top_location = Location(point=Point(9, 9, 14), labware=mock_well)
+    last_location = Location(point=Point(9, 9, 9), labware=mock_well)
+    mock_move_to = decoy.mock(func=subject.move_to)
+    monkeypatch.setattr(subject, "move_to", mock_move_to)
+
+    decoy.when(mock_instrument_core.has_tip()).then_return(True)
+    decoy.when(mock_protocol_core.get_last_location()).then_return(last_location)
+    decoy.when(mock_well.top(z=5.0)).then_return(top_location)
+    with pytest.raises(ValueError, match="Cannot define both flow_rate and rate."):
+        subject.air_gap(volume=10, height=5, flow_rate=100, rate=5.0)
+
+
+@pytest.mark.parametrize("api_version", versions_at_or_above(APIVersion(2, 24)))
+def test_air_gap_over_trash(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    mock_protocol_core: ProtocolCore,
+    subject: InstrumentContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """It should air gap over a disposal location."""
+    mock_trash = decoy.mock(cls=TrashBin)
+    mock_trash_2 = decoy.mock(cls=TrashBin)
+    mock_move_to = decoy.mock(func=subject.move_to)
+    monkeypatch.setattr(subject, "move_to", mock_move_to)
+
+    decoy.when(mock_instrument_core.has_tip()).then_return(True)
+    decoy.when(mock_protocol_core.get_last_location()).then_return(mock_trash)
+    decoy.when(mock_instrument_core.get_aspirate_flow_rate()).then_return(11)
+    decoy.when(mock_trash.top(11)).then_return(mock_trash_2)
+
+    subject.air_gap(volume=10, height=11)
+
+    decoy.verify(mock_move_to(mock_trash_2, publish=False))
+    decoy.verify(mock_instrument_core.prepare_to_aspirate())
+    decoy.verify(mock_instrument_core.air_gap_in_place(10, 11))
+
+
+@pytest.mark.parametrize(
+    "api_version",
+    versions_between(
+        low_exclusive_bound=APIVersion(2, 13), high_inclusive_bound=APIVersion(2, 23)
+    ),
+)
+def test_air_gap_over_trash_or_waste_chute_raises(
+    decoy: Decoy,
+    mock_instrument_core: InstrumentCore,
+    mock_protocol_core: ProtocolCore,
+    subject: InstrumentContext,
+) -> None:
+    """It should raise if a disposal location is the last accessed on versions below 2.23."""
+    mock_chute = decoy.mock(cls=WasteChute)
+    mock_trash = decoy.mock(cls=TrashBin)
+
+    decoy.when(mock_instrument_core.has_tip()).then_return(True)
+    decoy.when(mock_protocol_core.get_last_location()).then_return(mock_chute)
+
+    with pytest.raises(RuntimeError, match="not valid for air gap"):
+        subject.air_gap(volume=10, height=11)
+
+    decoy.when(mock_protocol_core.get_last_location()).then_return(mock_trash)
+
+    with pytest.raises(RuntimeError, match="not valid for air gap"):
+        subject.air_gap(volume=10, height=11)
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_transfer_liquid_raises_for_invalid_locations(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should raise errors if source or destination is invalid."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    with pytest.raises(ValueError):
+        subject.transfer_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=[],
+            dest=[[mock_well]],
+        )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_transfer_liquid_raises_for_unequal_source_and_dest(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should raise errors if source and destination are not of same length."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    trash_location = Location(point=Point(1, 2, 3), labware=mock_well)
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    mock_nozzle_map = decoy.mock(cls=NozzleMapInterface)
+    decoy.when(mock_nozzle_map.tip_count).then_return(1)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(mock_nozzle_map)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0)
+    with pytest.raises(
+        ValueError, match="Sources and destinations should be of the same length"
+    ):
+        subject.transfer_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=mock_well,
+            dest=[mock_well, mock_well],
+            trash_location=trash_location,
+        )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_transfer_liquid_raises_for_non_liquid_handling_locations(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should raise errors if source or dest are invalid for liquid handling."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    mock_nozzle_map = decoy.mock(cls=NozzleMapInterface)
+    decoy.when(mock_nozzle_map.tip_count).then_return(1)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(mock_nozzle_map)
+    decoy.when(
+        mock_instrument_support.validate_takes_liquid(
+            mock_well.top(), reject_module=True, reject_adapter=True
+        )
+    ).then_raise(ValueError("Uh oh"))
+    with pytest.raises(ValueError, match="Uh oh"):
+        subject.transfer_with_liquid_class(
+            liquid_class=test_liq_class, volume=10, source=[mock_well], dest=[mock_well]
+        )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_transfer_liquid_raises_for_bad_tip_policy(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should raise errors if new_tip is invalid."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    mock_nozzle_map = decoy.mock(cls=NozzleMapInterface)
+    decoy.when(mock_nozzle_map.tip_count).then_return(1)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(mock_nozzle_map)
+    with pytest.raises(ValueError, match="invalid value for 'new_tip'"):
+        subject.transfer_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=[mock_well],
+            dest=[mock_well],
+            new_tip="twice",  # type: ignore[arg-type]
+        )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_transfer_liquid_raises_for_no_tip(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should raise errors if there is no tip attached."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    mock_nozzle_map = decoy.mock(cls=NozzleMapInterface)
+    decoy.when(mock_nozzle_map.tip_count).then_return(1)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(mock_nozzle_map)
+    with pytest.raises(RuntimeError, match="Pipette has no tip"):
+        subject.transfer_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=[mock_well],
+            dest=[mock_well],
+            new_tip="never",
+        )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_transfer_liquid_raises_if_tip_has_liquid(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should raise errors if tip has liquid before starting transfer."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    tip_racks = [decoy.mock(cls=Labware)]
+
+    subject.starting_tip = None
+    subject.tip_racks = tip_racks
+
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(MOCK_MAP)
+    decoy.when(mock_instrument_core.get_active_channels()).then_return(2)
+    decoy.when(
+        labware.next_available_tip(
+            starting_tip=None,
+            tip_racks=tip_racks,
+            channels=2,
+            nozzle_map=MOCK_MAP,
+        )
+    ).then_return((decoy.mock(cls=Labware), decoy.mock(cls=Well)))
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(1000)
+    with pytest.raises(RuntimeError, match="liquid already in the tip"):
+        subject.transfer_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=[mock_well],
+            dest=[mock_well],
+            new_tip="once",
+        )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_transfer_liquid_delegates_to_engine_core(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should delegate the transfer execution to core."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    mock_starting_tip_well = decoy.mock(cls=Well)
+    tip_racks = [decoy.mock(cls=Labware)]
+    trash_location = Location(point=Point(1, 2, 3), labware=mock_well)
+    subject.starting_tip = mock_starting_tip_well
+    subject._tip_racks = tip_racks
+
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(MOCK_MAP)
+    decoy.when(mock_instrument_core.get_active_channels()).then_return(2)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0)
+    decoy.when(mock_instrument_core.get_pipette_name()).then_return("pipette-name")
+    subject.transfer_with_liquid_class(
+        liquid_class=test_liq_class,
+        volume=10,
+        source=[mock_well],
+        dest=[mock_well],
+        new_tip="once",
+        trash_location=trash_location,
+        return_tip=True,
+    )
+    decoy.verify(
+        mock_instrument_core.transfer_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=[(Location(Point(), labware=mock_well), mock_well._core)],
+            dest=[(Location(Point(), labware=mock_well), mock_well._core)],
+            new_tip=TransferTipPolicyV2.ONCE,
+            tip_racks=[(Location(Point(), labware=tip_racks[0]), tip_racks[0]._core)],
+            starting_tip=mock_starting_tip_well._core,
+            trash_location=trash_location,
+            return_tip=True,
+            keep_last_tip=False,
+            tips=None,
+        )
+    )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_transfer_liquid_multi_channel_delegates_to_engine_core(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should delegate the transfer execution to core for a multi-channel pipette."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    decoy.when(mock_well.well_name).then_return("mock well")
+    tip_racks = [decoy.mock(cls=Labware)]
+    trash_location = Location(point=Point(1, 2, 3), labware=mock_well)
+    subject.starting_tip = None
+    subject._tip_racks = tip_racks
+
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    mock_nozzle_map = decoy.mock(cls=NozzleMapInterface)
+    decoy.when(mock_nozzle_map.tip_count).then_return(2)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(mock_nozzle_map)
+    decoy.when(
+        mock_tx_liquid_utils.group_wells_for_multi_channel_transfer(
+            [mock_well, mock_well], mock_nozzle_map, "source"
+        )
+    ).then_return([mock_well])
+    decoy.when(
+        mock_tx_liquid_utils.group_wells_for_multi_channel_transfer(
+            [mock_well, mock_well], mock_nozzle_map, "destination"
+        )
+    ).then_return([mock_well])
+
+    decoy.when(mock_instrument_core.get_active_channels()).then_return(2)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0)
+    decoy.when(mock_instrument_core.get_pipette_name()).then_return("pipette-name")
+    subject.transfer_with_liquid_class(
+        liquid_class=test_liq_class,
+        volume=10,
+        source=[[mock_well, mock_well]],
+        dest=[[mock_well, mock_well]],
+        new_tip="once",
+        trash_location=trash_location,
+        return_tip=True,
+    )
+    decoy.verify(
+        mock_instrument_core.transfer_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=[(Location(Point(), labware=mock_well), mock_well._core)],
+            dest=[(Location(Point(), labware=mock_well), mock_well._core)],
+            new_tip=TransferTipPolicyV2.ONCE,
+            tip_racks=[(Location(Point(), labware=tip_racks[0]), tip_racks[0]._core)],
+            starting_tip=None,
+            trash_location=trash_location,
+            return_tip=True,
+            keep_last_tip=False,
+            tips=None,
+        )
+    )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_transfer_liquid_delegates_to_engine_core_with_trash_destination(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should delegate the transfer execution to core with a trash location as the destination."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    mock_starting_tip_well = decoy.mock(cls=Well)
+    mock_trash = decoy.mock(cls=TrashBin)
+    tip_racks = [decoy.mock(cls=Labware)]
+    trash_location = Location(point=Point(1, 2, 3), labware=mock_well)
+    subject.starting_tip = mock_starting_tip_well
+    subject._tip_racks = tip_racks
+
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(MOCK_MAP)
+    decoy.when(mock_instrument_core.get_active_channels()).then_return(2)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0)
+    decoy.when(mock_instrument_core.get_pipette_name()).then_return("pipette-name")
+    subject.transfer_with_liquid_class(
+        liquid_class=test_liq_class,
+        volume=10,
+        source=[mock_well],
+        dest=mock_trash,
+        new_tip="once",
+        trash_location=trash_location,
+        return_tip=True,
+    )
+    decoy.verify(
+        mock_instrument_core.transfer_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=[(Location(Point(), labware=mock_well), mock_well._core)],
+            dest=mock_trash,
+            new_tip=TransferTipPolicyV2.ONCE,
+            tip_racks=[(Location(Point(), labware=tip_racks[0]), tip_racks[0]._core)],
+            starting_tip=mock_starting_tip_well._core,
+            trash_location=trash_location,
+            return_tip=True,
+            keep_last_tip=False,
+            tips=None,
+        )
+    )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_transfer_liquid_uses_provided_tip_racks(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should use the provided tip racks instead of the assigned ones."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    mock_starting_tip_well = decoy.mock(cls=Well)
+    tip_racks = [decoy.mock(cls=Labware)]
+    trash_location = Location(point=Point(1, 2, 3), labware=mock_well)
+    assigned_tip_rack = decoy.mock(cls=Labware)
+    subject.starting_tip = mock_starting_tip_well
+    subject._tip_racks = tip_racks
+
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(MOCK_MAP)
+    decoy.when(mock_instrument_core.get_active_channels()).then_return(2)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0)
+    decoy.when(mock_instrument_core.get_pipette_name()).then_return("pipette-name")
+    subject.transfer_with_liquid_class(
+        liquid_class=test_liq_class,
+        volume=10,
+        source=[mock_well],
+        dest=[mock_well],
+        new_tip="once",
+        trash_location=trash_location,
+        return_tip=True,
+        tip_racks=[assigned_tip_rack],
+    )
+    decoy.verify(
+        mock_instrument_core.transfer_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=[(Location(Point(), labware=mock_well), mock_well._core)],
+            dest=[(Location(Point(), labware=mock_well), mock_well._core)],
+            new_tip=TransferTipPolicyV2.ONCE,
+            tip_racks=[
+                (Location(Point(), labware=assigned_tip_rack), assigned_tip_rack._core)
+            ],
+            starting_tip=mock_starting_tip_well._core,
+            trash_location=trash_location,
+            return_tip=True,
+            keep_last_tip=False,
+            tips=None,
+        )
+    )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_transfer_liquid_uses_selected_tips(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should use the provided tips for the transfer."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    mock_selected_tip = decoy.mock(cls=Well)
+    selected_tip_tiprack = decoy.mock(cls=Labware)
+    decoy.when(mock_selected_tip.parent).then_return(selected_tip_tiprack)
+
+    trash_location = Location(point=Point(1, 2, 3), labware=mock_well)
+
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(MOCK_MAP)
+    decoy.when(mock_instrument_core.get_active_channels()).then_return(2)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0)
+    decoy.when(mock_instrument_core.get_pipette_name()).then_return("pipette-name")
+    subject.transfer_with_liquid_class(
+        liquid_class=test_liq_class,
+        volume=10,
+        source=[mock_well],
+        dest=[mock_well],
+        new_tip="always",
+        trash_location=trash_location,
+        tips=[mock_selected_tip],
+    )
+    decoy.verify(
+        mock_instrument_core.transfer_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=[(Location(Point(), labware=mock_well), mock_well._core)],
+            dest=[(Location(Point(), labware=mock_well), mock_well._core)],
+            new_tip=TransferTipPolicyV2.ALWAYS,
+            tip_racks=[
+                (
+                    Location(Point(), labware=selected_tip_tiprack),
+                    selected_tip_tiprack._core,
+                )
+            ],
+            starting_tip=None,
+            trash_location=trash_location,
+            return_tip=False,
+            keep_last_tip=False,
+            tips=[mock_selected_tip._core],
+        )
+    )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_distribute_liquid_raises_if_more_than_one_source(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should raise error if source is more than one well."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    trash_location = Location(point=Point(1, 2, 3), labware=mock_well)
+    mock_nozzle_map = decoy.mock(cls=NozzleMapInterface)
+    decoy.when(mock_nozzle_map.tip_count).then_return(1)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(mock_nozzle_map)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0)
+    with pytest.raises(ValueError, match="Source should be a single well"):
+        subject.distribute_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=[mock_well, mock_well],
+            dest=[mock_well],
+            trash_location=trash_location,
+        )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_distribute_liquid_raises_for_non_liquid_handling_locations(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should raise errors if source or dest are invalid for liquid handling."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    mock_nozzle_map = decoy.mock(cls=NozzleMapInterface)
+    decoy.when(mock_nozzle_map.tip_count).then_return(1)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(mock_nozzle_map)
+    decoy.when(
+        mock_instrument_support.validate_takes_liquid(
+            mock_well.top(), reject_module=True, reject_adapter=True
+        )
+    ).then_raise(ValueError("Uh oh"))
+    with pytest.raises(ValueError, match="Uh oh"):
+        subject.distribute_with_liquid_class(
+            liquid_class=test_liq_class, volume=10, source=mock_well, dest=[mock_well]
+        )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_distribute_liquid_raises_for_bad_tip_policy(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should raise errors if new_tip is invalid."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    mock_nozzle_map = decoy.mock(cls=NozzleMapInterface)
+    decoy.when(mock_nozzle_map.tip_count).then_return(1)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(mock_nozzle_map)
+    with pytest.raises(ValueError, match="invalid value for 'new_tip'"):
+        subject.distribute_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=mock_well,
+            dest=[mock_well],
+            new_tip="twice",  # type: ignore[arg-type]
+        )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_distribute_liquid_raises_for_no_tip(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should raise errors if there is no tip attached."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    mock_nozzle_map = decoy.mock(cls=NozzleMapInterface)
+    decoy.when(mock_nozzle_map.tip_count).then_return(1)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(mock_nozzle_map)
+    with pytest.raises(RuntimeError, match="Pipette has no tip"):
+        subject.distribute_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=mock_well,
+            dest=[mock_well],
+            new_tip="never",
+        )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_distribute_liquid_raises_if_tip_has_liquid(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should raise errors if the tip has liquid at the start of distribution."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    tip_racks = [decoy.mock(cls=Labware)]
+
+    subject.starting_tip = None
+    subject.tip_racks = tip_racks
+
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(MOCK_MAP)
+    decoy.when(mock_instrument_core.get_active_channels()).then_return(2)
+    decoy.when(
+        labware.next_available_tip(
+            starting_tip=None,
+            tip_racks=tip_racks,
+            channels=2,
+            nozzle_map=MOCK_MAP,
+        )
+    ).then_return((decoy.mock(cls=Labware), decoy.mock(cls=Well)))
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(1000)
+    with pytest.raises(RuntimeError, match="liquid already in the tip"):
+        subject.distribute_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=mock_well,
+            dest=[mock_well],
+            new_tip="once",
+        )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+@pytest.mark.parametrize("new_tip", ["per source", "per destination"])
+def test_distribute_liquid_raises_for_incompatible_tip_policies(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    new_tip: TransferTipPolicyV2Type,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should raise errors if the tip policy is "per source" or "per destination"."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    trash_location = Location(point=Point(1, 2, 3), labware=mock_well)
+    mock_nozzle_map = decoy.mock(cls=NozzleMapInterface)
+    decoy.when(mock_nozzle_map.tip_count).then_return(1)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(mock_nozzle_map)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0)
+    with pytest.raises(ValueError, match="Incompatible `new_tip` value"):
+        subject.distribute_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=mock_well,
+            dest=[mock_well],
+            new_tip=new_tip,
+            trash_location=trash_location,
+        )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_distribute_liquid_delegates_to_engine_core(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should delegate the distribute execution to core."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    mock_starting_tip_well = decoy.mock(cls=Well)
+    tip_racks = [decoy.mock(cls=Labware)]
+    trash_location = Location(point=Point(1, 2, 3), labware=mock_well)
+    subject.starting_tip = mock_starting_tip_well
+    subject._tip_racks = tip_racks
+
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(MOCK_MAP)
+    decoy.when(mock_instrument_core.get_active_channels()).then_return(2)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0)
+    decoy.when(mock_instrument_core.get_pipette_name()).then_return("pipette-name")
+    subject.distribute_with_liquid_class(
+        liquid_class=test_liq_class,
+        volume=10,
+        source=mock_well,
+        dest=[mock_well],
+        new_tip="once",
+        trash_location=trash_location,
+        return_tip=True,
+    )
+    decoy.verify(
+        mock_instrument_core.distribute_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=(Location(Point(), labware=mock_well), mock_well._core),
+            dest=[(Location(Point(), labware=mock_well), mock_well._core)],
+            new_tip=TransferTipPolicyV2.ONCE,
+            tip_racks=[(Location(Point(), labware=tip_racks[0]), tip_racks[0]._core)],
+            starting_tip=mock_starting_tip_well._core,
+            trash_location=trash_location,
+            return_tip=True,
+            keep_last_tip=False,
+            tips=None,
+        )
+    )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_distribute_liquid_multi_channel_delegates_to_engine_core(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should delegate the distribute execution to core for a multi-channel pipette."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    decoy.when(mock_well.well_name).then_return("mock well")
+    tip_racks = [decoy.mock(cls=Labware)]
+    trash_location = Location(point=Point(1, 2, 3), labware=mock_well)
+    subject.starting_tip = None
+    subject._tip_racks = tip_racks
+
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    mock_nozzle_map = decoy.mock(cls=NozzleMapInterface)
+    decoy.when(mock_nozzle_map.tip_count).then_return(2)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(mock_nozzle_map)
+    decoy.when(
+        mock_tx_liquid_utils.group_wells_for_multi_channel_transfer(
+            [mock_well, mock_well, mock_well], mock_nozzle_map, "source"
+        )
+    ).then_return([mock_well])
+    decoy.when(
+        mock_tx_liquid_utils.group_wells_for_multi_channel_transfer(
+            [mock_well, mock_well], mock_nozzle_map, "destination"
+        )
+    ).then_return([mock_well, mock_well])
+
+    decoy.when(mock_instrument_core.get_active_channels()).then_return(2)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0)
+    decoy.when(mock_instrument_core.get_pipette_name()).then_return("pipette-name")
+    subject.distribute_with_liquid_class(
+        liquid_class=test_liq_class,
+        volume=10,
+        source=[mock_well, mock_well, mock_well],
+        dest=[[mock_well, mock_well]],
+        new_tip="once",
+        trash_location=trash_location,
+        return_tip=True,
+    )
+    decoy.verify(
+        mock_instrument_core.distribute_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=(Location(Point(), labware=mock_well), mock_well._core),
+            dest=[
+                (Location(Point(), labware=mock_well), mock_well._core),
+                (Location(Point(), labware=mock_well), mock_well._core),
+            ],
+            new_tip=TransferTipPolicyV2.ONCE,
+            tip_racks=[(Location(Point(), labware=tip_racks[0]), tip_racks[0]._core)],
+            starting_tip=None,
+            trash_location=trash_location,
+            return_tip=True,
+            keep_last_tip=False,
+            tips=None,
+        )
+    )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_distribute_liquid_uses_provided_tip_racks(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should use the provided tip racks instead of the assigned ones."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    decoy.when(mock_well.well_name).then_return("mock well")
+    tip_racks = [decoy.mock(cls=Labware)]
+    trash_location = Location(point=Point(1, 2, 3), labware=mock_well)
+    assigned_tip_rack = decoy.mock(cls=Labware)
+    subject.starting_tip = None
+    subject._tip_racks = tip_racks
+
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    mock_nozzle_map = decoy.mock(cls=NozzleMapInterface)
+    decoy.when(mock_nozzle_map.tip_count).then_return(2)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(mock_nozzle_map)
+    decoy.when(
+        mock_tx_liquid_utils.group_wells_for_multi_channel_transfer(
+            [mock_well, mock_well, mock_well], mock_nozzle_map, "source"
+        )
+    ).then_return([mock_well])
+    decoy.when(
+        mock_tx_liquid_utils.group_wells_for_multi_channel_transfer(
+            [mock_well, mock_well], mock_nozzle_map, "destination"
+        )
+    ).then_return([mock_well, mock_well])
+
+    decoy.when(mock_instrument_core.get_active_channels()).then_return(2)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0)
+    decoy.when(mock_instrument_core.get_pipette_name()).then_return("pipette-name")
+    subject.distribute_with_liquid_class(
+        liquid_class=test_liq_class,
+        volume=10,
+        source=[mock_well, mock_well, mock_well],
+        dest=[[mock_well, mock_well]],
+        new_tip="once",
+        trash_location=trash_location,
+        return_tip=True,
+        tip_racks=[assigned_tip_rack],
+    )
+    decoy.verify(
+        mock_instrument_core.distribute_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=(Location(Point(), labware=mock_well), mock_well._core),
+            dest=[
+                (Location(Point(), labware=mock_well), mock_well._core),
+                (Location(Point(), labware=mock_well), mock_well._core),
+            ],
+            new_tip=TransferTipPolicyV2.ONCE,
+            tip_racks=[
+                (Location(Point(), labware=assigned_tip_rack), assigned_tip_rack._core)
+            ],
+            starting_tip=None,
+            trash_location=trash_location,
+            return_tip=True,
+            keep_last_tip=False,
+            tips=None,
+        )
+    )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_distribute_liquid_uses_selected_tips(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should use the provided tips for the distribute."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    decoy.when(mock_well.well_name).then_return("mock well")
+    mock_selected_tip = decoy.mock(cls=Well)
+    selected_tip_tiprack = decoy.mock(cls=Labware)
+    decoy.when(mock_selected_tip.parent).then_return(selected_tip_tiprack)
+    trash_location = Location(point=Point(1, 2, 3), labware=mock_well)
+    subject.starting_tip = None
+
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    mock_nozzle_map = decoy.mock(cls=NozzleMapInterface)
+    decoy.when(mock_nozzle_map.tip_count).then_return(2)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(mock_nozzle_map)
+    decoy.when(
+        mock_tx_liquid_utils.group_wells_for_multi_channel_transfer(
+            [mock_well, mock_well, mock_well], mock_nozzle_map, "source"
+        )
+    ).then_return([mock_well])
+    decoy.when(
+        mock_tx_liquid_utils.group_wells_for_multi_channel_transfer(
+            [mock_well, mock_well], mock_nozzle_map, "destination"
+        )
+    ).then_return([mock_well, mock_well])
+    decoy.when(
+        mock_tx_liquid_utils.group_wells_for_multi_channel_transfer(
+            [mock_selected_tip, mock_selected_tip], mock_nozzle_map, "tip"
+        )
+    ).then_return([mock_selected_tip])
+
+    decoy.when(mock_instrument_core.get_active_channels()).then_return(2)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0)
+    decoy.when(mock_instrument_core.get_pipette_name()).then_return("pipette-name")
+    subject.distribute_with_liquid_class(
+        liquid_class=test_liq_class,
+        volume=10,
+        source=[mock_well, mock_well, mock_well],
+        dest=[[mock_well, mock_well]],
+        new_tip="always",
+        trash_location=trash_location,
+        tips=[[mock_selected_tip, mock_selected_tip]],
+    )
+    decoy.verify(
+        mock_instrument_core.distribute_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=(Location(Point(), labware=mock_well), mock_well._core),
+            dest=[
+                (Location(Point(), labware=mock_well), mock_well._core),
+                (Location(Point(), labware=mock_well), mock_well._core),
+            ],
+            new_tip=TransferTipPolicyV2.ALWAYS,
+            tip_racks=[
+                (
+                    Location(Point(), labware=selected_tip_tiprack),
+                    selected_tip_tiprack._core,
+                )
+            ],
+            starting_tip=None,
+            trash_location=trash_location,
+            return_tip=False,
+            keep_last_tip=False,
+            tips=[mock_selected_tip._core],
+        )
+    )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_consolidate_liquid_raises_if_more_than_one_destination(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should raise error if destination is more than one well."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    trash_location = Location(point=Point(1, 2, 3), labware=mock_well)
+    mock_nozzle_map = decoy.mock(cls=NozzleMapInterface)
+    decoy.when(mock_nozzle_map.tip_count).then_return(1)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(mock_nozzle_map)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0)
+    with pytest.raises(ValueError, match="Destination should be a single well"):
+        subject.consolidate_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=[mock_well, mock_well],
+            dest=[mock_well, mock_well],
+            trash_location=trash_location,
+        )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_consolidate_liquid_raises_for_non_liquid_handling_locations(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should raise errors if sources or destination are not a valid liquid handling target."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    mock_nozzle_map = decoy.mock(cls=NozzleMapInterface)
+    decoy.when(mock_nozzle_map.tip_count).then_return(1)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(mock_nozzle_map)
+    decoy.when(
+        mock_instrument_support.validate_takes_liquid(
+            mock_well.top(), reject_module=True, reject_adapter=True
+        )
+    ).then_raise(ValueError("Uh oh"))
+    with pytest.raises(ValueError, match="Uh oh"):
+        subject.consolidate_with_liquid_class(
+            liquid_class=test_liq_class, volume=10, source=[mock_well], dest=mock_well
+        )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_consolidate_liquid_raises_for_bad_tip_policy(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should raise errors if new_tip is invalid."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    mock_nozzle_map = decoy.mock(cls=NozzleMapInterface)
+    decoy.when(mock_nozzle_map.tip_count).then_return(1)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(mock_nozzle_map)
+    with pytest.raises(ValueError, match="invalid value for 'new_tip'"):
+        subject.consolidate_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=[mock_well],
+            dest=mock_well,
+            new_tip="whenever",  # type: ignore[arg-type]
+        )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_consolidate_liquid_raises_for_no_tip(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should raise errors if there is no tip attached."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    mock_nozzle_map = decoy.mock(cls=NozzleMapInterface)
+    decoy.when(mock_nozzle_map.tip_count).then_return(1)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(mock_nozzle_map)
+    with pytest.raises(RuntimeError, match="Pipette has no tip"):
+        subject.consolidate_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=[mock_well],
+            dest=mock_well,
+            new_tip="never",
+        )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_consolidate_liquid_raises_if_tip_has_liquid(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should raise errors if there is liquid in the tip."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    tip_racks = [decoy.mock(cls=Labware)]
+
+    subject.starting_tip = None
+    subject.tip_racks = tip_racks
+
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    mock_nozzle_map = decoy.mock(cls=NozzleMapInterface)
+    decoy.when(mock_nozzle_map.tip_count).then_return(1)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(mock_nozzle_map)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(1000)
+    with pytest.raises(RuntimeError, match="liquid already in the tip"):
+        subject.consolidate_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=[mock_well],
+            dest=mock_well,
+            new_tip="once",
+        )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+@pytest.mark.parametrize("new_tip", ["per source", "per destination"])
+def test_consolidate_liquid_raises_for_incompatible_tip_policies(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    new_tip: TransferTipPolicyV2Type,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should raise errors if the tip policy is "per source" or "per destination"."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    trash_location = Location(point=Point(1, 2, 3), labware=mock_well)
+    mock_nozzle_map = decoy.mock(cls=NozzleMapInterface)
+    decoy.when(mock_nozzle_map.tip_count).then_return(1)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(mock_nozzle_map)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0)
+    with pytest.raises(ValueError, match="Incompatible `new_tip` value."):
+        subject.consolidate_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=[mock_well],
+            dest=mock_well,
+            new_tip=new_tip,
+            trash_location=trash_location,
+        )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_consolidate_liquid_delegates_to_engine_core(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should delegate the consolidate execution to core."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    mock_starting_tip_well = decoy.mock(cls=Well)
+    tip_racks = [decoy.mock(cls=Labware)]
+    trash_location = Location(point=Point(1, 2, 3), labware=mock_well)
+    subject.starting_tip = mock_starting_tip_well
+    subject._tip_racks = tip_racks
+
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(MOCK_MAP)
+    decoy.when(mock_instrument_core.get_active_channels()).then_return(2)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0)
+    decoy.when(mock_instrument_core.get_pipette_name()).then_return("pipette-name")
+
+    subject.consolidate_with_liquid_class(
+        liquid_class=test_liq_class,
+        volume=10,
+        source=[mock_well],
+        dest=mock_well,
+        new_tip="once",
+        trash_location=trash_location,
+        return_tip=True,
+    )
+    decoy.verify(
+        mock_instrument_core.consolidate_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=[(Location(Point(), labware=mock_well), mock_well._core)],
+            dest=(Location(Point(), labware=mock_well), mock_well._core),
+            new_tip=TransferTipPolicyV2.ONCE,
+            tip_racks=[(Location(Point(), labware=tip_racks[0]), tip_racks[0]._core)],
+            starting_tip=mock_starting_tip_well._core,
+            trash_location=trash_location,
+            return_tip=True,
+            keep_last_tip=False,
+            tips=None,
+        )
+    )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_consolidate_liquid_multi_channel_delegates_to_engine_core(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should delegate the consolidate execution to core for a multi-channel pipette."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    decoy.when(mock_well.well_name).then_return("mock well")
+    tip_racks = [decoy.mock(cls=Labware)]
+    trash_location = Location(point=Point(1, 2, 3), labware=mock_well)
+    subject.starting_tip = None
+    subject._tip_racks = tip_racks
+
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    mock_nozzle_map = decoy.mock(cls=NozzleMapInterface)
+    decoy.when(mock_nozzle_map.tip_count).then_return(2)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(mock_nozzle_map)
+    decoy.when(
+        mock_tx_liquid_utils.group_wells_for_multi_channel_transfer(
+            [mock_well, mock_well], mock_nozzle_map, "source"
+        )
+    ).then_return([mock_well, mock_well])
+    decoy.when(
+        mock_tx_liquid_utils.group_wells_for_multi_channel_transfer(
+            [mock_well, mock_well, mock_well], mock_nozzle_map, "destination"
+        )
+    ).then_return([mock_well])
+
+    decoy.when(mock_instrument_core.get_active_channels()).then_return(2)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0)
+    decoy.when(mock_instrument_core.get_pipette_name()).then_return("pipette-name")
+
+    subject.consolidate_with_liquid_class(
+        liquid_class=test_liq_class,
+        volume=10,
+        source=[[mock_well, mock_well]],
+        dest=[mock_well, mock_well, mock_well],
+        new_tip="once",
+        trash_location=trash_location,
+        return_tip=True,
+    )
+    decoy.verify(
+        mock_instrument_core.consolidate_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=[
+                (Location(Point(), labware=mock_well), mock_well._core),
+                (Location(Point(), labware=mock_well), mock_well._core),
+            ],
+            dest=(Location(Point(), labware=mock_well), mock_well._core),
+            new_tip=TransferTipPolicyV2.ONCE,
+            tip_racks=[(Location(Point(), labware=tip_racks[0]), tip_racks[0]._core)],
+            starting_tip=None,
+            trash_location=trash_location,
+            return_tip=True,
+            keep_last_tip=False,
+            tips=None,
+        )
+    )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_consolidate_liquid_delegates_to_engine_core_with_trash_destination(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should delegate the consolidate execution to core."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    mock_starting_tip_well = decoy.mock(cls=Well)
+    mock_waste_chute = decoy.mock(cls=WasteChute)
+    tip_racks = [decoy.mock(cls=Labware)]
+    trash_location = Location(point=Point(1, 2, 3), labware=mock_well)
+    subject.starting_tip = mock_starting_tip_well
+    subject._tip_racks = tip_racks
+
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(MOCK_MAP)
+    decoy.when(mock_instrument_core.get_active_channels()).then_return(2)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0)
+    decoy.when(mock_instrument_core.get_pipette_name()).then_return("pipette-name")
+
+    subject.consolidate_with_liquid_class(
+        liquid_class=test_liq_class,
+        volume=10,
+        source=[mock_well],
+        dest=mock_waste_chute,
+        new_tip="once",
+        trash_location=trash_location,
+        return_tip=True,
+    )
+    decoy.verify(
+        mock_instrument_core.consolidate_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=[(Location(Point(), labware=mock_well), mock_well._core)],
+            dest=mock_waste_chute,
+            new_tip=TransferTipPolicyV2.ONCE,
+            tip_racks=[(Location(Point(), labware=tip_racks[0]), tip_racks[0]._core)],
+            starting_tip=mock_starting_tip_well._core,
+            trash_location=trash_location,
+            return_tip=True,
+            keep_last_tip=False,
+            tips=None,
+        )
+    )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_consolidate_liquid_uses_provided_tip_racks(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should use the provided tip racks instead of the assigned ones."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    mock_starting_tip_well = decoy.mock(cls=Well)
+    tip_racks = [decoy.mock(cls=Labware)]
+    trash_location = Location(point=Point(1, 2, 3), labware=mock_well)
+    assigned_tip_rack = decoy.mock(cls=Labware)
+    subject.starting_tip = mock_starting_tip_well
+    subject._tip_racks = tip_racks
+
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(MOCK_MAP)
+    decoy.when(mock_instrument_core.get_active_channels()).then_return(2)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0)
+    decoy.when(mock_instrument_core.get_pipette_name()).then_return("pipette-name")
+
+    subject.consolidate_with_liquid_class(
+        liquid_class=test_liq_class,
+        volume=10,
+        source=[mock_well],
+        dest=mock_well,
+        new_tip="once",
+        trash_location=trash_location,
+        return_tip=True,
+        tip_racks=[assigned_tip_rack],
+    )
+    decoy.verify(
+        mock_instrument_core.consolidate_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=[(Location(Point(), labware=mock_well), mock_well._core)],
+            dest=(Location(Point(), labware=mock_well), mock_well._core),
+            new_tip=TransferTipPolicyV2.ONCE,
+            tip_racks=[
+                (Location(Point(), labware=assigned_tip_rack), assigned_tip_rack._core)
+            ],
+            starting_tip=mock_starting_tip_well._core,
+            trash_location=trash_location,
+            return_tip=True,
+            keep_last_tip=False,
+            tips=None,
+        )
+    )
+
+
+@pytest.mark.parametrize("robot_type", ["OT-2 Standard", "OT-3 Standard"])
+def test_consolidate_liquid_uses_selected_tips(
+    decoy: Decoy,
+    mock_protocol_core: ProtocolCore,
+    mock_instrument_core: InstrumentCore,
+    subject: InstrumentContext,
+    robot_type: RobotType,
+    minimal_liquid_class_def2: LiquidClassSchemaV1,
+) -> None:
+    """It should use the provided tips for the consolidate."""
+    test_liq_class = LiquidClass.create(minimal_liquid_class_def2)
+    mock_well = decoy.mock(cls=Well)
+    mock_selected_tip = decoy.mock(cls=Well)
+    selected_tip_tiprack = decoy.mock(cls=Labware)
+    decoy.when(mock_selected_tip.parent).then_return(selected_tip_tiprack)
+    trash_location = Location(point=Point(1, 2, 3), labware=mock_well)
+    subject.starting_tip = None
+
+    decoy.when(mock_protocol_core.robot_type).then_return(robot_type)
+    decoy.when(mock_instrument_core.get_nozzle_map()).then_return(MOCK_MAP)
+    decoy.when(mock_instrument_core.get_active_channels()).then_return(2)
+    decoy.when(mock_instrument_core.get_current_volume()).then_return(0)
+    decoy.when(mock_instrument_core.get_pipette_name()).then_return("pipette-name")
+
+    subject.consolidate_with_liquid_class(
+        liquid_class=test_liq_class,
+        volume=10,
+        source=[mock_well],
+        dest=mock_well,
+        new_tip="once",
+        trash_location=trash_location,
+        tips=[mock_selected_tip],
+    )
+    decoy.verify(
+        mock_instrument_core.consolidate_with_liquid_class(
+            liquid_class=test_liq_class,
+            volume=10,
+            source=[(Location(Point(), labware=mock_well), mock_well._core)],
+            dest=(Location(Point(), labware=mock_well), mock_well._core),
+            new_tip=TransferTipPolicyV2.ONCE,
+            tip_racks=[
+                (
+                    Location(Point(), labware=selected_tip_tiprack),
+                    selected_tip_tiprack._core,
+                )
+            ],
+            starting_tip=None,
+            trash_location=trash_location,
+            return_tip=False,
+            keep_last_tip=False,
+            tips=[mock_selected_tip._core],
+        )
     )

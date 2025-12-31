@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from copy import deepcopy
 from typing import (
     Callable,
     Dict,
@@ -10,21 +11,29 @@ from typing import (
     Union,
     Mapping,
     cast,
+    Tuple,
 )
 
 from opentrons_shared_data.labware.types import LabwareDefinition
+from opentrons_shared_data.liquid_classes.liquid_class_definition import (
+    TransferProperties as SharedTransferProperties,
+)
+from opentrons_shared_data.liquid_classes import DEFAULT_LC_VERSION, definition_exists
+from opentrons_shared_data.liquid_classes.types import TransferPropertiesDict
 from opentrons_shared_data.pipette.types import PipetteNameType
-from opentrons_shared_data.robot.types import RobotTypeEnum
 
 from opentrons.types import Mount, Location, DeckLocation, DeckSlotName, StagingSlotName
-from opentrons.config import feature_flags
 from opentrons.legacy_broker import LegacyBroker
 from opentrons.hardware_control.modules.types import (
     MagneticBlockModel,
     AbsorbanceReaderModel,
+    FlexStackerModuleModel,
 )
 from opentrons.legacy_commands import protocol_commands as cmds, types as cmd_types
-from opentrons.legacy_commands.helpers import stringify_labware_movement_command
+from opentrons.legacy_commands.helpers import (
+    stringify_labware_movement_command,
+    stringify_lid_movement_command,
+)
 from opentrons.legacy_commands.publisher import (
     CommandPublisher,
     publish,
@@ -45,6 +54,8 @@ from opentrons.protocols.api_support.util import (
     UnsupportedAPIError,
 )
 from opentrons_shared_data.errors.exceptions import CommandPreconditionViolated
+from opentrons.protocol_engine.errors import LabwareMovementNotAllowedError
+from ._liquid_properties import build_transfer_properties
 
 from ._types import OffDeckType
 from .core.common import ModuleCore, LabwareCore, ProtocolCore
@@ -57,6 +68,7 @@ from .core.module import (
     AbstractHeaterShakerCore,
     AbstractMagneticBlockCore,
     AbstractAbsorbanceReaderCore,
+    AbstractFlexStackerCore,
 )
 from .robot_context import RobotContext, HardwareManager
 from .core.engine import ENGINE_CORE_API_VERSION
@@ -75,8 +87,10 @@ from .module_contexts import (
     HeaterShakerContext,
     MagneticBlockContext,
     AbsorbanceReaderContext,
+    FlexStackerContext,
     ModuleContext,
 )
+from .tasks import Task
 from ._parameters import Parameters
 
 
@@ -90,6 +104,7 @@ ModuleTypes = Union[
     HeaterShakerContext,
     MagneticBlockContext,
     AbsorbanceReaderContext,
+    FlexStackerContext,
 ]
 
 
@@ -185,7 +200,15 @@ class ProtocolContext(CommandPublisher):
         self._commands: List[str] = []
         self._params: Parameters = Parameters()
         self._unsubscribe_commands: Optional[Callable[[], None]] = None
-        self._robot = RobotContext(self._core)
+        try:
+            self._robot: Optional[RobotContext] = RobotContext(
+                core=self._core.load_robot(),
+                protocol_core=self._core,
+                api_version=self._api_version,
+                broker=broker,
+            )
+        except APIVersionError:
+            self._robot = None
         self.clear_commands()
 
     @property
@@ -211,12 +234,11 @@ class ProtocolContext(CommandPublisher):
         return self._api_version
 
     @property
-    @requires_version(2, 21)
+    @requires_version(2, 22)
     def robot(self) -> RobotContext:
-        """The :py:class:`.RobotContext` for the protocol.
-
-        :meta private:
-        """
+        """The :py:class:`.RobotContext` for the protocol."""
+        if self._core.robot_type != "OT-3 Standard" or not self._robot:
+            raise RobotTypeError("The RobotContext is only available on Flex robots.")
         return self._robot
 
     @property
@@ -228,7 +250,9 @@ class ProtocolContext(CommandPublisher):
             "This function will be deprecated in later versions."
             "Please use with caution."
         )
-        return self._robot.hardware
+        if self._robot:
+            return self._robot.hardware
+        return HardwareManager(hardware=self._core.get_hardware())
 
     @property
     @requires_version(2, 0)
@@ -312,23 +336,24 @@ class ProtocolContext(CommandPublisher):
         if self._unsubscribe_commands:
             self._unsubscribe_commands()
 
-        def on_command(message: cmd_types.CommandMessage) -> None:
-            payload = message.get("payload")
-
-            if payload is None:
-                return
-
-            text = payload.get("text")
-
-            if text is None:
-                return
-
-            if message["$"] == "before":
-                self._commands.append(text)
-
         self._unsubscribe_commands = self.broker.subscribe(
-            cmd_types.COMMAND, on_command
+            cmd_types.COMMAND, self._on_command_callback
         )
+
+    def _on_command_callback(self, message: cmd_types.CommandMessage) -> None:
+        """Callback for command messages."""
+        payload = message.get("payload")
+
+        if payload is None:
+            return
+
+        text = payload.get("text")
+
+        if text is None:
+            return
+
+        if message["$"] == "before":
+            self._commands.append(text)
 
     @requires_version(2, 0)
     def is_simulating(self) -> bool:
@@ -379,7 +404,7 @@ class ProtocolContext(CommandPublisher):
         )
 
     @requires_version(2, 0)
-    def load_labware(
+    def load_labware(  # noqa: C901
         self,
         load_name: str,
         location: Union[DeckLocation, OffDeckType],
@@ -387,6 +412,12 @@ class ProtocolContext(CommandPublisher):
         namespace: Optional[str] = None,
         version: Optional[int] = None,
         adapter: Optional[str] = None,
+        lid: Optional[str] = None,
+        *,
+        adapter_namespace: Optional[str] = None,
+        adapter_version: Optional[int] = None,
+        lid_namespace: Optional[str] = None,
+        lid_version: Optional[int] = None,
     ) -> Labware:
         """Load a labware onto a location.
 
@@ -427,19 +458,90 @@ class ProtocolContext(CommandPublisher):
         :param version: The version of the labware definition. You should normally
             leave this unspecified to let ``load_labware()`` choose a version
             automatically.
-        :param adapter: An adapter to load the labware on top of. Accepts the same
-            values as the ``load_name`` parameter of :py:meth:`.load_adapter`. The
-            adapter will use the same namespace as the labware, and the API will
-            choose the adapter's version automatically.
 
-                        .. versionadded:: 2.15
+        :param adapter: The load name of an adapter to load the labware on top of. Accepts
+            the same values as the ``load_name`` parameter of :py:meth:`.load_adapter`.
+
+            .. versionadded:: 2.15
+
+        :param adapter_namespace: The namespace of the adapter being loaded.
+            Applies to ``adapter`` the same way that ``namespace`` applies to ``load_name``.
+
+            .. versionchanged:: 2.26
+               ``adapter_namespace`` may now be specified explicitly.
+               When you've specified ``namespace`` for ``load_name`` but not ``adapter_namespace``,
+               ``adapter_namespace`` now independently follows the same search rules
+               described in ``namespace``. Formerly, it took the exact ``namespace`` value.
+
+        :param adapter_version: The version of the adapter being loaded.
+            Applies to ``adapter`` the same way that ``version`` applies to ``load_name``.
+
+            .. versionchanged:: 2.26
+               ``adapter_version`` may now be specified explicitly. When unspecified, the API uses the newest version available for your protocol's API level.
+
+        :param lid: A lid to load on the top of the main labware. Accepts the same
+            values as the ``load_name`` parameter of :py:meth:`.load_lid_stack`. The
+            lid will use the same namespace as the labware, and the API will
+            choose the lid's version automatically.
+
+            .. versionadded:: 2.23
+
+        :param lid_namespace: The namespace of the lid being loaded.
+            Applies to ``lid`` the same way that ``namespace`` applies to ``load_name``.
+
+            .. versionchanged:: 2.26
+               ``lid_namespace`` may now be specified explicitly.
+               When you've specified ``namespace`` for ``load_name`` but not ``lid_namespace``,
+               ``lid_namespace`` now independently follows the same search rules
+               described in ``namespace``. Formerly, it took the exact ``namespace`` value.
+
+        :param lid_version: The version of the adapter being loaded.
+            Applies to ``lid`` the same way that ``version`` applies to ``load_name``.
+
+            .. versionchanged:: 2.26
+               ``lid_version`` may now be specified explicitly. When unspecified, the API uses the newest version available for your protocol's API level.
         """
+
         if isinstance(location, OffDeckType) and self._api_version < APIVersion(2, 15):
             raise APIVersionError(
                 api_element="Loading a labware off-deck",
                 until_version="2.15",
                 current_version=f"{self._api_version}",
             )
+
+        if self._api_version < validation.NAMESPACE_VERSION_ADAPTER_LID_VERSION_GATE:
+            if adapter_namespace is not None:
+                raise APIVersionError(
+                    api_element="The `adapter_namespace` parameter",
+                    until_version=str(
+                        validation.NAMESPACE_VERSION_ADAPTER_LID_VERSION_GATE
+                    ),
+                    current_version=str(self._api_version),
+                )
+            if adapter_version is not None:
+                raise APIVersionError(
+                    api_element="The `adapter_version` parameter",
+                    until_version=str(
+                        validation.NAMESPACE_VERSION_ADAPTER_LID_VERSION_GATE
+                    ),
+                    current_version=str(self._api_version),
+                )
+            if lid_namespace is not None:
+                raise APIVersionError(
+                    api_element="The `lid_namespace` parameter",
+                    until_version=str(
+                        validation.NAMESPACE_VERSION_ADAPTER_LID_VERSION_GATE
+                    ),
+                    current_version=str(self._api_version),
+                )
+            if lid_version is not None:
+                raise APIVersionError(
+                    api_element="The `lid_version` parameter",
+                    until_version=str(
+                        validation.NAMESPACE_VERSION_ADAPTER_LID_VERSION_GATE
+                    ),
+                    current_version=str(self._api_version),
+                )
 
         load_name = validation.ensure_lowercase_name(load_name)
         load_location: Union[OffDeckType, DeckSlotName, StagingSlotName, LabwareCore]
@@ -450,10 +552,22 @@ class ProtocolContext(CommandPublisher):
                     until_version="2.15",
                     current_version=f"{self._api_version}",
                 )
+
+            if (
+                self._api_version
+                < validation.NAMESPACE_VERSION_ADAPTER_LID_VERSION_GATE
+            ):
+                checked_adapter_namespace = namespace
+                checked_adapter_version = None
+            else:
+                checked_adapter_namespace = adapter_namespace
+                checked_adapter_version = adapter_version
+
             loaded_adapter = self.load_adapter(
                 load_name=adapter,
                 location=location,
-                namespace=namespace,
+                namespace=checked_adapter_namespace,
+                version=checked_adapter_version,
             )
             load_location = loaded_adapter._core
         elif isinstance(location, OffDeckType):
@@ -466,10 +580,35 @@ class ProtocolContext(CommandPublisher):
         labware_core = self._core.load_labware(
             load_name=load_name,
             location=load_location,
-            label=label,
+            label=label if label is None else str(label),
             namespace=namespace,
             version=version,
         )
+
+        if lid is not None:
+            if self._api_version < validation.LID_STACK_VERSION_GATE:
+                raise APIVersionError(
+                    api_element="Loading a Lid on a Labware",
+                    until_version=f"{validation.LID_STACK_VERSION_GATE}",
+                    current_version=f"{self._api_version}",
+                )
+
+            if (
+                self._api_version
+                < validation.NAMESPACE_VERSION_ADAPTER_LID_VERSION_GATE
+            ):
+                checked_lid_namespace = namespace
+                checked_lid_version = version
+            else:
+                checked_lid_namespace = lid_namespace
+                checked_lid_version = lid_version
+
+            self._core.load_lid(
+                load_name=lid,
+                location=labware_core,
+                namespace=checked_lid_namespace,
+                version=checked_lid_version,
+            )
 
         labware = Labware(
             core=labware_core,
@@ -668,7 +807,7 @@ class ProtocolContext(CommandPublisher):
         self,
         labware: Labware,
         new_location: Union[
-            DeckLocation, Labware, ModuleTypes, OffDeckType, WasteChute
+            DeckLocation, Labware, ModuleTypes, OffDeckType, WasteChute, TrashBin
         ],
         use_gripper: bool = False,
         pick_up_offset: Optional[Mapping[str, float]] = None,
@@ -713,7 +852,8 @@ class ProtocolContext(CommandPublisher):
                 f"Expected labware of type 'Labware' but got {type(labware)}."
             )
 
-        # Ensure that when moving to an absorbance reader than the lid is open
+        # Ensure that when moving to an absorbance reader that the lid is open
+        # todo(mm, 2024-11-08): Unify this with opentrons.protocol_api.core.engine.deck_conflict.
         if isinstance(new_location, AbsorbanceReaderContext):
             if new_location.is_lid_on():
                 raise CommandPreconditionViolated(
@@ -727,11 +867,19 @@ class ProtocolContext(CommandPublisher):
             OffDeckType,
             DeckSlotName,
             StagingSlotName,
+            TrashBin,
         ]
         if isinstance(new_location, (Labware, ModuleContext)):
             location = new_location._core
         elif isinstance(new_location, (OffDeckType, WasteChute)):
             location = new_location
+        elif isinstance(new_location, TrashBin):
+            if labware._core.is_lid():
+                location = new_location
+            else:
+                raise LabwareMovementNotAllowedError(
+                    "Can only dispose of tips and Lid-type labware in a Trash Bin. Did you mean to use a Waste Chute?"
+                )
         else:
             location = validation.ensure_and_convert_deck_slot(
                 new_location, self._api_version, self._core.robot_type
@@ -819,6 +967,10 @@ class ProtocolContext(CommandPublisher):
 
                   .. versionchanged:: 2.15
                     Added ``MagneticBlockContext`` return value.
+
+                  .. TODO uncomment when 2.23 is ready
+                    versionchanged:: 2.23
+                    Added ``FlexStackerModuleContext`` return value.
         """
         if configuration:
             if self._api_version < APIVersion(2, 4):
@@ -847,7 +999,18 @@ class ProtocolContext(CommandPublisher):
             requested_model, AbsorbanceReaderModel
         ) and self._api_version < APIVersion(2, 21):
             raise APIVersionError(
-                f"Module of type {module_name} is only available in versions 2.21 and above."
+                api_element=f"Module of type {module_name}",
+                until_version="2.21",
+                current_version=f"{self._api_version}",
+            )
+        if (
+            isinstance(requested_model, FlexStackerModuleModel)
+            and self._api_version < validation.FLEX_STACKER_VERSION_GATE
+        ):
+            raise APIVersionError(
+                api_element=f"Module of type {module_name}",
+                until_version=f"{validation.FLEX_STACKER_VERSION_GATE}",
+                current_version=f"{self._api_version}",
             )
 
         deck_slot = (
@@ -858,7 +1021,11 @@ class ProtocolContext(CommandPublisher):
             )
         )
         if isinstance(deck_slot, StagingSlotName):
-            raise ValueError("Cannot load a module onto a staging slot.")
+            # flex stacker modules can only be loaded into staging slot inside a protocol
+            if isinstance(requested_model, FlexStackerModuleModel):
+                deck_slot = validation.convert_flex_stacker_load_slot(deck_slot)
+            else:
+                raise ValueError(f"Cannot load {module_name} onto a staging slot.")
 
         module_core = self._core.load_module(
             model=requested_model,
@@ -946,7 +1113,10 @@ class ProtocolContext(CommandPublisher):
             mount, checked_instrument_name
         )
 
-        is_96_channel = checked_instrument_name == PipetteNameType.P1000_96
+        is_96_channel = checked_instrument_name in [
+            PipetteNameType.P1000_96,
+            PipetteNameType.P200_96,
+        ]
 
         tip_racks = tip_racks or []
 
@@ -1013,6 +1183,7 @@ class ProtocolContext(CommandPublisher):
             tip_racks=tip_racks,
             trash=trash,
             requested_as=instrument_name,
+            core_map=self._core_map,
         )
 
         self._instruments[checked_mount] = instrument
@@ -1113,15 +1284,46 @@ class ProtocolContext(CommandPublisher):
         delay_time = seconds + minutes * 60
         self._core.delay(seconds=delay_time, msg=msg)
 
+    @publish(command=cmds.wait_for_tasks)
+    @requires_version(2, 27)
+    def wait_for_tasks(self, tasks: list[Task]) -> None:
+        """Wait for a list of tasks to complete before executing subsequent commands.
+
+        :param list Task: tasks: A list of :py:class:`Task` objects to wait for.
+
+        Task objects can be commands that are allowed to run concurrently.
+        """
+        task_cores = [task._core for task in tasks]
+        self._core.wait_for_tasks(task_cores)
+
+    @publish(command=cmds.create_timer)
+    @requires_version(2, 27)
+    def create_timer(self, seconds: float) -> Task:
+        """Create a timer :py:class:`Task` that runs in the background.
+
+        :param float seconds: The time to delay in seconds.
+
+        This timer will continue to run until it is complete and will not block subsequent commands.
+        """
+        task_core = self._core.create_timer(seconds=seconds)
+        return Task(core=task_core, api_version=self._api_version)
+
     @requires_version(2, 0)
     def home(self) -> None:
         """Home the movement system of the robot."""
         self._core.home()
 
     @property
-    def location_cache(self) -> Optional[Location]:
-        """The cache used by the robot to determine where it last was."""
-        return self._core.get_last_location()
+    def location_cache(self) -> Optional[Union[Location, TrashBin, WasteChute]]:
+        """The cache used by the robot to determine where it last was.
+
+        .. versionchanged:: 2.24
+           Can return a ``TrashBin`` or ``WasteChute`` object.
+        """
+        last_loc = self._core.get_last_location()
+        if isinstance(last_loc, Location) or self._api_version >= APIVersion(2, 24):
+            return last_loc
+        return None
 
     @location_cache.setter
     def location_cache(self, loc: Optional[Location]) -> None:
@@ -1263,8 +1465,8 @@ class ProtocolContext(CommandPublisher):
             if self._api_version < desc_and_display_color_omittable_since:
                 raise APIVersionError(
                     api_element="Calling `define_liquid()` without a `description`",
-                    current_version=str(self._api_version),
-                    until_version=str(desc_and_display_color_omittable_since),
+                    until_version=f"{desc_and_display_color_omittable_since}",
+                    current_version=f"{self._api_version}",
                     extra_message="Use a newer API version or explicitly supply `description=None`.",
                 )
             else:
@@ -1273,8 +1475,8 @@ class ProtocolContext(CommandPublisher):
             if self._api_version < desc_and_display_color_omittable_since:
                 raise APIVersionError(
                     api_element="Calling `define_liquid()` without a `display_color`",
-                    current_version=str(self._api_version),
-                    until_version=str(desc_and_display_color_omittable_since),
+                    until_version=f"{desc_and_display_color_omittable_since}",
+                    current_version=f"{self._api_version}",
                     extra_message="Use a newer API version or explicitly supply `display_color=None`.",
                 )
             else:
@@ -1286,17 +1488,75 @@ class ProtocolContext(CommandPublisher):
             display_color=display_color,
         )
 
+    @requires_version(2, 24)
+    def get_liquid_class(
+        self,
+        name: str,
+        version: Optional[int] = None,
+    ) -> LiquidClass:
+        """
+        Get an instance of an Opentrons-verified liquid class for use in a Flex protocol.
+
+        :param name: Name of an Opentrons-verified liquid class. Must be one of:
+
+            - ``"water"``: an Opentrons-verified liquid class based on deionized water.
+            - ``"glycerol_50"``: an Opentrons-verified liquid class for viscous liquid. Based on 50% glycerol.
+            - ``"ethanol_80"``: an Opentrons-verified liquid class for volatile liquid. Based on 80% ethanol.
+        :param version: Version of the liquid class to retrieve. If left unspecified, defaults to the latest version for the
+            protocol's API level.
+
+        :raises: ``LiquidClassDefinitionDoesNotExist``: if the specified liquid class does not exist.
+
+        :returns: A new LiquidClass object.
+        """
+        return self._core.get_liquid_class(name=name, version=version)
+
+    @requires_version(2, 24)
     def define_liquid_class(
         self,
         name: str,
+        properties: Dict[str, Dict[str, TransferPropertiesDict]],
+        base_liquid_class: Optional[LiquidClass] = None,
+        display_name: Optional[str] = None,
     ) -> LiquidClass:
-        """Define a liquid class for use in the protocol."""
-        if feature_flags.allow_liquid_classes(
-            robot_type=RobotTypeEnum.robot_literal_to_enum(self._core.robot_type)
-        ):
-            return self._core.define_liquid_class(name=name)
+        """Define a custom liquid class, either based on an existing liquid class, or create a completely new one.
+
+        :param name: The name to give to the new liquid class. Cannot use the name of an Opentrons-verified liquid class.
+        :param properties: A dict of transfer properties for pipette and tip combinations to use for liquid class transfers. The nested dictionary must have top-level keys corresponding to pipette load names and second-level keys corresponding to compatible tip rack load names. Further nested key–value pairs should be as specified in ``TransferPropertiesDict``. See the  `liquid class type definitions <https://github.com/Opentrons/opentrons/blob/edge/shared-data/python/opentrons_shared_data/liquid_classes/types.py>`_.
+
+        :param base_liquid_class: An existing liquid class object to base the newly defined liquid class on. The specified ``transfer_properties`` will override any existing properties for the specified pipette and tip combinations. All other properties will remain the same as those in the base class.
+
+        :param display_name: An optional name for the liquid class. Defaults to the title-case ``name`` if a display name isn't provided.
+
+        :returns: A new LiquidClass object.
+        """
+        if definition_exists(name, DEFAULT_LC_VERSION):
+            raise ValueError(
+                f"Liquid class named {name} already exists. Please specify a different name."
+            )
+        new_liquid_class: LiquidClass
+        if base_liquid_class:
+            # If base liquid is provided, copy to new class
+            # and replace the entries mentioned in transfer props arg
+            new_liquid_class = deepcopy(base_liquid_class)
         else:
-            raise NotImplementedError("This method is not implemented.")
+            new_liquid_class = LiquidClass.create_from(
+                name=name,
+                display_name=display_name or name.title(),
+                by_pipette_setting={},
+            )
+        for pipette, by_tiprack_props in properties.items():
+            for tiprack, transfer_props in by_tiprack_props.items():
+                new_liquid_class.update_for(
+                    pipette=pipette,
+                    tip_rack=tiprack,
+                    transfer_properties=build_transfer_properties(
+                        transfer_properties=SharedTransferProperties.model_validate(
+                            transfer_props
+                        )
+                    ),
+                )
+        return new_liquid_class
 
     @property
     @requires_version(2, 5)
@@ -1309,6 +1569,303 @@ class ProtocolContext(CommandPublisher):
     def door_closed(self) -> bool:
         """Returns ``True`` if the front door of the robot is closed."""
         return self._core.door_closed()
+
+    @requires_version(2, 23)
+    def load_lid_stack(
+        self,
+        load_name: str,
+        location: Union[DeckLocation, Labware],
+        quantity: int,
+        adapter: Optional[str] = None,
+        namespace: Optional[str] = None,
+        version: Optional[int] = None,
+        *,
+        adapter_namespace: Optional[str] = None,
+        adapter_version: Optional[int] = None,
+    ) -> Labware:
+        """
+        Load a stack of Opentrons Tough Auto-Sealing Lids onto a valid deck location or adapter.
+
+        :param str load_name: A string to use for looking up a lid definition.
+            You can find the ``load_name`` for any compatible lid on the Opentrons
+            `Labware Library <https://labware.opentrons.com>`_.
+
+        :param location: Either a :ref:`deck slot <deck-slots>`,
+            like ``1``, ``"1"``, or ``"D1"``, or a valid Opentrons Adapter.
+
+        :param int quantity: The quantity of lids to be loaded in the stack.
+
+        :param adapter: An adapter to load the lid stack on top of. Accepts the same
+            values as the ``load_name`` parameter of :py:meth:`.load_adapter`. The
+            adapter will use the same namespace as the lid labware, and the API will
+            choose the adapter's version automatically.
+
+        :param str namespace: The namespace that the lid labware definition belongs to.
+            If unspecified, the API will automatically search two namespaces:
+
+              - ``"opentrons"``, to load standard Opentrons labware definitions.
+              - ``"custom_beta"``, to load custom labware definitions created with the
+                `Custom Labware Creator <https://labware.opentrons.com/create>`__.
+
+            You might need to specify an explicit ``namespace`` if you have a custom
+            definition whose ``load_name`` is the same as an Opentrons-verified
+            definition, and you want to explicitly choose one or the other.
+
+        :param version: The version of the labware definition. You should normally
+            leave this unspecified to let ``load_lid_stack()`` choose a version
+            automatically.
+
+        :param adapter_namespace: The namespace of the adapter being loaded.
+            Applies to ``adapter`` the same way that ``namespace`` applies to ``load_name``.
+
+            .. versionchanged:: 2.26
+               ``adapter_namespace`` may now be specified explicitly.
+                When you've specified ``namespace`` for ``load_name`` but not ``adapter_namespace``,
+               ``adapter_namespace`` now independently follows the same search rules
+               described in ``namespace``. Formerly, it took the exact ``namespace`` value.
+
+        :param adapter_version: The version of the adapter being loaded.
+            Applies to ``adapter`` the same way that ``version`` applies to ``load_name``.
+
+            .. versionadded:: 2.26
+               ``adapter_version`` may now be specified explicitly.
+
+        :return:  The initialized and loaded labware object representing the lid stack.
+
+        .. versionadded:: 2.23
+
+        """
+        if self._api_version < validation.LID_STACK_VERSION_GATE:
+            raise APIVersionError(
+                api_element="Loading a Lid Stack",
+                until_version=f"{validation.LID_STACK_VERSION_GATE}",
+                current_version=f"{self._api_version}",
+            )
+
+        if self._api_version < validation.NAMESPACE_VERSION_ADAPTER_LID_VERSION_GATE:
+            if adapter_namespace is not None:
+                raise APIVersionError(
+                    api_element="The `adapter_namespace` parameter",
+                    until_version=str(
+                        validation.NAMESPACE_VERSION_ADAPTER_LID_VERSION_GATE
+                    ),
+                    current_version=str(self._api_version),
+                )
+            if adapter_version is not None:
+                raise APIVersionError(
+                    api_element="The `adapter_version` parameter",
+                    until_version=str(
+                        validation.NAMESPACE_VERSION_ADAPTER_LID_VERSION_GATE
+                    ),
+                    current_version=str(self._api_version),
+                )
+
+        load_location: Union[DeckSlotName, StagingSlotName, LabwareCore]
+        if isinstance(location, Labware):
+            load_location = location._core
+        else:
+            load_location = validation.ensure_and_convert_deck_slot(
+                location, self._api_version, self._core.robot_type
+            )
+
+        if adapter is not None:
+            if isinstance(load_location, DeckSlotName) or isinstance(
+                load_location, StagingSlotName
+            ):
+                if (
+                    self._api_version
+                    < validation.NAMESPACE_VERSION_ADAPTER_LID_VERSION_GATE
+                ):
+                    checked_adapter_namespace = namespace
+                    checked_adapter_version = None
+                else:
+                    checked_adapter_namespace = adapter_namespace
+                    checked_adapter_version = adapter_version
+
+                loaded_adapter = self.load_adapter(
+                    load_name=adapter,
+                    location=load_location.value,
+                    namespace=checked_adapter_namespace,
+                    version=checked_adapter_version,
+                )
+                load_location = loaded_adapter._core
+            else:
+                raise ValueError(
+                    "Location cannot be a Labware or Adapter when the 'adapter' field is not None."
+                )
+
+        load_name = validation.ensure_lowercase_name(load_name)
+
+        result = self._core.load_lid_stack(
+            load_name=load_name,
+            location=load_location,
+            quantity=quantity,
+            namespace=namespace,
+            version=version,
+        )
+
+        labware = Labware(
+            core=result,
+            api_version=self._api_version,
+            protocol_core=self._core,
+            core_map=self._core_map,
+        )
+        return labware
+
+    @requires_version(2, 23)
+    def move_lid(
+        self,
+        source_location: Union[DeckLocation, Labware],
+        new_location: Union[DeckLocation, Labware, OffDeckType, WasteChute, TrashBin],
+        use_gripper: bool = False,
+        pick_up_offset: Optional[Mapping[str, float]] = None,
+        drop_offset: Optional[Mapping[str, float]] = None,
+    ) -> Labware | None:
+        """Move a compatible lid from a valid source to a new location. Can return a lid stack if one is created.
+
+        :param source_location: The lid's starting location. This is either:
+
+                * A deck slot like ``1``, ``"1"``, or ``"D1"``. See :ref:`deck-slots`.
+                * A labware or adapter that's already been loaded on the deck
+                  with :py:meth:`load_labware` or :py:meth:`load_adapter`.
+                * A lid stack that's already been loaded on the deck with
+                  with :py:meth:`load_lid_stack`.
+
+        :param new_location: Where to move the lid to. This is either:
+
+                * A deck slot like ``1``, ``"1"``, or ``"D1"``. See :ref:`deck-slots`.
+                * A hardware module that's already been loaded on the deck
+                  with :py:meth:`load_module`.
+                * A labware or adapter that's already been loaded on the deck
+                  with :py:meth:`load_labware` or :py:meth:`load_adapter`.
+                * The special constant :py:obj:`OFF_DECK`.
+
+        :param use_gripper: Whether to use the Flex Gripper to move the lid.
+
+                * If ``True``, use the gripper to perform an automatic
+                  movement. This will raise an error in an OT-2 protocol.
+                * If ``False``, pause protocol execution until the user
+                  performs the movement. Protocol execution remains paused until
+                  the user presses **Confirm and resume**.
+
+        Gripper-only parameters:
+
+        :param pick_up_offset: Optional x, y, z vector offset to use when picking up a lid.
+        :param drop_offset: Optional x, y, z vector offset to use when dropping off a lid.
+
+        Before moving a lid to or from a labware in a hardware module, make sure that the
+        labware's current and new locations are accessible, i.e., open the Thermocycler lid
+        or open the Heater-Shaker's labware latch.
+
+        .. versionadded:: 2.23
+
+        """
+        source: Union[LabwareCore, DeckSlotName, StagingSlotName]
+        if isinstance(source_location, Labware):
+            source = source_location._core
+        else:
+            source = validation.ensure_and_convert_deck_slot(
+                source_location, self._api_version, self._core.robot_type
+            )
+
+        destination: Union[
+            ModuleCore,
+            LabwareCore,
+            WasteChute,
+            OffDeckType,
+            DeckSlotName,
+            StagingSlotName,
+            TrashBin,
+        ]
+        if isinstance(new_location, Labware):
+            destination = new_location._core
+        elif isinstance(new_location, (OffDeckType, WasteChute, TrashBin)):
+            destination = new_location
+        else:
+            destination = validation.ensure_and_convert_deck_slot(
+                new_location, self._api_version, self._core.robot_type
+            )
+
+        _pick_up_offset = (
+            validation.ensure_valid_labware_offset_vector(pick_up_offset)
+            if pick_up_offset
+            else None
+        )
+        _drop_offset = (
+            validation.ensure_valid_labware_offset_vector(drop_offset)
+            if drop_offset
+            else None
+        )
+        with publish_context(
+            broker=self.broker,
+            command=cmds.move_labware(
+                # This needs to be called from protocol context and not the command for import loop reasons
+                text=stringify_lid_movement_command(
+                    source_location, new_location, use_gripper
+                )
+            ),
+        ):
+            result = self._core.move_lid(
+                source_location=source,
+                new_location=destination,
+                use_gripper=use_gripper,
+                pause_for_manual_move=True,
+                pick_up_offset=_pick_up_offset,
+                drop_offset=_drop_offset,
+            )
+        if result is not None:
+            return Labware(
+                core=result,
+                api_version=self._api_version,
+                protocol_core=self._core,
+                core_map=self._core_map,
+            )
+        return None
+
+    @requires_version(2, 27)
+    def capture_image(
+        self,
+        home_before: Optional[bool] = False,
+        filename: Optional[str] = None,
+        resolution: Optional[Tuple[int, int]] = None,
+        zoom: Optional[float] = None,
+        contrast: Optional[float] = None,
+        brightness: Optional[float] = None,
+        saturation: Optional[float] = None,
+    ) -> None:
+        """Capture an image using the camera. Captured images are saved as during the protocol run.
+
+        :param home_before: If ``True``, homes the pipette before capturing an image.
+        :param filename: Custom name to use when saving the captured image as a file. The custom name is added as the beginning of the filename, followed by the robot and protocol name, a timestamp for the protocol run, the step number, and a timestamp for the command running when the image was captured.
+        :param resolution: Accepts a width and height (as a tuple) to determine the camera's resolution when capturing the image.
+        :param zoom: Zoom level the camera will use. Defaults to the minimum of 1x zoom (``1.0``) and has a maximum of 2x zoom (``2.0``).
+        :param contrast: The contrast level to be applied to the image. The acceptable range is from 0 to 100; provided as a percentage (``0.0`` to ``100.0``).
+        :param brightness: The brightness level to be applied to the image. The acceptable range is from 0 to 100; provided as a percentage (``0.0`` to ``100.0``).
+        :param saturation: The saturation level to be applied to the image. The acceptable range is from 0 to 100; provided as a percentage (``0.0`` to ``100.0``).
+
+        """
+        if home_before is True:
+            self._core.home()
+
+        with publish_context(
+            broker=self.broker,
+            command=cmds.capture_image(
+                resolution=resolution,
+                zoom=zoom,
+                contrast=contrast,
+                brightness=brightness,
+                saturation=saturation,
+            ),
+        ):
+            self._core.capture_image(
+                filename=filename,
+                resolution=resolution,
+                zoom=zoom,
+                contrast=contrast,
+                brightness=brightness,
+                saturation=saturation,
+            )
+        return None
 
 
 def _create_module_context(
@@ -1331,6 +1888,8 @@ def _create_module_context(
         module_cls = MagneticBlockContext
     elif isinstance(module_core, AbstractAbsorbanceReaderCore):
         module_cls = AbsorbanceReaderContext
+    elif isinstance(module_core, AbstractFlexStackerCore):
+        module_cls = FlexStackerContext
     else:
         assert False, "Unsupported module type"
 

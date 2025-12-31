@@ -2,25 +2,26 @@ import { useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 
 import {
-  updateRunSetupStepsRequired,
+  CAMERA_SETUP_STEP_KEY,
   getSetupStepsRequired,
-  ROBOT_CALIBRATION_STEP_KEY,
-  MODULE_SETUP_STEP_KEY,
-  LPC_STEP_KEY,
   LABWARE_SETUP_STEP_KEY,
-  LIQUID_SETUP_STEP_KEY,
+  LPC_STEP_KEY,
+  MODULE_SETUP_STEP_KEY,
+  ROBOT_CALIBRATION_STEP_KEY,
+  selectTotalCountLocationSpecificOffsets,
+  updateRunSetupStepsRequired,
 } from '/app/redux/protocol-runs'
 
+import type {
+  CompletedProtocolAnalysis,
+  ProtocolAnalysisOutput,
+} from '@opentrons/shared-data'
 import type {
   StepKey,
   StepMap,
   UpdateRunSetupStepsRequiredAction,
 } from '/app/redux/protocol-runs'
 import type { Dispatch, State } from '/app/redux/types'
-import type {
-  CompletedProtocolAnalysis,
-  ProtocolAnalysisOutput,
-} from '@opentrons/shared-data'
 
 export interface UseRequiredSetupStepsInOrderProps {
   runId: string
@@ -37,35 +38,51 @@ const ALL_STEPS_IN_ORDER = [
   MODULE_SETUP_STEP_KEY,
   LPC_STEP_KEY,
   LABWARE_SETUP_STEP_KEY,
-  LIQUID_SETUP_STEP_KEY,
+  CAMERA_SETUP_STEP_KEY,
 ] as const
 
 const NO_ANALYSIS_STEPS_IN_ORDER = [
   ROBOT_CALIBRATION_STEP_KEY,
   LPC_STEP_KEY,
   LABWARE_SETUP_STEP_KEY,
+  CAMERA_SETUP_STEP_KEY,
 ]
 
 const keysInOrder = (
-  protocolAnalysis: CompletedProtocolAnalysis | ProtocolAnalysisOutput | null
+  protocolAnalysis: CompletedProtocolAnalysis | ProtocolAnalysisOutput | null,
+  noLwOffsetsInRun: boolean,
+  noLabwareOrLiquidsInRun: boolean
 ): UseRequiredSetupStepsInOrderReturn => {
   const orderedSteps =
     protocolAnalysis == null ? NO_ANALYSIS_STEPS_IN_ORDER : ALL_STEPS_IN_ORDER
+  const orderedFinalizedSteps = orderedSteps.filter(
+    step => step !== CAMERA_SETUP_STEP_KEY
+  )
 
   const orderedApplicableSteps =
     protocolAnalysis == null
       ? NO_ANALYSIS_STEPS_IN_ORDER
       : ALL_STEPS_IN_ORDER.filter((stepKey: StepKey) => {
-          if (protocolAnalysis.modules.length === 0) {
-            return stepKey !== MODULE_SETUP_STEP_KEY
+          if (
+            stepKey === MODULE_SETUP_STEP_KEY &&
+            protocolAnalysis.modules.length === 0
+          ) {
+            return false
+          } else if (stepKey === LPC_STEP_KEY && noLwOffsetsInRun) {
+            return false
+          } else if (
+            stepKey === LABWARE_SETUP_STEP_KEY &&
+            noLabwareOrLiquidsInRun
+          ) {
+            return false
+          } else {
+            return true
           }
-
-          if (protocolAnalysis.liquids.length === 0) {
-            return stepKey !== LIQUID_SETUP_STEP_KEY
-          }
-          return true
         })
-  return { orderedSteps: orderedSteps as StepKey[], orderedApplicableSteps }
+  return {
+    orderedSteps: orderedFinalizedSteps as StepKey[],
+    orderedApplicableSteps,
+  }
 }
 
 const keyFor = (
@@ -81,9 +98,19 @@ export function useRequiredSetupStepsInOrder({
   const requiredSteps = useSelector<State>(state =>
     getSetupStepsRequired(state, runId)
   )
+  const noLwOffsetsInRun =
+    useSelector(selectTotalCountLocationSpecificOffsets(runId)) === 0
+
+  const noLabwareOrLiquidsInRun =
+    protocolAnalysis?.labware.length === 0 &&
+    protocolAnalysis?.liquids.length === 0
 
   useEffect(() => {
-    const applicable = keysInOrder(protocolAnalysis)
+    const applicable = keysInOrder(
+      protocolAnalysis,
+      noLwOffsetsInRun,
+      noLabwareOrLiquidsInRun
+    )
     dispatch(
       updateRunSetupStepsRequired(runId, {
         ...ALL_STEPS_IN_ORDER.reduce<
@@ -97,7 +124,7 @@ export function useRequiredSetupStepsInOrder({
         ),
       })
     )
-  }, [runId, keyFor(protocolAnalysis), dispatch])
+  }, [runId, dispatch, keyFor(protocolAnalysis), noLwOffsetsInRun])
   return protocolAnalysis == null
     ? {
         orderedSteps: NO_ANALYSIS_STEPS_IN_ORDER,

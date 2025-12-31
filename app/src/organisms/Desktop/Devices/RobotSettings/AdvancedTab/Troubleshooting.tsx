@@ -1,4 +1,4 @@
-import * as React from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { saveAs } from 'file-saver'
 import JSZip from 'jszip'
@@ -9,22 +9,23 @@ import {
   ALIGN_CENTER,
   ALIGN_END,
   Box,
-  Flex,
-  JUSTIFY_SPACE_BETWEEN,
-  SPACING_AUTO,
   ERROR_TOAST,
+  Flex,
   INFO_TOAST,
-  SPACING,
+  JUSTIFY_SPACE_BETWEEN,
   LegacyStyledText,
+  SPACING,
+  SPACING_AUTO,
   TYPOGRAPHY,
 } from '@opentrons/components'
 import { useHost } from '@opentrons/react-api-client'
 
 import { TertiaryButton } from '/app/atoms/buttons'
 import { useToaster } from '/app/organisms/ToasterOven'
-import { CONNECTABLE } from '/app/redux/discovery'
 import { useRobot } from '/app/redux-resources/robots'
+import { CONNECTABLE } from '/app/redux/discovery'
 
+import type { MouseEventHandler } from 'react'
 import type { IconProps } from '@opentrons/components'
 
 interface TroubleshootingProps {
@@ -38,16 +39,14 @@ export function Troubleshooting({
   const robot = useRobot(robotName)
   const controlDisabled = robot?.status !== CONNECTABLE
   const logsAvailable = robot?.health?.logs != null
-  const [
-    isDownloadingRobotLogs,
-    setIsDownloadingRobotLogs,
-  ] = React.useState<boolean>(false)
+  const [isDownloadingRobotLogs, setIsDownloadingRobotLogs] =
+    useState<boolean>(false)
   const { makeToast, eatToast } = useToaster()
   const toastIcon: IconProps = { name: 'ot-spinner', spin: true }
 
   const host = useHost()
 
-  const handleClick: React.MouseEventHandler<HTMLButtonElement> = () => {
+  const handleClick: MouseEventHandler<HTMLButtonElement> = () => {
     setIsDownloadingRobotLogs(true)
     const toastId = makeToast(t('downloading_logs') as string, INFO_TOAST, {
       disableTimeout: true,
@@ -99,8 +98,8 @@ export function Troubleshooting({
     }
   }
 
-  // set ref on component to check if component is mounted https://react.dev/reference/react/useRef#manipulating-the-dom-with-a-ref
-  const mounted = React.useRef(null)
+  // set ref on component to check if component is mounted https://dev/reference/react/useRef#manipulating-the-dom-with-a-ref
+  const mounted = useRef(null)
 
   return (
     <Flex
@@ -111,14 +110,14 @@ export function Troubleshooting({
     >
       <Box width="70%">
         <LegacyStyledText
-          as="h3"
+          forwardedAs="h3"
           fontWeight={TYPOGRAPHY.fontWeightSemiBold}
           marginBottom={SPACING.spacing20}
         >
           {t('troubleshooting')}
         </LegacyStyledText>
         <LegacyStyledText
-          as="p"
+          forwardedAs="p"
           fontWeight={TYPOGRAPHY.fontWeightSemiBold}
           data-testid="RobotSettings_Troubleshooting"
         >

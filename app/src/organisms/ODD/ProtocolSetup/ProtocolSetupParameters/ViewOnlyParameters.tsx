@@ -1,11 +1,6 @@
-import type * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import { css } from 'styled-components'
 
-import {
-  formatRunTimeParameterValue,
-  sortRuntimeParameters,
-} from '@opentrons/shared-data'
 import {
   ALIGN_CENTER,
   BORDERS,
@@ -14,19 +9,25 @@ import {
   DIRECTION_COLUMN,
   DIRECTION_ROW,
   Flex,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
-import { useMostRecentCompletedAnalysis } from '/app/resources/runs'
+import {
+  formatRunTimeParameterValue,
+  sortRuntimeParameters,
+} from '@opentrons/shared-data'
+
 import { ChildNavigation } from '/app/organisms/ODD/ChildNavigation'
 import { useToaster } from '/app/organisms/ToasterOven'
+import { useMostRecentCompletedAnalysis } from '/app/resources/runs'
 
+import type { Dispatch, SetStateAction } from 'react'
 import type { SetupScreens } from '../types'
 
 export interface ViewOnlyParametersProps {
   runId: string
-  setSetupScreen: React.Dispatch<React.SetStateAction<SetupScreens>>
+  setSetupScreen: Dispatch<SetStateAction<SetupScreens>>
 }
 
 export function ViewOnlyParameters({
@@ -85,7 +86,7 @@ export function ViewOnlyParameters({
             >
               <LegacyStyledText
                 width="48%"
-                as="p"
+                forwardedAs="p"
                 fontWeight={TYPOGRAPHY.fontWeightSemiBold}
               >
                 {parameter.displayName}
@@ -95,7 +96,7 @@ export function ViewOnlyParameters({
                 flexDirection={DIRECTION_ROW}
                 gridGap={SPACING.spacing8}
               >
-                <LegacyStyledText as="p" css={PARAMETER_VALUE_STYLE}>
+                <LegacyStyledText forwardedAs="p" css={PARAMETER_VALUE_STYLE}>
                   {formatRunTimeParameterValue(parameter, t)}
                 </LegacyStyledText>
                 {parameter.type === 'csv_file' ||

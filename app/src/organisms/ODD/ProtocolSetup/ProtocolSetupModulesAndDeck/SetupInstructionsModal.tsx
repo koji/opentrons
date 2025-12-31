@@ -7,15 +7,15 @@ import {
   DIRECTION_COLUMN,
   DIRECTION_ROW,
   Flex,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
+
+import imgSrc from '/app/assets/images/on-device-display/setup_instructions_qr_code.png'
 import { OddModal } from '/app/molecules/OddModal'
 
 import type { OddModalHeaderBaseProps } from '/app/molecules/OddModal/types'
-
-import imgSrc from '/app/assets/images/on-device-display/setup_instructions_qr_code.png'
 
 const INSTRUCTIONS_URL = 'support.opentrons.com/s/modules'
 
@@ -46,7 +46,7 @@ export function SetupInstructionsModal({
         gridGap={SPACING.spacing40}
       >
         <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing24}>
-          <LegacyStyledText as="p">
+          <LegacyStyledText forwardedAs="p">
             {t('branded:setup_instructions_description')}
           </LegacyStyledText>
           <Flex
@@ -54,7 +54,10 @@ export function SetupInstructionsModal({
             borderRadius={BORDERS.borderRadius8}
             padding={`${SPACING.spacing16} ${SPACING.spacing24}`}
           >
-            <LegacyStyledText as="p" fontWeight={TYPOGRAPHY.fontWeightSemiBold}>
+            <LegacyStyledText
+              forwardedAs="p"
+              fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+            >
               {INSTRUCTIONS_URL}
             </LegacyStyledText>
           </Flex>

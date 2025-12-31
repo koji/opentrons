@@ -1,4 +1,4 @@
-import * as React from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Trans, useTranslation } from 'react-i18next'
 
@@ -9,15 +9,16 @@ import {
   Flex,
   JUSTIFY_FLEX_END,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
+  Modal,
   PrimaryButton,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
-  Modal,
 } from '@opentrons/components'
 
 import { getTopPortalEl } from '/app/App/portal'
 
+import type { MouseEventHandler } from 'react'
 import type { AnalysisError } from '@opentrons/shared-data'
 
 interface ProtocolAnalysisErrorBannerProps {
@@ -29,9 +30,9 @@ export function ProtocolAnalysisErrorBanner(
 ): JSX.Element {
   const { errors } = props
   const { t } = useTranslation(['run_details'])
-  const [showErrorDetails, setShowErrorDetails] = React.useState(false)
+  const [showErrorDetails, setShowErrorDetails] = useState(false)
 
-  const handleToggleDetails: React.MouseEventHandler = e => {
+  const handleToggleDetails: MouseEventHandler = e => {
     e.preventDefault()
     e.stopPropagation()
     setShowErrorDetails(!showErrorDetails)
@@ -44,18 +45,17 @@ export function ProtocolAnalysisErrorBanner(
         alignItems={ALIGN_CENTER}
         width="100%"
       >
-        <LegacyStyledText as="p">
+        <LegacyStyledText forwardedAs="p">
           {t('protocol_analysis_failed')}
         </LegacyStyledText>
-        <LegacyStyledText as="p">
+        <LegacyStyledText forwardedAs="p">
           <Trans
             t={t}
             i18nKey="view_analysis_error_details"
             components={{
               errorLink: (
                 <Btn
-                  as="a"
-                  role="button"
+                  // forwardedAs="a"
                   aria-label="error_link"
                   textDecoration={TYPOGRAPHY.textDecorationUnderline}
                   onClick={handleToggleDetails}
@@ -73,7 +73,7 @@ export function ProtocolAnalysisErrorBanner(
               onClose={handleToggleDetails}
             >
               {errors.map((error, index) => (
-                <LegacyStyledText as="p" key={index}>
+                <LegacyStyledText forwardedAs="p" key={index}>
                   {error?.detail}
                 </LegacyStyledText>
               ))}

@@ -1,16 +1,17 @@
-import type * as React from 'react'
-import { fireEvent, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import { fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, it, vi } from 'vitest'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { getNetworkInterfaces, INTERFACE_WIFI } from '/app/redux/networking'
 import { useIsUnboxingFlowOngoing } from '/app/redux-resources/config'
+import { getNetworkInterfaces, INTERFACE_WIFI } from '/app/redux/networking'
+
 import { AlternativeSecurityTypeModal } from '../AlternativeSecurityTypeModal'
 import { SelectAuthenticationType } from '../SelectAuthenticationType'
 import { SetWifiCred } from '../SetWifiCred'
 
+import type { ComponentProps } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
 const mockNavigate = vi.fn()
@@ -36,9 +37,7 @@ const initialMockWifi = {
   type: INTERFACE_WIFI,
 }
 
-const render = (
-  props: React.ComponentProps<typeof SelectAuthenticationType>
-) => {
+const render = (props: ComponentProps<typeof SelectAuthenticationType>) => {
   return renderWithProviders(
     <MemoryRouter>
       <SelectAuthenticationType {...props} />
@@ -50,7 +49,7 @@ const render = (
 }
 
 describe('SelectAuthenticationType', () => {
-  let props: React.ComponentProps<typeof SelectAuthenticationType>
+  let props: ComponentProps<typeof SelectAuthenticationType>
   beforeEach(() => {
     props = {
       selectedAuthType: 'wpa-psk',

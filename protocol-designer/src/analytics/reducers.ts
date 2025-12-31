@@ -1,11 +1,19 @@
 import { combineReducers } from 'redux'
 import { handleActions } from 'redux-actions'
+
 import type { Reducer } from 'redux'
+import type { RehydratePersistedAction } from '../persist'
 import type { Action } from '../types'
 import type { SetOptIn } from './actions'
-import type { RehydratePersistedAction } from '../persist'
-type OptInState = boolean | null
-const optInInitialState = null
+
+export interface OptInState {
+  hasOptedIn: boolean
+  appVersion?: string
+}
+const optInInitialState: OptInState = {
+  hasOptedIn: true,
+}
+
 // @ts-expect-error(sb, 2021-6-17): cannot use string literals as action type
 // TODO IMMEDIATELY: refactor this to the old fashioned way if we cannot have type safety: https://github.com/redux-utilities/redux-actions/issues/282#issuecomment-595163081
 const hasOptedIn: Reducer<OptInState, any> = handleActions(
@@ -17,7 +25,11 @@ const hasOptedIn: Reducer<OptInState, any> = handleActions(
       action: RehydratePersistedAction
     ) => {
       const persistedState = action.payload?.['analytics.hasOptedIn']
-      return persistedState !== undefined ? persistedState : optInInitialState
+      if (persistedState == null || persistedState?.hasOptedIn == null) {
+        return optInInitialState
+      } else {
+        return persistedState
+      }
     },
   },
   optInInitialState
@@ -28,6 +40,5 @@ const _allReducers = {
 export interface RootState {
   hasOptedIn: OptInState
 }
-export const rootReducer: Reducer<RootState, Action> = combineReducers(
-  _allReducers
-)
+export const rootReducer: Reducer<RootState, Action> =
+  combineReducers(_allReducers)

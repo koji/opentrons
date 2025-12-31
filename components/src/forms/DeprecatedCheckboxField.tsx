@@ -1,33 +1,34 @@
-import type * as React from 'react'
 import cx from 'classnames'
-import { Icon } from '../icons'
 
+import { Icon } from '../icons'
 import styles from './forms.module.css'
+
+import type { ChangeEventHandler, ComponentProps } from 'react'
 
 /**
  * Checkbox Field Properties.
  */
 export interface DeprecatedCheckboxFieldProps {
   /** change handler */
-  onChange: React.ChangeEventHandler
+  onChange: ChangeEventHandler
   /** checkbox is checked if value is true */
   value?: boolean
   /** classes to apply */
   className?: string
   /** classes to apply to inner label text div. Deprecated. use labelProps.className */
-  labelTextClassName?: string | null | undefined
+  labelTextClassName?: string | null
   /** name of field in form */
   name?: string
   /** label text for checkbox */
   label?: string
   /** if is included, checkbox will use error style. The content of the string is ignored. */
-  error?: string | null | undefined
+  error?: string | null
   /** checkbox is disabled if value is true */
   disabled?: boolean
   /** html tabindex property */
   tabIndex?: number
   /** props passed into label div. TODO IMMEDIATELY what is the Flow type? */
-  labelProps?: React.ComponentProps<'div'>
+  labelProps?: ComponentProps<'div'>
   /** if true, render indeterminate icon */
   isIndeterminate?: boolean
 }
@@ -62,8 +63,8 @@ export function DeprecatedCheckboxField(
             props.isIndeterminate
               ? 'minus-box'
               : props.value
-              ? 'ot-checkbox'
-              : 'checkbox-blank-outline'
+                ? 'ot-checkbox'
+                : 'checkbox-blank-outline'
           }
           width="100%"
         />

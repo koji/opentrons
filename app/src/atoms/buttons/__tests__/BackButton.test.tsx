@@ -1,15 +1,18 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
 import '@testing-library/jest-dom/vitest'
+
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
 import { renderWithProviders } from '/app/__testing-utils__'
-
 import { i18n } from '/app/i18n'
+
 import { BackButton } from '..'
 
-const render = (props?: React.HTMLProps<HTMLButtonElement>) => {
+import type { HTMLProps } from 'react'
+
+const render = (props?: HTMLProps<HTMLButtonElement>) => {
   return renderWithProviders(
     <MemoryRouter
       initialEntries={['/previous-page', '/current-page']}

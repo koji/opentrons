@@ -1,76 +1,69 @@
 import { useState } from 'react'
-import { useTranslation } from 'react-i18next'
 import { connect } from 'react-redux'
+
 import { useConditionalConfirm } from '@opentrons/components'
 import { getModuleDisplayName } from '@opentrons/shared-data'
 
-import { actions } from '../../../../steplist'
-import { actions as stepsActions } from '../../../../ui/steps'
 import {
-  getHydratedForm,
-  selectors as stepFormSelectors,
-} from '../../../../step-forms'
-import { maskField } from '../../../../steplist/fieldLevel'
-import { getInvariantContext } from '../../../../step-forms/selectors'
-import {
+  BonusStepModal,
   CLOSE_STEP_FORM_WITH_CHANGES,
   CLOSE_UNSAVED_STEP_FORM,
   ConfirmDeleteModal,
-  DELETE_STEP_FORM,
-} from '../../../../components/modals/ConfirmDeleteModal'
-import { AutoAddPauseUntilTempStepModal } from '../../../../components/modals/AutoAddPauseUntilTempStepModal'
-import { getDirtyFields, makeSingleEditFieldProps } from './utils'
+} from '/protocol-designer/components/organisms'
+import { getEnableConcurrentModuleActions } from '/protocol-designer/feature-flags/selectors'
+import { selectors as labwareDefSelectors } from '/protocol-designer/labware-defs'
+import {
+  getHydratedForm,
+  selectors as stepFormSelectors,
+} from '/protocol-designer/step-forms'
+import { getInvariantContext } from '/protocol-designer/step-forms/selectors'
+import { actions } from '/protocol-designer/steplist'
+import { actions as stepsActions } from '/protocol-designer/ui/steps'
+
 import { StepFormToolbox } from './StepFormToolbox'
+import { getDirtyFields } from './utils'
 
 import type { ConnectedComponent } from 'react-redux'
 import type { InvariantContext } from '@opentrons/step-generation'
-import type { BaseState, ThunkDispatch } from '../../../../types'
-import type {
-  FormData,
-  StepFieldName,
-  StepIdType,
-} from '../../../../form-types'
+import type { BonusStepModalType } from '/protocol-designer/components/organisms'
+import type { FormData, StepFieldName } from '/protocol-designer/form-types'
+import type { LabwareDefByDefURI } from '/protocol-designer/labware-defs'
+import type { BaseState, ThunkDispatch } from '/protocol-designer/types'
 
 interface StateProps {
   canSave: boolean
   formHasChanges: boolean
   isNewStep: boolean
-  isPristineSetTempForm: boolean
-  isPristineSetHeaterShakerTempForm: boolean
+  bonusStepModalType: BonusStepModalType | null
   invariantContext: InvariantContext
+  allLabwareDefs: LabwareDefByDefURI
+  enableConcurrentModuleActions: boolean
   formData?: FormData | null
 }
 interface DispatchProps {
-  deleteStep: (stepId: string) => void
-  handleClose: () => void
-  saveSetTempFormWithAddedPauseUntilTemp: () => void
-  saveHeaterShakerFormWithAddedPauseUntilTemp: () => void
-  saveStepForm: () => void
-  handleChangeFormInput: (name: string, value: unknown) => void
+  cancelStepForm: () => void
+  saveStepForm: (options?: { userWantsBonusStep?: boolean }) => void
 }
 type StepFormManagerProps = StateProps & DispatchProps
 
 function StepFormManager(props: StepFormManagerProps): JSX.Element | null {
   const {
     canSave,
-    deleteStep,
     formData,
     formHasChanges,
-    handleChangeFormInput,
-    handleClose,
+    cancelStepForm,
     isNewStep,
-    isPristineSetTempForm,
-    isPristineSetHeaterShakerTempForm,
-    saveSetTempFormWithAddedPauseUntilTemp,
-    saveHeaterShakerFormWithAddedPauseUntilTemp,
+    bonusStepModalType,
     saveStepForm,
     invariantContext,
+    allLabwareDefs,
   } = props
-  const { t } = useTranslation('tooltip')
+
   const [focusedField, setFocusedField] = useState<string | null>(null)
   const [dirtyFields, setDirtyFields] = useState<StepFieldName[]>(
     getDirtyFields(isNewStep, formData)
   )
+
   const handleBlur = (fieldName: StepFieldName): void => {
     if (fieldName === focusedField) {
       setFocusedField(null)
@@ -82,77 +75,53 @@ function StepFormManager(props: StepFormManagerProps): JSX.Element | null {
       return prevDirtyFields
     })
   }
-  const stepId = formData?.id
-  const handleDelete = (): void => {
-    if (stepId != null) {
-      deleteStep(stepId)
-    } else {
-      console.error(
-        `StepEditForm: tried to delete step with no step id, this should not happen`
-      )
-    }
-  }
-  const {
-    confirm: confirmDelete,
-    showConfirmation: showConfirmDeleteModal,
-    cancel: cancelDelete,
-  } = useConditionalConfirm(handleDelete, true)
+
   const {
     confirm: confirmClose,
     showConfirmation: showConfirmCancelModal,
     cancel: cancelClose,
-  } = useConditionalConfirm(handleClose, isNewStep || formHasChanges)
-  const {
-    confirm: confirmAddPauseUntilTempStep,
-    showConfirmation: showAddPauseUntilTempStepModal,
-  } = useConditionalConfirm(
-    saveSetTempFormWithAddedPauseUntilTemp,
-    isPristineSetTempForm
-  )
-  const {
-    confirm: confirmAddPauseUntilHeaterShakerTempStep,
-    showConfirmation: showAddPauseUntilHeaterShakerTempStepModal,
-  } = useConditionalConfirm(
-    saveHeaterShakerFormWithAddedPauseUntilTemp,
-    isPristineSetHeaterShakerTempForm
-  )
+  } = useConditionalConfirm(cancelStepForm, isNewStep || formHasChanges)
+
+  const [currentBonusStepDialogType, setCurrentBonusStepDialogType] =
+    useState<BonusStepModalType | null>(null)
+
   // no form selected
   if (formData == null) {
     return null
   }
-  const hydratedForm = getHydratedForm(formData, invariantContext)
+  const hydratedForm = getHydratedForm(
+    formData,
+    invariantContext,
+    allLabwareDefs
+  )
   const focusHandlers = {
     focusedField,
     dirtyFields,
     focus: setFocusedField,
     blur: handleBlur,
   }
-  const propsForFields = makeSingleEditFieldProps(
-    focusHandlers,
-    formData,
-    handleChangeFormInput,
-    hydratedForm,
-    t
-  )
-  let handleSave = saveStepForm
-  if (isPristineSetTempForm) {
-    handleSave = confirmAddPauseUntilTempStep
-  } else if (
-    isPristineSetHeaterShakerTempForm &&
-    formData.heaterShakerSetTimer !== true
-  ) {
-    handleSave = confirmAddPauseUntilHeaterShakerTempStep
+
+  const handleSave = (): void => {
+    if (bonusStepModalType == null) {
+      // No dialog to show. Just save the step directly.
+      saveStepForm()
+    } else {
+      // There's a dialog we have to show before saving the step.
+      // Its confirm/cancel handlers will be the thing that saves the step.
+      setCurrentBonusStepDialogType(bonusStepModalType)
+    }
   }
+  const handleSkipPauseClick = (): void => {
+    saveStepForm({ userWantsBonusStep: false })
+    setCurrentBonusStepDialogType(null)
+  }
+  const handleAddPauseClick = (): void => {
+    saveStepForm({ userWantsBonusStep: true })
+    setCurrentBonusStepDialogType(null)
+  }
+
   return (
     <>
-      {/* TODO: update these modals to match new modal design */}
-      {showConfirmDeleteModal && (
-        <ConfirmDeleteModal
-          modalType={DELETE_STEP_FORM}
-          onCancelClick={cancelDelete}
-          onContinueClick={confirmDelete}
-        />
-      )}
       {showConfirmCancelModal && (
         <ConfirmDeleteModal
           modalType={
@@ -162,13 +131,34 @@ function StepFormManager(props: StepFormManagerProps): JSX.Element | null {
           onContinueClick={confirmClose}
         />
       )}
-      {showAddPauseUntilTempStepModal ||
-      showAddPauseUntilHeaterShakerTempStepModal ? (
-        <AutoAddPauseUntilTempStepModal
+
+      {currentBonusStepDialogType === 'explainWaitForTemperatureModuleTemp' && (
+        <BonusStepModal
+          modalType={currentBonusStepDialogType}
+          displayTemperature={formData.targetTemperature ?? '?'}
+          handleAddPauseClick={handleAddPauseClick}
+        />
+      )}
+      {currentBonusStepDialogType === 'explainWaitForHeaterShakerTemp' && (
+        <BonusStepModal
+          modalType={currentBonusStepDialogType}
+          displayTemperature={formData.targetHeaterShakerTemperature ?? '?'}
+          handleAddPauseClick={handleAddPauseClick}
+        />
+      )}
+      {currentBonusStepDialogType === 'explainWaitForThermocyclerProfile' && (
+        <BonusStepModal
+          modalType={currentBonusStepDialogType}
+          handleAddPauseClick={handleAddPauseClick}
+        />
+      )}
+      {currentBonusStepDialogType === 'optionallyWaitForTemp' && (
+        <BonusStepModal
+          modalType="optionallyWaitForTemp"
           displayTemperature={
-            showAddPauseUntilTempStepModal
-              ? formData?.targetTemperature
-              : formData?.targetHeaterShakerTemperature ?? '?'
+            formData.targetTemperature ??
+            formData.targetHeaterShakerTemperature ??
+            '?'
           }
           displayModule={
             formData.moduleId != null
@@ -177,10 +167,11 @@ function StepFormManager(props: StepFormManagerProps): JSX.Element | null {
                 )
               : ''
           }
-          handleCancelClick={saveStepForm}
-          handleContinueClick={handleSave}
+          handleAddPauseClick={handleAddPauseClick}
+          handleSkipPauseClick={handleSkipPauseClick}
         />
-      ) : null}
+      )}
+
       <StepFormToolbox
         {...{
           canSave,
@@ -190,7 +181,7 @@ function StepFormManager(props: StepFormManagerProps): JSX.Element | null {
           formData,
           handleClose: confirmClose,
           handleSave,
-          propsForFields,
+          hydratedForm,
         }}
       />
     </>
@@ -203,38 +194,21 @@ const mapStateToProps = (state: BaseState): StateProps => {
     formData: stepFormSelectors.getUnsavedForm(state),
     formHasChanges: stepFormSelectors.getCurrentFormHasUnsavedChanges(state),
     isNewStep: stepFormSelectors.getCurrentFormIsPresaved(state),
-    isPristineSetHeaterShakerTempForm: stepFormSelectors.getUnsavedFormIsPristineHeaterShakerForm(
-      state
-    ),
-    isPristineSetTempForm: stepFormSelectors.getUnsavedFormIsPristineSetTempForm(
-      state
-    ),
+    bonusStepModalType: stepFormSelectors.getBonusStepModalType(state),
     invariantContext: getInvariantContext(state),
+    allLabwareDefs: labwareDefSelectors.getLabwareDefsByURI(state),
+    enableConcurrentModuleActions: getEnableConcurrentModuleActions(state),
   }
 }
 
 const mapDispatchToProps = (dispatch: ThunkDispatch<any>): DispatchProps => {
-  const deleteStep = (stepId: StepIdType): void =>
-    dispatch(actions.deleteStep(stepId))
-  const handleClose = (): void => dispatch(actions.cancelStepForm())
-  const saveHeaterShakerFormWithAddedPauseUntilTemp = (): void =>
-    dispatch(stepsActions.saveHeaterShakerFormWithAddedPauseUntilTemp())
-  const saveSetTempFormWithAddedPauseUntilTemp = (): void =>
-    dispatch(stepsActions.saveSetTempFormWithAddedPauseUntilTemp())
-  const saveStepForm = (): void => dispatch(stepsActions.saveStepForm())
-
-  const handleChangeFormInput = (name: string, value: unknown): void => {
-    const maskedValue = maskField(name, value)
-    dispatch(actions.changeFormInput({ update: { [name]: maskedValue } }))
-  }
+  const cancelStepForm = (): void => dispatch(actions.cancelStepForm())
+  const saveStepForm = (options?: { userWantsBonusStep?: boolean }): void =>
+    dispatch(stepsActions.saveStepForm(options))
 
   return {
-    deleteStep,
-    handleChangeFormInput,
-    handleClose,
-    saveSetTempFormWithAddedPauseUntilTemp,
+    cancelStepForm,
     saveStepForm,
-    saveHeaterShakerFormWithAddedPauseUntilTemp,
   }
 }
 

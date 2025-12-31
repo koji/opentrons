@@ -1,11 +1,12 @@
 """Tests for the legacy Protocol API core implementation."""
+
 import inspect
 from typing import Any, Dict, cast
 
 import pytest
 from decoy import Decoy
 
-from opentrons_shared_data.labware.types import LabwareDefinition as LabwareDefDict
+from opentrons_shared_data.labware.types import LabwareDefinition2 as LabwareDefDict
 from opentrons_shared_data.pipette.types import PipetteNameType
 from opentrons_shared_data.module.types import ModuleDefinitionV3
 
@@ -82,8 +83,7 @@ def mock_sync_hardware_api(decoy: Decoy) -> SyncHardwareAPI:
 def mock_deck(decoy: Decoy) -> Deck:
     """Get a mock Deck."""
 
-    class _MockDeck(Dict[str, Any]):
-        ...
+    class _MockDeck(Dict[str, Any]): ...
 
     deck = _MockDeck()
     setattr(deck, "position_for", decoy.mock(name="Deck.position_for"))
@@ -204,6 +204,7 @@ def test_load_labware(
     labware_definition_dict = cast(
         LabwareDefDict,
         {
+            "schemaVersion": 2,
             "namespace": "super cool namespace",
             "parameters": {"loadName": "super cool load name"},
             "version": 42,
@@ -301,6 +302,7 @@ def test_load_labware_on_module(
     labware_definition_dict = cast(
         LabwareDefDict,
         {
+            "schemaVersion": 2,
             "namespace": "super cool namespace",
             "parameters": {"loadName": "super cool load name"},
             "version": 42,

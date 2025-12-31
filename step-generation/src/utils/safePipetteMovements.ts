@@ -1,29 +1,44 @@
 import {
+  ALL,
+  COLUMN,
   FLEX_ROBOT_TYPE,
-  THERMOCYCLER_MODULE_TYPE,
   getAddressableAreaFromSlotId,
   getDeckDefFromRobotType,
   getFlexSurroundingSlots,
+  getModuleDef,
+  getOt2SurroundingSlots,
   getPositionFromSlotId,
+  getRobotDefFromRobotType,
+  OT2_ROBOT_TYPE,
+  SINGLE,
+  THERMOCYCLER_MODULE_TYPE,
+  THERMOCYCLER_MODULE_V2,
 } from '@opentrons/shared-data'
+
+import { EMPTY, OT2_TC_SLOTS } from '../constants'
+import { getFullStackFromLabwares, getSlotInLocationStack } from './misc'
+
 import type {
   AddressableArea,
   CoordinateTuple,
+  LabwareDefinition,
   ModuleModel,
   NozzleConfigurationStyle,
+  OT2AddressableAreaName,
+  PipetteChannels,
+  PipetteV2Specs,
+  RobotType,
 } from '@opentrons/shared-data'
 import type {
-  RobotState,
   InvariantContext,
-  PipetteEntity,
-  ModuleEntities,
   LabwareEntity,
+  ModuleEntities,
+  PipetteEntity,
+  RobotState,
+  TipState,
 } from '../types'
 
-const A12_column_front_left_bound = { x: -11.03, y: 2 }
-const A12_column_back_right_bound = { x: 526.77, y: 506.2 }
-const PRIMARY_NOZZLE = 'A12'
-const NOZZLE_CONFIGURATION = 'COLUMN'
+export const PRIMARY_NOZZLE = 'A12'
 const FLEX_TC_LID_COLLISION_ZONE = {
   back_left: { x: -43.25, y: 454.9, z: 211.91 },
   front_right: { x: 128.75, y: 402, z: 211.91 },
@@ -44,30 +59,10 @@ interface SlotInfo {
   addressableArea: AddressableArea | null
   position: CoordinateTuple | null
 }
-interface Point {
+export interface Point {
   x: number
   y: number
   z?: number
-}
-
-//  check if nozzle(s) are inbounds
-const getIsWithinPipetteExtents = (
-  location: Point,
-  nozzleConfiguration: NozzleConfigurationStyle,
-  primaryNozzle: string
-): boolean => {
-  if (nozzleConfiguration === 'COLUMN' && primaryNozzle === 'A12') {
-    const isWithinBounds =
-      A12_column_front_left_bound.x <= location.x &&
-      location.x <= A12_column_back_right_bound.x &&
-      A12_column_front_left_bound.y <= location.y &&
-      location.y <= A12_column_back_right_bound.y
-
-    return isWithinBounds
-  } else {
-    // TODO: Handle other configurations such as 8-channel partial tip, and eventually all pipettes.
-    return true
-  }
 }
 
 // return pipette bounds at a sepcific position
@@ -78,13 +73,11 @@ const getPipetteBoundsAtSpecifiedMoveToPosition = (
   pipetteEntity: PipetteEntity,
   tipLength: number,
   wellTargetPoint: Point,
-  primaryNozzle: string = 'A12' // hardcoding A12 becasue only column pick up supported currently
+  primaryNozzle: string,
+  tipOverlapOnNozzle: number
 ): Point[] => {
-  const {
-    nozzleMap,
-    nozzleOffset,
-    pipetteBoundingBoxOffsets,
-  } = pipetteEntity.spec
+  const { nozzleMap, nozzleOffset, pipetteBoundingBoxOffsets } =
+    pipetteEntity.spec
   const primaryNozzlePoint =
     nozzleMap == null || primaryNozzle == null
       ? nozzleOffset
@@ -106,7 +99,6 @@ const getPipetteBoundsAtSpecifiedMoveToPosition = (
   const frontY =
     wellTargetPoint.y - (primaryNozzlePoint[1] - pipetteBoundingBoxFrontYOffset)
 
-  const tipOverlapOnNozzle = 0
   const zNozzles = (wellTargetPoint.z ?? 0) + tipLength - tipOverlapOnNozzle
 
   const backLeftBound = { x: leftX, y: backY, z: zNozzles }
@@ -130,14 +122,19 @@ const getHasOverlappingRectangles = (
 }
 
 const getModuleHeightFromDeckDefinition = (
-  moduleModel: ModuleModel
+  moduleModel: ModuleModel,
+  robotType: RobotType
 ): number => {
-  const deckDef = getDeckDefFromRobotType(FLEX_ROBOT_TYPE)
-  const { addressableAreas } = deckDef.locations
-  const moduleAddressableArea = addressableAreas.find(addressableArea =>
-    addressableArea.id.includes(moduleModel)
-  )
-  return moduleAddressableArea?.offsetFromCutoutFixture[2] ?? 0
+  if (robotType === FLEX_ROBOT_TYPE) {
+    const deckDef = getDeckDefFromRobotType(robotType)
+    const { addressableAreas } = deckDef.locations
+    const moduleAddressableArea = addressableAreas.find(addressableArea =>
+      addressableArea.id.includes(moduleModel)
+    )
+    return moduleAddressableArea?.offsetFromCutoutFixture[2] ?? 0
+  }
+  // OT-2
+  return getModuleDef(moduleModel).dimensions.bareOverallHeight
 }
 
 //  check the highest Z-point of all items stacked given a deck slot (including modules,
@@ -145,57 +142,37 @@ const getModuleHeightFromDeckDefinition = (
 const getHighestZInSlot = (
   robotState: RobotState,
   invariantContext: InvariantContext,
-  slotId: string
+  slotId: string,
+  robotType: RobotType
 ): number => {
   const { modules, labware } = robotState
   const { moduleEntities, labwareEntities } = invariantContext
 
   let totalHeight: number = 0
+  const largestLabwareStack = getFullStackFromLabwares(labware, slotId)
   const moduleInSlot = Object.keys(modules).find(
     moduleId => modules[moduleId].slot === slotId
   )
-  // module in slot
-  if (moduleInSlot != null) {
+
+  //  if slot has labware, includes labware, adapters, and module
+  if (largestLabwareStack.length > 0) {
+    largestLabwareStack.forEach(item => {
+      if (modules[item] != null) {
+        totalHeight += getModuleHeightFromDeckDefinition(
+          moduleEntities[item].model,
+          robotType
+        )
+      }
+      if (labware[item] != null) {
+        totalHeight += labwareEntities[item].def.dimensions.zDimension
+      }
+    })
+    // if slot only has module
+  } else if (moduleInSlot != null) {
     totalHeight += getModuleHeightFromDeckDefinition(
-      moduleEntities[moduleInSlot].model
+      moduleEntities[moduleInSlot].model,
+      robotType
     )
-    const moduleDirectChildId = Object.keys(labware).find(
-      lwId => labware[lwId].slot === moduleInSlot
-    )
-    if (moduleDirectChildId != null) {
-      const moduleChildHeight =
-        labwareEntities[moduleDirectChildId].def.dimensions.zDimension
-      totalHeight += moduleChildHeight
-
-      // check if adapter is on module and has child
-      const moduleGrandchildId = Object.keys(labware).find(
-        lwId => labware[lwId].slot === moduleDirectChildId
-      )
-      if (moduleGrandchildId != null) {
-        const moduleGrandchildHeight =
-          labwareEntities[moduleGrandchildId].def.dimensions.zDimension
-        totalHeight += moduleGrandchildHeight
-      }
-    }
-  } else {
-    const labwareInSlotId = Object.keys(labware).find(
-      lwId => labware[lwId].slot === slotId
-    )
-    if (labwareInSlotId != null) {
-      const slotDirectChild = labwareEntities[labwareInSlotId]
-      const slotDirectChildHeight = slotDirectChild.def.dimensions.zDimension
-      totalHeight += slotDirectChildHeight
-
-      // check if adapter and has child
-      const slotGrandchildId = Object.keys(labware).find(
-        lwId => labware[lwId].slot === labwareInSlotId
-      )
-      if (slotGrandchildId != null) {
-        const slotGrandchildHeight =
-          labwareEntities[slotGrandchildId].def.dimensions.zDimension
-        totalHeight += slotGrandchildHeight
-      }
-    }
   }
   return totalHeight
 }
@@ -206,11 +183,25 @@ const getSlotHasPotentialCollidingObject = (
   slotInfo: SlotInfo[],
   robotState: RobotState,
   invariantContext: InvariantContext,
-  labwareId: string
+  robotType: RobotType
 ): boolean => {
+  const isThermocyclerOnDeck = Object.values(
+    invariantContext.moduleEntities
+  ).some(({ type }) => type === THERMOCYCLER_MODULE_TYPE)
   for (const slot of slotInfo) {
     const slotBounds = slot.addressableArea?.boundingBox
     const slotPosition = slot.position
+
+    // explicit OT-2 check for if the pipette will enter the space above a thermocycler-occupied slot
+    const willCollideWithThermocycler =
+      isThermocyclerOnDeck &&
+      robotType === OT2_ROBOT_TYPE &&
+      slot.addressableArea?.id != null &&
+      OT2_TC_SLOTS.includes(slot.addressableArea.id as OT2AddressableAreaName)
+
+    if (willCollideWithThermocycler) {
+      return true
+    }
 
     // If slotPosition or slotBounds is null, continue to the next iteration
     if (slotPosition == null || slotBounds == null) {
@@ -240,10 +231,13 @@ const getSlotHasPotentialCollidingObject = (
           ? getHighestZInSlot(
               robotState,
               invariantContext,
-              slot.addressableArea.id
+              slot.addressableArea.id,
+              robotType
             )
           : 0
-      return highestZInSurroundingSlot >= pipetteBounds[0]?.z
+      if (highestZInSurroundingSlot >= pipetteBounds[0]?.z) {
+        return true
+      }
     }
   }
   return false
@@ -273,7 +267,7 @@ const getWellPosition = (
   labwareEntity: LabwareEntity,
   wellName: string,
   wellLocationOffset: Point,
-  addressableAreaOffset: CoordinateTuple | null,
+  addressableAreaOffset: CoordinateTuple,
   hasTip: boolean
 ): Point => {
   const { wells } = labwareEntity.def
@@ -292,95 +286,405 @@ const getWellPosition = (
 }
 
 //  util to use in step-generation for if the pipette movement is safe
-export const getIsSafePipetteMovement = (
-  robotState: RobotState,
-  invariantContext: InvariantContext,
-  pipetteId: string,
-  labwareId: string,
-  tipRackDefURI: string,
-  wellLocationOffset: Point,
+export const getIsSafePipetteMovement = (args: {
+  robotState: RobotState
+  invariantContext: InvariantContext
+  pipetteId: string
+  labwareId: string
+  wellLocationOffset?: Point
   wellTargetName?: string
-): boolean => {
-  const deckDefinition = getDeckDefFromRobotType(FLEX_ROBOT_TYPE)
+  primaryNozzle?: string
+  nozzleConfiguration?: NozzleConfigurationStyle
+}): boolean => {
+  const {
+    robotState,
+    invariantContext,
+    pipetteId,
+    labwareId,
+    wellLocationOffset = { x: 0, y: 0, z: 0 },
+    wellTargetName,
+    primaryNozzle: primaryNozzleOverride,
+    nozzleConfiguration: nozzleConfigurationOverride,
+  } = args
   const {
     pipetteEntities,
     labwareEntities,
-    additionalEquipmentEntities,
+    stagingAreaEntities,
     moduleEntities,
   } = invariantContext
   const { labware: labwareState, tipState } = robotState
 
-  //  early exit if labwareId is a trashBin or wasteChute
-  if (labwareEntities[labwareId] == null || wellTargetName == null) {
+  const pipetteEntity = pipetteEntities[pipetteId]
+  const nozzleConfiguration =
+    nozzleConfigurationOverride ?? robotState.pipettes[pipetteId]?.nozzles
+  const { spec: pipetteSpecs } = pipetteEntity ?? {}
+
+  // NOTE: I don't like this, but step-generation is currently blind to robot type, so we'll infer from the pipette specs
+  const displayCategory = pipetteSpecs?.displayCategory
+  const isFlexPipette = displayCategory === 'FLEX'
+  const robotType = isFlexPipette ? FLEX_ROBOT_TYPE : OT2_ROBOT_TYPE
+  const deckDefinition = getDeckDefFromRobotType(robotType)
+
+  //  early exit if labwareId is a trashBin or wasteChute or if no nozzle is provided
+  if (
+    labwareEntities[labwareId] == null ||
+    wellTargetName == null ||
+    nozzleConfiguration == null ||
+    nozzleConfiguration === ALL
+  ) {
     return true
   }
 
-  const tiprackEntityId = Object.keys(labwareEntities).find(lwKey =>
-    lwKey.includes(tipRackDefURI)
-  )
+  const tiprackId = tipState.pipettes[pipetteId]?.tiprackURI
+  const tiprackEntity = tiprackId != null ? labwareEntities[tiprackId] : null
   const tiprackTipLength =
-    tiprackEntityId != null
-      ? labwareEntities[tiprackEntityId].def.parameters.tipLength
-      : 0
-  const stagingAreaSlots = Object.values(additionalEquipmentEntities)
-    .filter(ae => ae.name === 'stagingArea')
-    .map(stagingArea => stagingArea.location as string)
-  const pipetteEntity = pipetteEntities[pipetteId]
-  const pipetteHasTip = tipState.pipettes[pipetteId]
+    tiprackEntity != null ? tiprackEntity.def.parameters.tipLength : 0
+  const stagingAreaSlots = Object.values(stagingAreaEntities).map(
+    stagingArea => stagingArea.location as string
+  )
+  const pipetteHasTip = tipState.pipettes[pipetteId]?.hasTip ?? false
   // account for tip length if picking up tip
-  const tipLength = pipetteHasTip ? tiprackTipLength ?? 0 : 0
-  const labwareSlot = labwareState[labwareId].slot
+  const tipLength = pipetteHasTip ? (tiprackTipLength ?? 0) : 0
+  const labwareSlot = getSlotInLocationStack(labwareState[labwareId].stack)
   const addressableAreaOffset = getPositionFromSlotId(
     labwareSlot,
     deckDefinition
-  )
+  ) ?? [0, 0, 0]
+  const isOnFlexThermocycler =
+    robotType === FLEX_ROBOT_TYPE &&
+    labwareState[labwareId].stack.some(
+      item => moduleEntities[item]?.type === THERMOCYCLER_MODULE_TYPE
+    )
+  const thermocyclerOffset = isOnFlexThermocycler
+    ? (deckDefinition.locations.addressableAreas.find(
+        addressableArea => addressableArea.id === THERMOCYCLER_MODULE_V2
+      )?.offsetFromCutoutFixture ?? [0, 0, 0])
+    : [0, 0, 0]
+  const fullOffset = [
+    thermocyclerOffset[0] + addressableAreaOffset[0],
+    thermocyclerOffset[1] + addressableAreaOffset[1],
+    thermocyclerOffset[2] + addressableAreaOffset[2],
+  ]
   const wellTargetPoint = getWellPosition(
     labwareEntities[labwareId],
     wellTargetName,
     wellLocationOffset,
-    addressableAreaOffset,
+    fullOffset as CoordinateTuple,
     pipetteHasTip
   )
 
-  const isWithinPipetteExtents = getIsWithinPipetteExtents(
+  const { channels } = pipetteEntity.spec
+  const primaryNozzle =
+    primaryNozzleOverride ??
+    getDefaultPrimaryNozzle({
+      nozzles: nozzleConfiguration,
+      channels,
+    })
+
+  const tipOverlapOnNozzle =
+    tiprackEntity != null
+      ? getTipOverlap({
+          pipetteSpecs,
+          tiprackUri: tiprackEntity.labwareDefURI,
+          nozzles: nozzleConfiguration,
+        })
+      : 0
+  const pipetteBoundsAtWellLocation = getPipetteBoundsAtSpecifiedMoveToPosition(
+    pipetteEntity,
+    tipLength,
     wellTargetPoint,
-    //  TODO(jr, 4/22/24): PD only supports A12 as a primary nozzle for now
-    //  and only for 96-channel column pick up
-    NOZZLE_CONFIGURATION,
-    PRIMARY_NOZZLE
+    primaryNozzle,
+    tipOverlapOnNozzle
   )
+  const isWithinPipetteExtents = getIsMovementWithinDeckExtents({
+    channels,
+    boundingBox: pipetteBoundsAtWellLocation,
+    robotType,
+  })
   if (!isWithinPipetteExtents) {
     return false
-  } else {
-    const pipetteBoundsAtWellLocation = getPipetteBoundsAtSpecifiedMoveToPosition(
-      pipetteEntity,
-      tipLength,
-      wellTargetPoint
-    )
-    const surroundingSlots = getFlexSurroundingSlots(
-      labwareSlot,
-      stagingAreaSlots
-    )
-    const slotInfos: SlotInfo[] = surroundingSlots.map(slot => {
-      const addressableArea = getAddressableAreaFromSlotId(slot, deckDefinition)
-      const position = getPositionFromSlotId(slot, deckDefinition)
-      return {
-        addressableArea,
-        position,
-      }
-    })
-    return (
-      !getWillCollideWithThermocyclerLid(
-        pipetteBoundsAtWellLocation,
-        moduleEntities
-      ) &&
-      !getSlotHasPotentialCollidingObject(
-        pipetteBoundsAtWellLocation,
-        slotInfos,
-        robotState,
-        invariantContext,
-        labwareId
-      )
-    )
   }
+  const surroundingSlots =
+    robotType === OT2_ROBOT_TYPE
+      ? getOt2SurroundingSlots(labwareSlot as OT2AddressableAreaName)
+      : getFlexSurroundingSlots(labwareSlot, stagingAreaSlots)
+  const slotInfos: SlotInfo[] = surroundingSlots.map(slot => {
+    const addressableArea = getAddressableAreaFromSlotId(slot, deckDefinition)
+    const position = getPositionFromSlotId(slot, deckDefinition)
+    return {
+      addressableArea,
+      position,
+    }
+  })
+  return (
+    !getWillCollideWithThermocyclerLid(
+      pipetteBoundsAtWellLocation,
+      moduleEntities
+    ) &&
+    !getSlotHasPotentialCollidingObject(
+      pipetteBoundsAtWellLocation,
+      slotInfos,
+      robotState,
+      invariantContext,
+      robotType
+    )
+  )
+}
+
+interface TipPickupAvailability {
+  isSafe: boolean
+  isComplete?: boolean
+}
+
+export const getIsSafePickupWithinTiprack = (args: {
+  tipState: Record<string, TipState>
+  primaryNozzle: string
+  channels: PipetteChannels
+  nozzleConfiguration: NozzleConfigurationStyle
+  wellName: string
+  tiprackDef: LabwareDefinition
+  tipsToIgnore?: string[]
+}): TipPickupAvailability => {
+  const {
+    tipState,
+    primaryNozzle,
+    channels,
+    nozzleConfiguration,
+    wellName,
+    tiprackDef,
+    tipsToIgnore = [],
+  } = args
+  const { ordering } = tiprackDef
+
+  if (channels === 1) {
+    return { isSafe: true, isComplete: tipState[wellName] !== EMPTY }
+  }
+  if (channels === 8) {
+    const shouldReverse = primaryNozzle === 'H1'
+    const columnIndex = getTipColumnIndex(wellName)
+    const tipColumn = ordering[columnIndex]
+    const tipColumnOrdered = shouldReverse
+      ? [...tipColumn].reverse()
+      : tipColumn
+    if (nozzleConfiguration === SINGLE) {
+      const targetWellIndex = tipColumnOrdered.indexOf(wellName)
+      return {
+        isSafe: tipColumnOrdered
+          .slice(targetWellIndex + 1) // don't check the actual target well
+          .every(
+            well => tipState[well] === EMPTY || tipsToIgnore.includes(well)
+          ),
+        isComplete: tipState[wellName] !== EMPTY,
+      }
+    }
+    // 8 channel pickup, full column
+    return {
+      isSafe: true,
+      isComplete: tipColumnOrdered.every(well => tipState[well] !== EMPTY),
+    }
+  }
+
+  // channels = 96, all nozzles configured
+  if (nozzleConfiguration === ALL) {
+    return {
+      isSafe: true,
+      isComplete: Object.keys(tiprackDef.wells).every(
+        well => tipState[well] !== EMPTY
+      ),
+    }
+  }
+  // channels = 96, 8 nozzles configured
+  if (nozzleConfiguration === COLUMN) {
+    const shouldReverseColumns = primaryNozzle === 'A12'
+    const columnIndex = getTipColumnIndex(wellName)
+    const columnPreOrdering = ordering[columnIndex]
+    const tipColumnsOrdered = shouldReverseColumns
+      ? [...ordering].reverse()
+      : ordering
+    const targetColumnIndex = tipColumnsOrdered.indexOf(columnPreOrdering)
+    return {
+      isSafe: tipColumnsOrdered
+        .slice(targetColumnIndex + 1) // don't check the actual target column
+        .flat()
+        .every(well => tipState[well] === EMPTY || tipsToIgnore.includes(well)),
+      isComplete: tipColumnsOrdered[targetColumnIndex].every(
+        well => tipState[well] !== EMPTY
+      ),
+    }
+  }
+  // channels = 96, 1 nozzle configured
+  if (nozzleConfiguration === SINGLE) {
+    const primaryRowName = getTipRowName(primaryNozzle)
+    const primaryColumnName = getTipColumnName(primaryNozzle)
+    const shouldReverseRows = primaryRowName === 'H'
+    const shouldReverseColumns = primaryColumnName === '12'
+    const tipColumnsOrdered = shouldReverseColumns
+      ? [...ordering].reverse()
+      : ordering
+    const targetColumnIndex = tipColumnsOrdered.findIndex(column =>
+      column.some(columnWell => columnWell === wellName)
+    )
+
+    return {
+      isSafe: tipColumnsOrdered.slice(targetColumnIndex).every(column => {
+        const columnOrdered = shouldReverseRows ? [...column].reverse() : column
+        const rowIndex = columnOrdered.findIndex(
+          colWell => getTipRowName(colWell) === getTipRowName(wellName)
+        )
+        return columnOrdered.slice(rowIndex).every(
+          well =>
+            tipState[well] === EMPTY ||
+            tipsToIgnore.includes(well) ||
+            // need to include the well's own row and column, so ignore its own tip state
+            well === wellName
+        )
+      }),
+      isComplete: tipState[wellName] !== EMPTY,
+    }
+  }
+
+  // should not hit
+  return { isSafe: false }
+}
+
+export const getTipRowName = (wellName: string): string => wellName.slice(0, 1)
+
+export const getTipColumnName = (wellName: string): string => wellName.slice(1)
+
+export const getTipColumnIndex = (wellName: string): number =>
+  parseInt(wellName.slice(1)) - 1
+
+export const getDefaultPrimaryNozzle = (args: {
+  nozzles: NozzleConfigurationStyle
+  channels: PipetteChannels
+}): string => {
+  const { nozzles, channels } = args
+  if (channels === 8 && nozzles === SINGLE) {
+    return 'H1'
+  } else if (channels === 96) {
+    if (nozzles === COLUMN) {
+      return 'A12'
+    } else if (nozzles === SINGLE) {
+      return 'H12'
+    }
+  }
+  return 'A1'
+}
+
+export const getTargetTipsFromWellSets = (args: {
+  wellSets: string[][]
+  nozzles: NozzleConfigurationStyle
+  channels: PipetteChannels
+  primaryNozzle: string
+}): string[] => {
+  const { wellSets, nozzles, channels, primaryNozzle } = args
+  return wellSets.map(wellSet => {
+    // 96-channel pipette with ALL nozzle configuration
+    if (channels === 96 && nozzles === ALL) {
+      return primaryNozzle
+    }
+    // 96- or 8-channel pipette with COLUMN nozzle configuration
+    if (nozzles === COLUMN || (channels === 8 && nozzles === ALL)) {
+      const shouldReverse = getTipRowName(primaryNozzle) === 'H'
+      return shouldReverse ? wellSet[wellSet.length - 1] : wellSet[0]
+    }
+    // any pipette with SINGLE nozzle configuration
+    console.assert(
+      wellSet.length === 1,
+      'Well set for SINGLE nozzle configuration should have exactly 1 well'
+    )
+    return wellSet[0]
+  })
+}
+
+const getTipOverlap = (args: {
+  pipetteSpecs: PipetteV2Specs
+  tiprackUri: string
+  nozzles: NozzleConfigurationStyle
+}): number => {
+  const { pipetteSpecs, tiprackUri, nozzles } = args
+  const { channels } = pipetteSpecs
+  const overlapKey = getOverlapKeyForPipetteSpecs(channels, nozzles)
+  const tipOverlaps =
+    pipetteSpecs.pickUpTipConfigurations.pressFit.configurationsByNozzleMap[
+      overlapKey
+    ]?.default.tipOverlaps
+
+  // protect in case we get a bad overlap key
+  if (tipOverlaps == null) {
+    console.error(
+      `No tip overlaps found for ${nozzles} and ${overlapKey} overlap.`
+    )
+    return 0
+  }
+  const maxVersion = Math.max(
+    ...Object.keys(tipOverlaps).map(version => Number(version.slice(1)))
+  )
+  return (
+    tipOverlaps[`v${maxVersion}`]?.[tiprackUri] ??
+    tipOverlaps[`v${maxVersion}`]?.default ??
+    0
+  )
+}
+
+const getOverlapKeyForPipetteSpecs = (
+  channels: PipetteChannels,
+  nozzles: NozzleConfigurationStyle
+): string => {
+  if (channels === 1) {
+    return 'SingleA1'
+  }
+  if (channels === 8) {
+    return nozzles === SINGLE ? 'SingleH1' : 'Full'
+  }
+  if (channels === 96) {
+    if (nozzles === SINGLE) {
+      return 'SingleH12'
+    } else if (nozzles === COLUMN) {
+      return 'Column12'
+    }
+  }
+  // default
+  return 'Full'
+}
+
+const getIsMovementWithinDeckExtents = (args: {
+  channels: PipetteChannels
+  boundingBox: Point[]
+  robotType: RobotType
+}): boolean => {
+  const { channels, boundingBox, robotType } = args
+  const robotDef = getRobotDefFromRobotType(robotType)
+  const { paddingOffsets } = robotDef
+  const { front, rear, leftSide, rightSide } = paddingOffsets
+  const [xExtent, yExtent] = robotDef.extents
+  const [backLeftBound, frontRightBound] = boundingBox
+  const { x: pipetteLeftBound, y: pipetteBackBound } = backLeftBound
+  const { x: pipetteRightBound, y: pipetteFrontBound } = frontRightBound
+
+  if (channels === 96) {
+    // check left
+    if (pipetteRightBound < leftSide) {
+      return false
+    }
+    // check right
+    const rightLimit = xExtent + rightSide
+    if (pipetteLeftBound > rightLimit) {
+      return false
+    }
+  }
+
+  // 8- and 96-channel pipettes
+  if (channels !== 1) {
+    // check front
+    if (pipetteBackBound < front) {
+      return false
+    }
+    // check rear
+    const rearLimit = yExtent + rear
+    if (pipetteFrontBound > rearLimit) {
+      return false
+    }
+  }
+  return true
 }

@@ -1,24 +1,36 @@
-import * as React from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useSelector, useDispatch } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 
 import {
   ALIGN_CENTER,
   Box,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   SPACING,
   TYPOGRAPHY,
-  LegacyStyledText,
 } from '@opentrons/components'
 
-import { Divider } from '/app/atoms/structure'
+import { getTopPortalEl } from '/app/App/portal'
 import { ToggleButton } from '/app/atoms/buttons'
+import { Divider } from '/app/atoms/structure'
+import { useIsFlex, useRobot } from '/app/redux-resources/robots'
+import { getRobotSerialNumber, UNREACHABLE } from '/app/redux/discovery'
+import {
+  fetchSettings,
+  getRobotSettings,
+  updateSetting,
+} from '/app/redux/robot-settings'
+import { useIsEstopNotDisengaged } from '/app/resources/devices/hooks/useIsEstopNotDisengaged'
+import { useCurrentRun } from '/app/resources/runs'
+
 import {
   DeviceReset,
+  DisableStackerSensors,
   DisplayRobotName,
-  EnableStatusLight,
   EnableErrorRecoveryMode,
+  EnableStatusLight,
   FactoryMode,
   GantryHoming,
   LegacySettings,
@@ -31,60 +43,40 @@ import {
   UsageSettings,
   UseOlderAspirateBehavior,
 } from './AdvancedTab'
-import {
-  useRobot,
-  useIsFlex,
-  useIsRobotBusy,
-} from '/app/redux-resources/robots'
-import {
-  updateSetting,
-  getRobotSettings,
-  fetchSettings,
-} from '/app/redux/robot-settings'
-import { RenameRobotSlideout } from './AdvancedTab/AdvancedTabSlideouts/RenameRobotSlideout'
-import { DeviceResetSlideout } from './AdvancedTab/AdvancedTabSlideouts/DeviceResetSlideout'
 import { DeviceResetModal } from './AdvancedTab/AdvancedTabSlideouts/DeviceResetModal'
+import { DeviceResetSlideout } from './AdvancedTab/AdvancedTabSlideouts/DeviceResetSlideout'
 import { FactoryModeSlideout } from './AdvancedTab/AdvancedTabSlideouts/FactoryModeSlideout'
+import { RenameRobotSlideout } from './AdvancedTab/AdvancedTabSlideouts/RenameRobotSlideout'
 import { handleUpdateBuildroot } from './UpdateBuildroot'
-import { getRobotSerialNumber, UNREACHABLE } from '/app/redux/discovery'
-import { getTopPortalEl } from '/app/App/portal'
-import { useIsEstopNotDisengaged } from '/app/resources/devices/hooks/useIsEstopNotDisengaged'
 
-import type { State, Dispatch } from '/app/redux/types'
+import type { MouseEventHandler } from 'react'
+import type { ResetConfigRequest } from '/app/redux/robot-admin/types'
 import type {
   RobotSettings,
   RobotSettingsField,
 } from '/app/redux/robot-settings/types'
-import type { ResetConfigRequest } from '/app/redux/robot-admin/types'
+import type { Dispatch, State } from '/app/redux/types'
 
 interface RobotSettingsAdvancedProps {
   robotName: string
-  updateRobotStatus: (isRobotBusy: boolean) => void
+  isRobotBusy: boolean
 }
 
 export function RobotSettingsAdvanced({
   robotName,
-  updateRobotStatus,
+  isRobotBusy,
 }: RobotSettingsAdvancedProps): JSX.Element {
-  const [
-    showRenameRobotSlideout,
-    setShowRenameRobotSlideout,
-  ] = React.useState<boolean>(false)
-  const [
-    showDeviceResetSlideout,
-    setShowDeviceResetSlideout,
-  ] = React.useState<boolean>(false)
-  const [
-    showDeviceResetModal,
-    setShowDeviceResetModal,
-  ] = React.useState<boolean>(false)
-  const [
-    showFactoryModeSlideout,
-    setShowFactoryModeSlideout,
-  ] = React.useState<boolean>(false)
+  const [showRenameRobotSlideout, setShowRenameRobotSlideout] =
+    useState<boolean>(false)
+  const [showDeviceResetSlideout, setShowDeviceResetSlideout] =
+    useState<boolean>(false)
+  const [showDeviceResetModal, setShowDeviceResetModal] =
+    useState<boolean>(false)
+  const [showFactoryModeSlideout, setShowFactoryModeSlideout] =
+    useState<boolean>(false)
 
-  const isRobotBusy = useIsRobotBusy({ poll: true })
   const isEstopNotDisengaged = useIsEstopNotDisengaged(robotName)
+  const currentRun = useCurrentRun()
 
   const robot = useRobot(robotName)
   const isFlex = useIsFlex(robotName)
@@ -95,10 +87,12 @@ export function RobotSettingsAdvanced({
   const reachable = robot?.status !== UNREACHABLE
   const sn = robot?.status != null ? getRobotSerialNumber(robot) : null
 
-  const [isRobotReachable, setIsRobotReachable] = React.useState<boolean>(
-    reachable
-  )
-  const [resetOptions, setResetOptions] = React.useState<ResetConfigRequest>({})
+  const [isRobotReachable, setIsRobotReachable] = useState<boolean>(reachable)
+  // todo(mm, 2025-03-27): This duplicates the default resetOptions inside DeviceResetSlideout.
+  const [resetOptions, setResetOptions] = useState<ResetConfigRequest>({
+    resetLabwareOffsets: false,
+    settingsResets: {},
+  })
   const findSettings = (id: string): RobotSettingsField | undefined =>
     settings?.find(s => s.id === id)
 
@@ -124,13 +118,9 @@ export function RobotSettingsAdvanced({
 
   const dispatch = useDispatch<Dispatch>()
 
-  React.useEffect(() => {
+  useEffect(() => {
     dispatch(fetchSettings(robotName))
   }, [dispatch, robotName])
-
-  React.useEffect(() => {
-    updateRobotStatus(isRobotBusy)
-  }, [isRobotBusy, updateRobotStatus])
 
   return (
     <>
@@ -218,6 +208,15 @@ export function RobotSettingsAdvanced({
             <EnableErrorRecoveryMode isRobotBusy={isRobotBusy} />
           </>
         ) : null}
+        {isFlex ? (
+          <>
+            <Divider marginY={SPACING.spacing16} />
+            <DisableStackerSensors
+              robotName={robotName}
+              isRobotBusy={isRobotBusy || isEstopNotDisengaged}
+            />
+          </>
+        ) : null}
         <Divider marginY={SPACING.spacing16} />
         <OpenJupyterControl
           robotIp={ipAddress}
@@ -226,7 +225,7 @@ export function RobotSettingsAdvanced({
         <Divider marginY={SPACING.spacing16} />
         <UpdateRobotSoftware
           robotName={robotName}
-          isRobotBusy={isRobotBusy}
+          currentRun={currentRun}
           onUpdateStart={() => {
             handleUpdateBuildroot(robot)
           }}
@@ -291,7 +290,7 @@ export function FeatureFlagToggle({
 
   if (id == null) return null
 
-  const handleClick: React.MouseEventHandler<Element> = () => {
+  const handleClick: MouseEventHandler<Element> = () => {
     if (!isRobotBusy) {
       dispatch(updateSetting(robotName, id, !value))
     }
@@ -310,7 +309,7 @@ export function FeatureFlagToggle({
         >
           {title}
         </LegacyStyledText>
-        <LegacyStyledText as="p">{description}</LegacyStyledText>
+        <LegacyStyledText forwardedAs="p">{description}</LegacyStyledText>
       </Box>
       <ToggleButton
         label={title}

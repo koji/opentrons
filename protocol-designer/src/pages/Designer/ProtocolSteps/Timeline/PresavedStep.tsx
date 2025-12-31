@@ -1,19 +1,27 @@
-import { useSelector, useDispatch } from 'react-redux'
 import { useTranslation } from 'react-i18next'
-import { PRESAVED_STEP_ID } from '../../../../steplist/types'
-import { selectors as stepFormSelectors } from '../../../../step-forms'
-import { stepIconsByType } from '../../../../form-types'
+import { useDispatch, useSelector } from 'react-redux'
+
+import { stepIconsByType } from '/protocol-designer/form-types'
+import { selectors as stepFormSelectors } from '/protocol-designer/step-forms'
+import { PRESAVED_STEP_ID } from '/protocol-designer/steplist/types'
 import {
   getHoveredTerminalItemId,
   getSelectedTerminalItemId,
   actions as stepsActions,
-} from '../../../../ui/steps'
-import { StepContainer } from './StepContainer'
+} from '/protocol-designer/ui/steps'
 
-export function PresavedStep(): JSX.Element | null {
+import { ConnectedStepContainer } from './ConnectedStepContainer'
+
+interface PresavedStepProps {
+  sidebarWidth: number
+}
+
+export function PresavedStep({
+  sidebarWidth,
+}: PresavedStepProps): JSX.Element | null {
   const { t } = useTranslation('application')
   const presavedStepForm = useSelector(stepFormSelectors.getPresavedStepForm)
-  const stepNumber = useSelector(stepFormSelectors.getOrderedStepIds).length + 1
+  const stepNumber = useSelector(stepFormSelectors.getNextUserVisibleStepNumber)
   const hovered = useSelector(getHoveredTerminalItemId) === PRESAVED_STEP_ID
   const selected = useSelector(getSelectedTerminalItemId) === PRESAVED_STEP_ID
   const dispatch = useDispatch()
@@ -32,13 +40,16 @@ export function PresavedStep(): JSX.Element | null {
   const stepType = presavedStepForm.stepType
 
   return (
-    <StepContainer
+    <ConnectedStepContainer
       onMouseEnter={highlightStep}
       onMouseLeave={unhighlightStep}
       selected={selected}
       hovered={hovered}
+      stepNumber={stepNumber}
       iconName={stepIconsByType[stepType]}
-      title={`${stepNumber}. ${t(`stepType.${stepType}`)}`}
+      text={t(`stepType.${stepType}`)}
+      subtext={null}
+      sidebarWidth={sidebarWidth}
     />
   )
 }

@@ -1,12 +1,12 @@
 import path from 'path'
-import fs from 'fs-extra'
-import uuid from 'uuid/v4'
-
 import { app, shell } from 'electron'
+import fs from 'fs-extra'
+import { v4 as uuidv4 } from 'uuid'
 
-import type { StoredProtocolDir } from '@opentrons/app/src/redux/protocol-storage'
-import type { Dirent } from 'fs'
 import { analyzeProtocolSource } from '../protocol-analysis'
+
+import type { Dirent } from 'fs'
+import type { StoredProtocolDir } from '@opentrons/app/src/redux/protocol-storage'
 
 /**
  * Module for managing local protocol files on the host filesystem
@@ -52,12 +52,18 @@ export function readDirectoriesWithinDirectory(dir: string): Promise<string[]> {
   })
 }
 
+const VALID_PROTOCOL_FILE_EXTENSIONS = ['.py', '.json']
 export function readFilesWithinDirectory(dir: string): Promise<string[]> {
   const getAbsolutePath = (e: Dirent): string => path.join(dir, e.name)
 
+  const isValidProtocolFile = (e: Dirent): boolean => {
+    const extension = path.extname(e.name).toLowerCase()
+    return e.isFile() && VALID_PROTOCOL_FILE_EXTENSIONS.includes(extension)
+  }
+
   return fs.readdir(dir, { withFileTypes: true }).then((entries: Dirent[]) => {
     const protocolDirPaths = entries
-      .filter(e => e.isFile())
+      .filter(isValidProtocolFile)
       .map(getAbsolutePath)
 
     return protocolDirPaths
@@ -108,7 +114,7 @@ export function addProtocolFile(
   mainFileSourcePath: string,
   protocolsDirPath: string
 ): Promise<string> {
-  const protocolKey = uuid()
+  const protocolKey = uuidv4()
   const protocolDirPath = path.join(protocolsDirPath, protocolKey as string)
 
   const srcDirPath = path.join(protocolDirPath, PROTOCOL_SRC_DIRECTORY_NAME)
@@ -159,7 +165,14 @@ export function analyzeProtocolByKey(
     PROTOCOL_ANALYSIS_DIRECTORY_NAME
   )
   const destFilePath = makeAnalysisFilePath(analysisDirPath)
-  return analyzeProtocolSource(srcDirPath, destFilePath)
+  return readFilesWithinDirectory(srcDirPath).then(dirsContainingProtocol => {
+    if (dirsContainingProtocol.length === 0) {
+      throw new Error(
+        `No valid protocol files (.py, .json) found in directory: ${srcDirPath}`
+      )
+    }
+    return analyzeProtocolSource(dirsContainingProtocol[0], destFilePath)
+  })
 }
 
 export function viewProtocolSourceFolder(

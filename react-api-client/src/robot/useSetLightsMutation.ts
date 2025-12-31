@@ -1,12 +1,15 @@
-import { setLights } from '@opentrons/api-client'
 import { useMutation } from 'react-query'
+
+import { setLights } from '@opentrons/api-client'
+
 import { useHost } from '../api'
+
+import type { AxiosError } from 'axios'
 import type {
-  UseMutationResult,
   UseMutateFunction,
   UseMutationOptions,
+  UseMutationResult,
 } from 'react-query'
-import type { AxiosError } from 'axios'
 import type { HostConfig, Lights, SetLightsData } from '@opentrons/api-client'
 
 export type UseSetLightsMutationResult = UseMutationResult<
@@ -33,7 +36,7 @@ export function useSetLightsMutation(
   const mutation = useMutation<Lights, AxiosError, SetLightsData>(
     [host, 'robot', 'lights'],
     setLightsData =>
-      setLights(host as HostConfig, setLightsData)
+      setLights(host!, setLightsData)
         .then(response => response.data)
         .catch(e => {
           throw e

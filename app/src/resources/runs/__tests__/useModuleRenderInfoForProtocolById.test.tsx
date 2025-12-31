@@ -1,23 +1,27 @@
 import { renderHook } from '@testing-library/react'
-import { vi, it, expect, describe, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { when } from 'vitest-when'
 
 import {
+  heater_shaker_commands_with_results_key,
   TEMPERATURE_MODULE_TYPE,
   TEMPERATURE_MODULE_V2,
   TEMPERATURE_MODULE_V2_FIXTURE,
-  heater_shaker_commands_with_results_key,
 } from '@opentrons/shared-data'
-import { useMostRecentCompletedAnalysis } from '../useMostRecentCompletedAnalysis'
-import { getProtocolModulesInfo } from '/app/transformations/analysis'
-import { useStoredProtocolAnalysis } from '/app/resources/analysis'
-import { useAttachedModules } from '/app/resources/modules'
-import { useModuleRenderInfoForProtocolById } from '../useModuleRenderInfoForProtocolById'
-import { useNotifyDeckConfigurationQuery } from '/app/resources/deck_configuration'
+
 import {
   mockTemperatureModuleGen2,
   mockThermocycler,
 } from '/app/redux/modules/__fixtures__'
+import { useStoredProtocolAnalysis } from '/app/resources/analysis'
+import { useNotifyDeckConfigurationQuery } from '/app/resources/deck_configuration'
+import { useAttachedModules } from '/app/resources/modules'
+import { getProtocolModulesInfo } from '/app/transformations/analysis'
+
+import { useModuleRenderInfoForProtocolById } from '../useModuleRenderInfoForProtocolById'
+import { useMostRecentCompletedAnalysis } from '../useMostRecentCompletedAnalysis'
+
+import type { UseQueryResult } from 'react-query'
 import type {
   CutoutConfig,
   DeckConfiguration,
@@ -25,7 +29,6 @@ import type {
   ModuleType,
   ProtocolAnalysisOutput,
 } from '@opentrons/shared-data'
-import type { UseQueryResult } from 'react-query'
 import type { AttachedModule } from '/app/redux/modules/types'
 
 vi.mock('/app/transformations/analysis')
@@ -34,7 +37,8 @@ vi.mock('/app/resources/analysis')
 vi.mock('../useMostRecentCompletedAnalysis')
 vi.mock('/app/resources/deck_configuration')
 
-const heaterShakerCommandsWithResultsKey = (heater_shaker_commands_with_results_key as unknown) as ProtocolAnalysisOutput
+const heaterShakerCommandsWithResultsKey =
+  heater_shaker_commands_with_results_key as unknown as ProtocolAnalysisOutput
 
 const PROTOCOL_DETAILS = {
   displayName: 'fake protocol',
@@ -84,7 +88,6 @@ const mockTemperatureModuleDefinition = {
     labwareInterfaceXDimension: 80,
     labwareInterfaceYDimension: 120,
   },
-  twoDimensionalRendering: { children: [] },
 }
 
 const TEMPERATURE_MODULE_INFO = {
@@ -118,7 +121,7 @@ describe('useModuleRenderInfoForProtocolById hook', () => {
     ])
     when(vi.mocked(useStoredProtocolAnalysis))
       .calledWith('1')
-      .thenReturn((PROTOCOL_DETAILS as unknown) as ProtocolAnalysisOutput)
+      .thenReturn(PROTOCOL_DETAILS as unknown as ProtocolAnalysisOutput)
     when(vi.mocked(useMostRecentCompletedAnalysis))
       .calledWith('1')
       .thenReturn(PROTOCOL_DETAILS.protocolData as any)

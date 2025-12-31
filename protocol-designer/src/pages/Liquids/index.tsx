@@ -1,28 +1,17 @@
-import { useState, useEffect } from 'react'
-import { useTranslation } from 'react-i18next'
+import { useEffect, useState } from 'react'
 import { useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
+
+import { useOnClickOutside } from '@opentrons/components'
+
 import {
-  ALIGN_CENTER,
-  DIRECTION_COLUMN,
-  Flex,
-  Icon,
-  JUSTIFY_SPACE_BETWEEN,
-  PrimaryButton,
-  SPACING,
-  StyledText,
-  useOnClickOutside,
-} from '@opentrons/components'
-import {
-  AssignLiquidsModal,
+  AssignLiquidsModalContainer,
   DefineLiquidsModal,
-  ProtocolMetadataNav,
-} from '../../organisms'
+} from '../../components/organisms'
+import { LiquidsOverflowMenu } from '../../components/organisms/LiquidsOverflowMenu'
 import { selectors as labwareIngredSelectors } from '../../labware-ingred/selectors'
-import { LiquidsOverflowMenu } from '../Designer/LiquidsOverflowMenu'
 
 export function Liquids(): JSX.Element {
-  const { t } = useTranslation('starting_deck_state')
   const navigate = useNavigate()
   const selectedLabware = useSelector(
     labwareIngredSelectors.getSelectedLabwareId
@@ -66,26 +55,10 @@ export function Liquids(): JSX.Element {
         />
       ) : null}
 
-      <Flex flexDirection={DIRECTION_COLUMN}>
-        <Flex padding={SPACING.spacing12}>
-          <Flex justifyContent={JUSTIFY_SPACE_BETWEEN} width="100%">
-            <ProtocolMetadataNav />
-            <PrimaryButton
-              onClick={() => {
-                showLiquidOverflowMenu(true)
-              }}
-            >
-              <Flex alignItems={ALIGN_CENTER} gridGap={SPACING.spacing8}>
-                <Icon size="1rem" name="liquid" />
-                <StyledText desktopStyle="bodyDefaultRegular">
-                  {t('liquids')}
-                </StyledText>
-              </Flex>
-            </PrimaryButton>
-          </Flex>
-        </Flex>
-        <AssignLiquidsModal />
-      </Flex>
+      <AssignLiquidsModalContainer
+        showLiquidOverflowMenu={showLiquidOverflowMenu}
+        setDefineLiquidModal={setDefineLiquidModal}
+      />
     </>
   )
 }

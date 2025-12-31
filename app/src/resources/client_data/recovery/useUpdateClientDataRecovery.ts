@@ -1,7 +1,9 @@
-import { useUpdateClientData } from '@opentrons/react-api-client'
 import { useSelector } from 'react-redux'
 
+import { useUpdateClientData } from '@opentrons/react-api-client'
+
 import { getUserId } from '/app/redux/config'
+
 import { KEYS } from '../constants'
 
 import type {
@@ -24,10 +26,8 @@ export type UseUpdateClientDataRecoveryResult = Omit<
 export function useUpdateClientDataRecovery(
   options: UseUpdateClientDataMutationOptions<ClientDataRecovery> = {}
 ): UseUpdateClientDataRecoveryResult {
-  const {
-    updateClientData,
-    ...mutate
-  } = useUpdateClientData<ClientDataRecovery>(KEYS.ERROR_RECOVERY, options)
+  const { updateClientData, ...mutate } =
+    useUpdateClientData<ClientDataRecovery>(KEYS.ERROR_RECOVERY, options)
   const thisUserId = useSelector(getUserId)
 
   const updateWithIntent = (intent: ClientDataRecovery['intent']): void => {

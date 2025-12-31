@@ -1,18 +1,21 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
 import {
-  transfer_settings,
+  getModuleDef,
   multiple_temp_modules,
   ot2DeckDefV5,
-  getModuleDef2,
-} from '@opentrons/shared-data'
-import { getProtocolModulesInfo } from '../getProtocolModulesInfo'
-import type {
-  ProtocolAnalysisOutput,
-  LoadedLabware,
-  LoadedModule,
+  transfer_settings,
 } from '@opentrons/shared-data'
 
-const protocolWithMagTempTC = ({
+import { getProtocolModulesInfo } from '../getProtocolModulesInfo'
+
+import type {
+  LoadedLabware,
+  LoadedModule,
+  ProtocolAnalysisOutput,
+} from '@opentrons/shared-data'
+
+const protocolWithMagTempTC = {
   ...transfer_settings,
   labware: [
     {
@@ -21,46 +24,39 @@ const protocolWithMagTempTC = ({
       definitionUri: 'opentrons/opentrons_1_trash_1100ml_fixed/1',
     },
     {
-      id:
-        '3e047fb0-3412-11eb-ad93-ed232a2337cf:opentrons/opentrons_96_tiprack_1000ul/1',
+      id: '3e047fb0-3412-11eb-ad93-ed232a2337cf:opentrons/opentrons_96_tiprack_1000ul/1',
       displayName: 'Opentrons 96 Tip Rack 1000 µL',
       definitionUri: 'opentrons/opentrons_96_tiprack_1000ul/1',
     },
     {
-      id:
-        '5ae317e0-3412-11eb-ad93-ed232a2337cf:opentrons/nest_1_reservoir_195ml/1',
+      id: '5ae317e0-3412-11eb-ad93-ed232a2337cf:opentrons/nest_1_reservoir_195ml/1',
       displayName: 'NEST 1 Well Reservoir 195 mL',
       definitionUri: 'opentrons/nest_1_reservoir_195ml/1',
     },
     {
-      id:
-        '60e8b050-3412-11eb-ad93-ed232a2337cf:opentrons/corning_24_wellplate_3.4ml_flat/1',
+      id: '60e8b050-3412-11eb-ad93-ed232a2337cf:opentrons/corning_24_wellplate_3.4ml_flat/1',
       displayName: 'Corning 24 Well Plate 3.4 mL Flat',
       definitionUri: 'opentrons/corning_24_wellplate_3.4ml_flat/1',
     },
     {
-      id:
-        'aac5d680-3412-11eb-ad93-ed232a2337cf:opentrons/nest_96_wellplate_100ul_pcr_full_skirt/1',
+      id: 'aac5d680-3412-11eb-ad93-ed232a2337cf:opentrons/nest_96_wellplate_100ul_pcr_full_skirt/1',
       displayName: 'NEST 96 Well Plate 100 µL PCR Full Skirt',
       definitionUri: 'opentrons/nest_96_wellplate_100ul_pcr_full_skirt/1',
     },
     {
-      id:
-        'ada13110-3412-11eb-ad93-ed232a2337cf:opentrons/opentrons_96_aluminumblock_generic_pcr_strip_200ul/1',
+      id: 'ada13110-3412-11eb-ad93-ed232a2337cf:opentrons/opentrons_96_aluminumblock_generic_pcr_strip_200ul/1',
       displayName:
         'Opentrons 96 Well Aluminum Block with Generic PCR Strip 200 µL',
       definitionUri:
         'opentrons/opentrons_96_aluminumblock_generic_pcr_strip_200ul/1',
     },
     {
-      id:
-        'b0103540-3412-11eb-ad93-ed232a2337cf:opentrons/nest_96_wellplate_100ul_pcr_full_skirt/1',
+      id: 'b0103540-3412-11eb-ad93-ed232a2337cf:opentrons/nest_96_wellplate_100ul_pcr_full_skirt/1',
       displayName: 'NEST 96 Well Plate 100 µL PCR Full Skirt (1)',
       definitionUri: 'opentrons/nest_96_wellplate_100ul_pcr_full_skirt/1',
     },
     {
-      id:
-        'faa13a50-a9bf-11eb-bce6-9f1d5b9c1a1b:opentrons/opentrons_96_tiprack_20ul/1',
+      id: 'faa13a50-a9bf-11eb-bce6-9f1d5b9c1a1b:opentrons/opentrons_96_tiprack_20ul/1',
       displayName: 'Opentrons 96 Tip Rack 20 µL',
       definitionUri: 'opentrons/opentrons_96_tiprack_20ul/1',
     },
@@ -93,8 +89,8 @@ const protocolWithMagTempTC = ({
       },
     },
   ] as LoadedModule[],
-} as unknown) as ProtocolAnalysisOutput
-const protocolWithMultipleTemps = ({
+} as unknown as ProtocolAnalysisOutput
+const protocolWithMultipleTemps = {
   ...multiple_temp_modules,
   labware: [
     {
@@ -103,46 +99,39 @@ const protocolWithMultipleTemps = ({
       definitionUri: 'opentrons/opentrons_1_trash_1100ml_fixed/1',
     },
     {
-      id:
-        '3e047fb0-3412-11eb-ad93-ed232a2337cf:opentrons/opentrons_96_tiprack_1000ul/1',
+      id: '3e047fb0-3412-11eb-ad93-ed232a2337cf:opentrons/opentrons_96_tiprack_1000ul/1',
       displayName: 'Opentrons 96 Tip Rack 1000 µL',
       definitionUri: 'opentrons/opentrons_96_tiprack_1000ul/1',
     },
     {
-      id:
-        '5ae317e0-3412-11eb-ad93-ed232a2337cf:opentrons/nest_1_reservoir_195ml/1',
+      id: '5ae317e0-3412-11eb-ad93-ed232a2337cf:opentrons/nest_1_reservoir_195ml/1',
       displayName: 'NEST 1 Well Reservoir 195 mL',
       definitionUri: 'opentrons/nest_1_reservoir_195ml/1',
     },
     {
-      id:
-        '60e8b050-3412-11eb-ad93-ed232a2337cf:opentrons/corning_24_wellplate_3.4ml_flat/1',
+      id: '60e8b050-3412-11eb-ad93-ed232a2337cf:opentrons/corning_24_wellplate_3.4ml_flat/1',
       displayName: 'Corning 24 Well Plate 3.4 mL Flat',
       definitionUri: 'opentrons/corning_24_wellplate_3.4ml_flat/1',
     },
     {
-      id:
-        'aac5d680-3412-11eb-ad93-ed232a2337cf:opentrons/nest_96_wellplate_100ul_pcr_full_skirt/1',
+      id: 'aac5d680-3412-11eb-ad93-ed232a2337cf:opentrons/nest_96_wellplate_100ul_pcr_full_skirt/1',
       displayName: 'NEST 96 Well Plate 100 µL PCR Full Skirt',
       definitionUri: 'opentrons/nest_96_wellplate_100ul_pcr_full_skirt/1',
     },
     {
-      id:
-        'ada13110-3412-11eb-ad93-ed232a2337cf:opentrons/opentrons_96_aluminumblock_generic_pcr_strip_200ul/1',
+      id: 'ada13110-3412-11eb-ad93-ed232a2337cf:opentrons/opentrons_96_aluminumblock_generic_pcr_strip_200ul/1',
       displayName:
         'Opentrons 96 Well Aluminum Block with Generic PCR Strip 200 µL',
       definitionUri:
         'opentrons/opentrons_96_aluminumblock_generic_pcr_strip_200ul/1',
     },
     {
-      id:
-        'b0103540-3412-11eb-ad93-ed232a2337cf:opentrons/nest_96_wellplate_100ul_pcr_full_skirt/1',
+      id: 'b0103540-3412-11eb-ad93-ed232a2337cf:opentrons/nest_96_wellplate_100ul_pcr_full_skirt/1',
       displayName: 'NEST 96 Well Plate 100 µL PCR Full Skirt (1)',
       definitionUri: 'opentrons/nest_96_wellplate_100ul_pcr_full_skirt/1',
     },
     {
-      id:
-        'faa13a50-a9bf-11eb-bce6-9f1d5b9c1a1b:opentrons/opentrons_96_tiprack_20ul/1',
+      id: 'faa13a50-a9bf-11eb-bce6-9f1d5b9c1a1b:opentrons/opentrons_96_tiprack_20ul/1',
       displayName: 'Opentrons 96 Tip Rack 20 µL',
       definitionUri: 'opentrons/opentrons_96_tiprack_20ul/1',
     },
@@ -175,7 +164,7 @@ const protocolWithMultipleTemps = ({
       },
     },
   ] as LoadedModule[],
-} as unknown) as ProtocolAnalysisOutput
+} as unknown as ProtocolAnalysisOutput
 const standardDeckDef = ot2DeckDefV5 as any
 
 describe('getProtocolModulesInfo', () => {
@@ -207,7 +196,7 @@ describe('getProtocolModulesInfo', () => {
         x: SLOT_1_COORDS[0],
         y: SLOT_1_COORDS[1],
         z: SLOT_1_COORDS[2],
-        moduleDef: getModuleDef2('magneticModuleV2'),
+        moduleDef: getModuleDef('magneticModuleV2'),
         nestedLabwareDef:
           transfer_settings.labwareDefinitions[
             'opentrons/nest_96_wellplate_100ul_pcr_full_skirt/1'
@@ -222,7 +211,7 @@ describe('getProtocolModulesInfo', () => {
         x: SLOT_3_COORDS[0],
         y: SLOT_3_COORDS[1],
         z: SLOT_3_COORDS[2],
-        moduleDef: getModuleDef2('temperatureModuleV2'),
+        moduleDef: getModuleDef('temperatureModuleV2'),
         nestedLabwareDef:
           transfer_settings.labwareDefinitions[
             'opentrons/opentrons_96_aluminumblock_generic_pcr_strip_200ul/1'
@@ -238,7 +227,7 @@ describe('getProtocolModulesInfo', () => {
         x: SLOT_7_COORDS[0],
         y: SLOT_7_COORDS[1],
         z: SLOT_7_COORDS[2],
-        moduleDef: getModuleDef2('thermocyclerModuleV1'),
+        moduleDef: getModuleDef('thermocyclerModuleV1'),
         nestedLabwareDef:
           transfer_settings.labwareDefinitions[
             'opentrons/nest_96_wellplate_100ul_pcr_full_skirt/1'
@@ -283,7 +272,7 @@ describe('getProtocolModulesInfo', () => {
         x: SLOT_1_COORDS[0],
         y: SLOT_1_COORDS[1],
         z: SLOT_1_COORDS[2],
-        moduleDef: getModuleDef2('magneticModuleV2'),
+        moduleDef: getModuleDef('magneticModuleV2'),
         nestedLabwareDef:
           multiple_temp_modules.labwareDefinitions[
             'opentrons/nest_96_wellplate_100ul_pcr_full_skirt/1'
@@ -298,7 +287,7 @@ describe('getProtocolModulesInfo', () => {
         x: SLOT_3_COORDS[0],
         y: SLOT_3_COORDS[1],
         z: SLOT_3_COORDS[2],
-        moduleDef: getModuleDef2('temperatureModuleV2'),
+        moduleDef: getModuleDef('temperatureModuleV2'),
         nestedLabwareDef:
           multiple_temp_modules.labwareDefinitions[
             'opentrons/opentrons_96_aluminumblock_generic_pcr_strip_200ul/1'
@@ -314,7 +303,7 @@ describe('getProtocolModulesInfo', () => {
         x: SLOT_7_COORDS[0],
         y: SLOT_7_COORDS[1],
         z: SLOT_7_COORDS[2],
-        moduleDef: getModuleDef2('temperatureModuleV2'),
+        moduleDef: getModuleDef('temperatureModuleV2'),
         nestedLabwareDef:
           multiple_temp_modules.labwareDefinitions[
             'opentrons/nest_96_wellplate_100ul_pcr_full_skirt/1'
@@ -347,7 +336,7 @@ describe('getProtocolModulesInfo', () => {
         x: SLOT_1_COORDS[0],
         y: SLOT_1_COORDS[1],
         z: SLOT_1_COORDS[2],
-        moduleDef: getModuleDef2('magneticModuleV2'),
+        moduleDef: getModuleDef('magneticModuleV2'),
         nestedLabwareDef:
           transfer_settings.labwareDefinitions[
             'opentrons/nest_96_wellplate_100ul_pcr_full_skirt/1'

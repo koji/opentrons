@@ -1,4 +1,8 @@
 {
+  "commandAnnotations": [],
+  "commandPreconditions": {
+    "isCameraUsed": false
+  },
   "commands": [
     {
       "commandType": "home",
@@ -1159,7 +1163,13 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "1",
+            "kind": "onAddressableArea"
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -1405,7 +1415,13 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "2",
+            "kind": "onAddressableArea"
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -2587,7 +2603,13 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "3",
+            "kind": "onAddressableArea"
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -2638,9 +2660,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -2652,9 +2674,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.099999999999994,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -2673,9 +2695,9 @@
         "volume": 20.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -2707,9 +2729,9 @@
         "volume": 20.0,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top",
           "volumeOffset": 0.0
@@ -2738,11 +2760,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -2786,7 +2809,7 @@
             "class": "AttributeError",
             "name": "pair_with",
             "obj": "P300 Single-Channel GEN2 on left mount",
-            "traceback": "  File \"/usr/local/lib/python3.10/site-packages/opentrons/protocols/execution/execute_python.py\", line N, in exec_run\n    exec(\"run(__context)\", new_globs)\n\n  File \"<string>\", line N, in <module>\n\n  File \"OT2_X_v2_7_P300S_TwinningError.py\", line N, in run\n"
+            "traceback": "  File \"<PATH>\", line N, in exec_run\n    exec(\"run(__context)\", new_globs)\n\n  File \"<string>\", line N, in <module>\n\n  File \"OT2_X_v2_7_P300S_TwinningError.py\", line N, in run\n"
           },
           "errorType": "PythonException",
           "id": "UUID",
@@ -2796,12 +2819,7 @@
       ]
     }
   ],
-  "files": [
-    {
-      "name": "OT2_X_v2_7_P300S_TwinningError.py",
-      "role": "main"
-    }
-  ],
+  "files": [],
   "labware": [
     {
       "definitionUri": "opentrons/opentrons_1_trash_1100ml_fixed/1",
@@ -2836,6 +2854,7 @@
       }
     }
   ],
+  "liquidClasses": [],
   "liquids": [],
   "metadata": {
     "apiLevel": "2.7",

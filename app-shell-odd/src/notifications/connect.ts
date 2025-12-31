@@ -1,13 +1,13 @@
 import mqtt from 'mqtt'
 
-import { connectionStore } from './store'
 import {
+  deserializeExpectedMessages,
   sendDeserialized,
   sendDeserializedGenericError,
-  deserializeExpectedMessages,
 } from './deserialize'
-import { unsubscribe } from './unsubscribe'
 import { notifyLog } from './notifyLog'
+import { connectionStore } from './store'
+import { unsubscribe } from './unsubscribe'
 
 import type { NotifyTopic } from '@opentrons/app/src/redux/shell/types'
 
@@ -66,7 +66,7 @@ export function connectAsync(brokerURL: string): Promise<mqtt.Client> {
 }
 
 export function establishListeners(): void {
-  const client = connectionStore.client as mqtt.MqttClient
+  const client = connectionStore.client!
   const { ip, robotName } = connectionStore
 
   client.on(

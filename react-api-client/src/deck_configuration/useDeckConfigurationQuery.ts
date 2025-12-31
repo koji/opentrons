@@ -1,8 +1,10 @@
 import { useQuery } from 'react-query'
+
 import { getDeckConfiguration } from '@opentrons/api-client'
+
 import { useHost } from '../api'
-import type { UseQueryResult, UseQueryOptions } from 'react-query'
-import type { HostConfig } from '@opentrons/api-client'
+
+import type { UseQueryOptions, UseQueryResult } from 'react-query'
 import type { DeckConfiguration } from '@opentrons/shared-data'
 
 export function useDeckConfigurationQuery(
@@ -12,7 +14,7 @@ export function useDeckConfigurationQuery(
   const query = useQuery<DeckConfiguration>(
     [host, 'deck_configuration'],
     () =>
-      getDeckConfiguration(host as HostConfig).then(
+      getDeckConfiguration(host!).then(
         response => response.data?.data?.cutoutFixtures ?? []
       ),
     { enabled: host !== null, ...options }

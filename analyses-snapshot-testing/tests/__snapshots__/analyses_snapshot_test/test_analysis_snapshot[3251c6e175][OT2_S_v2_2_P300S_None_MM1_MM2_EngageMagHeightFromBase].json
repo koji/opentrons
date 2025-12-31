@@ -1,4 +1,8 @@
 {
+  "commandAnnotations": [],
+  "commandPreconditions": {
+    "isCameraUsed": false
+  },
   "commands": [
     {
       "commandType": "home",
@@ -27,30 +31,6 @@
         "moduleId": "UUID"
       },
       "result": {
-        "definition": {
-          "calibrationPoint": {
-            "x": 124.875,
-            "y": 2.75,
-            "z": 82.25
-          },
-          "compatibleWith": [],
-          "dimensions": {
-            "bareOverallHeight": 110.152,
-            "overLabwareHeight": 4.052
-          },
-          "displayName": "Magnetic Module GEN1",
-          "gripperOffsets": {},
-          "labwareOffset": {
-            "x": 0.125,
-            "y": -0.125,
-            "z": 82.25
-          },
-          "model": "magneticModuleV1",
-          "moduleType": "magneticModuleType",
-          "otSharedSchema": "module/schemas/2",
-          "quirks": [],
-          "slotTransforms": {}
-        },
         "model": "magneticModuleV1",
         "moduleId": "UUID",
         "serialNumber": "UUID"
@@ -73,203 +53,6 @@
         "moduleId": "UUID"
       },
       "result": {
-        "definition": {
-          "calibrationPoint": {
-            "x": 124.875,
-            "y": 2.75,
-            "z": 82.25
-          },
-          "compatibleWith": [],
-          "dimensions": {
-            "bareOverallHeight": 110.152,
-            "overLabwareHeight": 4.052
-          },
-          "displayName": "Magnetic Module GEN2",
-          "gripperOffsets": {},
-          "labwareOffset": {
-            "x": -1.175,
-            "y": -0.125,
-            "z": 82.25
-          },
-          "model": "magneticModuleV2",
-          "moduleType": "magneticModuleType",
-          "otSharedSchema": "module/schemas/2",
-          "quirks": [],
-          "slotTransforms": {
-            "ot2_short_trash": {
-              "3": {
-                "labwareOffset": [
-                  [
-                    -1,
-                    0,
-                    0,
-                    0.3
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ]
-                ]
-              },
-              "6": {
-                "labwareOffset": [
-                  [
-                    -1,
-                    0,
-                    0,
-                    0.3
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ]
-                ]
-              },
-              "9": {
-                "labwareOffset": [
-                  [
-                    -1,
-                    0,
-                    0,
-                    0.3
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ]
-                ]
-              }
-            },
-            "ot2_standard": {
-              "3": {
-                "labwareOffset": [
-                  [
-                    -1,
-                    0,
-                    0,
-                    0.25
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ]
-                ]
-              },
-              "6": {
-                "labwareOffset": [
-                  [
-                    -1,
-                    0,
-                    0,
-                    0.25
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ]
-                ]
-              },
-              "9": {
-                "labwareOffset": [
-                  [
-                    -1,
-                    0,
-                    0,
-                    0.25
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ]
-                ]
-              }
-            }
-          }
-        },
         "model": "magneticModuleV2",
         "moduleId": "UUID",
         "serialNumber": "UUID"
@@ -1424,7 +1207,13 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "5",
+            "kind": "onAddressableArea"
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -1488,9 +1277,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -1502,9 +1291,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.099999999999994,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -1520,11 +1309,12 @@
         "alternateDropLocation": false,
         "labwareId": "UUID",
         "pipetteId": "UUID",
+        "scrape_tips": false,
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "default"
         },
@@ -1552,9 +1342,9 @@
         "pipetteId": "UUID",
         "wellLocation": {
           "offset": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
           },
           "origin": "top"
         },
@@ -1566,9 +1356,9 @@
           "y": 0.0,
           "z": 0.0
         },
-        "tipDiameter": 0,
+        "tipDiameter": 0.0,
         "tipLength": 51.099999999999994,
-        "tipVolume": 300
+        "tipVolume": 300.0
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -1583,12 +1373,7 @@
   },
   "createdAt": "TIMESTAMP",
   "errors": [],
-  "files": [
-    {
-      "name": "OT2_S_v2_2_P300S_None_MM1_MM2_EngageMagHeightFromBase.py",
-      "role": "main"
-    }
-  ],
+  "files": [],
   "labware": [
     {
       "definitionUri": "opentrons/opentrons_1_trash_1100ml_fixed/1",
@@ -1607,6 +1392,7 @@
       }
     }
   ],
+  "liquidClasses": [],
   "liquids": [],
   "metadata": {
     "apiLevel": "2.2"

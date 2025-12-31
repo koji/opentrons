@@ -1,23 +1,23 @@
 import { useTranslation } from 'react-i18next'
+
 import {
+  BORDERS,
   Box,
+  DIRECTION_COLUMN,
+  DIRECTION_ROW,
   Flex,
   Icon,
-  BORDERS,
-  SPACING,
-  DIRECTION_ROW,
   JUSTIFY_SPACE_BETWEEN,
-  DIRECTION_COLUMN,
   LegacyStyledText,
+  SPACING,
 } from '@opentrons/components'
 import { getDisplayVolume } from '@opentrons/shared-data'
 
-import type { LabwareWellGroupProperties } from '/app/local-resources/labware'
-
 import type {
-  LabwareDefinition2 as LabwareDefinition,
+  LabwareDefinition,
   LabwareVolumeUnits,
 } from '@opentrons/shared-data'
+import type { LabwareWellGroupProperties } from '/app/local-resources/labware'
 
 export interface AllWellPropertiesProps {
   definition: LabwareDefinition
@@ -59,8 +59,10 @@ export function WellProperties(props: WellPropertiesProps): JSX.Element {
           flexDirection={DIRECTION_COLUMN}
           justifyContent={JUSTIFY_SPACE_BETWEEN}
         >
-          <LegacyStyledText as="h6">{t('max_volume')}</LegacyStyledText>
-          <LegacyStyledText as="p">
+          <LegacyStyledText forwardedAs="h6">
+            {t('max_volume')}
+          </LegacyStyledText>
+          <LegacyStyledText forwardedAs="p">
             {vol != null
               ? `${String(getDisplayVolume(vol, units, 2))} ${String(units)}`
               : t('various')}
@@ -73,10 +75,12 @@ export function WellProperties(props: WellPropertiesProps): JSX.Element {
               justifyContent={JUSTIFY_SPACE_BETWEEN}
               marginRight={SPACING.spacing16}
             >
-              <LegacyStyledText as="h6">
+              <LegacyStyledText forwardedAs="h6">
                 {t(wellLabel)} {t('shape')}
               </LegacyStyledText>
-              <LegacyStyledText as="p">{wellBottomValue}</LegacyStyledText>
+              <LegacyStyledText forwardedAs="p">
+                {wellBottomValue}
+              </LegacyStyledText>
             </Flex>
             <Icon
               height="1.25rem"

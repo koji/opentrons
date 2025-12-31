@@ -6,9 +6,9 @@ import {
   DIRECTION_COLUMN,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   SPACING,
   TYPOGRAPHY,
-  LegacyStyledText,
 } from '@opentrons/components'
 
 import { ToggleButton } from '/app/atoms/buttons'
@@ -31,13 +31,13 @@ export function EnableErrorRecoveryMode({
       <Box width="70%">
         <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing4}>
           <LegacyStyledText
-            as="p"
+            forwardedAs="p"
             fontWeight={TYPOGRAPHY.fontWeightSemiBold}
             id="AdvancedSettings_Error_Recovery_Mode"
           >
             {t('error_recovery_mode')}
           </LegacyStyledText>
-          <LegacyStyledText as="p">
+          <LegacyStyledText forwardedAs="p">
             {t('error_recovery_mode_description')}
           </LegacyStyledText>
         </Flex>

@@ -1,24 +1,25 @@
-import { useRef, useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { useSelector, useDispatch } from 'react-redux'
 import { useTranslation } from 'react-i18next'
-import { ModalShell } from '@opentrons/components'
+import { useDispatch, useSelector } from 'react-redux'
+
+import { ModalShell, WizardHeader } from '@opentrons/components'
 
 import { getTopPortalEl } from '/app/App/portal'
-import { WizardHeader } from '/app/molecules/WizardHeader'
 import { CalibratePipetteOffset } from '/app/organisms/Desktop/CalibratePipetteOffset'
 import { LoadingState } from '/app/organisms/Desktop/CalibrationPanels'
+import { pipetteOffsetCalibrationStarted } from '/app/redux/analytics'
 import * as RobotApi from '/app/redux/robot-api'
 import * as Sessions from '/app/redux/sessions'
 import { getPipetteOffsetCalibrationSession } from '/app/redux/sessions/pipette-offset-calibration/selectors'
-import { pipetteOffsetCalibrationStarted } from '/app/redux/analytics'
+
 import type { DashboardCalOffsetInvoker } from '/app/organisms/Desktop/Devices/hooks/useCalibrationTaskList'
-import type { State } from '/app/redux/types'
-import type {
-  SessionCommandString,
-  PipetteOffsetCalibrationSession,
-} from '/app/redux/sessions/types'
 import type { RequestState } from '/app/redux/robot-api/types'
+import type {
+  PipetteOffsetCalibrationSession,
+  SessionCommandString,
+} from '/app/redux/sessions/types'
+import type { State } from '/app/redux/types'
 
 // pipette calibration commands for which the full page spinner should not appear
 const spinnerCommandBlockList: SessionCommandString[] = [
@@ -36,11 +37,10 @@ export function useDashboardCalibratePipOffset(
   const dispatch = useDispatch()
   const { t } = useTranslation('robot_calibration')
 
-  const pipOffsetCalSession: PipetteOffsetCalibrationSession | null = useSelector(
-    (state: State) => {
+  const pipOffsetCalSession: PipetteOffsetCalibrationSession | null =
+    useSelector((state: State) => {
       return getPipetteOffsetCalibrationSession(state, robotName)
-    }
-  )
+    })
 
   const [dispatchRequests, requestIds] = RobotApi.useDispatchApiRequests(
     dispatchedAction => {
@@ -51,7 +51,7 @@ export function useDashboardCalibratePipOffset(
       ) {
         createRequestId.current =
           'requestId' in dispatchedAction.meta
-            ? dispatchedAction.meta.requestId ?? null
+            ? (dispatchedAction.meta.requestId ?? null)
             : null
       } else if (
         dispatchedAction.type === Sessions.DELETE_SESSION &&
@@ -59,7 +59,7 @@ export function useDashboardCalibratePipOffset(
       ) {
         deleteRequestId.current =
           'requestId' in dispatchedAction.meta
-            ? dispatchedAction.meta.requestId ?? null
+            ? (dispatchedAction.meta.requestId ?? null)
             : null
       } else if (
         dispatchedAction.type === Sessions.CREATE_SESSION_COMMAND &&
@@ -68,7 +68,7 @@ export function useDashboardCalibratePipOffset(
       ) {
         jogRequestId.current =
           'requestId' in dispatchedAction.meta
-            ? dispatchedAction.meta.requestId ?? null
+            ? (dispatchedAction.meta.requestId ?? null)
             : null
       } else if (
         dispatchedAction.type !== Sessions.CREATE_SESSION_COMMAND ||
@@ -78,7 +78,7 @@ export function useDashboardCalibratePipOffset(
       ) {
         spinnerRequestId.current =
           'meta' in dispatchedAction && 'requestId' in dispatchedAction.meta
-            ? dispatchedAction.meta.requestId ?? null
+            ? (dispatchedAction.meta.requestId ?? null)
             : null
       }
     }
@@ -119,37 +119,38 @@ export function useDashboardCalibratePipOffset(
     }
   }, [shouldClose, onComplete])
 
-  const handleStartDashboardPipOffsetCalSession: DashboardCalOffsetInvoker = props => {
-    const { params } = props
-    const {
-      mount,
-      shouldRecalibrateTipLength = false,
-      hasCalibrationBlock = false,
-      tipRackDefinition = null,
-    } = params
-    dispatchRequests(
-      Sessions.ensureSession(
-        robotName,
-        Sessions.SESSION_TYPE_PIPETTE_OFFSET_CALIBRATION,
-        {
-          mount,
-          shouldRecalibrateTipLength,
-          hasCalibrationBlock,
-          tipRackDefinition,
-        }
-      )
-    )
-    dispatch(
-      pipetteOffsetCalibrationStarted(
+  const handleStartDashboardPipOffsetCalSession: DashboardCalOffsetInvoker =
+    props => {
+      const { params } = props
+      const {
         mount,
-        hasCalibrationBlock,
-        shouldRecalibrateTipLength,
-        tipRackDefinition != null
-          ? `${tipRackDefinition.namespace}/${tipRackDefinition.parameters.loadName}/${tipRackDefinition.version}`
-          : null
+        shouldRecalibrateTipLength = false,
+        hasCalibrationBlock = false,
+        tipRackDefinition = null,
+      } = params
+      dispatchRequests(
+        Sessions.ensureSession(
+          robotName,
+          Sessions.SESSION_TYPE_PIPETTE_OFFSET_CALIBRATION,
+          {
+            mount,
+            shouldRecalibrateTipLength,
+            hasCalibrationBlock,
+            tipRackDefinition,
+          }
+        )
       )
-    )
-  }
+      dispatch(
+        pipetteOffsetCalibrationStarted(
+          mount,
+          hasCalibrationBlock,
+          shouldRecalibrateTipLength,
+          tipRackDefinition != null
+            ? `${tipRackDefinition.namespace}/${tipRackDefinition.parameters.loadName}/${tipRackDefinition.version}`
+            : null
+        )
+      )
+    }
 
   let Wizard: JSX.Element | null = createPortal(
     startingSession ? (

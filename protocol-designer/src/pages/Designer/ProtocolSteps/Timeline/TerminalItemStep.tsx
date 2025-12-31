@@ -1,41 +1,48 @@
-import { useSelector, useDispatch } from 'react-redux'
+import { useTranslation } from 'react-i18next'
+import { useDispatch, useSelector } from 'react-redux'
+
 import { useConditionalConfirm } from '@opentrons/components'
-import {
-  getHoveredTerminalItemId,
-  getSelectedTerminalItemId,
-  getIsMultiSelectMode,
-  actions as stepsActions,
-} from '../../../../ui/steps'
-import {
-  getCurrentFormIsPresaved,
-  getCurrentFormHasUnsavedChanges,
-} from '../../../../step-forms/selectors'
+
 import {
   CLOSE_STEP_FORM_WITH_CHANGES,
   CLOSE_UNSAVED_STEP_FORM,
   ConfirmDeleteModal,
-} from '../../../../components/modals/ConfirmDeleteModal'
+} from '/protocol-designer/components/organisms'
+import {
+  getCurrentFormHasUnsavedChanges,
+  getCurrentFormIsPresaved,
+} from '/protocol-designer/step-forms/selectors'
+import { START_TERMINAL_ITEM_ID } from '/protocol-designer/steplist'
+import {
+  getHoveredTerminalItemId,
+  getIsMultiSelectMode,
+  getSelectedTerminalItemId,
+  actions as stepsActions,
+} from '/protocol-designer/ui/steps'
 import {
   deselectAllSteps,
   hoverOnStep,
+  selectDropdownItem,
   toggleViewSubstep,
-} from '../../../../ui/steps/actions/actions'
-import { StepContainer } from './StepContainer'
+} from '/protocol-designer/ui/steps/actions/actions'
 
+import { ConnectedStepContainer } from './ConnectedStepContainer'
+
+import type { TerminalItemId } from '/protocol-designer/steplist'
+import type { ThunkDispatch } from '/protocol-designer/types'
 import type {
-  SelectTerminalItemAction,
   HoverOnTerminalItemAction,
-} from '../../../../ui/steps'
-import type { TerminalItemId } from '../../../../steplist'
-import type { ThunkDispatch } from '../../../../types'
+  SelectTerminalItemAction,
+} from '/protocol-designer/ui/steps'
 
 export interface TerminalItemStepProps {
   id: TerminalItemId
-  title: string
+  sidebarWidth: number
 }
 
 export function TerminalItemStep(props: TerminalItemStepProps): JSX.Element {
-  const { id, title } = props
+  const { id, sidebarWidth } = props
+  const { t } = useTranslation('protocol_steps')
   const hovered = useSelector(getHoveredTerminalItemId) === id
   const selected = useSelector(getSelectedTerminalItemId) === id
   const currentFormIsPresaved = useSelector(getCurrentFormIsPresaved)
@@ -54,6 +61,12 @@ export function TerminalItemStep(props: TerminalItemStepProps): JSX.Element {
     dispatch(toggleViewSubstep(null))
     dispatch(hoverOnStep(null))
     selectItem()
+    dispatch(
+      selectDropdownItem({
+        selection: null,
+        mode: 'clear',
+      })
+    )
   }
   const { confirm, showConfirmation, cancel } = useConditionalConfirm(
     handleConfirm,
@@ -80,17 +93,23 @@ export function TerminalItemStep(props: TerminalItemStepProps): JSX.Element {
           onCancelClick={cancel}
         />
       )}
-      <StepContainer
+      <ConnectedStepContainer
         {...{
           stepId: `TerminalItem_${id}`,
-          iconName: title === 'Starting deck state' ? 'ot-start' : 'ot-end',
+          iconName: id === START_TERMINAL_ITEM_ID ? 'ot-start' : 'ot-end',
           hovered,
           selected,
-          title,
+          stepNumber: null,
+          text:
+            id === START_TERMINAL_ITEM_ID
+              ? t('starting_deck')
+              : t('ending_deck'),
+          subtext: null,
           onClick,
           onMouseEnter,
           onMouseLeave,
         }}
+        sidebarWidth={sidebarWidth}
       />
     </>
   )

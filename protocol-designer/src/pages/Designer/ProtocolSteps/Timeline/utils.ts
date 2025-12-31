@@ -1,14 +1,24 @@
 import round from 'lodash/round'
-import omitBy from 'lodash/omitBy'
 import uniq from 'lodash/uniq'
 import { UAParser } from 'ua-parser-js'
-import type { WellIngredientVolumeData } from '../../../../steplist'
-import type { StepIdType } from '../../../../form-types'
+
+import { getStepVisibilities } from '/protocol-designer/steplist/utils/getStepVisibilities'
+import { convertStepHierarchyToArray } from '/protocol-designer/steplist/utils/stepHierarchy'
+
+import type { MouseEvent } from 'react'
+import type { StepIdType } from '/protocol-designer/form-types'
+import type { StepHierarchy } from '/protocol-designer/steplist/utils/stepHierarchy'
 
 export const capitalizeFirstLetterAfterNumber = (title: string): string =>
   title.replace(
-    /(^[\d\W]*)([a-zA-Z])/,
-    (match, prefix, firstLetter) => `${prefix}${firstLetter.toUpperCase()}`
+    /(^[\d\W]*)([a-zA-Z])|(-[a-zA-Z])/g,
+    (match, prefix, firstLetter) => {
+      if (prefix != null) {
+        return `${prefix}${firstLetter.toUpperCase()}`
+      } else {
+        return `${match.charAt(0)}${match.charAt(1).toUpperCase()}`
+      }
+    }
   )
 
 const VOLUME_SIG_DIGITS_DEFAULT = 2
@@ -29,84 +39,65 @@ export const formatPercentage = (part: number, total: number): string => {
   return `${round((part / total) * 100, PERCENTAGE_DECIMALS_ALLOWED)}%`
 }
 
-export const compactPreIngreds = (
-  preIngreds: WellIngredientVolumeData
-): Partial<
-  | {
-      [ingredId: string]:
-        | {
-            volume: number
-          }
-        | undefined
-    }
-  | {
-      [well: string]:
-        | {
-            [ingredId: string]: {
-              volume: number
-            }
-          }
-        | undefined
-    }
-> => {
-  return omitBy(preIngreds, ingred => {
-    return typeof ingred?.volume === 'number' && ingred.volume <= 0
-  })
-}
-
 export const getMetaSelectedSteps = (
-  multiSelectItemIds: StepIdType[] | null,
-  stepId: StepIdType,
-  selectedStepId: StepIdType | null
+  priorMultiSelectedItemIds: StepIdType[] | null,
+  newlySelectedStepId: StepIdType,
+  priorSingleSelectedStepId: StepIdType | null
 ): StepIdType[] => {
   let stepsToSelect: StepIdType[]
-  if (multiSelectItemIds?.length) {
+  if (priorMultiSelectedItemIds?.length) {
     // already have a selection, add/remove the meta-clicked item
-    stepsToSelect = multiSelectItemIds.includes(stepId)
-      ? multiSelectItemIds.filter(id => id !== stepId)
-      : [...multiSelectItemIds, stepId]
-  } else if (selectedStepId && selectedStepId === stepId) {
+    stepsToSelect = priorMultiSelectedItemIds.includes(newlySelectedStepId)
+      ? priorMultiSelectedItemIds.filter(id => id !== newlySelectedStepId)
+      : [...priorMultiSelectedItemIds, newlySelectedStepId]
+  } else if (
+    priorSingleSelectedStepId &&
+    priorSingleSelectedStepId === newlySelectedStepId
+  ) {
     // meta-clicked on the selected single step
-    stepsToSelect = [selectedStepId]
-  } else if (selectedStepId) {
+    stepsToSelect = [priorSingleSelectedStepId]
+  } else if (priorSingleSelectedStepId) {
     // meta-clicked on a different step, multi-select both
-    stepsToSelect = [selectedStepId, stepId]
+    stepsToSelect = [priorSingleSelectedStepId, newlySelectedStepId]
   } else {
     // meta-clicked on a step when a terminal item was selected
-    stepsToSelect = [stepId]
+    stepsToSelect = [newlySelectedStepId]
   }
   return stepsToSelect
 }
 
 export const getShiftSelectedSteps = (
-  selectedStepId: StepIdType | null,
-  orderedStepIds: StepIdType[],
-  stepId: StepIdType,
-  multiSelectItemIds: StepIdType[] | null,
+  priorSingleSelectedStepId: StepIdType | null,
+  stepHierarchy: StepHierarchy,
+  newlySelectedStepId: StepIdType,
+  priorMultiSelectedItemIds: StepIdType[] | null,
   lastMultiSelectedStepId: StepIdType | null
 ): StepIdType[] => {
   let stepsToSelect: StepIdType[]
-  if (selectedStepId) {
-    stepsToSelect = getOrderedStepsInRange(
-      selectedStepId,
-      stepId,
-      orderedStepIds
+  if (priorSingleSelectedStepId) {
+    stepsToSelect = getOrderedVisibleStepsInRange(
+      priorSingleSelectedStepId,
+      newlySelectedStepId,
+      stepHierarchy
     )
-  } else if (multiSelectItemIds?.length && lastMultiSelectedStepId) {
-    const potentialStepsToSelect = getOrderedStepsInRange(
+  } else if (priorMultiSelectedItemIds?.length && lastMultiSelectedStepId) {
+    const potentialStepsToSelect = getOrderedVisibleStepsInRange(
       lastMultiSelectedStepId,
-      stepId,
-      orderedStepIds
+      newlySelectedStepId,
+      stepHierarchy
     )
 
     const allSelected: boolean = potentialStepsToSelect
       .slice(1)
-      .every(stepId => multiSelectItemIds.includes(stepId))
+      .every(stepId => priorMultiSelectedItemIds.includes(stepId))
 
     if (allSelected) {
       // if they're all selected, deselect them all
-      if (multiSelectItemIds.length - potentialStepsToSelect.length > 0) {
-        stepsToSelect = multiSelectItemIds.filter(
+      if (
+        priorMultiSelectedItemIds.length - potentialStepsToSelect.length >
+        0
+      ) {
+        stepsToSelect = priorMultiSelectedItemIds.filter(
           (id: StepIdType) => !potentialStepsToSelect.includes(id)
         )
       } else {
@@ -114,32 +105,40 @@ export const getShiftSelectedSteps = (
         stepsToSelect = [potentialStepsToSelect[0]]
       }
     } else {
-      stepsToSelect = uniq([...multiSelectItemIds, ...potentialStepsToSelect])
+      stepsToSelect = uniq([
+        ...priorMultiSelectedItemIds,
+        ...potentialStepsToSelect,
+      ])
     }
   } else {
-    stepsToSelect = [stepId]
+    stepsToSelect = [newlySelectedStepId]
   }
   return stepsToSelect
 }
 
-const getOrderedStepsInRange = (
+const getOrderedVisibleStepsInRange = (
   lastSelectedStepId: StepIdType,
   stepId: StepIdType,
-  orderedStepIds: StepIdType[]
+  stepHierarchy: StepHierarchy
 ): StepIdType[] => {
+  const orderedStepIds = convertStepHierarchyToArray(stepHierarchy)
+  const stepVisibilities = getStepVisibilities(stepHierarchy)
+
   const prevIndex: number = orderedStepIds.indexOf(lastSelectedStepId)
   const currentIndex: number = orderedStepIds.indexOf(stepId)
-
   const [startIndex, endIndex] = [prevIndex, currentIndex].sort((a, b) => a - b)
-  const orderedSteps = orderedStepIds.slice(startIndex, endIndex + 1)
-  return orderedSteps
+
+  const orderedVisibleSteps = orderedStepIds
+    .slice(startIndex, endIndex + 1)
+    .filter(stepId => stepVisibilities[stepId].isVisibleToUser)
+  return orderedVisibleSteps
 }
 
 export const nonePressed = (keysPressed: boolean[]): boolean =>
   keysPressed.every(keyPress => keyPress === false)
 
 export const getMouseClickKeyInfo = (
-  event: React.MouseEvent
+  event: MouseEvent
 ): { isShiftKeyPressed: boolean; isMetaKeyPressed: boolean } => {
   const isMac: boolean = getUserOS() === 'Mac OS'
   const isShiftKeyPressed: boolean = event.shiftKey
@@ -148,4 +147,4 @@ export const getMouseClickKeyInfo = (
   return { isShiftKeyPressed, isMetaKeyPressed }
 }
 
-const getUserOS = (): string | undefined => new UAParser().getOS().name
+export const getUserOS = (): string | undefined => new UAParser().getOS().name

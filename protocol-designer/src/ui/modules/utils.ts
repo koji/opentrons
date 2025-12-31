@@ -1,16 +1,29 @@
 import values from 'lodash/values'
+
 import {
-  MAGNETIC_MODULE_V1,
+  ABSORBANCE_READER_TYPE,
+  FLEX_STACKER_MODULE_TYPE,
   getLabwareDefaultEngageHeight,
+  HEATERSHAKER_MODULE_TYPE,
+  MAGNETIC_BLOCK_TYPE,
+  MAGNETIC_MODULE_TYPE,
+  MAGNETIC_MODULE_V1,
+  TEMPERATURE_MODULE_TYPE,
+  THERMOCYCLER_MODULE_TYPE,
 } from '@opentrons/shared-data'
-import type { Options } from '@opentrons/components'
+
+import {
+  getLabwareIdAfterModuleIdInStack,
+  getLabwaresOnModuleFromStack,
+} from '../../utils'
+
+import type { DropdownOption } from '@opentrons/components'
 import type { ModuleType } from '@opentrons/shared-data'
 import type {
-  ModuleOnDeck,
-  LabwareOnDeck,
   InitialDeckSetup,
+  LabwareOnDeck,
+  ModuleOnDeck,
 } from '../../step-forms/types'
-import type { SavedStepFormState } from '../../step-forms'
 
 export function getModuleOnDeckByType(
   initialDeckSetup: InitialDeckSetup,
@@ -32,62 +45,34 @@ export function getLabwareOnModule(
   initialDeckSetup: InitialDeckSetup,
   moduleId: string
 ): LabwareOnDeck | null | undefined {
-  return values(initialDeckSetup.labware).find(
-    (labware: LabwareOnDeck) =>
-      labware.slot === moduleId ||
-      //  acccount for adapter!
-      values(initialDeckSetup.labware).find(
-        adapter => adapter.id === labware.slot && adapter.slot === moduleId
-      )
+  const labwareId = getLabwareIdAfterModuleIdInStack(
+    moduleId,
+    initialDeckSetup.labware
   )
-}
-export function getModuleUnderLabware(
-  initialDeckSetup: InitialDeckSetup,
-  savedStepFormState: SavedStepFormState,
-  labwareId: string
-): ModuleOnDeck | null | undefined {
-  //  latest moveLabware step related to labwareId
-  const moveLabwareStep = Object.values(savedStepFormState)
-    .filter(
-      state =>
-        state.stepType === 'moveLabware' &&
-        labwareId != null &&
-        state.labware === labwareId
-    )
-    .reverse()[0]
-  const newLocation = moveLabwareStep?.newLocation
-
-  return values(initialDeckSetup.modules).find((moduleOnDeck: ModuleOnDeck) => {
-    const labwareSlot = initialDeckSetup.labware[labwareId]?.slot
-    let location
-    if (newLocation != null) {
-      location = newLocation
-    } else if (
-      labwareSlot != null &&
-      initialDeckSetup.labware[labwareSlot] != null
-    ) {
-      location = initialDeckSetup.labware[labwareSlot].slot
-    } else {
-      location = labwareSlot
-    }
-    return location === moduleOnDeck.id
-  })
+  return labwareId != null ? initialDeckSetup.labware[labwareId] : null
 }
 
 export const getModuleShortNames = (type: ModuleType): string => {
   switch (type) {
-    case 'heaterShakerModuleType':
-      return 'Heater-Shaker'
-    case 'magneticBlockType':
+    case HEATERSHAKER_MODULE_TYPE:
+      return 'Heater-Shaker Module'
+    case MAGNETIC_BLOCK_TYPE:
       return 'Magnetic Block'
-    case 'magneticModuleType':
+    case MAGNETIC_MODULE_TYPE:
       return 'Magnetic Module'
-    case 'temperatureModuleType':
+    case TEMPERATURE_MODULE_TYPE:
       return 'Temperature Module'
-    case 'thermocyclerModuleType':
+    case THERMOCYCLER_MODULE_TYPE:
       return 'Thermocycler'
-    case 'absorbanceReaderType':
-      return 'Absorbance Reader'
+    case ABSORBANCE_READER_TYPE:
+      return 'Absorbance Plate Reader'
+    case FLEX_STACKER_MODULE_TYPE:
+      return 'Flex Stacker'
+    default:
+      console.warn(
+        `unsupported module ${type} - need to add to getModuleShortNames`
+      )
+      return 'unsupported module'
   }
 }
 
@@ -95,37 +80,29 @@ export function getModuleLabwareOptions(
   initialDeckSetup: InitialDeckSetup,
   nicknamesById: Record<string, string>,
   type: ModuleType
-): Options {
+): DropdownOption[] {
   const labwares = initialDeckSetup.labware
   const modulesOnDeck = getModulesOnDeckByType(initialDeckSetup, type)
   const module = getModuleShortNames(type)
-  let options: Options = []
+  let options: DropdownOption[] = []
 
   if (modulesOnDeck != null) {
     options = modulesOnDeck.map(moduleOnDeck => {
-      const labware = getLabwareOnModule(initialDeckSetup, moduleOnDeck.id)
-      if (labware) {
-        const labwareOnAdapterId = Object.values(labwares).find(
-          lw => lw.slot === labware.id
-        )?.id
-        if (labwareOnAdapterId != null) {
-          return {
-            name: `${nicknamesById[labwareOnAdapterId]} in ${
-              nicknamesById[labware.id]
-            } in ${module} in slot ${moduleOnDeck.slot}`,
-            value: moduleOnDeck.id,
-          }
-        } else {
-          return {
-            name: `${nicknamesById[labware.id]} in ${module} in slot ${
-              moduleOnDeck.slot
-            }`,
-            value: moduleOnDeck.id,
-          }
+      const { topMostId } = getLabwaresOnModuleFromStack(
+        moduleOnDeck.id,
+        Object.values(labwares)
+      )
+      if (topMostId != null) {
+        return {
+          name: nicknamesById[topMostId],
+          deckLabel: moduleOnDeck.slot,
+          subtext: module,
+          value: moduleOnDeck.id,
         }
       } else {
         return {
-          name: `No labware in ${module} in slot ${moduleOnDeck.slot}`,
+          name: module,
+          deckLabel: moduleOnDeck.slot,
           value: moduleOnDeck.id,
         }
       }

@@ -1,3 +1,7 @@
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import React from 'react'
+import styled from 'styled-components'
+
 import {
   ALIGN_FLEX_START,
   Box,
@@ -5,11 +9,10 @@ import {
   DIRECTION_COLUMN,
   Flex,
   SPACING,
-  LegacyStyledText,
-  TYPOGRAPHY,
+  StyledText,
 } from '@opentrons/components'
 
-import type { Story, Meta } from '@storybook/react'
+import type { Meta, Story } from '@storybook/react'
 
 export default {
   title: 'Design Tokens/Spacing',
@@ -21,6 +24,12 @@ interface SpacingsStorybookProps {
 
 const Template: Story<SpacingsStorybookProps> = args => {
   const targetSpacings = args.spacings.filter(s => !s[1].includes('auto'))
+  // sort by rem value
+  const sortedSpacing = targetSpacings.sort((a, b) => {
+    const aValue = parseFloat(a[1].replace('rem', ''))
+    const bValue = parseFloat(b[1].replace('rem', ''))
+    return aValue - bValue
+  })
 
   const convertToPx = (remFormat: string): string => {
     const pxVal = Number(remFormat.replace('rem', '')) * 16
@@ -33,7 +42,7 @@ const Template: Story<SpacingsStorybookProps> = args => {
       gridGap={SPACING.spacing8}
       padding={SPACING.spacing24}
     >
-      {targetSpacings.map((spacing, index) => (
+      {sortedSpacing.map((spacing, index) => (
         <Flex
           key={`spacing_${index}`}
           flexDirection={DIRECTION_COLUMN}
@@ -43,14 +52,13 @@ const Template: Story<SpacingsStorybookProps> = args => {
           width="100%"
           height="6rem"
         >
-          <LegacyStyledText as="h2" fontWeight={TYPOGRAPHY.fontWeightRegular}>
+          <StyledText desktopStyle="bodyLargeSemiBold">
             {`${spacing[0]} - ${spacing[1]}: ${convertToPx(spacing[1])}`}
-          </LegacyStyledText>
-          <Box
-            width={spacing[1]}
-            height="2rem"
-            backgroundColor={COLORS.blue50}
-          />
+          </StyledText>
+          <Flex gridGap={spacing[1]} backgroundColor={COLORS.blue50}>
+            <StyledBox />
+            <StyledBox />
+          </Flex>
         </Flex>
       ))}
     </Flex>
@@ -62,3 +70,9 @@ const allSpacings = Object.entries(SPACING)
 AllSpacing.args = {
   spacings: allSpacings,
 }
+
+const StyledBox = styled(Box)`
+  width: 2rem;
+  height: 2rem;
+  background-color: ${COLORS.blue35};
+`

@@ -1,4 +1,5 @@
-import * as React from 'react'
+import { useState } from 'react'
+
 import {
   ALIGN_CENTER,
   Box,
@@ -6,20 +7,22 @@ import {
   Flex,
   Icon,
   JUSTIFY_SPACE_BETWEEN,
-  Link,
-  SIZE_1,
   LegacyStyledText,
+  Link,
   TYPOGRAPHY,
 } from '@opentrons/components'
+
 import { Divider } from '/app/atoms/structure'
 
+import type { ReactNode } from 'react'
+
 interface ExpandingTitleProps {
-  label: React.ReactNode
-  diagram?: React.ReactNode
+  label: ReactNode
+  diagram?: ReactNode
 }
 
 export function ExpandingTitle(props: ExpandingTitleProps): JSX.Element {
-  const [diagramVisible, setDiagramVisible] = React.useState<boolean>(false)
+  const [diagramVisible, setDiagramVisible] = useState<boolean>(false)
   const toggleDiagramVisible = (): void => {
     setDiagramVisible(currentDiagramVisible => !currentDiagramVisible)
   }
@@ -32,14 +35,17 @@ export function ExpandingTitle(props: ExpandingTitleProps): JSX.Element {
         justifyContent={JUSTIFY_SPACE_BETWEEN}
         alignItems={ALIGN_CENTER}
       >
-        <LegacyStyledText as="p" fontWeight={TYPOGRAPHY.fontWeightSemiBold}>
+        <LegacyStyledText
+          forwardedAs="p"
+          fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+        >
           {label}
         </LegacyStyledText>
         {diagram != null && (
           <Link role="button" onClick={toggleDiagramVisible}>
             <Icon
               name={diagramVisible ? 'chevron-up' : 'chevron-down'}
-              size={SIZE_1}
+              size="1rem"
             />
           </Link>
         )}

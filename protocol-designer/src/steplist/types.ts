@@ -1,22 +1,24 @@
-import type { THERMOCYCLER_PROFILE, THERMOCYCLER_STATE } from '../constants'
+import type { ModuleType } from '@opentrons/shared-data'
 import type {
   CommandCreatorArgs,
   CommentArgs,
   MoveLabwareArgs,
   PauseArgs,
-  ThermocyclerProfileStepArgs,
 } from '@opentrons/step-generation'
-import type { ModuleType } from '@opentrons/shared-data'
+import type { THERMOCYCLER_PROFILE, THERMOCYCLER_STATE } from '../constants'
 import type { StepIdType } from '../form-types'
 import type { FormError } from './formLevel/errors'
+
 // timeline start and end
 export const START_TERMINAL_ITEM_ID: '__initial_setup__' = '__initial_setup__'
 export const END_TERMINAL_ITEM_ID: '__end__' = '__end__'
 export const PRESAVED_STEP_ID: '__presaved_step__' = '__presaved_step__'
+export const HARDWARE_ID: '__hardware__' = '__hardware__'
 export type TerminalItemId =
   | typeof START_TERMINAL_ITEM_ID
   | typeof END_TERMINAL_ITEM_ID
   | typeof PRESAVED_STEP_ID
+  | typeof HARDWARE_ID
 export type WellIngredientNames = Record<string, string>
 // TODO: IL 2019-11-26 untangle single vs multi-channel data types for substeps.
 // We tried to unify them with Maybes and Unions, but really they should be
@@ -49,7 +51,6 @@ export interface SourceDestData {
   postIngreds: WellIngredientVolumeData
 }
 export interface SubstepTimelineFrame {
-  isAirGap?: boolean
   substepIndex?: number
   activeTips: TipLocation | null | undefined
   source?: SourceDestData
@@ -67,6 +68,8 @@ export interface StepItemSourceDestRow {
   substepIndex?: number
   source?: SubstepWellData
   dest?: SubstepWellData
+  aspirateVolume?: number
+  dispenseVolume?: number
   volume?: number | null
   channelId?: number
 }
@@ -144,16 +147,10 @@ export interface HeaterShakerSubstepItem {
 
 export interface ThermocyclerProfileSubstepItem {
   substepType: typeof THERMOCYCLER_PROFILE
-  blockTargetTempHold: number | null
-  labwareNickname: string | null | undefined
-  lidOpenHold: boolean
-  lidTargetTempHold: number | null
-  message?: string
-  meta: ThermocyclerProfileStepArgs['meta']
-  profileSteps: ThermocyclerProfileStepArgs['profileSteps']
-  profileTargetLidTemp: number | null
-  profileVolume: number
+  // No data in here because the UI gets it from other places instead of the substep
+  // machinery. We merely need to make sure the substep exists.
 }
+
 export interface ThermocyclerStateSubstepItem {
   substepType: typeof THERMOCYCLER_STATE
   labwareNickname: string | null | undefined
@@ -162,6 +159,7 @@ export interface ThermocyclerStateSubstepItem {
   lidOpen: boolean
   message?: string
 }
+
 export type SubstepItemData =
   | SourceDestSubstepItem
   | PauseSubstepItem

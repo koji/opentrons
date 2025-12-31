@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSelector } from 'react-redux'
+
 import {
+  ALIGN_CENTER,
   COLORS,
   DIRECTION_COLUMN,
   Flex,
+  Icon,
   InputField,
   ListButton,
   SPACING,
@@ -12,29 +15,56 @@ import {
   Tooltip,
   useHoverTooltip,
 } from '@opentrons/components'
-import { getWellsDepth, getWellDimension } from '@opentrons/shared-data'
-import { TipPositionModal, ZTipPositionModal } from '../../../../../organisms'
-import { getIsDelayPositionField } from '../../../../../form-types'
-import { getDefaultMmFromBottom } from '../../../../../organisms/TipPositionModal/utils'
-import { selectors as stepFormSelectors } from '../../../../../step-forms'
+import { getWellDimension, getWellsDepth } from '@opentrons/shared-data'
+
+import {
+  TipPositionModal,
+  ZTipPositionModal,
+} from '/protocol-designer/components/organisms'
+import { MoveLiquidPrefixToAction } from '/protocol-designer/components/organisms/TipPositionModal/constants'
+import { getDefaultMmFromEdge } from '/protocol-designer/components/organisms/TipPositionModal/utils'
+import { getIsDelayPositionField } from '/protocol-designer/form-types'
+import { selectors as stepFormSelectors } from '/protocol-designer/step-forms'
+
+import type { PositionSpecs } from '/protocol-designer/components/organisms'
 import type {
+  FormData,
+  ReferenceFields,
   TipXOffsetFields,
   TipYOffsetFields,
   TipZOffsetFields,
-} from '../../../../../form-types'
-import type { PositionSpecs } from '../../../../../organisms'
+} from '/protocol-designer/form-types'
+import type { MoveLiquidPrefixType } from '/protocol-designer/resources/types'
 import type { FieldPropsByName } from '../types'
+
 interface PositionFieldProps {
-  prefix: 'aspirate' | 'dispense' | 'mix'
+  prefix: MoveLiquidPrefixType
   propsForFields: FieldPropsByName
   zField: TipZOffsetFields
   xField?: TipXOffsetFields
   yField?: TipYOffsetFields
   labwareId?: string | null
+  padding?: string
+  showButton?: boolean
+  isNested?: boolean
+  referenceField?: ReferenceFields
+  formData?: FormData
 }
 
 export function PositionField(props: PositionFieldProps): JSX.Element {
-  const { labwareId, propsForFields, zField, xField, yField, prefix } = props
+  const {
+    formData,
+    labwareId,
+    propsForFields,
+    zField,
+    xField,
+    yField,
+    prefix,
+    padding = `0 ${SPACING.spacing16}`,
+    showButton = false,
+    isNested = false,
+    referenceField,
+  } = props
   const {
     name: zName,
     value: rawZValue,
@@ -46,7 +76,7 @@ export function PositionField(props: PositionFieldProps): JSX.Element {
 
   const { t, i18n } = useTranslation(['application', 'protocol_steps'])
   const [targetProps, tooltipProps] = useHoverTooltip()
-  const [isModalOpen, setModalOpen] = useState<boolean>(false)
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false)
   const labwareEntities = useSelector(stepFormSelectors.getLabwareEntities)
   const labwareDef =
     labwareId != null && labwareEntities[labwareId] != null
@@ -78,15 +108,15 @@ export function PositionField(props: PositionFieldProps): JSX.Element {
   }
 
   const handleOpen = (has3Specs: boolean): void => {
-    if (has3Specs && wellDepthMm && wellXWidthMm && wellYWidthMm) {
-      setModalOpen(true)
-    }
-    if (!has3Specs && wellDepthMm) {
-      setModalOpen(true)
+    if (
+      (has3Specs && wellDepthMm && wellXWidthMm && wellYWidthMm) ||
+      (!has3Specs && wellDepthMm)
+    ) {
+      setIsModalOpen(true)
     }
   }
   const handleClose = (): void => {
-    setModalOpen(false)
+    setIsModalOpen(false)
   }
   const isDelayPositionField = getIsDelayPositionField(zName)
   let zValue: string | number = '0'
@@ -95,14 +125,16 @@ export function PositionField(props: PositionFieldProps): JSX.Element {
   if (wellDepthMm !== null) {
     // show default value for field in parens if no mmFromBottom value is selected
     zValue =
-      mmFromBottom ?? getDefaultMmFromBottom({ name: zName, wellDepthMm })
+      mmFromBottom ??
+      getDefaultMmFromEdge({ name: zName, wellDepth: wellDepthMm })
   }
+
   let modal = (
     <ZTipPositionModal
       name={zName}
       closeModal={handleClose}
       wellDepthMm={wellDepthMm}
-      zValue={mmFromBottom}
+      zValue={zValue as number}
       updateValue={zUpdateValue}
       isIndeterminate={isIndeterminate}
     />
@@ -122,23 +154,24 @@ export function PositionField(props: PositionFieldProps): JSX.Element {
     const specs: PositionSpecs = {
       z: {
         name: zName,
-        value: mmFromBottom,
+        value: zValue as number,
         updateValue: zUpdateValue,
       },
       x: {
         name: xName,
-        value: rawXValue != null ? Number(rawXValue) : null,
+        value: rawXValue != null ? Number(rawXValue) : 0,
         updateValue: xUpdateValue,
       },
       y: {
         name: yName,
-        value: rawYValue != null ? Number(rawYValue) : null,
+        value: rawYValue != null ? Number(rawYValue) : 0,
         updateValue: yUpdateValue,
       },
     }
 
     modal = (
       <TipPositionModal
+        formData={formData}
         closeModal={handleClose}
         wellDepthMm={wellDepthMm}
         wellXWidthMm={wellXWidthMm}
@@ -146,47 +179,75 @@ export function PositionField(props: PositionFieldProps): JSX.Element {
         isIndeterminate={isIndeterminate}
         specs={specs}
         prefix={prefix}
+        reference={
+          referenceField != null ? propsForFields[referenceField] : null
+        }
       />
     )
   }
+
+  const referencePosition =
+    referenceField != null ? propsForFields[referenceField].value : null
+  const referencePositionText = t(
+    `protocol_steps:reference_positions.${referencePosition}`
+  )
+
+  const titleText =
+    prefix === 'aspirate' || prefix === 'dispense' || prefix === 'mix'
+      ? t('protocol_steps:tip_position', {
+          prefix: MoveLiquidPrefixToAction[prefix],
+        })
+      : t('protocol_steps:start_point', {
+          prefix: MoveLiquidPrefixToAction[prefix],
+        })
 
   return (
     <>
       <Tooltip tooltipProps={tooltipProps}>{tooltipContent}</Tooltip>
       {isModalOpen ? modal : null}
-      {yField != null && xField != null ? (
+      {(yField != null && xField != null) || showButton ? (
         <Flex
           {...targetProps}
-          padding={SPACING.spacing16}
+          padding={padding}
           gridGap={SPACING.spacing8}
           flexDirection={DIRECTION_COLUMN}
         >
           <StyledText desktopStyle="bodyDefaultRegular" color={COLORS.grey60}>
-            {i18n.format(
-              t('protocol_steps:tip_position', { prefix }),
-              'capitalize'
-            )}
+            {i18n.format(titleText, 'capitalize')}
           </StyledText>
           <ListButton
             padding={SPACING.spacing12}
-            type="noActive"
+            type={isNested ? 'onColor' : 'noActive'}
             onClick={() => {
               handleOpen(true)
             }}
+            gridGap={SPACING.spacing8}
+            alignItems={ALIGN_CENTER}
+            testId={`PositionField_ListButton_${prefix}`}
           >
+            {!isNested ? <Icon name="tip-position" size="1.25rem" /> : null}
             <StyledText desktopStyle="bodyDefaultRegular">
-              {t('protocol_steps:well_position')}
-              {`${
-                propsForFields[xField].value != null
-                  ? Number(propsForFields[xField].value)
-                  : 0
-              }${t('units.millimeter')}, 
-                  ${
-                    propsForFields[yField].value != null
-                      ? Number(propsForFields[yField].value)
-                      : 0
-                  }${t('units.millimeter')},
-                  ${mmFromBottom ?? 0}${t('units.millimeter')}`}
+              {xField != null && yField != null
+                ? t(
+                    isNested
+                      ? 'protocol_steps:well_position_with_reference_nested'
+                      : 'protocol_steps:well_position_with_reference',
+                    {
+                      x:
+                        propsForFields[xField].value != null
+                          ? Number(propsForFields[xField].value)
+                          : 0,
+                      y:
+                        propsForFields[yField].value != null
+                          ? Number(propsForFields[yField].value)
+                          : 0,
+                      z: zValue,
+                      reference: referencePositionText,
+                    }
+                  )
+                : t('protocol_steps:well_position_z_only', {
+                    z: zValue,
+                  })}
             </StyledText>
           </ListButton>
         </Flex>
@@ -199,8 +260,9 @@ export function PositionField(props: PositionFieldProps): JSX.Element {
           }
           disabled={disabled}
           readOnly
-          onClick={() => {
+          onClick={e => {
             handleOpen(false)
+            e.stopPropagation()
           }}
           value={String(zValue)}
           isIndeterminate={isIndeterminate}

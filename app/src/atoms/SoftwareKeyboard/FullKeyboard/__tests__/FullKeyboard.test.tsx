@@ -1,17 +1,23 @@
-import * as React from 'react'
-import { describe, it, expect, vi } from 'vitest'
+import { useRef } from 'react'
+import { describe, expect, it, vi } from 'vitest'
+
 import '@testing-library/jest-dom/vitest'
+
 import { fireEvent, renderHook, screen } from '@testing-library/react'
+
 import { renderWithProviders } from '/app/__testing-utils__'
+
 import { FullKeyboard } from '..'
 
-const render = (props: React.ComponentProps<typeof FullKeyboard>) => {
+import type { ComponentProps } from 'react'
+
+const render = (props: ComponentProps<typeof FullKeyboard>) => {
   return renderWithProviders(<FullKeyboard {...props} />)[0]
 }
 
 describe('FullKeyboard', () => {
   it('should render FullKeyboard keyboard', () => {
-    const { result } = renderHook(() => React.useRef(null))
+    const { result } = renderHook(() => useRef(null))
     const props = {
       onChange: vi.fn(),
       keyboardRef: result.current,
@@ -59,7 +65,7 @@ describe('FullKeyboard', () => {
   })
 
   it('should render full keyboard when hitting ABC key', () => {
-    const { result } = renderHook(() => React.useRef(null))
+    const { result } = renderHook(() => useRef(null))
     const props = {
       onChange: vi.fn(),
       keyboardRef: result.current,
@@ -108,7 +114,7 @@ describe('FullKeyboard', () => {
   })
 
   it('should render full keyboard when hitting 123 key', () => {
-    const { result } = renderHook(() => React.useRef(null))
+    const { result } = renderHook(() => useRef(null))
     const props = {
       onChange: vi.fn(),
       keyboardRef: result.current,
@@ -158,7 +164,7 @@ describe('FullKeyboard', () => {
   })
 
   it('should render the software keyboards when hitting #+= key', () => {
-    const { result } = renderHook(() => React.useRef(null))
+    const { result } = renderHook(() => useRef(null))
     const props = {
       onChange: vi.fn(),
       keyboardRef: result.current,
@@ -204,7 +210,7 @@ describe('FullKeyboard', () => {
   })
 
   it('should call mock function when clicking a key', () => {
-    const { result } = renderHook(() => React.useRef(null))
+    const { result } = renderHook(() => useRef(null))
     const props = {
       onChange: vi.fn(),
       keyboardRef: result.current,

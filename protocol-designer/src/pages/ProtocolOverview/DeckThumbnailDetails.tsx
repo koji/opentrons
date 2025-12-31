@@ -1,37 +1,45 @@
-import * as React from 'react'
+import { Fragment } from 'react'
 import values from 'lodash/values'
 
 import { Module } from '@opentrons/components'
 import {
+  FLEX_STACKER_MODULE_TYPE,
   getAddressableAreaFromSlotId,
-  getLabwareHasQuirk,
-  getModuleDef2,
+  getModuleDef,
   getPositionFromSlotId,
   inferModuleOrientationFromXCoordinate,
   isAddressableAreaStandardSlot,
   THERMOCYCLER_MODULE_TYPE,
 } from '@opentrons/shared-data'
-import { LabwareOnDeck } from '../../components/DeckSetup/LabwareOnDeck'
-import { getStagingAreaAddressableAreas } from '../../utils'
-import { getSlotIdsBlockedBySpanningForThermocycler } from '../../step-forms'
+import { getSlotInLocationStack } from '@opentrons/step-generation'
+
+import { HOPPER_LABWARE_X_OFFSET } from '/protocol-designer/constants'
+
+import { LabwareOnDeck } from '../../components/organisms'
+import {
+  getSlotIdsBlockedBySpanningForThermocycler,
+  getSlotIsEmpty,
+} from '../../step-forms'
+import {
+  getLabwaresOnModuleFromStack,
+  getStagingAreaAddressableAreas,
+} from '../../utils'
 import { SlotHover } from './SlotHover'
+
+import type { Dispatch, SetStateAction } from 'react'
 import type {
   CutoutId,
   DeckDefinition,
   RobotType,
 } from '@opentrons/shared-data'
-import type {
-  InitialDeckSetup,
-  ModuleOnDeck,
-  LabwareOnDeck as LabwareOnDeckType,
-} from '../../step-forms'
+import type { InitialDeckSetup, ModuleOnDeck } from '../../step-forms'
 
 interface DeckSetupDetailsProps {
   initialDeckSetup: InitialDeckSetup
   deckDef: DeckDefinition
   stagingAreaCutoutIds: CutoutId[]
   hover: string | null
-  setHover: React.Dispatch<React.SetStateAction<string | null>>
+  setHover: Dispatch<SetStateAction<string | null>>
   robotType: RobotType
 }
 
@@ -51,31 +59,24 @@ export const DeckThumbnailDetails = (
     robotType
   )
 
-  const allLabware: LabwareOnDeckType[] = Object.keys(
-    initialDeckSetup.labware
-  ).reduce<LabwareOnDeckType[]>((acc, labwareId) => {
-    const labware = initialDeckSetup.labware[labwareId]
-    return getLabwareHasQuirk(labware.def, 'fixedTrash')
-      ? acc
-      : [...acc, labware]
-  }, [])
-
+  const allLabware = Object.values(initialDeckSetup.labware)
   const allModules: ModuleOnDeck[] = values(initialDeckSetup.modules)
 
   return (
     <>
       {/* all modules */}
-      {allModules.map(({ id, slot, model, type, moduleState }) => {
+      {allModules.map(({ id, slot, model, moduleState }) => {
         const slotId = slot
         const slotPosition = getPositionFromSlotId(slotId, deckDef)
         if (slotPosition == null) {
           console.warn(`no slot ${slotId} for module ${id}`)
           return null
         }
-        const moduleDef = getModuleDef2(model)
-        const labwareLoadedOnModule = allLabware.find(lw => lw.slot === id)
+        const moduleDef = getModuleDef(model)
+        const { topMostId, rightBelowTopId, hopperTopMostId } =
+          getLabwaresOnModuleFromStack(id, allLabware)
         return (
-          <React.Fragment key={id}>
+          <Fragment key={id}>
             <Module
               key={slot}
               x={slotPosition[0]}
@@ -91,24 +92,36 @@ export const DeckThumbnailDetails = (
               }
               targetSlotId={slotId}
               targetDeckId={deckDef.otId}
+              childrenPositioningMode={
+                moduleState.type === FLEX_STACKER_MODULE_TYPE
+                  ? 'passThrough'
+                  : 'offsetToSlot'
+              }
             >
-              {labwareLoadedOnModule != null ? (
-                <>
+              <>
+                {hopperTopMostId != null ? (
+                  <>
+                    <LabwareOnDeck
+                      x={HOPPER_LABWARE_X_OFFSET}
+                      y={0}
+                      labwareOnDeck={initialDeckSetup.labware[hopperTopMostId]}
+                    />
+                  </>
+                ) : null}
+                {rightBelowTopId != null ? (
                   <LabwareOnDeck
                     x={0}
                     y={0}
-                    labwareOnDeck={labwareLoadedOnModule}
+                    labwareOnDeck={initialDeckSetup.labware[rightBelowTopId]}
                   />
-                  <SlotHover
-                    robotType={robotType}
-                    hover={hover}
-                    setHover={setHover}
-                    slotPosition={[0, 0, 0]}
-                    slotId={slotId}
+                ) : null}
+                {topMostId != null ? (
+                  <LabwareOnDeck
+                    x={0}
+                    y={0}
+                    labwareOnDeck={initialDeckSetup.labware[topMostId]}
                   />
-                </>
-              ) : null}
-              {labwareLoadedOnModule == null ? (
+                ) : null}
                 <SlotHover
                   robotType={robotType}
                   hover={hover}
@@ -116,81 +129,40 @@ export const DeckThumbnailDetails = (
                   slotPosition={[0, 0, 0]}
                   slotId={slotId}
                 />
-              ) : null}
+                <SlotHover
+                  robotType={robotType}
+                  hover={hover}
+                  setHover={setHover}
+                  slotPosition={[HOPPER_LABWARE_X_OFFSET, 0, 0]}
+                  slotId={`hopper${slotId}`}
+                />
+              </>
             </Module>
-          </React.Fragment>
+          </Fragment>
         )
       })}
       {/* all labware on deck NOT those in modules */}
       {allLabware.map(labware => {
         if (
-          labware.slot === 'offDeck' ||
-          allModules.some(m => m.id === labware.slot) ||
-          allLabware.some(lab => lab.id === labware.slot)
-        )
-          return null
-
-        const slotPosition = getPositionFromSlotId(labware.slot, deckDef)
-        const slotBoundingBox = getAddressableAreaFromSlotId(
-          labware.slot,
-          deckDef
-        )?.boundingBox
-        if (slotPosition == null || slotBoundingBox == null) {
-          console.warn(`no slot ${labware.slot} for labware ${labware.id}!`)
-          return null
-        }
-        return (
-          <React.Fragment key={labware.id}>
-            <LabwareOnDeck
-              x={slotPosition[0]}
-              y={slotPosition[1]}
-              labwareOnDeck={labware}
-            />
-            <SlotHover
-              robotType={robotType}
-              hover={hover}
-              setHover={setHover}
-              slotPosition={slotPosition}
-              slotId={labware.slot}
-            />
-          </React.Fragment>
-        )
-      })}
-
-      {/* all nested labwares on deck  */}
-      {allLabware.map(labware => {
-        if (
-          allModules.some(m => m.id === labware.slot) ||
-          labware.slot === 'offDeck'
-        )
-          return null
-        if (
-          deckDef.locations.addressableAreas.some(
-            addressableArea => addressableArea.id === labware.slot
-          )
+          getSlotInLocationStack(labware.stack) === 'offDeck' ||
+          allModules.some(m => labware.stack.includes(m.id)) ||
+          labware.stack.includes('fixedTrash')
         ) {
           return null
         }
-        const slotForOnTheDeck = allLabware.find(lab => lab.id === labware.slot)
-          ?.slot
-        const slotForOnMod = allModules.find(mod => mod.id === slotForOnTheDeck)
-          ?.slot
-        let slotPosition = null
-        if (slotForOnMod != null) {
-          slotPosition = getPositionFromSlotId(slotForOnMod, deckDef)
-        } else if (slotForOnTheDeck != null) {
-          slotPosition = getPositionFromSlotId(slotForOnTheDeck, deckDef)
-        }
-        if (slotPosition == null) {
-          console.warn(`no slot ${labware.slot} for labware ${labware.id}!`)
+        const slot = getSlotInLocationStack(labware.stack)
+
+        const slotPosition = getPositionFromSlotId(slot, deckDef)
+        const slotBoundingBox = getAddressableAreaFromSlotId(
+          slot,
+          deckDef
+        )?.boundingBox
+        if (slotPosition == null || slotBoundingBox == null) {
+          console.warn(`no slot ${slot} for labware ${labware.id}!`)
           return null
         }
-        const slotOnDeck =
-          slotForOnTheDeck != null
-            ? allModules.find(module => module.id === slotForOnTheDeck)?.slot
-            : null
         return (
-          <React.Fragment key={labware.id}>
+          <Fragment key={labware.id}>
             <LabwareOnDeck
               x={slotPosition[0]}
               y={slotPosition[1]}
@@ -201,29 +173,29 @@ export const DeckThumbnailDetails = (
               hover={hover}
               setHover={setHover}
               slotPosition={slotPosition}
-              slotId={slotOnDeck ?? ''}
+              slotId={slot}
             />
-          </React.Fragment>
+          </Fragment>
         )
       })}
 
       {/* SlotControls for all empty deck */}
       {deckDef.locations.addressableAreas
         .filter(addressableArea => {
-          const stagingAreaAddressableAreas = getStagingAreaAddressableAreas(
-            stagingAreaCutoutIds
-          )
+          const stagingAreaAddressableAreas =
+            getStagingAreaAddressableAreas(stagingAreaCutoutIds)
           const addressableAreas =
             isAddressableAreaStandardSlot(addressableArea.id, deckDef) ||
             stagingAreaAddressableAreas.includes(addressableArea.id)
           return (
             addressableAreas &&
-            !slotIdsBlockedBySpanning.includes(addressableArea.id)
+            !slotIdsBlockedBySpanning.includes(addressableArea.id) &&
+            getSlotIsEmpty(initialDeckSetup, addressableArea.id, false)
           )
         })
         .map(addressableArea => {
           return (
-            <React.Fragment key={addressableArea.id}>
+            <Fragment key={addressableArea.id}>
               <SlotHover
                 robotType={robotType}
                 hover={hover}
@@ -234,7 +206,7 @@ export const DeckThumbnailDetails = (
                 )}
                 slotId={addressableArea.id}
               />
-            </React.Fragment>
+            </Fragment>
           )
         })}
     </>

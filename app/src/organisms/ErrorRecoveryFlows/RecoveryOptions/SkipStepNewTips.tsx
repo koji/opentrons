@@ -1,5 +1,5 @@
 import { RECOVERY_MAP } from '../constants'
-import { TwoColLwInfoAndDeck, SelectTips, SkipStepInfo } from '../shared'
+import { SelectTips, SkipStepInfo, TwoColLwInfoAndDeck } from '../shared'
 import { SelectRecoveryOption } from './SelectRecoveryOption'
 
 import type { RecoveryContentProps } from '../types'
@@ -29,7 +29,9 @@ export function SkipStepNewTips(
       case SKIP_STEP_WITH_NEW_TIPS.STEPS.SKIP:
         return <SkipStepInfo {...props} />
       default:
-        console.warn(`${step} in ${route} not explicitly handled. Rerouting.`)
+        console.warn(
+          `SkipStepNewTips: ${step} in ${route} not explicitly handled. Rerouting.`
+        )
         return <SelectRecoveryOption {...props} />
     }
   }

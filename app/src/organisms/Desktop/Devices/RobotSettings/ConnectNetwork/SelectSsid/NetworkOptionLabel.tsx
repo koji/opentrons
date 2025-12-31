@@ -1,5 +1,7 @@
 import styled from 'styled-components'
-import { Icon, FONT_BODY_1_DARK, SPACING } from '@opentrons/components'
+
+import { FONT_BODY_1_DARK, Icon, SPACING } from '@opentrons/components'
+
 import { SECURITY_NONE } from '/app/redux/networking'
 
 import type { StyledComponent } from 'styled-components'
@@ -30,19 +32,16 @@ const StyledConnectedIcon: StyledComponent<typeof StyledIcon, any> = styled(
   padding-left: 0;
 `
 
-const StyledName: StyledComponent<
-  'span',
-  any,
-  { padLeft: boolean }
-> = styled.span`
-  flex-basis: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  ${({ padLeft }: { padLeft: boolean }) => `
+const StyledName: StyledComponent<'span', any, { padLeft: boolean }> =
+  styled.span`
+    flex-basis: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    ${({ padLeft }: { padLeft: boolean }) => `
     padding-left: ${padLeft ? SPACING.spacing12 : SPACING.spacing4};
   `}
-`
+  `
 
 export interface NetworkOptionLabelProps extends WifiNetwork {
   showConnectedIcon: boolean

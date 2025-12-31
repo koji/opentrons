@@ -1,24 +1,24 @@
 // analytics epics
 import { combineEpics, ofType } from 'redux-observable'
-import { of, from, zip } from 'rxjs'
+import { from, of, zip } from 'rxjs'
 import {
-  mergeMap,
   filter,
+  ignoreElements,
+  mergeMap,
+  pairwise,
   tap,
   withLatestFrom,
-  ignoreElements,
-  pairwise,
 } from 'rxjs/operators'
 
 import * as Cfg from '../config'
-import { getAnalyticsConfig, getAnalyticsOptedIn } from './selectors'
-import { initializeMixpanel, setMixpanelTracking, trackEvent } from './mixpanel'
 import { makeEvent } from './make-event'
+import { initializeMixpanel, setMixpanelTracking, trackEvent } from './mixpanel'
+import { getAnalyticsConfig, getAnalyticsOptedIn } from './selectors'
 
 import type { Observable, OperatorFunction } from 'rxjs'
-import type { State, Action, Epic } from '../types'
 import type { ConfigInitializedAction } from '../config/types'
-import type { TrackEventArgs, AnalyticsEvent, AnalyticsConfig } from './types'
+import type { Action, Epic, State } from '../types'
+import type { AnalyticsConfig, AnalyticsEvent, TrackEventArgs } from './types'
 
 const initializeAnalyticsEpic: Epic = (action$, state$) => {
   return action$.pipe(
@@ -40,13 +40,12 @@ const sendAnalyticsEventEpic: Epic = (action$, state$) => {
       const event$ = from(makeEvent(action, state))
       return zip(event$, of(getAnalyticsConfig(state)))
     }),
-    filter<TrackEventArgs, [AnalyticsEvent, AnalyticsConfig]>((args): args is [
-      AnalyticsEvent,
-      AnalyticsConfig
-    ] => {
-      const [maybeEvent, maybeConfig] = args
-      return Boolean(maybeEvent != null && maybeConfig)
-    }),
+    filter<TrackEventArgs, [AnalyticsEvent, AnalyticsConfig]>(
+      (args): args is [AnalyticsEvent, AnalyticsConfig] => {
+        const [maybeEvent, maybeConfig] = args
+        return Boolean(maybeEvent != null && maybeConfig)
+      }
+    ),
     tap(([event, config]: [AnalyticsEvent, AnalyticsConfig]) => {
       trackEvent(event, config)
     }),

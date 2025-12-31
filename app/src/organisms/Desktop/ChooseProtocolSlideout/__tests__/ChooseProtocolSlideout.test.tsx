@@ -1,24 +1,29 @@
-import type * as React from 'react'
-import { vi, it, describe, expect, beforeEach } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  FLEX_ROBOT_TYPE,
   OT2_ROBOT_TYPE,
   simpleAnalysisFileFixture,
 } from '@opentrons/shared-data'
+
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { getStoredProtocols } from '/app/redux/protocol-storage'
+import { useCreateRunFromProtocol } from '/app/organisms/Desktop/ChooseRobotToRunProtocolSlideout/useCreateRunFromProtocol'
+import { useTrackCreateProtocolRunEvent } from '/app/organisms/Desktop/Devices/hooks'
+import { useRobotType } from '/app/redux-resources/robots'
 import { mockConnectableRobot } from '/app/redux/discovery/__fixtures__'
+import { getStoredProtocols } from '/app/redux/protocol-storage'
 import {
   storedProtocolData as storedProtocolDataFixture,
   storedProtocolDataWithoutRunTimeParameters,
 } from '/app/redux/protocol-storage/__fixtures__'
-import { useTrackCreateProtocolRunEvent } from '/app/organisms/Desktop/Devices/hooks'
-import { useCreateRunFromProtocol } from '/app/organisms/Desktop/ChooseRobotToRunProtocolSlideout/useCreateRunFromProtocol'
-import { ChooseProtocolSlideout } from '../'
 import { useNotifyDataReady } from '/app/resources/useNotifyDataReady'
+
+import { ChooseProtocolSlideout } from '../'
+
+import type { ComponentProps } from 'react'
 import type { ProtocolAnalysisOutput } from '@opentrons/shared-data'
 
 vi.mock(
@@ -28,8 +33,11 @@ vi.mock('/app/redux/protocol-storage')
 vi.mock('/app/organisms/Desktop/Devices/hooks')
 vi.mock('/app/redux/config')
 vi.mock('/app/resources/useNotifyDataReady')
+vi.mock('/app/redux-resources/robots')
 
-const render = (props: React.ComponentProps<typeof ChooseProtocolSlideout>) => {
+window.HTMLElement.prototype.scrollIntoView = vi.fn()
+
+const render = (props: ComponentProps<typeof ChooseProtocolSlideout>) => {
   return renderWithProviders(
     <MemoryRouter>
       <ChooseProtocolSlideout {...props} />
@@ -47,10 +55,10 @@ const modifiedSimpleAnalysisFileFixture = {
 const mockStoredProtocolDataFixture = [
   {
     ...storedProtocolDataFixture,
-    mostRecentAnalysis: ({
+    mostRecentAnalysis: {
       ...modifiedSimpleAnalysisFileFixture,
       runTimeParameters: [],
-    } as any) as ProtocolAnalysisOutput,
+    } as any as ProtocolAnalysisOutput,
   },
 ]
 
@@ -71,6 +79,7 @@ describe('ChooseProtocolSlideout', () => {
       trackCreateProtocolRunEvent: mockTrackCreateProtocolRunEvent,
     })
     vi.mocked(useNotifyDataReady).mockReturnValue({} as any)
+    vi.mocked(useRobotType).mockReturnValue(FLEX_ROBOT_TYPE)
   })
 
   it('renders slideout if showSlideout true', () => {

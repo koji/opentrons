@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
-import { calcTextAreaHeight } from '../utils'
+import { describe, expect, it } from 'vitest'
+
+import { calcTextAreaHeight } from '../index'
 
 describe('calcTextAreaHeight', () => {
   it('should return the correct number of lines', () => {

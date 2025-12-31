@@ -1,10 +1,11 @@
-import * as React from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import { useQueryClient } from 'react-query'
+import { useNavigate } from 'react-router-dom'
 import last from 'lodash/last'
 import { css } from 'styled-components'
 
+import { deleteProtocol } from '@opentrons/api-client'
 import {
   ALIGN_CENTER,
   ALIGN_END,
@@ -29,13 +30,14 @@ import {
   useMostRecentSuccessfulAnalysisAsDocumentQuery,
   useProtocolAnalysisAsDocumentQuery,
 } from '@opentrons/react-api-client'
-import { deleteProtocol } from '@opentrons/api-client'
 
 import { SmallButton } from '/app/atoms/buttons'
 import { OddModal } from '/app/molecules/OddModal'
-import { LongPressModal } from './LongPressModal'
 import { formatTimeWithUtcLabel } from '/app/resources/runs'
 
+import { LongPressModal } from './LongPressModal'
+
+import type { Dispatch, SetStateAction } from 'react'
 import type { UseLongPressResult } from '@opentrons/components'
 import type { ProtocolResource } from '@opentrons/shared-data'
 import type { OddModalHeaderBaseProps } from '/app/molecules/OddModal/types'
@@ -44,7 +46,7 @@ const REFETCH_INTERVAL = 5000
 
 export function QuickTransferCard(props: {
   quickTransfer: ProtocolResource
-  longPress: React.Dispatch<React.SetStateAction<boolean>>
+  longPress: Dispatch<SetStateAction<boolean>>
   setShowDeleteConfirmationModal: (showDeleteConfirmationModal: boolean) => void
   setTargetTransferId: (targetTransferId: string) => void
 }): JSX.Element {
@@ -55,11 +57,9 @@ export function QuickTransferCard(props: {
     setTargetTransferId,
   } = props
   const navigate = useNavigate()
-  const [showIcon, setShowIcon] = React.useState<boolean>(false)
-  const [
-    showFailedAnalysisModal,
-    setShowFailedAnalysisModal,
-  ] = React.useState<boolean>(false)
+  const [showIcon, setShowIcon] = useState<boolean>(false)
+  const [showFailedAnalysisModal, setShowFailedAnalysisModal] =
+    useState<boolean>(false)
   const { t, i18n } = useTranslation(['quick_transfer', 'branded'])
   const transferName =
     quickTransfer.metadata.protocolName ?? quickTransfer.files[0].name
@@ -68,17 +68,16 @@ export function QuickTransferCard(props: {
   const host = useHost()
 
   const { id: transferId, analysisSummaries } = quickTransfer
-  const {
-    data: mostRecentSuccessfulAnalysis,
-  } = useMostRecentSuccessfulAnalysisAsDocumentQuery(
-    transferId,
-    analysisSummaries,
-    {
-      enabled: quickTransfer != null,
-      refetchInterval: analysisData =>
-        analysisData == null ? REFETCH_INTERVAL : false,
-    }
-  )
+  const { data: mostRecentSuccessfulAnalysis } =
+    useMostRecentSuccessfulAnalysisAsDocumentQuery(
+      transferId,
+      analysisSummaries,
+      {
+        enabled: quickTransfer != null,
+        refetchInterval: analysisData =>
+          analysisData == null ? REFETCH_INTERVAL : false,
+      }
+    )
   const { data: mostRecentAnalysis } = useProtocolAnalysisAsDocumentQuery(
     transferId,
     last(quickTransfer.analysisSummaries)?.id ?? null,
@@ -113,7 +112,7 @@ export function QuickTransferCard(props: {
     }
   }
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (longpress.isLongPressed) {
       longPress(true)
       setTargetTransferId(quickTransfer.id)
@@ -162,8 +161,8 @@ export function QuickTransferCard(props: {
       background-color: ${longpress.isLongPressed
         ? ''
         : isFailedAnalysis
-        ? COLORS.red40
-        : COLORS.grey50};
+          ? COLORS.red40
+          : COLORS.grey50};
     }
   `
 
@@ -188,7 +187,8 @@ export function QuickTransferCard(props: {
           aria-label="Transfer is loading"
           spin
           size="2rem"
-          marginY="-1.5rem"
+          marginTop="-1.5rem"
+          marginBottom="-1.5rem"
           opacity={0.7}
         />
       ) : null}
@@ -209,13 +209,16 @@ export function QuickTransferCard(props: {
               size="1.5rem"
               aria-label="failedAnalysis_icon"
             />
-            <LegacyStyledText as="p" fontWeight={TYPOGRAPHY.fontWeightSemiBold}>
+            <LegacyStyledText
+              forwardedAs="p"
+              fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+            >
               {i18n.format(t('failed_analysis'), 'capitalize')}
             </LegacyStyledText>
           </Flex>
         ) : null}
         <LegacyStyledText
-          as="p"
+          forwardedAs="p"
           fontWeight={TYPOGRAPHY.fontWeightSemiBold}
           opacity={isPendingAnalysis ? 0.7 : 1}
         >
@@ -223,7 +226,7 @@ export function QuickTransferCard(props: {
         </LegacyStyledText>
       </Flex>
       <Flex width="12.5rem" whiteSpace={NO_WRAP}>
-        <LegacyStyledText as="p" color={COLORS.grey60}>
+        <LegacyStyledText forwardedAs="p" color={COLORS.grey60}>
           {formatTimeWithUtcLabel(quickTransfer.createdAt)}
         </LegacyStyledText>
         {longpress.isLongPressed && !isFailedAnalysis && (
@@ -259,7 +262,7 @@ export function QuickTransferCard(props: {
                   components={{
                     block: (
                       <LegacyStyledText
-                        as="p"
+                        forwardedAs="p"
                         css={css`
                           display: -webkit-box;
                           -webkit-box-orient: vertical;
@@ -274,7 +277,7 @@ export function QuickTransferCard(props: {
                   }}
                 />
 
-                <LegacyStyledText as="p">
+                <LegacyStyledText forwardedAs="p">
                   {t('branded:delete_transfer_from_app')}
                 </LegacyStyledText>
               </Flex>

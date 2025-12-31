@@ -1,22 +1,25 @@
-import { describe, it, vi, beforeEach, expect } from 'vitest'
 import { fireEvent, screen } from '@testing-library/react'
-import { renderWithProviders } from '../../../../../../__testing-utils__'
-import { i18n } from '../../../../../../assets/localization'
-import {
-  getMagneticLabwareOptions,
-  getMagnetLabwareEngageHeight,
-} from '../../../../../../ui/modules/selectors'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { renderWithProviders } from '/protocol-designer/__testing-utils__'
+import { i18n } from '/protocol-designer/assets/localization'
 import {
   getInitialDeckSetup,
   getModuleEntities,
-} from '../../../../../../step-forms/selectors'
+} from '/protocol-designer/step-forms/selectors'
+import {
+  getMagneticLabwareOptions,
+  getMagnetLabwareEngageHeight,
+} from '/protocol-designer/ui/modules/selectors'
+
 import { MagnetTools } from '../MagnetTools'
+
 import type { ComponentProps } from 'react'
-import type * as ModulesSelectors from '../../../../../../ui/modules/selectors'
+import type * as ModulesSelectors from '/protocol-designer/ui/modules/selectors'
 
-vi.mock('../../../../../../step-forms/selectors')
+vi.mock('/protocol-designer/step-forms/selectors')
 
-vi.mock('../../../../../../ui/modules/selectors', async importOriginal => {
+vi.mock('/protocol-designer/ui/modules/selectors', async importOriginal => {
   const actualFields = await importOriginal<typeof ModulesSelectors>()
   return {
     ...actualFields,
@@ -31,7 +34,7 @@ const render = (props: ComponentProps<typeof MagnetTools>) => {
 }
 
 describe('MagnetTools', () => {
-  let props: React.ComponentProps<typeof MagnetTools>
+  let props: ComponentProps<typeof MagnetTools>
 
   beforeEach(() => {
     props = {
@@ -47,10 +50,18 @@ describe('MagnetTools', () => {
         dirtyFields: [],
         focusedField: null,
       },
-      visibleFormErrors: [],
       toolboxStep: 1,
       propsForFields: {
         magnetAction: {
+          onFieldFocus: vi.fn(),
+          onFieldBlur: vi.fn(),
+          errorToShow: null,
+          disabled: false,
+          name: 'magnetAction',
+          updateValue: vi.fn(),
+          value: 'engage',
+        },
+        moduleId: {
           onFieldFocus: vi.fn(),
           onFieldBlur: vi.fn(),
           errorToShow: null,
@@ -70,6 +81,8 @@ describe('MagnetTools', () => {
         },
       },
       showFormErrors: false,
+      tab: 'aspirate',
+      setTab: vi.fn(),
     }
     vi.mocked(getMagneticLabwareOptions).mockReturnValue([
       { name: 'mock labware in mock module in slot abc', value: 'mockValue' },
@@ -79,6 +92,7 @@ describe('MagnetTools', () => {
         id: 'magnetId',
         model: 'magneticModuleV2',
         type: 'magneticModuleType',
+        pythonName: 'mockPythonName',
       },
     })
     vi.mocked(getMagnetLabwareEngageHeight).mockReturnValue(null)
@@ -91,6 +105,7 @@ describe('MagnetTools', () => {
           type: 'magneticModuleType',
           moduleState: { engaged: false, type: 'magneticModuleType' },
           model: 'magneticModuleV1',
+          pythonName: 'mockPythonName',
         },
       },
       additionalEquipmentOnDeck: {},
@@ -101,10 +116,7 @@ describe('MagnetTools', () => {
   it('renders the text and a switch button for v2', () => {
     render(props)
     screen.getByText('Module')
-    screen.getByText('10')
-    screen.getByText('mock labware')
-    screen.getByText('mock module')
-    screen.getByText('Magnet state')
+    screen.getByText('Magnets')
     screen.getByLabelText('Engage')
     const toggleButton = screen.getByRole('switch')
     screen.getByText('Engage height')
@@ -119,6 +131,7 @@ describe('MagnetTools', () => {
         id: 'magnetId',
         model: 'magneticModuleV1',
         type: 'magneticModuleType',
+        pythonName: 'mockPythonName',
       },
     })
     render(props)

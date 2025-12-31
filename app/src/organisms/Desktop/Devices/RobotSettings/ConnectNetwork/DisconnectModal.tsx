@@ -11,11 +11,11 @@ import {
   Icon,
   JUSTIFY_CENTER,
   JUSTIFY_FLEX_END,
+  LegacyStyledText,
   Link,
+  Modal,
   PrimaryButton,
   SPACING,
-  LegacyStyledText,
-  Modal,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
@@ -26,15 +26,15 @@ import {
   getNetworkInterfaces,
   postWifiDisconnect,
 } from '/app/redux/networking'
-import { useWifiList } from '/app/resources/networking/hooks'
 import {
   dismissRequest,
-  getRequestById,
-  useDispatchApiRequest,
-  PENDING,
   FAILURE,
+  getRequestById,
+  PENDING,
   SUCCESS,
+  useDispatchApiRequest,
 } from '/app/redux/robot-api'
+import { useWifiList } from '/app/resources/networking/hooks'
 
 import type { Dispatch, State } from '/app/redux/types'
 
@@ -131,7 +131,7 @@ export const DisconnectModal = ({
     >
       <Flex flexDirection={DIRECTION_COLUMN}>
         {isError ? (
-          <LegacyStyledText as="p" marginBottom={SPACING.spacing24}>
+          <LegacyStyledText forwardedAs="p" marginBottom={SPACING.spacing24}>
             {requestState != null &&
             'error' in requestState &&
             'message' in requestState?.error
@@ -139,11 +139,11 @@ export const DisconnectModal = ({
               : t('shared:unknown_error')}
           </LegacyStyledText>
         ) : null}
-        <LegacyStyledText as="p" marginBottom={SPACING.spacing24}>
+        <LegacyStyledText forwardedAs="p" marginBottom={SPACING.spacing24}>
           {disconnectModalBody}
         </LegacyStyledText>
         {isError ? (
-          <LegacyStyledText as="p" marginBottom={SPACING.spacing24}>
+          <LegacyStyledText forwardedAs="p" marginBottom={SPACING.spacing24}>
             {t('branded:general_error_message')}
           </LegacyStyledText>
         ) : null}

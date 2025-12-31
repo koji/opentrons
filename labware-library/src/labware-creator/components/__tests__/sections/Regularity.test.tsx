@@ -1,11 +1,15 @@
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
 import '@testing-library/jest-dom/vitest'
-import { when } from 'vitest-when'
+
 import { render, screen } from '@testing-library/react'
+import { when } from 'vitest-when'
+
 import { getDefaultFormState, getInitialStatus } from '../../../fields'
-import { isEveryFieldHidden, getLabwareName } from '../../../utils'
+import { getLabwareName, isEveryFieldHidden } from '../../../utils'
 import { Regularity } from '../../sections/Regularity'
 import { wrapInFormik } from '../../utils/wrapInFormik'
+
 import type { FormikConfig } from 'formik'
 import type { LabwareFields } from '../../../fields'
 
@@ -22,7 +26,10 @@ describe('Regularity', () => {
     }
 
     when(vi.mocked(isEveryFieldHidden))
-      .calledWith(['homogeneousWells'], formikConfig.initialValues)
+      .calledWith(
+        ['homogeneousWells', 'hasLpcQuirk'],
+        formikConfig.initialValues
+      )
       .thenReturn(false)
   })
 
@@ -41,17 +48,20 @@ describe('Regularity', () => {
     screen.getByText(
       'Are all your FAKE LABWARE NAME PLURAL the same shape and size?'
     )
-
+    screen.getByText(
+      'Do you want to exclude this labware from Labware Position Check?'
+    )
     const radioElements = screen.getAllByRole('radio')
-    expect(radioElements).toHaveLength(2)
-    screen.getByRole('radio', { name: /yes/i })
-    screen.getByRole('radio', { name: /no/i })
+    expect(radioElements).toHaveLength(4)
   })
 
   it('should render alert when error is present', () => {
     const FAKE_ERROR = 'ahh'
-    formikConfig.initialErrors = { homogeneousWells: FAKE_ERROR }
-    formikConfig.initialTouched = { homogeneousWells: true }
+    formikConfig.initialErrors = {
+      homogeneousWells: FAKE_ERROR,
+      hasLpcQuirk: FAKE_ERROR,
+    }
+    formikConfig.initialTouched = { homogeneousWells: true, hasLpcQuirk: true }
     render(wrapInFormik(<Regularity />, formikConfig))
 
     // TODO(IL, 2021-05-26): AlertItem should have role="alert", then we can `getByRole('alert', {name: FAKE_ERROR})`

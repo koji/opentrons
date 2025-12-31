@@ -1,4 +1,5 @@
 """Tests for the legacy Protocol API module core implementations."""
+
 import pytest
 from decoy import Decoy
 
@@ -351,6 +352,7 @@ def test_set_target_block_temperature(
         celsius=42.0,
         hold_time_seconds=1.2,
         block_max_volume=3.4,
+        ramp_rate=None,
     )
 
     decoy.verify(
@@ -358,6 +360,7 @@ def test_set_target_block_temperature(
             celsius=42.0,
             hold_time_seconds=1.2,
             volume=3.4,
+            ramp_rate=None,
         ),
         times=1,
     )

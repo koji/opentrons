@@ -1,107 +1,146 @@
-import map from 'lodash/map'
-import { BaseDeck, Flex } from '@opentrons/components'
+import { useMemo } from 'react'
+
+import {
+  BaseDeck,
+  CenterLabwareInSlot,
+  Flex,
+  LabwareRender,
+} from '@opentrons/components'
 import {
   FLEX_ROBOT_TYPE,
+  getLabwareDefinitionsByURIForProtocol,
+  getLabwareOnDeck,
   getSimplestDeckConfigForProtocol,
-  getTopLabwareInfo,
+  getStacksOnModules,
+  getTopLabwareFromStack,
+  getWellFillFromLabwareId,
   THERMOCYCLER_MODULE_V1,
 } from '@opentrons/shared-data'
 
 import { getStandardDeckViewLayerBlockList } from '/app/local-resources/deck_configuration'
-import { getLabwareRenderInfo } from '/app/transformations/analysis'
 
+import type { Dispatch, SetStateAction } from 'react'
 import type { LabwareOnDeck } from '@opentrons/components'
 import type {
   CompletedProtocolAnalysis,
-  DeckDefinition,
-  LabwareDefinition2,
-  RunTimeCommand,
-  LoadLabwareRunTimeCommand,
+  LabwareByLiquidId,
+  StackedItemsOnDeck,
+  StackItem,
 } from '@opentrons/shared-data'
 
-import type { AttachedProtocolModuleMatch } from '/app/transformations/analysis'
-
 interface LabwareMapViewProps {
-  attachedProtocolModuleMatches: AttachedProtocolModuleMatch[]
-  handleLabwareClick: (
-    labwareDef: LabwareDefinition2,
-    labwareId: string
-  ) => void
-  deckDef: DeckDefinition
+  handleLabwareClick: Dispatch<SetStateAction<[string, StackItem[]] | null>>
   mostRecentAnalysis: CompletedProtocolAnalysis | null
+  startingDeck: StackedItemsOnDeck
+  labwareByLiquidId: LabwareByLiquidId
 }
 
 export function LabwareMapView(props: LabwareMapViewProps): JSX.Element {
   const {
     handleLabwareClick,
-    attachedProtocolModuleMatches,
-    deckDef,
     mostRecentAnalysis,
+    startingDeck,
+    labwareByLiquidId,
   } = props
   const deckConfig = getSimplestDeckConfigForProtocol(mostRecentAnalysis)
-  const commands: RunTimeCommand[] = mostRecentAnalysis?.commands ?? []
-  const loadLabwareCommands = commands?.filter(
-    (command): command is LoadLabwareRunTimeCommand =>
-      command.commandType === 'loadLabware'
+  const definitionsByURI = useMemo(
+    () =>
+      getLabwareDefinitionsByURIForProtocol(mostRecentAnalysis?.commands ?? []),
+    [mostRecentAnalysis]
+  )
+  const modulesOnDeck = Object.entries(getStacksOnModules(startingDeck)).map(
+    ([slotName, { allItemsInStack: stackedItems, moduleInStack: module }]) => {
+      const topLabwareInfo = getTopLabwareFromStack(stackedItems)
+      const topLabwareDefinition =
+        topLabwareInfo != null
+          ? definitionsByURI[topLabwareInfo.definitionUri]
+          : null
+      // TODO: ja 8.27.25: find a better way to find the matching lid def without
+      // relying on the lidDisplayNames
+      // TODO: mm 12.3.25: deduplicate with other places where we're doing the same thing
+      // (grep for matchingLidDef)
+      const matchingLidDef = Object.values(definitionsByURI).find(
+        uri => uri.metadata.displayName === topLabwareInfo?.lidDisplayName
+      )
+      const isLabwareStacked = topLabwareInfo != null && stackedItems.length > 2
+      const wellFill =
+        topLabwareInfo != null
+          ? getWellFillFromLabwareId(
+              topLabwareInfo.labwareId,
+              mostRecentAnalysis?.liquids ?? [],
+              labwareByLiquidId,
+              mostRecentAnalysis?.commands ?? []
+            )
+          : undefined
+      return {
+        moduleModel: module.moduleModel,
+        moduleLocation: { slotName: module.moduleSlotName },
+        innerProps:
+          module.moduleModel === THERMOCYCLER_MODULE_V1
+            ? { lidMotorState: 'open' }
+            : {},
+        nestedLabwareDefsBottomToTop: [
+          ...(topLabwareDefinition != null ? [topLabwareDefinition] : []),
+          ...(matchingLidDef != null ? [matchingLidDef] : []),
+        ],
+        nestedLabwareWellFill: wellFill,
+        onLabwareClick:
+          topLabwareInfo != null
+            ? () => {
+                handleLabwareClick([slotName, stackedItems])
+              }
+            : undefined,
+        highlightLabware: true,
+        stacked: isLabwareStacked,
+      }
+    }
   )
 
-  const labwareRenderInfo =
-    mostRecentAnalysis != null
-      ? getLabwareRenderInfo(mostRecentAnalysis, deckDef)
-      : {}
+  const labwareLocations: Array<LabwareOnDeck | null> = Object.entries(
+    getLabwareOnDeck(startingDeck)
+  ).map(([slotName, stackedItems]) => {
+    const topLabwareInfo = getTopLabwareFromStack(stackedItems)
+    const topLabwareDefinition =
+      topLabwareInfo != null
+        ? definitionsByURI[topLabwareInfo.definitionUri]
+        : null
+    // TODO: ja 8.27.25: find a better way to find the matching lid def without
+    // relying on the lidDisplayNames
+    // TODO: mm 12.3.25: deduplicate with other places where we're doing the same thing
+    // (grep for matchingLidDef)
+    const matchingLidDef = Object.values(definitionsByURI).find(
+      uri => uri.metadata.displayName === topLabwareInfo?.lidDisplayName
+    )
+    if (topLabwareInfo == null || topLabwareDefinition == null) return null
 
-  const modulesOnDeck = attachedProtocolModuleMatches.map(module => {
-    const { moduleDef, nestedLabwareDef, nestedLabwareId, slotName } = module
-    const isLabwareStacked = nestedLabwareId != null && nestedLabwareDef != null
-    const { topLabwareId, topLabwareDefinition } = getTopLabwareInfo(
-      module.nestedLabwareId ?? '',
-      loadLabwareCommands
+    const isLabwareInStack = stackedItems.length > 1
+    const wellFill = getWellFillFromLabwareId(
+      topLabwareInfo.labwareId,
+      mostRecentAnalysis?.liquids ?? [],
+      labwareByLiquidId,
+      mostRecentAnalysis?.commands ?? []
     )
 
     return {
-      moduleModel: moduleDef.model,
-      moduleLocation: { slotName },
-      innerProps:
-        moduleDef.model === THERMOCYCLER_MODULE_V1
-          ? { lidMotorState: 'open' }
-          : {},
-      nestedLabwareDef: topLabwareDefinition,
-      onLabwareClick:
-        topLabwareDefinition != null && topLabwareId != null
-          ? () => {
-              handleLabwareClick(topLabwareDefinition, topLabwareId)
-            }
-          : undefined,
-      highlightLabware: true,
-      highlightShadowLabware: isLabwareStacked,
-      moduleChildren: null,
-      stacked: isLabwareStacked,
+      labwareLocation: { slotName },
+      definition: topLabwareDefinition,
+      onLabwareClick: () => {
+        handleLabwareClick([slotName, stackedItems])
+      },
+      wellFill,
+      highlight: true,
+      stacked: isLabwareInStack,
+      labwareChildren:
+        matchingLidDef != null ? (
+          <CenterLabwareInSlot definition={matchingLidDef}>
+            <LabwareRender
+              definition={matchingLidDef}
+              positioningMode="passThrough"
+            />
+          </CenterLabwareInSlot>
+        ) : null,
     }
   })
-
-  const labwareLocations: Array<LabwareOnDeck | null> = map(
-    labwareRenderInfo,
-    ({ slotName }, labwareId) => {
-      const { topLabwareId, topLabwareDefinition } = getTopLabwareInfo(
-        labwareId,
-        loadLabwareCommands
-      )
-      const isLabwareInStack = labwareId !== topLabwareId
-
-      return topLabwareDefinition != null
-        ? {
-            labwareLocation: { slotName },
-            definition: topLabwareDefinition,
-            onLabwareClick: () => {
-              handleLabwareClick(topLabwareDefinition, topLabwareId)
-            },
-            highlight: true,
-            highlightShadow: isLabwareInStack,
-            stacked: isLabwareInStack,
-          }
-        : null
-    }
-  )
 
   const labwareLocationsFiltered: LabwareOnDeck[] = labwareLocations.filter(
     (labwareLocation): labwareLocation is LabwareOnDeck =>

@@ -1,4 +1,8 @@
 {
+  "commandAnnotations": [],
+  "commandPreconditions": {
+    "isCameraUsed": false
+  },
   "commands": [
     {
       "commandType": "home",
@@ -294,6 +298,11 @@
               "x": 0,
               "y": 0,
               "z": 121
+            },
+            "opentrons_flex_tiprack_lid": {
+              "x": 0,
+              "y": 0,
+              "z": 0.25
             }
           },
           "stackingOffsetWithModule": {},
@@ -1165,7 +1174,20 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "B2",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutoutB2",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "singleCenterSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -2378,7 +2400,20 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "D2",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutoutD2",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "singleCenterSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -3552,7 +3587,22 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "D3",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutoutD3",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "flexStackerModuleV1",
+              "singleRightSlot",
+              "stagingAreaRightSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -3734,12 +3784,7 @@
       ]
     }
   ],
-  "files": [
-    {
-      "name": "Flex_X_v2_20_96_and_8_Overrides_InvalidConfigs_Override_drop_tip_with_location.py",
-      "role": "main"
-    }
-  ],
+  "files": [],
   "labware": [
     {
       "definitionUri": "opentrons/opentrons_flex_96_tiprack_1000ul/1",
@@ -3766,6 +3811,7 @@
       }
     }
   ],
+  "liquidClasses": [],
   "liquids": [],
   "metadata": {
     "description": "oooo",

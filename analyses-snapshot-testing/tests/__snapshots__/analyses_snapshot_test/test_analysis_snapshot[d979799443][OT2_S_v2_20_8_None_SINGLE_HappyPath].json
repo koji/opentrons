@@ -1,4 +1,8 @@
 {
+  "commandAnnotations": [],
+  "commandPreconditions": {
+    "isCameraUsed": false
+  },
   "commands": [
     {
       "commandType": "home",
@@ -1160,7 +1164,20 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "8",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutout8",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "singleStandardSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -2372,7 +2389,20 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "2",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutout2",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "singleStandardSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -3547,7 +3577,20 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "3",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutout3",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "singleStandardSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -6461,7 +6504,20 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "4",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutout4",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "singleStandardSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -8197,12 +8253,7 @@
   },
   "createdAt": "TIMESTAMP",
   "errors": [],
-  "files": [
-    {
-      "name": "OT2_S_v2_20_8_None_SINGLE_HappyPath.py",
-      "role": "main"
-    }
-  ],
+  "files": [],
   "labware": [
     {
       "definitionUri": "opentrons/opentrons_96_tiprack_300ul/1",
@@ -8241,6 +8292,7 @@
       }
     }
   ],
+  "liquidClasses": [],
   "liquids": [],
   "metadata": {
     "description": "OT2 8 Channel pipette and a SINGLE partial tip configuration.",

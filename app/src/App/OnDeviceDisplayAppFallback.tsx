@@ -1,11 +1,6 @@
 import { useEffect } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
 import { useTranslation } from 'react-i18next'
-
-import { useTrackEvent, ANALYTICS_ODD_APP_ERROR } from '/app/redux/analytics'
-import { getLocalRobot, getRobotSerialNumber } from '/app/redux/discovery'
-
-import type { FallbackProps } from 'react-error-boundary'
+import { useDispatch, useSelector } from 'react-redux'
 
 import {
   ALIGN_CENTER,
@@ -13,16 +8,20 @@ import {
   DIRECTION_COLUMN,
   Flex,
   JUSTIFY_CENTER,
-  SPACING,
   LegacyStyledText,
+  SPACING,
 } from '@opentrons/components'
 
+import { useSentryReport } from '/app/App/hooks'
 import { MediumButton } from '/app/atoms/buttons'
 import { OddModal } from '/app/molecules/OddModal'
+import { ANALYTICS_ODD_APP_ERROR, useTrackEvent } from '/app/redux/analytics'
+import { getLocalRobot, getRobotSerialNumber } from '/app/redux/discovery'
 import { appRestart, sendLog } from '/app/redux/shell'
 
-import type { Dispatch } from '/app/redux/types'
+import type { FallbackProps } from 'react-error-boundary'
 import type { OddModalHeaderBaseProps } from '/app/molecules/OddModal/types'
+import type { Dispatch } from '/app/redux/types'
 
 export function OnDeviceDisplayAppFallback({
   error,
@@ -46,6 +45,8 @@ export function OnDeviceDisplayAppFallback({
     iconColor: COLORS.red50,
   }
 
+  useSentryReport(error)
+
   // immediately report to robot logs that something fatal happened
   useEffect(() => {
     dispatch(sendLog(`ODD app encountered a fatal error: ${error.message}`))
@@ -59,7 +60,7 @@ export function OnDeviceDisplayAppFallback({
         alignItems={ALIGN_CENTER}
         justifyContent={JUSTIFY_CENTER}
       >
-        <LegacyStyledText as="p">
+        <LegacyStyledText forwardedAs="p">
           {t('branded:error_boundary_description')}
         </LegacyStyledText>
         <MediumButton

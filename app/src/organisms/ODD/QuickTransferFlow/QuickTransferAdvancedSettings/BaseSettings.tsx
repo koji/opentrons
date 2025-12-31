@@ -1,5 +1,6 @@
-import * as React from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+
 import {
   ALIGN_CENTER,
   COLORS,
@@ -14,9 +15,11 @@ import {
   TEXT_ALIGN_RIGHT,
   TYPOGRAPHY,
 } from '@opentrons/components'
+
 import { FlowRateEntry } from './FlowRate'
 import { PipettePath } from './PipettePath'
 
+import type { Dispatch } from 'react'
 import type {
   QuickTransferSummaryAction,
   QuickTransferSummaryState,
@@ -24,15 +27,13 @@ import type {
 
 interface BaseSettingsProps {
   state: QuickTransferSummaryState
-  dispatch: React.Dispatch<QuickTransferSummaryAction>
+  dispatch: Dispatch<QuickTransferSummaryAction>
 }
 
 export function BaseSettings(props: BaseSettingsProps): JSX.Element | null {
   const { state, dispatch } = props
   const { t } = useTranslation(['quick_transfer', 'shared'])
-  const [selectedSetting, setSelectedSetting] = React.useState<string | null>(
-    null
-  )
+  const [selectedSetting, setSelectedSetting] = useState<string | null>(null)
 
   let pipettePath: string = ''
   if (state.path === 'single') {
@@ -76,7 +77,7 @@ export function BaseSettings(props: BaseSettingsProps): JSX.Element | null {
       {selectedSetting == null
         ? displayItems.map(displayItem => (
             <ListItem
-              type="noActive"
+              type="default"
               key={displayItem.option}
               onClick={displayItem.onClick}
             >

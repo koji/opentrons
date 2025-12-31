@@ -1,19 +1,21 @@
+import { useTranslation } from 'react-i18next'
+import uniq from 'lodash/uniq'
+
 import {
   ALIGN_STRETCH,
   DIRECTION_COLUMN,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   PrimaryButton,
   SPACING,
-  LegacyStyledText,
 } from '@opentrons/components'
-import uniq from 'lodash/uniq'
 
+import { NeedHelpLink } from '/app/molecules/OT2CalibrationNeedHelpLink'
 import * as Sessions from '/app/redux/sessions'
+
 import type { CalibrationPanelProps } from '/app/organisms/Desktop/CalibrationPanels/types'
 import type { SessionCommandString } from '/app/redux/sessions/types'
-import { useTranslation } from 'react-i18next'
-import { NeedHelpLink } from '/app/molecules/OT2CalibrationNeedHelpLink'
 
 export function ReturnTip(props: CalibrationPanelProps): JSX.Element {
   const { t } = useTranslation('robot_calibration')
@@ -57,7 +59,7 @@ export function ReturnTip(props: CalibrationPanelProps): JSX.Element {
       minHeight="32rem"
     >
       <Flex alignSelf={ALIGN_STRETCH}>
-        <LegacyStyledText as="h1">
+        <LegacyStyledText forwardedAs="h1">
           {onFinalPipette
             ? t('return_tip_and_exit')
             : t('return_tip_and_continue')}

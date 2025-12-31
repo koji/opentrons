@@ -9,15 +9,17 @@ import type {
   ActionToRequestMapper,
   ResponseToActionMapper,
 } from '../../robot-api/operators'
+import type { RobotApiErrorResponse } from '../../robot-api/types'
 import type { Action, Epic } from '../../types'
 import type {
   FetchStatusAction,
   InterfaceStatus,
   InternetStatus,
 } from '../types'
-import type { RobotApiErrorResponse } from '../../robot-api/types'
 
-const mapActionToRequest: ActionToRequestMapper<FetchStatusAction> = action => ({
+const mapActionToRequest: ActionToRequestMapper<
+  FetchStatusAction
+> = action => ({
   method: GET,
   path: Constants.STATUS_PATH,
 })

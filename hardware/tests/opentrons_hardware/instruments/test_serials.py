@@ -1,4 +1,5 @@
 """Test serial setting."""
+
 import pytest
 from opentrons_shared_data.errors.exceptions import InvalidInstrumentData
 from opentrons_hardware.instruments.serial_utils import model_versionstring_from_int
@@ -39,6 +40,12 @@ from opentrons_hardware.firmware_bindings.constants import PipetteName
             PipetteName.p50_single,
             1,
             b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+        ),
+        (
+            "P1KPV30",
+            PipetteName.p1000_multi_em,
+            30,
+            b"\x00" * 16,
         ),
     ],
 )

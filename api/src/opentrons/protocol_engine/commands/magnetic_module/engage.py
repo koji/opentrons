@@ -1,4 +1,5 @@
 """Magnetic Module engage command request, result, and implementation models."""
+
 from __future__ import annotations
 from typing import Optional, TYPE_CHECKING
 from typing_extensions import Literal, Type
@@ -105,7 +106,7 @@ class Engage(BaseCommand[EngageParams, EngageResult, ErrorOccurrence]):
 
     commandType: EngageCommandType = "magneticModule/engage"
     params: EngageParams
-    result: Optional[EngageResult]
+    result: Optional[EngageResult] = None
 
     _ImplementationCls: Type[EngageImplementation] = EngageImplementation
 

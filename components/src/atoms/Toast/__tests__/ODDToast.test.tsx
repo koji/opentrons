@@ -1,16 +1,20 @@
-import type * as React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import '@testing-library/jest-dom/vitest'
-import { act, fireEvent, screen } from '@testing-library/react'
-import { renderWithProviders } from '../../../testing/utils'
-import { Toast, TOAST_ANIMATION_DURATION } from '..'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const render = (props: React.ComponentProps<typeof Toast>) => {
+import '@testing-library/jest-dom/vitest'
+
+import { act, fireEvent, screen } from '@testing-library/react'
+
+import { Toast, TOAST_ANIMATION_DURATION } from '..'
+import { renderWithProviders } from '../../../testing/utils'
+
+import type { ComponentProps } from 'react'
+
+const render = (props: ComponentProps<typeof Toast>) => {
   return renderWithProviders(<Toast {...props} displayType="odd" />)[0]
 }
 
 describe('Toast', () => {
-  let props: React.ComponentProps<typeof Toast>
+  let props: ComponentProps<typeof Toast>
   beforeEach(() => {
     props = {
       id: '1',

@@ -1,8 +1,8 @@
-import * as React from 'react'
-import { useDispatch, useSelector } from 'react-redux'
-import { css } from 'styled-components'
+import { useEffect, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
+import { useDispatch, useSelector } from 'react-redux'
 import { NavLink } from 'react-router-dom'
+import { css } from 'styled-components'
 
 import {
   Box,
@@ -10,22 +10,23 @@ import {
   DIRECTION_COLUMN,
   Flex,
   Icon,
+  LegacyStyledText,
   SIZE_1,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
+import FLEX_PNG from '/app/assets/images/FLEX.png'
+import OT2_PNG from '/app/assets/images/OT2-R_HERO.png'
 import { MiniCard } from '/app/molecules/MiniCard'
 import { getRobotModelByName, OPENTRONS_USB } from '/app/redux/discovery'
-import { getNetworkInterfaces, fetchStatus } from '/app/redux/networking'
+import { fetchStatus, getNetworkInterfaces } from '/app/redux/networking'
 import { appShellRequestor } from '/app/redux/shell/remote'
-import OT2_PNG from '/app/assets/images/OT2-R_HERO.png'
-import FLEX_PNG from '/app/assets/images/FLEX.png'
 import { useCurrentRunId, useNotifyRunQuery } from '/app/resources/runs'
 
-import type { IconName } from '@opentrons/components'
+import type { Dispatch as ReactDispatch } from 'react'
 import type { Runs } from '@opentrons/api-client'
+import type { IconName } from '@opentrons/components'
 import type { Robot } from '/app/redux/discovery/types'
 import type { Dispatch, State } from '/app/redux/types'
 import type { RobotBusyStatusAction } from '.'
@@ -35,7 +36,7 @@ interface AvailableRobotOptionProps {
   onClick: () => void
   isSelected: boolean
   isSelectedRobotOnDifferentSoftwareVersion: boolean
-  registerRobotBusyStatus: React.Dispatch<RobotBusyStatusAction>
+  registerRobotBusyStatus: ReactDispatch<RobotBusyStatusAction>
   isError?: boolean
   showIdleOnly?: boolean
 }
@@ -59,7 +60,7 @@ export function AvailableRobotOption(
     getRobotModelByName(state, robotName)
   )
 
-  const [isBusy, setIsBusy] = React.useState(true)
+  const [isBusy, setIsBusy] = useState(true)
 
   const currentRunId = useCurrentRunId(
     {
@@ -112,7 +113,7 @@ export function AvailableRobotOption(
     iconName = 'usb'
   }
 
-  React.useEffect(() => {
+  useEffect(() => {
     dispatch(fetchStatus(robotName))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -139,22 +140,27 @@ export function AvailableRobotOption(
           marginTop={SPACING.spacing8}
           marginBottom={SPACING.spacing16}
         >
-          <LegacyStyledText as="h6" fontWeight={TYPOGRAPHY.fontWeightSemiBold}>
+          <LegacyStyledText
+            forwardedAs="h6"
+            fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+          >
             {robotModel}
           </LegacyStyledText>
           <Box maxWidth="9.5rem">
             <LegacyStyledText
-              as="p"
+              forwardedAs="p"
               overflowWrap="break-word"
               fontWeight={TYPOGRAPHY.fontWeightSemiBold}
             >
               {robotName}
               <Icon
-                aria-label={iconName}
-                marginBottom={`-${SPACING.spacing4}`}
-                marginLeft={SPACING.spacing8}
+                aria-label={iconName ?? 'wifi-icon'}
                 name={iconName ?? 'wifi'}
                 size={SIZE_1}
+                style={{
+                  marginLeft: SPACING.spacing8,
+                  marginBottom: `-${SPACING.spacing4}`,
+                }}
               />
             </LegacyStyledText>
           </Box>
@@ -163,14 +169,13 @@ export function AvailableRobotOption(
         isSelected ? (
           <>
             <Box flex="1 1 auto" />
-            <Icon name="alert-circle" size="1.25rem" color={COLORS.red50} />
+            <Icon name="ot-alert" size="1.25rem" color={COLORS.red50} />
           </>
         ) : null}
       </MiniCard>
-
       {isSelectedRobotOnDifferentSoftwareVersion && isSelected ? (
         <LegacyStyledText
-          as="label"
+          forwardedAs="label"
           color={COLORS.red60}
           marginBottom={SPACING.spacing8}
           css={css`

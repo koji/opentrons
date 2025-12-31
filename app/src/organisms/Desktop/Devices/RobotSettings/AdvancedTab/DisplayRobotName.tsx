@@ -1,4 +1,3 @@
-import type * as React from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -7,13 +6,16 @@ import {
   COLORS,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
-  SPACING_AUTO,
-  SPACING,
   LegacyStyledText,
+  SPACING,
+  SPACING_AUTO,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
 import { TertiaryButton } from '/app/atoms/buttons'
+
+import type { MouseEventHandler } from 'react'
+
 interface DisplayRobotNameProps {
   robotName: string
   updateIsExpanded: (
@@ -30,7 +32,7 @@ export function DisplayRobotName({
 }: DisplayRobotNameProps): JSX.Element {
   const { t } = useTranslation('device_settings')
 
-  const handleClick: React.MouseEventHandler<HTMLButtonElement> = () => {
+  const handleClick: MouseEventHandler<HTMLButtonElement> = () => {
     if (!isRobotBusy) {
       updateIsExpanded(true, 'renameRobot')
     }
@@ -40,7 +42,7 @@ export function DisplayRobotName({
     <Flex alignItems={ALIGN_CENTER} justifyContent={JUSTIFY_SPACE_BETWEEN}>
       <Box width="70%">
         <LegacyStyledText
-          as="h2"
+          forwardedAs="h2"
           fontWeight={TYPOGRAPHY.fontWeightSemiBold}
           marginBottom={SPACING.spacing16}
           id="AdvancedSettings_About"
@@ -48,13 +50,13 @@ export function DisplayRobotName({
           {t('about_advanced')}
         </LegacyStyledText>
         <LegacyStyledText
-          as="p"
+          forwardedAs="p"
           css={TYPOGRAPHY.pSemiBold}
           marginBottom={SPACING.spacing4}
         >
           {t('robot_name')}
         </LegacyStyledText>
-        <LegacyStyledText as="p" color={COLORS.grey60}>
+        <LegacyStyledText forwardedAs="p" color={COLORS.grey60}>
           {robotName}
         </LegacyStyledText>
       </Box>

@@ -1,27 +1,29 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, beforeEach, vi, expect } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { LEFT, SINGLE_MOUNT_PIPETTES } from '@opentrons/shared-data'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { mockAttachedPipetteInformation } from '/app/redux/pipettes/__fixtures__'
 import { InProgressModal } from '/app/molecules/InProgressModal/InProgressModal'
+import { mockAttachedPipetteInformation } from '/app/redux/pipettes/__fixtures__'
 import { RUN_ID_1 } from '/app/resources/runs/__fixtures__'
+
 import { FLOWS } from '../constants'
 import { DetachProbe } from '../DetachProbe'
 
+import type { ComponentProps } from 'react'
+
 vi.mock('/app/molecules/InProgressModal/InProgressModal')
 
-const render = (props: React.ComponentProps<typeof DetachProbe>) => {
+const render = (props: ComponentProps<typeof DetachProbe>) => {
   return renderWithProviders(<DetachProbe {...props} />, {
     i18nInstance: i18n,
   })[0]
 }
 
 describe('DetachProbe', () => {
-  let props: React.ComponentProps<typeof DetachProbe>
+  let props: ComponentProps<typeof DetachProbe>
   beforeEach(() => {
     props = {
       selectedPipette: SINGLE_MOUNT_PIPETTES,

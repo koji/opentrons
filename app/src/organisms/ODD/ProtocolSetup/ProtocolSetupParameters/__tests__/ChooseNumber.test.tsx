@@ -1,31 +1,36 @@
-import type * as React from 'react'
-import { it, describe, beforeEach, vi, expect } from 'vitest'
 import { fireEvent, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import '@testing-library/jest-dom/vitest'
+
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 import { useToaster } from '/app/organisms/ToasterOven'
+
 import { mockRunTimeParameterData } from '../../__fixtures__'
 import { ChooseNumber } from '../ChooseNumber'
 
+import type { ComponentProps } from 'react'
 import type { NumberParameter } from '@opentrons/shared-data'
 
 vi.mock('/app/organisms/ToasterOven')
 
 const mockHandleGoBack = vi.fn()
-const mockIntNumberParameterData = mockRunTimeParameterData[5] as NumberParameter
-const mockFloatNumberParameterData = mockRunTimeParameterData[6] as NumberParameter
+const mockIntNumberParameterData =
+  mockRunTimeParameterData[5] as NumberParameter
+const mockFloatNumberParameterData =
+  mockRunTimeParameterData[6] as NumberParameter
 const mockSetParameter = vi.fn()
 const mockMakeSnackbar = vi.fn()
 
-const render = (props: React.ComponentProps<typeof ChooseNumber>) => {
+const render = (props: ComponentProps<typeof ChooseNumber>) => {
   return renderWithProviders(<ChooseNumber {...props} />, {
     i18nInstance: i18n,
   })
 }
 
 describe('ChooseNumber', () => {
-  let props: React.ComponentProps<typeof ChooseNumber>
+  let props: ComponentProps<typeof ChooseNumber>
 
   beforeEach(() => {
     props = {

@@ -1,34 +1,37 @@
-import * as React from 'react'
-import { css } from 'styled-components'
+import { useMemo } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
+import { css } from 'styled-components'
+
 import {
   ALIGN_FLEX_END,
   ALIGN_STRETCH,
+  AnimationVideo,
   Box,
   DIRECTION_COLUMN,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   PrimaryButton,
   SPACING,
-  LegacyStyledText,
 } from '@opentrons/components'
 
-import * as Sessions from '/app/redux/sessions'
+import slot5LeftMultiDemoAsset from '/app/assets/videos/cal-movement/SLOT_5_LEFT_MULTI_Z.webm'
+import slot5LeftSingleDemoAsset from '/app/assets/videos/cal-movement/SLOT_5_LEFT_SINGLE_Z.webm'
+import slot5RightMultiDemoAsset from '/app/assets/videos/cal-movement/SLOT_5_RIGHT_MULTI_Z.webm'
+import slot5RightSingleDemoAsset from '/app/assets/videos/cal-movement/SLOT_5_RIGHT_SINGLE_Z.webm'
 import {
   JogControls,
   MEDIUM_STEP_SIZE_MM,
   SMALL_STEP_SIZE_MM,
   VERTICAL_PLANE,
 } from '/app/molecules/JogControls'
-import { formatJogVector } from './utils'
-import { useConfirmCrashRecovery } from './useConfirmCrashRecovery'
 import { NeedHelpLink } from '/app/molecules/OT2CalibrationNeedHelpLink'
+import * as Sessions from '/app/redux/sessions'
 
-import slot5LeftMultiDemoAsset from '/app/assets/videos/cal-movement/SLOT_5_LEFT_MULTI_Z.webm'
-import slot5LeftSingleDemoAsset from '/app/assets/videos/cal-movement/SLOT_5_LEFT_SINGLE_Z.webm'
-import slot5RightMultiDemoAsset from '/app/assets/videos/cal-movement/SLOT_5_RIGHT_MULTI_Z.webm'
-import slot5RightSingleDemoAsset from '/app/assets/videos/cal-movement/SLOT_5_RIGHT_SINGLE_Z.webm'
+import { useConfirmCrashRecovery } from './useConfirmCrashRecovery'
+import { formatJogVector } from './utils'
 
+import type { MouseEventHandler } from 'react'
 import type { Axis, Sign, StepSize } from '/app/molecules/JogControls/types'
 import type { CalibrationPanelProps } from './types'
 
@@ -46,7 +49,7 @@ const assetMap = {
 export function SaveZPoint(props: CalibrationPanelProps): JSX.Element {
   const { t } = useTranslation('robot_calibration')
   const { isMulti, mount, sendCommands, sessionType } = props
-  const demoAsset = React.useMemo(
+  const demoAsset = useMemo(
     () => mount && assetMap[mount][isMulti ? 'multi' : 'single'],
     [mount, isMulti]
   )
@@ -62,7 +65,7 @@ export function SaveZPoint(props: CalibrationPanelProps): JSX.Element {
 
   const isHealthCheck =
     sessionType === Sessions.SESSION_TYPE_CALIBRATION_HEALTH_CHECK
-  const proceed: React.MouseEventHandler<HTMLButtonElement> = _event => {
+  const proceed: MouseEventHandler<HTMLButtonElement> = _event => {
     isHealthCheck
       ? sendCommands(
           { command: Sessions.checkCommands.COMPARE_POINT },
@@ -74,9 +77,8 @@ export function SaveZPoint(props: CalibrationPanelProps): JSX.Element {
         )
   }
 
-  const [confirmLink, crashRecoveryConfirmation] = useConfirmCrashRecovery(
-    props
-  )
+  const [confirmLink, crashRecoveryConfirmation] =
+    useConfirmCrashRecovery(props)
 
   let title = t('calibrate_z_axis_on_slot')
   const bodyTranslationKey = 'jog_pipette_to_touch_slot'
@@ -98,7 +100,7 @@ export function SaveZPoint(props: CalibrationPanelProps): JSX.Element {
           gridGap={SPACING.spacing8}
         >
           <Flex flexDirection={DIRECTION_COLUMN} flex="1">
-            <LegacyStyledText as="h1" marginBottom={SPACING.spacing16}>
+            <LegacyStyledText forwardedAs="h1" marginBottom={SPACING.spacing16}>
               {title}
             </LegacyStyledText>
             <Trans
@@ -106,27 +108,27 @@ export function SaveZPoint(props: CalibrationPanelProps): JSX.Element {
               i18nKey={bodyTranslationKey}
               components={{
                 block: (
-                  <LegacyStyledText as="p" marginBottom={SPACING.spacing8} />
+                  <LegacyStyledText
+                    forwardedAs="p"
+                    marginBottom={SPACING.spacing8}
+                  />
                 ),
               }}
             />
           </Flex>
           <Box flex="1">
-            <video
+            <AnimationVideo
               key={demoAsset}
               css={css`
                 max-width: 100%;
                 max-height: 15rem;
               `}
-              autoPlay={true}
-              loop={true}
-              controls={false}
               aria-label={`${mount} ${
                 isMulti ? 'multi' : 'single'
               } channel pipette moving to slot 5`}
             >
               <source src={demoAsset} />
-            </video>
+            </AnimationVideo>
           </Box>
         </Flex>
         <JogControls

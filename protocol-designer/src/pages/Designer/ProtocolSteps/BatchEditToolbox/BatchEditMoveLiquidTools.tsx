@@ -1,5 +1,6 @@
-import { useTranslation } from 'react-i18next'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+
 import {
   DIRECTION_COLUMN,
   Divider,
@@ -8,14 +9,12 @@ import {
   StyledText,
   Tabs,
 } from '@opentrons/components'
+
 import {
   CheckboxExpandStepFormField,
   InputStepFormField,
-} from '../../../../molecules'
-import {
-  getBlowoutLocationOptionsForForm,
-  getLabwareFieldForPositioningField,
-} from '../StepForm/utils'
+} from '/protocol-designer/components/molecules'
+
 import {
   BlowoutLocationField,
   BlowoutOffsetField,
@@ -23,8 +22,13 @@ import {
   PositionField,
   WellsOrderField,
 } from '../StepForm/PipetteFields'
-import type { WellOrderOption } from '../../../../form-types'
-import type { FieldPropsByName } from '../StepForm/types'
+import {
+  getBlowoutLocationOptionsForForm,
+  getLabwareFieldForPositioningField,
+} from '../StepForm/utils'
+
+import type { WellOrderOption } from '/protocol-designer/form-types'
+import type { FieldPropsByName, LiquidHandlingTab } from '../StepForm/types'
 
 interface BatchEditMoveLiquidProps {
   propsForFields: FieldPropsByName
@@ -35,7 +39,7 @@ export function BatchEditMoveLiquidTools(
 ): JSX.Element {
   const { t, i18n } = useTranslation(['button', 'tooltip', 'protocol_steps'])
   const { propsForFields } = props
-  const [tab, setTab] = useState<'aspirate' | 'dispense'>('aspirate')
+  const [tab, setTab] = useState<LiquidHandlingTab>('aspirate')
   const aspirateTab = {
     text: t('protocol_steps:aspirate'),
     isActive: tab === 'aspirate',
@@ -61,24 +65,18 @@ export function BatchEditMoveLiquidTools(
     const labwareId = propsForFields[labwareField]?.value
     return labwareId ? String(labwareId) : null
   }
-  const getWellOrderFieldValue = (
-    name: string
-  ): WellOrderOption | null | undefined => {
-    const val = propsForFields[name]?.value
-    if (val === 'l2r' || val === 'r2l' || val === 't2b' || val === 'b2t') {
-      return val
-    } else {
-      return null
-    }
-  }
 
   return (
-    <Flex flexDirection={DIRECTION_COLUMN} width="100%">
+    <Flex
+      flexDirection={DIRECTION_COLUMN}
+      width="100%"
+      gridGap={SPACING.spacing12}
+    >
       <Flex padding={SPACING.spacing16}>
         <Tabs tabs={[aspirateTab, dispenseTab]} />
       </Flex>
       <Divider marginY="0" />
-      <Flex padding={SPACING.spacing16} width="100%">
+      <Flex width="100%">
         <FlowRateField
           {...propsForFields[addFieldNamePrefix('flowRate')]}
           pipetteId={getPipetteIdForForm()}
@@ -96,12 +94,12 @@ export function BatchEditMoveLiquidTools(
         updateSecondWellOrder={
           propsForFields[addFieldNamePrefix('wellOrder_second')].updateValue
         }
-        firstValue={getWellOrderFieldValue(
-          addFieldNamePrefix('wellOrder_first')
-        )}
-        secondValue={getWellOrderFieldValue(
-          addFieldNamePrefix('wellOrder_second')
-        )}
+        firstValue={
+          (propsForFields.wellOrder_first?.value ?? 't2b') as WellOrderOption
+        }
+        secondValue={
+          (propsForFields.wellOrder_second?.value ?? 'l2r') as WellOrderOption
+        }
         firstName={addFieldNamePrefix('wellOrder_first')}
         secondName={addFieldNamePrefix('wellOrder_second')}
       />
@@ -115,12 +113,13 @@ export function BatchEditMoveLiquidTools(
         labwareId={getLabwareIdForPositioningField(
           addFieldNamePrefix('mmFromBottom')
         )}
+        referenceField={`${tab}_position_reference`}
       />
       <Divider marginY="0" />
       <Flex
         flexDirection={DIRECTION_COLUMN}
-        padding={SPACING.spacing12}
-        gridGap={SPACING.spacing8}
+        padding={`0 ${SPACING.spacing16}`}
+        gridGap={SPACING.spacing4}
       >
         <StyledText desktopStyle="bodyDefaultSemiBold">
           {t('protocol_steps:advanced_settings')}
@@ -131,9 +130,7 @@ export function BatchEditMoveLiquidTools(
               t('form:step_edit_form.field.preWetTip.label'),
               'capitalize'
             )}
-            checkboxValue={propsForFields.preWetTip.value}
-            isChecked={propsForFields.preWetTip.value === true}
-            checkboxUpdateValue={propsForFields.preWetTip.updateValue}
+            fieldProps={propsForFields.preWetTip}
           />
         ) : null}
         <CheckboxExpandStepFormField
@@ -141,11 +138,7 @@ export function BatchEditMoveLiquidTools(
             t('form:step_edit_form.field.mix.label'),
             'capitalize'
           )}
-          checkboxValue={propsForFields[`${tab}_mix_checkbox`].value}
-          isChecked={propsForFields[`${tab}_mix_checkbox`].value === true}
-          checkboxUpdateValue={
-            propsForFields[`${tab}_mix_checkbox`].updateValue
-          }
+          fieldProps={propsForFields[`${tab}_mix_checkbox`]}
         >
           {propsForFields[`${tab}_mix_checkbox`].value === true ? (
             <Flex
@@ -175,11 +168,7 @@ export function BatchEditMoveLiquidTools(
             t('form:step_edit_form.field.delay.label'),
             'capitalize'
           )}
-          checkboxValue={propsForFields[`${tab}_delay_checkbox`].value}
-          isChecked={propsForFields[`${tab}_delay_checkbox`].value === true}
-          checkboxUpdateValue={
-            propsForFields[`${tab}_delay_checkbox`].updateValue
-          }
+          fieldProps={propsForFields[`${tab}_delay_checkbox`]}
         >
           {propsForFields[`${tab}_delay_checkbox`].value === true ? (
             <Flex
@@ -194,14 +183,6 @@ export function BatchEditMoveLiquidTools(
                 {...propsForFields[`${tab}_delay_seconds`]}
                 units={t('application:units.seconds')}
               />
-              <PositionField
-                prefix={tab}
-                propsForFields={propsForFields}
-                zField={`${tab}_delay_mmFromBottom`}
-                labwareId={getLabwareIdForPositioningField(
-                  addFieldNamePrefix('delay_mmFromBottom')
-                )}
-              />
             </Flex>
           ) : null}
         </CheckboxExpandStepFormField>
@@ -211,9 +192,7 @@ export function BatchEditMoveLiquidTools(
               t('form:step_edit_form.field.blowout.label'),
               'capitalize'
             )}
-            checkboxValue={propsForFields.blowout_checkbox.value}
-            isChecked={propsForFields.blowout_checkbox.value === true}
-            checkboxUpdateValue={propsForFields.blowout_checkbox.updateValue}
+            fieldProps={propsForFields.blowout_checkbox}
           >
             {propsForFields.blowout_checkbox.value === true ? (
               <Flex
@@ -227,6 +206,7 @@ export function BatchEditMoveLiquidTools(
                     path: propsForFields.path.value as any,
                     stepType: 'moveLiquid',
                   })}
+                  padding="0"
                 />
                 <FlowRateField
                   {...propsForFields.blowout_flowRate}
@@ -234,6 +214,7 @@ export function BatchEditMoveLiquidTools(
                   flowRateType="blowout"
                   volume={propsForFields.volume?.value ?? 0}
                   tiprack={propsForFields.tipRack.value}
+                  padding="0"
                 />
                 <BlowoutOffsetField
                   {...propsForFields.blowout_z_offset}

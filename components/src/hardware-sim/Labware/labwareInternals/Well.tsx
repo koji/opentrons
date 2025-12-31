@@ -1,18 +1,21 @@
-import * as React from 'react'
+import { memo } from 'react'
+
+import { INTERACTIVE_WELL_DATA_ATTRIBUTE } from '@opentrons/shared-data'
 
 import { COLORS } from '../../../helix-design-system'
-import { INTERACTIVE_WELL_DATA_ATTRIBUTE } from '@opentrons/shared-data'
+
+import type { CSSProperties, MemoExoticComponent, MouseEvent } from 'react'
 import type { LabwareWell } from '@opentrons/shared-data'
 import type { WellMouseEvent } from './types'
-import type { StyleProps } from '../../../primitives'
-export interface WellProps extends StyleProps {
+
+export interface WellProps extends CSSProperties {
   /** Well Name (eg 'A1') */
   wellName: string
   /** well object from labware definition */
   well: LabwareWell
-  stroke: React.CSSProperties['stroke']
-  strokeWidth: React.CSSProperties['strokeWidth']
-  fill: React.CSSProperties['fill']
+  stroke: CSSProperties['stroke']
+  strokeWidth: CSSProperties['strokeWidth']
+  fill: CSSProperties['fill']
   /** Optional callback, called with WellMouseEvent args onMouseOver */
   onMouseEnterWell?: (e: WellMouseEvent) => unknown
   onMouseLeaveWell?: (e: WellMouseEvent) => unknown
@@ -35,18 +38,18 @@ export function WellComponent(props: WellProps): JSX.Element {
 
   const wellFill = fill ?? COLORS.white
 
-  const pointerEvents: React.CSSProperties['pointerEvents'] = isInteractive
+  const pointerEvents: CSSProperties['pointerEvents'] = isInteractive
     ? 'auto'
     : 'none'
   const commonProps = {
     [INTERACTIVE_WELL_DATA_ATTRIBUTE]: isInteractive ? wellName : undefined,
     onMouseEnter:
       onMouseEnterWell != null
-        ? (event: React.MouseEvent) => onMouseEnterWell({ wellName, event })
+        ? (event: MouseEvent) => onMouseEnterWell({ wellName, event })
         : undefined,
     onMouseLeave:
       onMouseLeaveWell != null
-        ? (event: React.MouseEvent) => onMouseLeaveWell({ wellName, event })
+        ? (event: MouseEvent) => onMouseLeaveWell({ wellName, event })
         : undefined,
     style: { pointerEvents, stroke, strokeWidth, fill: wellFill },
   }
@@ -69,6 +72,5 @@ export function WellComponent(props: WellProps): JSX.Element {
   )
 }
 
-export const Well: React.MemoExoticComponent<typeof WellComponent> = React.memo(
-  WellComponent
-)
+export const Well: MemoExoticComponent<typeof WellComponent> =
+  memo(WellComponent)

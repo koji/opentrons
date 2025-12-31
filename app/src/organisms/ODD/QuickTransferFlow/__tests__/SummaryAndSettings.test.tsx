@@ -1,24 +1,32 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   useCreateProtocolMutation,
   useCreateRunMutation,
 } from '@opentrons/react-api-client'
+import { TRASH_BIN_ADAPTER_FIXTURE } from '@opentrons/shared-data'
 
-import { useNotifyDeckConfigurationQuery } from '/app/resources/deck_configuration'
-import { ANALYTICS_QUICK_TRANSFER_RUN_NOW } from '/app/redux/analytics'
-import { createQuickTransferFile } from '../utils'
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 import { useTrackEventWithRobotSerial } from '/app/redux-resources/analytics'
-import { SummaryAndSettings } from '../SummaryAndSettings'
+import { ANALYTICS_QUICK_TRANSFER_RUN_NOW } from '/app/redux/analytics'
+import { useNotifyDeckConfigurationQuery } from '/app/resources/deck_configuration'
+
 import { NameQuickTransfer } from '../NameQuickTransfer'
 import { Overview } from '../Overview'
+import mockQuickTransferState from '../QuickTransferAdvancedSettings/__fixtures__/QuickTransferState.json'
+import { SummaryAndSettings } from '../SummaryAndSettings'
+import { createQuickTransferPythonFile, getInitialSummaryState } from '../utils'
+
+import type { ComponentProps } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
 const mockNavigate = vi.fn()
+const mockFixture = {
+  cutoutId: 'cutoutA3',
+  cutoutFixtureId: TRASH_BIN_ADAPTER_FIXTURE,
+}
 
 vi.mock('react-router-dom', async importOriginal => {
   const reactRouterDom = await importOriginal<NavigateFunction>()
@@ -41,7 +49,7 @@ vi.mock('../utils/createQuickTransferFile')
 vi.mock('@opentrons/react-api-client')
 vi.mock('/app/resources/deck_configuration')
 
-const render = (props: React.ComponentProps<typeof SummaryAndSettings>) => {
+const render = (props: ComponentProps<typeof SummaryAndSettings>) => {
   return renderWithProviders(<SummaryAndSettings {...props} />, {
     i18nInstance: i18n,
   })
@@ -49,7 +57,7 @@ const render = (props: React.ComponentProps<typeof SummaryAndSettings>) => {
 let mockTrackEventWithRobotSerial: any
 
 describe('SummaryAndSettings', () => {
-  let props: React.ComponentProps<typeof SummaryAndSettings>
+  let props: ComponentProps<typeof SummaryAndSettings>
   const createProtocol = vi.fn()
   const createRun = vi.fn()
 
@@ -61,15 +69,19 @@ describe('SummaryAndSettings', () => {
         onClick: vi.fn(),
       },
       state: {
-        pipette: {} as any,
+        pipette: mockQuickTransferState.pipette as any,
         mount: 'left',
-        tipRack: {} as any,
+        tipRack: mockQuickTransferState.tipRack as any,
         source: {} as any,
         sourceWells: ['A1'],
         destination: {} as any,
         destinationWells: ['A1'],
         transferType: 'transfer',
         volume: 25,
+        path: 'single',
+        liquidClassName: 'none',
+        changeTip: 'once',
+        dropTipLocation: undefined,
       },
       analyticsStartTime: new Date(),
     }
@@ -77,9 +89,7 @@ describe('SummaryAndSettings', () => {
       () => new Promise(resolve => resolve({}))
     )
     vi.mocked(useNotifyDeckConfigurationQuery).mockReturnValue({
-      data: {
-        data: [],
-      },
+      data: [mockFixture],
     } as any)
     vi.mocked(useTrackEventWithRobotSerial).mockReturnValue({
       trackEventWithRobotSerial: mockTrackEventWithRobotSerial,
@@ -90,7 +100,10 @@ describe('SummaryAndSettings', () => {
     vi.mocked(useCreateRunMutation).mockReturnValue({
       createRun,
     } as any)
-    vi.mocked(createQuickTransferFile).mockReturnValue('' as any)
+    vi.mocked(createQuickTransferPythonFile).mockReturnValue('' as any)
+    vi.mocked(getInitialSummaryState).mockReturnValue({
+      liquidClassValuesInitialized: true,
+    } as any)
     createProtocol.mockResolvedValue({
       data: {
         data: {
@@ -116,8 +129,8 @@ describe('SummaryAndSettings', () => {
   it('renders the three tabs and shows overview screen by default', () => {
     render(props)
     screen.getByText('Overview')
-    screen.getByText('Advanced settings')
-    screen.getByText('Tip management')
+    screen.getByText('Aspirate')
+    screen.getByText('Dispense')
     expect(vi.mocked(Overview)).toHaveBeenCalled()
   })
   it('renders the save or run modal when continue is pressed', () => {
@@ -146,7 +159,7 @@ describe('SummaryAndSettings', () => {
       name: ANALYTICS_QUICK_TRANSFER_RUN_NOW,
       properties: {},
     })
-    expect(vi.mocked(createQuickTransferFile)).toHaveBeenCalled()
+    expect(vi.mocked(createQuickTransferPythonFile)).toHaveBeenCalled()
     expect(vi.mocked(createProtocol)).toHaveBeenCalled()
   })
 })

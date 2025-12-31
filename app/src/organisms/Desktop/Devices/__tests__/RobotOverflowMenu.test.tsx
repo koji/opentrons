@@ -1,20 +1,23 @@
-import type * as React from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, vi, beforeEach, expect } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import '@testing-library/jest-dom/vitest'
+
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { useCurrentRunId } from '/app/resources/runs'
 import { ChooseProtocolSlideout } from '/app/organisms/Desktop/ChooseProtocolSlideout'
-import { RobotOverflowMenu } from '../RobotOverflowMenu'
-import { useIsRobotOnWrongVersionOfSoftware } from '/app/redux/robot-update'
 import { useIsRobotBusy } from '/app/redux-resources/robots'
-
 import {
-  mockUnreachableRobot,
   mockConnectedRobot,
+  mockUnreachableRobot,
 } from '/app/redux/discovery/__fixtures__'
+import { useIsRobotOnWrongVersionOfSoftware } from '/app/redux/robot-update'
+import { useCurrentRunId } from '/app/resources/runs'
+
+import { RobotOverflowMenu } from '../RobotOverflowMenu'
+
+import type { ComponentProps } from 'react'
 
 vi.mock('/app/redux/robot-update/hooks')
 vi.mock('/app/resources/runs')
@@ -23,7 +26,7 @@ vi.mock('../hooks')
 vi.mock('/app/redux-resources/robots')
 vi.mock('/app/resources/devices/hooks/useIsEstopNotDisengaged')
 
-const render = (props: React.ComponentProps<typeof RobotOverflowMenu>) => {
+const render = (props: ComponentProps<typeof RobotOverflowMenu>) => {
   return renderWithProviders(
     <MemoryRouter>
       <RobotOverflowMenu {...props} />
@@ -35,7 +38,7 @@ const render = (props: React.ComponentProps<typeof RobotOverflowMenu>) => {
 }
 
 describe('RobotOverflowMenu', () => {
-  let props: React.ComponentProps<typeof RobotOverflowMenu>
+  let props: ComponentProps<typeof RobotOverflowMenu>
 
   beforeEach(() => {
     props = {

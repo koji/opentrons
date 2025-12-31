@@ -1,13 +1,14 @@
-import { vi, it, describe, expect, beforeEach, afterEach } from 'vitest'
-import { when } from 'vitest-when'
 import { MemoryRouter } from 'react-router-dom'
 import { fireEvent, renderHook, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { when } from 'vitest-when'
 
 import { useLongPress } from '@opentrons/components'
 import { useCreateRunMutation, useHost } from '@opentrons/react-api-client'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
+
 import { LongPressModal } from '../LongPressModal'
 
 import type { HostConfig } from '@opentrons/api-client'
@@ -26,7 +27,7 @@ const render = (longPress: UseLongPressResult) => {
     <MemoryRouter>
       <LongPressModal
         longpress={longPress}
-        transferId={'mockProtocol1'}
+        transferId="mockProtocol1"
         setShowDeleteConfirmationModal={mockFunc}
         setTargetTransferId={mockSetTargetTransferId}
       />

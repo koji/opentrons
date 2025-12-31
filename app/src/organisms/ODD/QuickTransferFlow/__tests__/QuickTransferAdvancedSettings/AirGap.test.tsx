@@ -1,13 +1,15 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { InputField } from '@opentrons/components'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 import { useTrackEventWithRobotSerial } from '/app/redux-resources/analytics'
+
 import { AirGap } from '../../QuickTransferAdvancedSettings/AirGap'
+
+import type { ComponentProps } from 'react'
 import type { QuickTransferSummaryState } from '../../types'
 
 vi.mock('/app/redux-resources/analytics')
@@ -21,7 +23,7 @@ vi.mock('@opentrons/components', async importOriginal => {
   }
 })
 
-const render = (props: React.ComponentProps<typeof AirGap>) => {
+const render = (props: ComponentProps<typeof AirGap>) => {
   return renderWithProviders(<AirGap {...props} />, {
     i18nInstance: i18n,
   })
@@ -29,7 +31,7 @@ const render = (props: React.ComponentProps<typeof AirGap>) => {
 let mockTrackEventWithRobotSerial: any
 
 describe('AirGap', () => {
-  let props: React.ComponentProps<typeof AirGap>
+  let props: ComponentProps<typeof AirGap>
 
   beforeEach(() => {
     props = {
@@ -47,6 +49,9 @@ describe('AirGap', () => {
           ] as any,
         } as any,
         tipRack: {
+          parameters: {
+            isTiprack: true,
+          },
           wells: {
             A1: {
               totalLiquidVolume: 200,
@@ -74,7 +79,7 @@ describe('AirGap', () => {
 
   it('renders the first air gap screen, continue, and back buttons', () => {
     render(props)
-    screen.getByText('Air gap before aspirating')
+    screen.getByText('Air gap after aspirating')
     screen.getByTestId('ChildNavigation_Primary_Button')
     screen.getByText('Enabled')
     screen.getByText('Disabled')
@@ -117,15 +122,16 @@ describe('AirGap', () => {
     fireEvent.click(enabledBtn)
     const continueBtn = screen.getByText('Continue')
     fireEvent.click(continueBtn)
-    const numButton = screen.getByText('0')
-    fireEvent.click(numButton)
+    fireEvent.click(screen.getByText('2'))
+    fireEvent.click(screen.getByText('0'))
+    fireEvent.click(screen.getByText('0'))
     expect(vi.mocked(InputField)).toHaveBeenCalledWith(
       {
         title: 'Air gap volume (µL)',
-        error: 'Value must be between 1-180',
+        error: 'Value must be between 0 to 195',
         readOnly: true,
         type: 'number',
-        value: 0,
+        value: 200,
       },
       {}
     )
@@ -151,7 +157,7 @@ describe('AirGap', () => {
     expect(vi.mocked(InputField)).toHaveBeenCalledWith(
       {
         title: 'Air gap volume (µL)',
-        error: 'Value must be between 1-80',
+        error: null,
         readOnly: true,
         type: 'number',
         value: 0,
@@ -178,7 +184,7 @@ describe('AirGap', () => {
     expect(vi.mocked(InputField)).toHaveBeenCalledWith(
       {
         title: 'Air gap volume (µL)',
-        error: 'Value must be between 1-140',
+        error: null,
         readOnly: true,
         type: 'number',
         value: 0,
@@ -193,7 +199,7 @@ describe('AirGap', () => {
       kind: 'dispense',
     }
     render(props)
-    screen.getByText('Air gap before dispensing')
+    screen.getByText('Air gap after dispensing')
     const enabledBtn = screen.getByText('Enabled')
     fireEvent.click(enabledBtn)
     const continueBtn = screen.getByText('Continue')
@@ -203,7 +209,7 @@ describe('AirGap', () => {
     expect(vi.mocked(InputField)).toHaveBeenCalledWith(
       {
         title: 'Air gap volume (µL)',
-        error: 'Value must be between 1-200',
+        error: null,
         readOnly: true,
         type: 'number',
         value: 0,

@@ -1,30 +1,27 @@
-import { createSelector } from 'reselect'
 import last from 'lodash/last'
 import uniq from 'lodash/uniq'
+import { createSelector } from 'reselect'
+
 import { selectors as stepFormSelectors } from '../../step-forms'
 import { getDefaultsForStepType } from '../../steplist/formLevel/getDefaultsForStepType'
-import { PRESAVED_STEP_ID } from '../../steplist/types'
-
 import { getLabwareOnModule } from '../modules/utils'
 import {
   initialSelectedItemState,
+  MULTI_STEP_SELECTION_TYPE,
   SINGLE_STEP_SELECTION_TYPE,
   TERMINAL_ITEM_SELECTION_TYPE,
-  MULTI_STEP_SELECTION_TYPE,
 } from './reducers'
-
 import {
   getAspirateLabwareDisabledFields,
   getDispenseLabwareDisabledFields,
+  getLabwareDisabledFields,
   getMultiAspiratePathDisabledFields,
   getMultiDispensePathDisabledFields,
   getPipetteDifferentAndMultiAspiratePathFields,
   getPipetteDifferentAndMultiDispensePathFields,
   getPipetteDifferentDisabledFields,
-  getLabwareDisabledFields,
 } from './utils'
-import type { BaseState, Selector } from '../../types'
-import type { SubstepIdentifier, TerminalItemId } from '../../steplist/types'
+
 import type {
   CountPerStepType,
   FormData,
@@ -32,60 +29,63 @@ import type {
   StepIdType,
   StepType,
 } from '../../form-types'
-import type {
-  SelectableItem,
-  StepsState,
-  CollapsedStepsState,
-  HoverableItem,
-} from './reducers'
+import type { SubstepIdentifier, TerminalItemId } from '../../steplist/types'
+import type { BaseState, Selector } from '../../types'
+import type { Selection } from './actions/types'
+import type { HoverableItem, SelectableItem, StepsState } from './reducers'
 
 export const rootSelector = (state: BaseState): StepsState => state.ui.steps
-// ======= Selectors ===============================================
-// NOTE: when the selected step is deleted, we need to fall back to the last step
-// (or the initial selected item, if there are no more saved steps).
-// Ideally this would happen in the selectedItem reducer itself,
-// but it's not easy to feed orderedStepIds into that reducer.
 
-// @ts-expect-error(sa, 2021-6-15): lodash/last might return undefined, change line 55 to pull out the last element directly
 const getSelectedItem: Selector<SelectableItem> = createSelector(
   rootSelector,
   stepFormSelectors.getOrderedStepIds,
   (state, orderedStepIds) => {
     if (state.selectedItem != null) return state.selectedItem
-    if (orderedStepIds.length > 0)
-      return {
-        selectionType: SINGLE_STEP_SELECTION_TYPE,
-        id: last(orderedStepIds),
-      }
-    return initialSelectedItemState
+    else {
+      // NOTE: when the selected step is deleted, we need to fall back to the last step
+      // (or the initial selected item, if there are no more saved steps).
+      // Ideally this would happen in the selectedItem reducer itself,
+      // but it's not easy to feed orderedStepIds into that reducer.
+      if (orderedStepIds.length > 0)
+        return {
+          selectionType: SINGLE_STEP_SELECTION_TYPE,
+          // This non-null assertion is safe because the length is checked above.
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+          id: last(orderedStepIds)!,
+        }
+      else return initialSelectedItemState
+    }
   }
 )
+
 export const getSelectedStepId: Selector<StepIdType | null> = createSelector(
   getSelectedItem,
   item => (item.selectionType === SINGLE_STEP_SELECTION_TYPE ? item.id : null)
 )
-export const getSelectedTerminalItemId: Selector<TerminalItemId | null> = createSelector(
-  getSelectedItem,
-  item => (item.selectionType === TERMINAL_ITEM_SELECTION_TYPE ? item.id : null)
-)
+export const getSelectedTerminalItemId: Selector<TerminalItemId | null> =
+  createSelector(getSelectedItem, item =>
+    item.selectionType === TERMINAL_ITEM_SELECTION_TYPE ? item.id : null
+  )
+
 export const getIsMultiSelectMode: Selector<boolean> = createSelector(
   getSelectedItem,
   item => {
     return item.selectionType === MULTI_STEP_SELECTION_TYPE
   }
 )
-export const getMultiSelectItemIds: Selector<
-  StepIdType[] | null
-> = createSelector(getSelectedItem, item => {
-  if (item && item.selectionType === MULTI_STEP_SELECTION_TYPE) {
-    return item.ids
-  }
 
-  return null
-})
-export const getMultiSelectLastSelected: Selector<StepIdType | null> = createSelector(
+export const getMultiSelectItemIds: Selector<StepIdType[] | null> =
+  createSelector(getSelectedItem, item => {
+    if (item && item.selectionType === MULTI_STEP_SELECTION_TYPE) {
+      return item.ids
+    }
+
+    return null
+  })
+
+export const getMultiSelectLastSelected = createSelector(
   getSelectedItem,
-  item => {
+  (item): StepIdType | null => {
     if (item.selectionType === MULTI_STEP_SELECTION_TYPE) {
       return item.lastSelected
     }
@@ -93,14 +93,26 @@ export const getMultiSelectLastSelected: Selector<StepIdType | null> = createSel
     return null
   }
 )
+
 export const getHoveredItem: Selector<HoverableItem | null> = createSelector(
   rootSelector,
   (state: StepsState) => state.hoveredItem
 )
+
 export const getHoveredStepId: Selector<StepIdType | null> = createSelector(
   getHoveredItem,
   item =>
     item && item.selectionType === SINGLE_STEP_SELECTION_TYPE ? item.id : null
+)
+
+export const getHoveredDropdownItem: Selector<Selection> = createSelector(
+  rootSelector,
+  (state: StepsState) => state.hoveredDropdownItem
+)
+
+export const getSelectedDropdownItem: Selector<Selection[]> = createSelector(
+  rootSelector,
+  (state: StepsState) => state.selectedDropdownItem
 )
 
 /** Array of labware (labwareId's) involved in hovered Step, or [] */
@@ -136,23 +148,24 @@ export const getHoveredStepLabware = createSelector(
       // only 1 labware
       return [stepArgs.labware]
     }
-    if ('module' in stepArgs) {
+    if ('moduleId' in stepArgs) {
       const labware = getLabwareOnModule(
         initialDeckState,
-        stepArgs.module ?? ''
+        stepArgs.moduleId ?? ''
       )
       return labware ? [labware.id] : []
     }
 
     if (stepArgs.commandCreatorFnName === 'moveLabware') {
-      const src = stepArgs.labware
+      const src = stepArgs.labwareId
       return [src]
     }
 
     // step types that have no labware that gets highlighted
     if (
       !(stepArgs.commandCreatorFnName === 'delay') &&
-      !(stepArgs.commandCreatorFnName === 'comment')
+      !(stepArgs.commandCreatorFnName === 'comment') &&
+      !(stepArgs.commandCreatorFnName === 'captureImage')
     ) {
       console.warn(
         //  @ts-expect-error: should only reach this warning when new step is added and
@@ -164,20 +177,22 @@ export const getHoveredStepLabware = createSelector(
     return blank
   }
 )
-export const getHoveredTerminalItemId: Selector<TerminalItemId | null> = createSelector(
-  getHoveredItem,
-  item =>
+
+export const getHoveredTerminalItemId: Selector<TerminalItemId | null> =
+  createSelector(getHoveredItem, item =>
     item && item.selectionType === TERMINAL_ITEM_SELECTION_TYPE ? item.id : null
-)
+  )
+
 export const getHoveredSubstep: Selector<SubstepIdentifier> = createSelector(
   rootSelector,
   (state: StepsState) => state.hoveredSubstep
 )
+
 // Hovered or selected item. Hovered has priority. Used to tell deck what to display
-export const getActiveItem: Selector<HoverableItem | null> = createSelector(
+export const getActiveItem = createSelector(
   getSelectedItem,
   getHoveredItem,
-  (selected, hovered) => {
+  (selected, hovered): HoverableItem | null => {
     if (hovered != null) {
       return hovered
     } else if (selected.selectionType === MULTI_STEP_SELECTION_TYPE) {
@@ -187,44 +202,13 @@ export const getActiveItem: Selector<HoverableItem | null> = createSelector(
     }
   }
 )
-// TODO: BC 2018-12-17 refactor as react state
-export const getCollapsedSteps: Selector<CollapsedStepsState> = createSelector(
-  rootSelector,
-  (state: StepsState) => state.collapsedSteps
-)
-interface StepTitleInfo {
-  stepName: string
-  stepType: StepType
-}
 
-const _stepToTitleInfo = (stepForm: FormData): StepTitleInfo => ({
-  stepName: stepForm.stepName,
-  stepType: stepForm.stepType,
-})
+export const getWellSelectionLabwareKey: Selector<string | null> =
+  createSelector(
+    rootSelector,
+    (state: StepsState) => state.wellSelectionLabwareKey
+  )
 
-export const getSelectedStepTitleInfo: Selector<StepTitleInfo | null> = createSelector(
-  stepFormSelectors.getUnsavedForm,
-  stepFormSelectors.getSavedStepForms,
-  getSelectedStepId,
-  getSelectedTerminalItemId,
-  (unsavedForm, savedStepForms, selectedStepId, terminalItemId) => {
-    if (unsavedForm != null && terminalItemId === PRESAVED_STEP_ID) {
-      return _stepToTitleInfo(unsavedForm)
-    }
-
-    if (selectedStepId == null) {
-      return null
-    }
-
-    return _stepToTitleInfo(savedStepForms[selectedStepId])
-  }
-)
-export const getWellSelectionLabwareKey: Selector<
-  string | null
-> = createSelector(
-  rootSelector,
-  (state: StepsState) => state.wellSelectionLabwareKey
-)
 export type MultiselectFieldValues = Record<
   StepFieldName,
   {
@@ -232,10 +216,14 @@ export type MultiselectFieldValues = Record<
     isIndeterminate: boolean
   }
 >
-export const _getSavedMultiSelectFieldValues: Selector<MultiselectFieldValues | null> = createSelector(
+
+const getUniqueValues = (key: string, forms: FormData[]): string[] =>
+  Array.from(new Set(forms.map(form => form[key])))
+
+export const _getSavedMultiSelectFieldValues = createSelector(
   stepFormSelectors.getSavedStepForms,
   getMultiSelectItemIds,
-  (savedStepForms, multiSelectItemIds) => {
+  (savedStepForms, multiSelectItemIds): MultiselectFieldValues | null => {
     if (!multiSelectItemIds) return null
     const forms = multiSelectItemIds.map(id => savedStepForms[id])
     const stepTypes = uniq(forms.map(form => form.stepType))
@@ -250,6 +238,20 @@ export const _getSavedMultiSelectFieldValues: Selector<MultiselectFieldValues | 
       return null
     }
 
+    const uniqueTipRackFieldValues = getUniqueValues('tipRack', forms)
+    const uniquePipetteFieldValues = getUniqueValues('pipette', forms)
+
+    //  since a lot liquid class advanced settings rely on
+    //  knowing the pipette and tiprack, we can't support
+    //  batch edit if the steps have multiple tiprack types
+    //  or multiple pipette types
+    if (
+      uniqueTipRackFieldValues.length > 1 ||
+      uniquePipetteFieldValues.length > 1
+    ) {
+      return null
+    }
+
     const allFieldNames = Object.keys(getDefaultsForStepType(stepType))
     return allFieldNames.reduce(
       (acc: MultiselectFieldValues, fieldName: StepFieldName) => {
@@ -257,7 +259,6 @@ export const _getSavedMultiSelectFieldValues: Selector<MultiselectFieldValues | 
         const isFieldValueIndeterminant = forms.some(
           form => form[fieldName] !== firstFieldValue
         )
-
         if (isFieldValueIndeterminant) {
           acc[fieldName] = {
             isIndeterminate: true,
@@ -275,10 +276,11 @@ export const _getSavedMultiSelectFieldValues: Selector<MultiselectFieldValues | 
     )
   }
 )
-export const getMultiSelectFieldValues: Selector<MultiselectFieldValues | null> = createSelector(
+
+export const getMultiSelectFieldValues = createSelector(
   _getSavedMultiSelectFieldValues,
   stepFormSelectors.getBatchEditFieldChanges,
-  (savedValues, changes) => {
+  (savedValues, changes): MultiselectFieldValues | null => {
     if (savedValues === null) {
       // multi-selection has an invalid combination of stepTypes
       return null
@@ -296,13 +298,16 @@ export const getMultiSelectFieldValues: Selector<MultiselectFieldValues | null> 
     return { ...savedValues, ...multiselectChanges }
   }
 )
+
 // NOTE: the value is the tooltip text explaining why the field is disabled
 type TooltipText = string
+
 export type DisabledFields = Record<string, TooltipText>
-export const getMultiSelectDisabledFields: Selector<DisabledFields | null> = createSelector(
+
+export const getMultiSelectDisabledFields = createSelector(
   stepFormSelectors.getSavedStepForms,
   getMultiSelectItemIds,
-  (savedStepForms, multiSelectItemIds) => {
+  (savedStepForms, multiSelectItemIds): DisabledFields | null => {
     if (!multiSelectItemIds) return null
     const forms: FormData[] = multiSelectItemIds.map(id => savedStepForms[id])
 
@@ -316,10 +321,10 @@ export const getMultiSelectDisabledFields: Selector<DisabledFields | null> = cre
   }
 )
 
-export const getCountPerStepType: Selector<CountPerStepType> = createSelector(
+export const getCountPerStepType = createSelector(
   getMultiSelectItemIds,
   stepFormSelectors.getSavedStepForms,
-  (stepIds, allSteps) => {
+  (stepIds, allSteps): CountPerStepType => {
     if (stepIds === null) return {}
     const steps = stepIds.map(id => allSteps[id])
     const countPerStepType = steps.reduce<CountPerStepType>((acc, step) => {
@@ -332,16 +337,18 @@ export const getCountPerStepType: Selector<CountPerStepType> = createSelector(
     return countPerStepType
   }
 )
-export const getBatchEditSelectedStepTypes: Selector<
-  StepType[]
-> = createSelector(getCountPerStepType, countPerStepType => {
-  return uniq(
-    (Object.keys(countPerStepType) as StepType[]).filter(
-      // @ts-expect-error(sa, 2021-6-15): TS thinks countPerStepType[stepType] might be undefined because CountPerStepType is a partial record
-      stepType => countPerStepType[stepType] > 0
-    )
-  ).sort()
-})
+
+export const getBatchEditSelectedStepTypes = createSelector(
+  getCountPerStepType,
+  (countPerStepType): StepType[] => {
+    return uniq(
+      (Object.keys(countPerStepType) as StepType[]).filter(
+        // @ts-expect-error(sa, 2021-6-15): TS thinks countPerStepType[stepType] might be undefined because CountPerStepType is a partial record
+        stepType => countPerStepType[stepType] > 0
+      )
+    ).sort()
+  }
+)
 
 function getMoveLiquidMultiSelectDisabledFields(
   forms: FormData[]

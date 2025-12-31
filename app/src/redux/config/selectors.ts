@@ -1,16 +1,18 @@
 import { createSelector } from 'reselect'
-import { SLEEP_NEVER_MS } from '/app/local-resources/config'
+
+import { SLEEP_NEVER_MS } from '/app/local-resources/dom-utils'
+
+import type { Language } from '/app/i18n'
+import type { ProtocolSort } from '/app/redux/protocol-storage'
 import type { State } from '../types'
 import type {
   Config,
   FeatureFlags,
-  UpdateChannel,
+  OnDeviceDisplaySettings,
   ProtocolsOnDeviceSortKey,
   QuickTransfersOnDeviceSortKey,
-  OnDeviceDisplaySettings,
+  UpdateChannel,
 } from './types'
-import type { Language } from '/app/i18n'
-import type { ProtocolSort } from '/app/redux/protocol-storage'
 
 export interface SelectOption {
   value: string
@@ -19,13 +21,6 @@ export interface SelectOption {
 }
 
 export const getConfig = (state: State): Config | null => state.config
-
-export const getApplyHistoricOffsets: (
-  state: State
-) => boolean = createSelector(
-  getConfig,
-  config => config?.protocols.applyHistoricOffsets ?? true
-)
 
 export const getDevtoolsEnabled = (state: State): boolean => {
   return state.config?.devtools ?? false
@@ -60,12 +55,11 @@ export const getIsLabwareOffsetCodeSnippetsOn = (state: State): boolean => {
   return state.config?.labware.showLabwareOffsetCodeSnippets ?? false
 }
 
-export const getPathToPythonOverride: (
-  state: State
-) => string | null = createSelector(
-  getConfig,
-  config => config?.python.pathToPythonOverride ?? null
-)
+export const getPathToPythonOverride: (state: State) => string | null =
+  createSelector(
+    getConfig,
+    config => config?.python.pathToPythonOverride ?? null
+  )
 
 const UPDATE_CHANNEL_OPTS = [
   { label: 'Stable', value: 'latest' as UpdateChannel },
@@ -88,12 +82,11 @@ export const getIsOnDevice: (state: State) => boolean = createSelector(
   config => !!(config?.isOnDevice ?? false)
 )
 
-export const getProtocolsDesktopSortKey: (
-  state: State
-) => ProtocolSort | null = createSelector(
-  getConfig,
-  config => config?.protocols.protocolsStoredSortKey ?? null
-)
+export const getProtocolsDesktopSortKey: (state: State) => ProtocolSort | null =
+  createSelector(
+    getConfig,
+    config => config?.protocols.protocolsStoredSortKey ?? null
+  )
 
 export const getProtocolsOnDeviceSortKey: (
   state: State
@@ -102,19 +95,11 @@ export const getProtocolsOnDeviceSortKey: (
   config => config?.protocols.protocolsOnDeviceSortKey ?? null
 )
 
-export const getPinnedProtocolIds: (
-  state: State
-) => string[] | undefined = createSelector(
-  getConfig,
-  config => config?.protocols.pinnedProtocolIds
-)
+export const getPinnedProtocolIds: (state: State) => string[] | undefined =
+  createSelector(getConfig, config => config?.protocols.pinnedProtocolIds)
 
-export const getPinnedQuickTransferIds: (
-  state: State
-) => string[] | undefined = createSelector(
-  getConfig,
-  config => config?.protocols.pinnedQuickTransferIds
-)
+export const getPinnedQuickTransferIds: (state: State) => string[] | undefined =
+  createSelector(getConfig, config => config?.protocols.pinnedQuickTransferIds)
 
 export const getQuickTransfersOnDeviceSortKey: (
   state: State
@@ -123,12 +108,11 @@ export const getQuickTransfersOnDeviceSortKey: (
   config => config?.protocols.quickTransfersOnDeviceSortKey ?? null
 )
 
-export const getHasDismissedQuickTransferIntro: (
-  state: State
-) => boolean = createSelector(
-  getConfig,
-  config => config?.protocols.hasDismissedQuickTransferIntro ?? false
-)
+export const getHasDismissedQuickTransferIntro: (state: State) => boolean =
+  createSelector(
+    getConfig,
+    config => config?.protocols.hasDismissedQuickTransferIntro ?? false
+  )
 
 export const getOnDeviceDisplaySettings: (
   state: State
@@ -148,7 +132,7 @@ export const getOnDeviceDisplaySettings: (
     sleepMs: SLEEP_NEVER_MS,
     brightness: 4,
     textSize: 1,
-    unfinishedUnboxingFlowRoute: '/welcome',
+    unfinishedUnboxingFlowRoute: '/choose-language',
   }
 })
 
@@ -162,9 +146,5 @@ export const getAppLanguage: (state: State) => Language | null = createSelector(
   config => config?.language.appLanguage ?? null
 )
 
-export const getStoredSystemLanguage: (
-  state: State
-) => string | null = createSelector(
-  getConfig,
-  config => config?.language.systemLanguage ?? null
-)
+export const getStoredSystemLanguage: (state: State) => string | null =
+  createSelector(getConfig, config => config?.language.systemLanguage ?? null)

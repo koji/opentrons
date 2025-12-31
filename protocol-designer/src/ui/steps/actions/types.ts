@@ -1,6 +1,7 @@
 import type { Timeline } from '@opentrons/step-generation'
 import type { StepIdType, StepType } from '../../../form-types'
-import type { TerminalItemId, SubstepIdentifier } from '../../../steplist/types'
+import type { SubstepIdentifier, TerminalItemId } from '../../../steplist/types'
+
 interface AddStepPayload {
   id: string
   stepType: StepType
@@ -17,35 +18,33 @@ export interface ClearWellSelectionLabwareKeyAction {
   payload: null
 }
 interface DuplicateStepPayload {
-  stepId: StepIdType
+  originalStepId: StepIdType
   duplicateStepId: StepIdType
 }
-export interface DuplicateStepAction {
-  type: 'DUPLICATE_STEP'
-  payload: DuplicateStepPayload
-}
-export interface DuplicateMultipleStepsAction {
-  type: 'DUPLICATE_MULTIPLE_STEPS'
+export interface DuplicateSelectedStepsAction {
+  type: 'DUPLICATE_SELECTED_STEPS'
   payload: {
     steps: DuplicateStepPayload[]
-    indexToInsert: number
+    newStepOrder: StepIdType[]
   }
 }
-export interface ExpandAddStepButtonAction {
-  type: 'EXPAND_ADD_STEP_BUTTON'
-  payload: boolean
+
+export type Mode = 'clear' | 'add'
+export interface Selection {
+  id: string | null
+  text: string | null
+  field?: '1' | '2'
 }
-export interface ToggleStepCollapsedAction {
-  type: 'TOGGLE_STEP_COLLAPSED'
-  payload: StepIdType
+export interface selectDropdownItemAction {
+  type: 'SELECT_DROPDOWN_ITEM'
+  payload: {
+    selection: Selection | null
+    mode: 'add' | 'clear'
+  }
 }
-export interface ExpandMultipleStepsAction {
-  type: 'EXPAND_MULTIPLE_STEPS'
-  payload: StepIdType[]
-}
-export interface CollapseMultipleStepsAction {
-  type: 'COLLAPSE_MULTIPLE_STEPS'
-  payload: StepIdType[]
+export interface hoverSelectionAction {
+  type: 'HOVER_DROPDOWN_ITEM'
+  payload: Selection
 }
 export interface HoverOnSubstepAction {
   type: 'HOVER_ON_SUBSTEP'

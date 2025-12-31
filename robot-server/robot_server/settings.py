@@ -4,10 +4,11 @@ import logging
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import BaseSettings, Field
+from pydantic import Field
 from dotenv import load_dotenv
 
 from opentrons.config import infer_config_base_dir
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 log = logging.getLogger(__name__)
 
@@ -28,9 +29,7 @@ class Environment(BaseSettings):
     """Environment related settings"""
 
     dot_env_path: Path = infer_config_base_dir() / "robot.env"
-
-    class Config:
-        env_prefix = "OT_ROBOT_SERVER_"
+    model_config = SettingsConfigDict(env_prefix="OT_ROBOT_SERVER_")
 
 
 # If you update this, also update the generated settings_schema.json.
@@ -75,6 +74,34 @@ class RobotServerSettings(BaseSettings):
         ),
     )
 
+    images_directory: typing.Optional[Path] = Field(
+        default=None,
+        description=(
+            "A directory for the server to store captured images."
+            " If this directory doesn't already exist, the server will create it."
+            " If no directory is supplied, the server will use a fresh temporary directory"
+            " (effectively not persisting anything)."
+        ),
+    )
+
+    images_directory_max_size_mb: int = Field(
+        default=2048,
+        gt=0,
+        description=(
+            "The maximum allowable disk size of the images directory in megabytes. "
+            "Commands that generate image files will fail when the images directory is greater than this threshold."
+        ),
+    )
+
+    system_low_space_threshold_mb: int = Field(
+        default=250,
+        gt=0,
+        description=(
+            "Minimum free disk space required in megabytes. "
+            "Commands that generate data files will fail when available space is less than this threshold."
+        ),
+    )
+
     maximum_runs: int = Field(
         default=20,
         gt=0,
@@ -94,6 +121,8 @@ class RobotServerSettings(BaseSettings):
         ),
     )
 
+    model_config = SettingsConfigDict(env_prefix="OT_ROBOT_SERVER_")
+
     maximum_quick_transfer_protocols: int = Field(
         default=20,
         gt=0,
@@ -110,6 +139,3 @@ class RobotServerSettings(BaseSettings):
             "The maximum number of uploaded data files to allow before auto-deleting old ones."
         ),
     )
-
-    class Config:
-        env_prefix = "OT_ROBOT_SERVER_"

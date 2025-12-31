@@ -1,15 +1,14 @@
-import { Fragment, useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
+import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { css } from 'styled-components'
 
 import {
   ALIGN_CENTER,
-  Btn,
+  COLORS,
   DIRECTION_COLUMN,
-  EndUserAgreementFooter,
   Flex,
   JUSTIFY_FLEX_END,
   JUSTIFY_SPACE_BETWEEN,
@@ -17,49 +16,43 @@ import {
   NO_WRAP,
   SPACING,
   StyledText,
-  ToggleGroup,
-  TYPOGRAPHY,
   WRAP,
 } from '@opentrons/components'
 import { OT2_ROBOT_TYPE } from '@opentrons/shared-data'
 
+import { PeripheralsInfo } from '/protocol-designer/pages/ProtocolOverview/PeripheralsInfo'
+
+import { COLUMN_STYLE, LINE_CLAMP_TEXT_STYLE } from '../../components/atoms'
+import { EndUserAgreementFooter } from '../../components/molecules'
+import {
+  EditInstrumentsModal,
+  EditProtocolMetadataModal,
+} from '../../components/organisms'
+import { MaterialsListModal } from '../../components/organisms/MaterialsListModal'
+import { selectors as fileSelectors } from '../../file-data'
+import { selectors as labwareIngredSelectors } from '../../labware-ingred/selectors'
+import { actions as loadFileActions } from '../../load-file'
+import { useProtocolExportHandler } from '../../resources/hooks'
+import { selectors as stepFormSelectors } from '../../step-forms'
 import {
   getAdditionalEquipmentEntities,
   getInitialDeckSetup,
+  getLiquidEntities,
 } from '../../step-forms/selectors'
-import { selectors as fileSelectors } from '../../file-data'
-import { selectors as stepFormSelectors } from '../../step-forms'
-import { actions as loadFileActions } from '../../load-file'
-import { selectors as labwareIngredSelectors } from '../../labware-ingred/selectors'
-import {
-  getUnusedEntities,
-  getUnusedStagingAreas,
-  getUnusedTrash,
-} from '../../components/FileSidebar/utils'
-import { MaterialsListModal } from '../../organisms/MaterialsListModal'
-import { BUTTON_LINK_STYLE, LINE_CLAMP_TEXT_STYLE } from '../../atoms'
-import { useBlockingHint } from '../../organisms/BlockingHintModal/useBlockingHint'
-import {
-  EditProtocolMetadataModal,
-  EditInstrumentsModal,
-  SlotDetailsContainer,
-} from '../../organisms'
-import { DeckThumbnail } from './DeckThumbnail'
-import { OffDeckThumbnail } from './OffdeckThumbnail'
-import { getWarningContent } from './UnusedModalContent'
-import { ProtocolMetadata } from './ProtocolMetadata'
+import { HardwareInfo } from './HardwareInfo'
 import { InstrumentsInfo } from './InstrumentsInfo'
 import { LiquidDefinitions } from './LiquidDefinitions'
+import { ProtocolMetadata } from './ProtocolMetadata'
+import { StartingDeck } from './StartingDeck'
 import { StepsInfo } from './StepsInfo'
 
 import type { CreateCommand } from '@opentrons/shared-data'
-import type { DeckSlot } from '@opentrons/step-generation'
 import type { ThunkDispatch } from '../../types'
 
 const DATE_ONLY_FORMAT = 'MMMM dd, yyyy'
 const DATETIME_FORMAT = 'MMMM dd, yyyy | h:mm a'
 
-const LOAD_COMMANDS: Array<CreateCommand['commandType']> = [
+export const LOAD_COMMANDS: Array<CreateCommand['commandType']> = [
   'loadLabware',
   'loadModule',
   'loadPipette',
@@ -81,39 +74,25 @@ export function ProtocolOverview(): JSX.Element {
     'modules',
   ])
   const navigate = useNavigate()
-  const [
-    showEditInstrumentsModal,
-    setShowEditInstrumentsModal,
-  ] = useState<boolean>(false)
-  const [showEditMetadataModal, setShowEditMetadataModal] = useState<boolean>(
-    false
-  )
-  const [showExportWarningModal, setShowExportWarningModal] = useState<boolean>(
-    false
-  )
+  const [showEditInstrumentsModal, setShowEditInstrumentsModal] =
+    useState<boolean>(false)
+  const [showEditMetadataModal, setShowEditMetadataModal] =
+    useState<boolean>(false)
   const formValues = useSelector(fileSelectors.getFileMetadata)
   const robotType = useSelector(fileSelectors.getRobotType)
   const initialDeckSetup = useSelector(getInitialDeckSetup)
   const allIngredientGroupFields = useSelector(
     labwareIngredSelectors.allIngredientGroupFields
   )
+  const { timeline } = useSelector(fileSelectors.getRobotStateTimeline)
+  const hasCommands = timeline.length > 0
+
   const dispatch: ThunkDispatch<any> = useDispatch()
-  const [hover, setHover] = useState<DeckSlot | string | null>(null)
-  const [showMaterialsListModal, setShowMaterialsListModal] = useState<boolean>(
-    false
-  )
-  const fileData = useSelector(fileSelectors.createFile)
+  const [showMaterialsListModal, setShowMaterialsListModal] =
+    useState<boolean>(false)
   const savedStepForms = useSelector(stepFormSelectors.getSavedStepForms)
   const additionalEquipment = useSelector(getAdditionalEquipmentEntities)
-  const liquidsOnDeck = useSelector(
-    labwareIngredSelectors.allIngredientNamesIds
-  )
-  const leftString = t('starting_deck_state:onDeck')
-  const rightString = t('starting_deck_state:offDeck')
-
-  const [deckView, setDeckView] = useState<
-    typeof leftString | typeof rightString
-  >(leftString)
+  const liquids = useSelector(getLiquidEntities)
 
   useEffect(() => {
     if (formValues?.created == null) {
@@ -130,106 +109,34 @@ export function ProtocolOverview(): JSX.Element {
     additionalEquipmentOnDeck,
     pipettes,
   } = initialDeckSetup
-  const isOffDeckHover = hover != null && labwaresOnDeck[hover] != null
 
-  const nonLoadCommands =
-    fileData?.commands.filter(
-      command => !LOAD_COMMANDS.includes(command.commandType)
-    ) ?? []
-  const gripperInUse =
-    fileData?.commands.find(
-      command =>
-        command.commandType === 'moveLabware' &&
-        command.params.strategy === 'usingGripper'
-    ) != null
-  const noCommands = fileData != null ? nonLoadCommands.length === 0 : true
-  const modulesWithoutStep = getUnusedEntities(
-    modulesOnDeck,
-    savedStepForms,
-    'moduleId',
-    robotType
-  )
-  const pipettesWithoutStep = getUnusedEntities(
-    initialDeckSetup.pipettes,
-    savedStepForms,
-    'pipette',
-    robotType
-  )
-  const isGripperAttached = Object.values(additionalEquipment).some(
-    equipment => equipment?.name === 'gripper'
-  )
-  const gripperWithoutStep = isGripperAttached && !gripperInUse
-
-  const { trashBinUnused, wasteChuteUnused } = getUnusedTrash(
-    additionalEquipmentOnDeck,
-    fileData?.commands
-  )
-  const fixtureWithoutStep: Fixture = {
-    trashBin: trashBinUnused,
-    wasteChute: wasteChuteUnused,
-    stagingAreaSlots: getUnusedStagingAreas(
-      additionalEquipmentOnDeck,
-      fileData?.commands
-    ),
-  }
+  const { handleExportClick, exportWarningModalElement } =
+    useProtocolExportHandler({
+      hasCommands,
+      onConfirmExport: () => {
+        dispatch(loadFileActions.saveProtocolFile())
+      },
+    })
 
   const pipettesOnDeck = Object.values(pipettes)
-  const {
-    protocolName,
-    description,
-    created,
-    lastModified,
-    author,
-  } = formValues
+  const { protocolName, description, created, lastModified, author } =
+    formValues
   const metaDataInfo = [
-    { description },
-    { author },
-    { created: created != null ? format(created, DATE_ONLY_FORMAT) : t('na') },
+    { title: 'description', value: description ?? null },
+    { title: 'author', value: author ?? null },
     {
-      modified:
-        lastModified != null ? format(lastModified, DATETIME_FORMAT) : t('na'),
+      title: 'created',
+      value: created != null ? format(created, DATE_ONLY_FORMAT) : null,
+    },
+    {
+      title: 'modified',
+      value:
+        lastModified != null ? format(lastModified, DATETIME_FORMAT) : null,
     },
   ]
 
-  const hasWarning =
-    noCommands ||
-    modulesWithoutStep.length > 0 ||
-    pipettesWithoutStep.length > 0 ||
-    gripperWithoutStep ||
-    fixtureWithoutStep.trashBin ||
-    fixtureWithoutStep.wasteChute ||
-    fixtureWithoutStep.stagingAreaSlots.length > 0
-
-  const warning = hasWarning
-    ? getWarningContent({
-        noCommands,
-        pipettesWithoutStep,
-        modulesWithoutStep,
-        gripperWithoutStep,
-        fixtureWithoutStep,
-        t,
-      })
-    : null
-
-  const cancelModal = (): void => {
-    setShowExportWarningModal(false)
-  }
-
-  const confirmExport = (): void => {
-    setShowExportWarningModal(false)
-    dispatch(loadFileActions.saveProtocolFile())
-  }
-
-  const exportWarningModal = useBlockingHint({
-    hintKey: warning?.hintKey ?? null,
-    enabled: showExportWarningModal && warning?.hintKey != null,
-    content: warning?.content,
-    handleCancel: cancelModal,
-    handleContinue: confirmExport,
-  })
-
   return (
-    <Fragment>
+    <>
       {showEditMetadataModal ? (
         <EditProtocolMetadataModal
           onClose={() => {
@@ -244,7 +151,7 @@ export function ProtocolOverview(): JSX.Element {
           }}
         />
       ) : null}
-      {exportWarningModal}
+      {exportWarningModalElement}
       {showMaterialsListModal ? (
         <MaterialsListModal
           hardware={Object.values(modulesOnDeck)}
@@ -254,7 +161,7 @@ export function ProtocolOverview(): JSX.Element {
               : []
           }
           labware={Object.values(labwaresOnDeck)}
-          liquids={liquidsOnDeck}
+          liquids={liquids}
           setShowMaterialsListModal={setShowMaterialsListModal}
         />
       ) : null}
@@ -294,24 +201,23 @@ export function ProtocolOverview(): JSX.Element {
               }}
               whiteSpace={NO_WRAP}
               height="3.5rem"
+              // ToDo (kk:2024/11/07 this will be updated in the future)
+              css={css`
+                border: 2px solid ${COLORS.blue50};
+              `}
             />
             <LargeButton
               buttonText={t('export_protocol')}
-              onClick={() => {
-                if (warning != null) {
-                  setShowExportWarningModal(true)
-                } else {
-                  dispatch(loadFileActions.saveProtocolFile())
-                }
-              }}
+              onClick={handleExportClick}
               iconName="arrow-right"
               whiteSpace={NO_WRAP}
+              height="3.5rem"
             />
           </Flex>
         </Flex>
         <Flex gridGap={SPACING.spacing80} flexWrap={WRAP}>
           <Flex
-            flex="1.27"
+            flex="1"
             flexDirection={DIRECTION_COLUMN}
             css={COLUMN_STYLE}
             gridGap={SPACING.spacing40}
@@ -326,83 +232,31 @@ export function ProtocolOverview(): JSX.Element {
               additionalEquipment={additionalEquipment}
               setShowEditInstrumentsModal={setShowEditInstrumentsModal}
             />
+            <HardwareInfo
+              robotType={robotType}
+              modules={Object.values(modulesOnDeck)}
+              additionalEquipment={additionalEquipmentOnDeck}
+            />
+            <PeripheralsInfo robotType={robotType} />
             <LiquidDefinitions
               allIngredientGroupFields={allIngredientGroupFields}
             />
             <StepsInfo savedStepForms={savedStepForms} />
           </Flex>
           <Flex
+            flex="1"
             flexDirection={DIRECTION_COLUMN}
             css={COLUMN_STYLE}
             gridGap={SPACING.spacing12}
           >
-            <Flex
-              justifyContent={JUSTIFY_SPACE_BETWEEN}
-              alignItems={ALIGN_CENTER}
-            >
-              <Flex gridGap="1.875rem" alignItems={ALIGN_CENTER}>
-                <StyledText desktopStyle="headingSmallBold">
-                  {t('starting_deck')}
-                </StyledText>
-                <Flex padding={SPACING.spacing4}>
-                  <Btn
-                    data-testid="Materials_list"
-                    textDecoration={TYPOGRAPHY.textDecorationUnderline}
-                    onClick={() => {
-                      setShowMaterialsListModal(true)
-                    }}
-                    css={BUTTON_LINK_STYLE}
-                  >
-                    <StyledText desktopStyle="bodyDefaultRegular">
-                      {t('materials_list')}
-                    </StyledText>
-                  </Btn>
-                </Flex>
-              </Flex>
-              <ToggleGroup
-                selectedValue={deckView}
-                leftText={leftString}
-                rightText={rightString}
-                leftClick={() => {
-                  setDeckView(leftString)
-                }}
-                rightClick={() => {
-                  setDeckView(rightString)
-                }}
-              />
-            </Flex>
-            <Flex
-              flexDirection={DIRECTION_COLUMN}
-              gridGap={SPACING.spacing32}
-              alignItems={ALIGN_CENTER}
-            >
-              {deckView === leftString ? (
-                <DeckThumbnail hoverSlot={hover} setHoverSlot={setHover} />
-              ) : (
-                <OffDeckThumbnail
-                  hover={hover}
-                  setHover={setHover}
-                  width="100%"
-                />
-              )}
-              <SlotDetailsContainer
-                robotType={robotType}
-                slot={isOffDeckHover ? 'offDeck' : hover}
-                offDeckLabwareId={isOffDeckHover ? hover : null}
-              />
-            </Flex>
+            <StartingDeck
+              robotType={robotType}
+              setShowMaterialsListModal={setShowMaterialsListModal}
+            />
           </Flex>
         </Flex>
       </Flex>
       <EndUserAgreementFooter />
-    </Fragment>
+    </>
   )
 }
-
-const MIN_OVERVIEW_WIDTH = '64rem'
-const COLUMN_GRID_GAP = '5rem'
-const COLUMN_STYLE = css`
-  flex-direction: ${DIRECTION_COLUMN};
-  min-width: calc((${MIN_OVERVIEW_WIDTH} - ${COLUMN_GRID_GAP}) * 0.5);
-  flex: 1;
-`

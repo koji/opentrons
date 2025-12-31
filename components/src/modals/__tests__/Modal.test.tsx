@@ -1,18 +1,21 @@
 //
-import type * as React from 'react'
 import '@testing-library/jest-dom/vitest'
+
 import { screen } from '@testing-library/react'
-import { describe, it, expect, beforeEach } from 'vitest'
-import { renderWithProviders } from '../../testing/utils'
+import { beforeEach, describe, expect, it } from 'vitest'
+
 import { COLORS } from '../../helix-design-system'
+import { renderWithProviders } from '../../testing/utils'
 import { Modal } from '../Modal'
 
-const render = (props: React.ComponentProps<typeof Modal>) => {
+import type { ComponentProps } from 'react'
+
+const render = (props: ComponentProps<typeof Modal>) => {
   return renderWithProviders(<Modal {...props} />)
 }
 
 describe('Modal', () => {
-  let props: React.ComponentProps<typeof Modal>
+  let props: ComponentProps<typeof Modal>
 
   beforeEach(() => {
     props = {

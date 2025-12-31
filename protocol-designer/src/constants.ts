@@ -1,71 +1,33 @@
 import mapValues from 'lodash/mapValues'
-import {
-  MAGNETIC_MODULE_TYPE,
-  TEMPERATURE_MODULE_TYPE,
-  THERMOCYCLER_MODULE_TYPE,
-  HEATERSHAKER_MODULE_TYPE,
-  MAGNETIC_MODULE_V1,
-  MAGNETIC_MODULE_V2,
-  TEMPERATURE_MODULE_V1,
-  TEMPERATURE_MODULE_V2,
-  THERMOCYCLER_MODULE_V1,
-  HEATERSHAKER_MODULE_V1,
-  THERMOCYCLER_MODULE_V2,
-  MAGNETIC_BLOCK_TYPE,
-  MAGNETIC_BLOCK_V1,
-  ABSORBANCE_READER_TYPE,
-  ABSORBANCE_READER_V1,
-} from '@opentrons/shared-data'
+
+import { FLEX_ROBOT_TYPE, OT2_ROBOT_TYPE } from '@opentrons/shared-data'
+
 import type {
+  CutoutId,
   LabwareDefinition2,
-  DeckSlot as DeckDefSlot,
-  ModuleType,
-  ModuleModel,
+  RobotType,
 } from '@opentrons/shared-data'
-import type { DeckSlot, WellVolumes } from './types'
+import type { WellVolumes } from './types'
 
 export const getMaxVolumes = (def: LabwareDefinition2): WellVolumes =>
   mapValues(def.wells, well => well.totalLiquidVolume)
 
-/** All wells for labware, in arbitrary order. */
-export function getAllWellsForLabware(def: LabwareDefinition2): string[] {
-  return Object.keys(def.wells)
-}
 export const FIXED_TRASH_ID: 'fixedTrash' = 'fixedTrash'
 // Standard slot dims FOR VISUALIZATION ONLY
 export const STD_SLOT_X_DIM = 128
 export const STD_SLOT_Y_DIM = 86
 export const STD_SLOT_DIVIDER_WIDTH = 4
-// PD-specific slots that don't exist in deck definition.
-// These have no visual representation on the deck themselves,
-// but may contain certain specific items that span (eg thermocycler)
-export const SPAN7_8_10_11_SLOT: 'span7_8_10_11' = 'span7_8_10_11'
-export const TC_SPAN_SLOTS: DeckSlot[] = ['7', '8', '10', '11']
-export const PSEUDO_DECK_SLOTS: Record<DeckSlot, DeckDefSlot> = {
-  [SPAN7_8_10_11_SLOT]: {
-    displayName: 'Spanning slot',
-    id: SPAN7_8_10_11_SLOT,
-    position: [0.0, 181.0, 0.0],
-    // shares origin with OT2 standard slot 7
-    matingSurfaceUnitVector: [-1, 1, -1],
-    boundingBox: {
-      xDimension: STD_SLOT_X_DIM * 2 + STD_SLOT_DIVIDER_WIDTH,
-      yDimension: STD_SLOT_Y_DIM * 2 + STD_SLOT_DIVIDER_WIDTH,
-      zDimension: 0,
-    },
-    compatibleModules: [THERMOCYCLER_MODULE_TYPE],
-  },
-}
 export const START_TERMINAL_TITLE = 'STARTING DECK STATE'
 export const END_TERMINAL_TITLE = 'FINAL DECK STATE'
+export const WASTE_CHUTE_DISPLAY_NAME = 'Waste chute'
+export const TRASH_BIN_DISPLAY_NAME = 'Trash bin'
 // special ID for invisible deck setup step-form
 export const INITIAL_DECK_SETUP_STEP_ID = '__INITIAL_DECK_SETUP_STEP__'
 export const DEFAULT_CHANGE_TIP_OPTION: 'always' = 'always'
-// TODO: Ian 2019-06-13 don't keep these as hard-coded static values (see #3587)
-export const DEFAULT_MM_FROM_BOTTOM_ASPIRATE = 1
-export const DEFAULT_MM_FROM_BOTTOM_DISPENSE = 1
+export const DEFAULT_MM_OFFSET_FROM_BOTTOM = 1
 // NOTE: in the negative Z direction, to go down from top
 export const DEFAULT_MM_TOUCH_TIP_OFFSET_FROM_TOP = -1
+export const DEFAULT_MM_TOUCH_TIP_OFFSET_FROM_EDGE = 0
 export const DEFAULT_MM_BLOWOUT_OFFSET_FROM_TOP = 0
 export const DEFAULT_DELAY_SECONDS = 1
 export const DEFAULT_WELL_ORDER_FIRST_OPTION: 't2b' = 't2b'
@@ -76,7 +38,7 @@ export const MIN_ENGAGE_HEIGHT_V2 = -2.5
 export const MAX_ENGAGE_HEIGHT_V2 = 25
 export const MIN_TEMP_MODULE_TEMP = 4
 export const MAX_TEMP_MODULE_TEMP = 95
-export const MIN_HEATER_SHAKER_MODULE_TEMP = 37
+export const MIN_HEATER_SHAKER_MODULE_TEMP = 20
 export const MAX_HEATER_SHAKER_MODULE_TEMP = 95
 export const MIN_HEATER_SHAKER_MODULE_RPM = 200
 export const MAX_HEATER_SHAKER_MODULE_RPM = 3000
@@ -90,76 +52,14 @@ export const MIN_TC_DURATION_SECONDS = 0
 export const MAX_TC_DURATION_SECONDS = 60
 export const MIN_TC_PROFILE_VOLUME = 0
 export const MAX_TC_PROFILE_VOLUME = 100
-export const MODELS_FOR_MODULE_TYPE: Record<
-  ModuleType,
-  Array<{
-    name: string
-    value: ModuleModel
-    disabled?: boolean
-  }>
-> = {
-  [MAGNETIC_MODULE_TYPE]: [
-    {
-      name: 'GEN1',
-      value: MAGNETIC_MODULE_V1,
-    },
-    {
-      name: 'GEN2',
-      value: MAGNETIC_MODULE_V2,
-    },
-  ],
-  [TEMPERATURE_MODULE_TYPE]: [
-    {
-      name: 'GEN1',
-      value: TEMPERATURE_MODULE_V1,
-    },
-    {
-      name: 'GEN2',
-      value: TEMPERATURE_MODULE_V2,
-    },
-  ],
-  [THERMOCYCLER_MODULE_TYPE]: [
-    {
-      name: 'GEN1',
-      value: THERMOCYCLER_MODULE_V1,
-    },
-    {
-      name: 'GEN2',
-      value: THERMOCYCLER_MODULE_V2,
-    },
-  ],
-  [HEATERSHAKER_MODULE_TYPE]: [
-    {
-      name: 'GEN1',
-      value: HEATERSHAKER_MODULE_V1,
-    },
-  ],
-  [MAGNETIC_BLOCK_TYPE]: [
-    {
-      name: 'GEN1',
-      value: MAGNETIC_BLOCK_V1,
-    },
-  ],
-  [ABSORBANCE_READER_TYPE]: [
-    {
-      name: 'GEN1',
-      value: ABSORBANCE_READER_V1,
-    },
-  ],
-}
 
-export const DEFAULT_MODEL_FOR_MODULE_TYPE: Record<ModuleType, ModuleModel> = {
-  [MAGNETIC_MODULE_TYPE]: MAGNETIC_MODULE_V2,
-  [TEMPERATURE_MODULE_TYPE]: TEMPERATURE_MODULE_V2,
-  [THERMOCYCLER_MODULE_TYPE]: THERMOCYCLER_MODULE_V2,
-  [HEATERSHAKER_MODULE_TYPE]: HEATERSHAKER_MODULE_V1,
-  [MAGNETIC_BLOCK_TYPE]: MAGNETIC_BLOCK_V1,
-  [ABSORBANCE_READER_TYPE]: ABSORBANCE_READER_V1,
-}
 // Values for pauseAction field
 export const PAUSE_UNTIL_RESUME: 'untilResume' = 'untilResume'
 export const PAUSE_UNTIL_TIME: 'untilTime' = 'untilTime'
 export const PAUSE_UNTIL_TEMP: 'untilTemperature' = 'untilTemperature'
+export const PAUSE_UNTIL_TC_PROFILE_COMPLETE: 'untilThermocyclerProfileComplete' =
+  'untilThermocyclerProfileComplete'
+
 export const DND_TYPES = {
   LABWARE: 'LABWARE',
   STEP_ITEM: 'STEP_ITEM',
@@ -167,3 +67,102 @@ export const DND_TYPES = {
 // Values for TC fields
 export const THERMOCYCLER_STATE: 'thermocyclerState' = 'thermocyclerState'
 export const THERMOCYCLER_PROFILE: 'thermocyclerProfile' = 'thermocyclerProfile'
+// Priority for fixtures
+export const STAGING_AREA_CUTOUTS_ORDERED: CutoutId[] = [
+  'cutoutB3',
+  'cutoutC3',
+  'cutoutD3',
+  'cutoutA3',
+]
+
+// Values for absorbance reader
+export const ABSORBANCE_READER_INITIALIZE_MODE_SINGLE = 'single'
+export const ABSORBANCE_READER_INITIALIZE_MODE_MULTI = 'multi'
+export const ABSORBANCE_READER_INITIALIZE: 'absorbanceReaderInitialize' =
+  'absorbanceReaderInitialize'
+export const ABSORBANCE_READER_READ: 'absorbanceReaderRead' =
+  'absorbanceReaderRead'
+export const ABSORBANCE_READER_LID: 'absorbanceReaderLid' =
+  'absorbanceReaderLid'
+export const ABSORBANCE_READER_MIN_WAVELENGTH_NM = 350
+export const ABSORBANCE_READER_MAX_WAVELENGTH_NM = 1000
+export const ABSORBANCE_READER_COLOR_BY_WAVELENGTH: Record<number, string> = {
+  450: 'Blue',
+  562: 'Green',
+  600: 'Orange',
+  650: 'Red',
+}
+
+// Values for flex stacker
+export const FLEX_STACKER_RETRIEVE: 'retrieve' = 'retrieve'
+export const FLEX_STACKER_STORE: 'store' = 'store'
+export const FLEX_STACKER_FILL: 'fill' = 'fill'
+export const FLEX_STACKER_EMPTY: 'empty' = 'empty'
+
+export const OFFDECK: 'offDeck' = 'offDeck'
+
+export const PROTOCOL_DESIGNER_SOURCE: 'Protocol Designer' = 'Protocol Designer' // protocolSource for tracking analytics in the app
+
+export const DECK_SETUP_TOOLS_WIDTH_REM = 21.875
+export const OVERFLOW_MENU_POSITION_ADJUSTMENT = 8
+
+// Below values copied from opentrons/api/src/opentrons/config/defaults_ot[2/3].py
+export const FLEX_X_Y_MAX_SPEED = 300
+export const FLEX_LOW_THROUGHPUT_Z_MAX_SPEED = 100
+export const FLEX_HIGH_THROUGHPUT_Z_MAX_SPEED = 35
+export const FLEX_LOW_THROUGHPUT_PLUNGER_MAX_SPEED = 70
+export const FLEX_HIGH_THROUGHPUT_PLUNGER_MAX_SPEED = 15
+export const OT2_X_MAX_SPEED = 600
+export const OT2_Y_MAX_SPEED = 400
+export const OT2_Z_MAX_SPEED = 125
+export const OT2_PLUNGER_MAX_SPEED = 40
+
+// pulled from documentation
+export const DEFAULT_TOUCH_TIP_SPEED = 60
+
+export const CHANNELS_MAPPED_TO_MAX_SPEED: Record<
+  RobotType,
+  Record<number, { plunger: number; x: number; y: number; z: number }>
+> = {
+  [FLEX_ROBOT_TYPE]: {
+    1: {
+      plunger: FLEX_LOW_THROUGHPUT_PLUNGER_MAX_SPEED,
+      x: FLEX_X_Y_MAX_SPEED,
+      y: FLEX_X_Y_MAX_SPEED,
+      z: FLEX_LOW_THROUGHPUT_Z_MAX_SPEED,
+    },
+    8: {
+      plunger: FLEX_LOW_THROUGHPUT_PLUNGER_MAX_SPEED,
+      x: FLEX_X_Y_MAX_SPEED,
+      y: FLEX_X_Y_MAX_SPEED,
+      z: FLEX_LOW_THROUGHPUT_Z_MAX_SPEED,
+    },
+    96: {
+      plunger: FLEX_HIGH_THROUGHPUT_PLUNGER_MAX_SPEED,
+      x: FLEX_X_Y_MAX_SPEED,
+      y: FLEX_X_Y_MAX_SPEED,
+      z: FLEX_HIGH_THROUGHPUT_Z_MAX_SPEED,
+    },
+  },
+  [OT2_ROBOT_TYPE]: {
+    1: {
+      plunger: OT2_PLUNGER_MAX_SPEED,
+      x: OT2_X_MAX_SPEED,
+      y: OT2_Y_MAX_SPEED,
+      z: OT2_Z_MAX_SPEED,
+    },
+    8: {
+      plunger: OT2_PLUNGER_MAX_SPEED,
+      x: OT2_X_MAX_SPEED,
+      y: OT2_Y_MAX_SPEED,
+      z: OT2_Z_MAX_SPEED,
+    },
+  },
+}
+
+export const MINIMUM_LIQUID_CLASS_VOLUME = 1
+
+export const ACCEPTED_PROTOCOL_FILE_TYPES = '.json,.py'
+
+export const HOPPER_LABWARE_X_OFFSET = 178
+export const HOPPER_ZOOM_OFFSET_POSTITION = 230

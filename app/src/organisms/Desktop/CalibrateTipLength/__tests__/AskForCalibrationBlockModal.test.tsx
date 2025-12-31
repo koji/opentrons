@@ -1,17 +1,19 @@
-import { vi, it, describe, expect } from 'vitest'
+import { fireEvent, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 
 import { renderWithProviders } from '/app/__testing-utils__'
-
 import { i18n } from '/app/i18n'
 import { setUseTrashSurfaceForTipCal } from '/app/redux/calibration'
+
 import { AskForCalibrationBlockModal } from '../AskForCalibrationBlockModal'
-import { fireEvent, screen } from '@testing-library/react'
+
+import type { ComponentProps } from 'react'
 
 describe('AskForCalibrationBlockModal', () => {
   const onResponse = vi.fn()
   const render = () => {
     return renderWithProviders<
-      React.ComponentProps<typeof AskForCalibrationBlockModal>
+      ComponentProps<typeof AskForCalibrationBlockModal>
     >(
       <AskForCalibrationBlockModal
         onResponse={onResponse}

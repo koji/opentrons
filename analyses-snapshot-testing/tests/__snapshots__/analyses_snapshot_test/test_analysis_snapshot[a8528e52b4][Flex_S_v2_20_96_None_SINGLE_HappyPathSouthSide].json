@@ -1,4 +1,8 @@
 {
+  "commandAnnotations": [],
+  "commandPreconditions": {
+    "isCameraUsed": false
+  },
   "commands": [
     {
       "commandType": "home",
@@ -295,6 +299,11 @@
               "x": 0,
               "y": 0,
               "z": 121
+            },
+            "opentrons_flex_tiprack_lid": {
+              "x": 0,
+              "y": 0,
+              "z": 0.25
             }
           },
           "stackingOffsetWithModule": {},
@@ -1166,7 +1175,20 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "A2",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutoutA2",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "singleCenterSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -2378,7 +2400,20 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "C1",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutoutC1",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "singleLeftSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -3553,7 +3588,20 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "C2",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutoutC2",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "singleCenterSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -6467,7 +6515,20 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "B2",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutoutB2",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "singleCenterSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -7642,7 +7703,22 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "C3",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutoutC3",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "flexStackerModuleV1",
+              "singleRightSlot",
+              "stagingAreaRightSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -9378,12 +9454,7 @@
   },
   "createdAt": "TIMESTAMP",
   "errors": [],
-  "files": [
-    {
-      "name": "Flex_S_v2_20_96_None_SINGLE_HappyPathSouthSide.py",
-      "role": "main"
-    }
-  ],
+  "files": [],
   "labware": [
     {
       "definitionUri": "opentrons/opentrons_flex_96_tiprack_1000ul/1",
@@ -9431,6 +9502,7 @@
       }
     }
   ],
+  "liquidClasses": [],
   "liquids": [],
   "metadata": {
     "description": "Unsafe protocol ❗❗❗❗❗❗❗❗❗❗❗ will collide with tube.",

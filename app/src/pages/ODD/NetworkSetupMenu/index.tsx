@@ -7,12 +7,12 @@ import {
   DIRECTION_ROW,
   Flex,
   JUSTIFY_CENTER,
-  SPACING,
   LegacyStyledText,
+  SPACING,
+  StepMeter,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
-import { StepMeter } from '/app/atoms/StepMeter'
 import { CardButton } from '/app/molecules/CardButton'
 
 import type { IconName } from '@opentrons/components'
@@ -54,7 +54,7 @@ export function NetworkSetupMenu(): JSX.Element {
           marginBottom="3.09375rem"
         >
           <LegacyStyledText
-            as="h2"
+            forwardedAs="h2"
             fontWeight={TYPOGRAPHY.fontWeightBold}
             color={COLORS.black90}
           >
@@ -67,7 +67,7 @@ export function NetworkSetupMenu(): JSX.Element {
           marginBottom={SPACING.spacing40}
         >
           <LegacyStyledText
-            as="h4"
+            forwardedAs="h4"
             fontWeight={TYPOGRAPHY.fontWeightRegular}
             color={COLORS.grey60}
             textAlign={TYPOGRAPHY.textAlignCenter}

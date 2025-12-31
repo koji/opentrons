@@ -1,4 +1,5 @@
-import * as React from 'react'
+import { useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -11,24 +12,25 @@ import {
   SPACING,
 } from '@opentrons/components'
 
-import { ANALYTICS_QUICK_TRANSFER_SETTING_SAVED } from '/app/redux/analytics'
 import { getTopPortalEl } from '/app/App/portal'
-import { ChildNavigation } from '/app/organisms/ODD/ChildNavigation'
 import { NumericalKeyboard } from '/app/atoms/SoftwareKeyboard'
-import { ACTIONS } from '../constants'
-import { createPortal } from 'react-dom'
+import { ChildNavigation } from '/app/organisms/ODD/ChildNavigation'
 import { useTrackEventWithRobotSerial } from '/app/redux-resources/analytics'
+import { ANALYTICS_QUICK_TRANSFER_SETTING_SAVED } from '/app/redux/analytics'
 
+import { ACTIONS } from '../constants'
+
+import type { Dispatch } from 'react'
 import type {
-  QuickTransferSummaryState,
-  QuickTransferSummaryAction,
   FlowRateKind,
+  QuickTransferSummaryAction,
+  QuickTransferSummaryState,
 } from '../types'
 
 interface TipPositionEntryProps {
   onBack: () => void
   state: QuickTransferSummaryState
-  dispatch: React.Dispatch<QuickTransferSummaryAction>
+  dispatch: Dispatch<QuickTransferSummaryAction>
   kind: FlowRateKind // TODO: rename flowRateKind to be generic
 }
 
@@ -36,9 +38,9 @@ export function TipPositionEntry(props: TipPositionEntryProps): JSX.Element {
   const { onBack, state, dispatch, kind } = props
   const { i18n, t } = useTranslation(['quick_transfer', 'shared'])
   const { trackEventWithRobotSerial } = useTrackEventWithRobotSerial()
-  const keyboardRef = React.useRef(null)
+  const keyboardRef = useRef(null)
 
-  const [tipPosition, setTipPosition] = React.useState<number>(
+  const [tipPosition, setTipPosition] = useState<number>(
     kind === 'aspirate' ? state.tipPositionAspirate : state.tipPositionDispense
   )
 
@@ -61,8 +63,9 @@ export function TipPositionEntry(props: TipPositionEntryProps): JSX.Element {
     )
   }
 
-  // the maxiumum allowed position is 2x the height of the well
-  const tipPositionRange = { min: 1, max: Math.floor(wellHeight * 2) } // TODO: set this based on range
+  // the maxiumum allowed position is 2mm above the height of the well
+  // this currently assumes bottom position reference
+  const tipPositionRange = { min: 1, max: Math.floor(wellHeight + 2) } // TODO: set this based on range
 
   const textEntryCopy: string = t('distance_bottom_of_well_mm')
   const tipPositionAction =

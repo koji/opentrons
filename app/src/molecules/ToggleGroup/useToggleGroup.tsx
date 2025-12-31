@@ -1,13 +1,20 @@
-import * as React from 'react'
+import { useState } from 'react'
+
 import { ToggleGroup } from '@opentrons/components'
+
 import { useTrackEvent } from '/app/redux/analytics'
+
+import type { ReactNode } from 'react'
 
 export const useToggleGroup = (
   left: string,
   right: string,
-  trackEventName?: string
-): [string, React.ReactNode] => {
-  const [selectedValue, setSelectedValue] = React.useState<string>(left)
+  trackEventName?: string,
+  selectRightFirst?: boolean
+): [string, ReactNode] => {
+  const [selectedValue, setSelectedValue] = useState<string>(
+    selectRightFirst ? right : left
+  )
   const trackEvent = useTrackEvent()
   const handleLeftClick = (): void => {
     setSelectedValue(left)

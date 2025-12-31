@@ -1,11 +1,14 @@
-import * as React from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+
+import { RUN_STATUS_STOPPED } from '@opentrons/api-client'
 import {
   COLORS,
   DIRECTION_COLUMN,
   Flex,
+  InlineNotification,
   JUSTIFY_CENTER,
   LegacyStyledText,
   SPACING,
@@ -15,29 +18,30 @@ import {
   FLEX_ROBOT_TYPE,
   getDeckDefFromRobotType,
 } from '@opentrons/shared-data'
-import { RUN_STATUS_STOPPED } from '@opentrons/api-client'
 
 import { getTopPortalEl } from '/app/App/portal'
 import { FloatingActionButton } from '/app/atoms/buttons'
-import { InlineNotification } from '/app/atoms/InlineNotification'
 import { ChildNavigation } from '/app/organisms/ODD/ChildNavigation'
+import { useNotifyDeckConfigurationQuery } from '/app/resources/deck_configuration'
+import { useDeckConfigurationCompatibility } from '/app/resources/deck_configuration/hooks'
 import { useAttachedModules } from '/app/resources/modules'
 import {
-  getProtocolModulesInfo,
-  getAttachedProtocolModuleMatches,
-} from '/app/transformations/analysis'
-import {
-  useRunStatus,
+  DEFAULT_STATUS_REFETCH_INTERVAL,
   useMostRecentCompletedAnalysis,
+  useNotifyRunQuery,
 } from '/app/resources/runs'
-import { getUnmatchedModulesForProtocol } from './utils'
-import { SetupInstructionsModal } from './SetupInstructionsModal'
-import { FixtureTable } from './FixtureTable'
-import { ModuleTable } from './ModuleTable'
-import { ModulesAndDeckMapView } from './ModulesAndDeckMapView'
-import { useNotifyDeckConfigurationQuery } from '/app/resources/deck_configuration'
+import {
+  getAttachedProtocolModuleMatches,
+  getProtocolModulesInfo,
+} from '/app/transformations/analysis'
 
-import type { CutoutId, CutoutFixtureId } from '@opentrons/shared-data'
+import { FixtureTable } from './FixtureTable'
+import { ModulesAndDeckMapView } from './ModulesAndDeckMapView'
+import { ModuleTable } from './ModuleTable'
+import { SetupInstructionsModal } from './SetupInstructionsModal'
+import { getUnmatchedModulesForProtocol } from './utils'
+
+import type { Dispatch, SetStateAction } from 'react'
 import type { SetupScreens } from '../types'
 
 const ATTACHED_MODULE_POLL_MS = 5000
@@ -45,9 +49,7 @@ const DECK_CONFIG_POLL_MS = 5000
 
 interface ProtocolSetupModulesAndDeckProps {
   runId: string
-  setSetupScreen: React.Dispatch<React.SetStateAction<SetupScreens>>
-  setCutoutId: (cutoutId: CutoutId) => void
-  setProvidedFixtureOptions: (providedFixtureOptions: CutoutFixtureId[]) => void
+  setSetupScreen: Dispatch<SetStateAction<SetupScreens>>
 }
 
 /**
@@ -56,28 +58,28 @@ interface ProtocolSetupModulesAndDeckProps {
 export function ProtocolSetupModulesAndDeck({
   runId,
   setSetupScreen,
-  setCutoutId,
-  setProvidedFixtureOptions,
 }: ProtocolSetupModulesAndDeckProps): JSX.Element {
   const { i18n, t } = useTranslation('protocol_setup')
   const navigate = useNavigate()
-  const runStatus = useRunStatus(runId)
-  React.useEffect(() => {
+  const { data: runRecord } = useNotifyRunQuery(runId, {
+    refetchInterval: DEFAULT_STATUS_REFETCH_INTERVAL,
+  })
+  const runStatus = runRecord?.data.status ?? null
+  useEffect(() => {
     if (runStatus === RUN_STATUS_STOPPED) {
       navigate('/protocols')
     }
   }, [runStatus, navigate])
-  const [
-    showSetupInstructionsModal,
-    setShowSetupInstructionsModal,
-  ] = React.useState<boolean>(false)
-  const [showMapView, setShowMapView] = React.useState<boolean>(false)
-  const [
-    clearModuleMismatchBanner,
-    setClearModuleMismatchBanner,
-  ] = React.useState<boolean>(false)
+  const [showSetupInstructionsModal, setShowSetupInstructionsModal] =
+    useState<boolean>(false)
+  const [showMapView, setShowMapView] = useState<boolean>(false)
+  const [clearModuleMismatchBanner, setClearModuleMismatchBanner] =
+    useState<boolean>(false)
   const mostRecentAnalysis = useMostRecentCompletedAnalysis(runId)
-
+  const deckConfigCompatibility = useDeckConfigurationCompatibility(
+    FLEX_ROBOT_TYPE,
+    mostRecentAnalysis
+  )
   const deckDef = getDeckDefFromRobotType(FLEX_ROBOT_TYPE)
   const { data: deckConfig = [] } = useNotifyDeckConfigurationQuery({
     refetchInterval: DECK_CONFIG_POLL_MS,
@@ -100,10 +102,8 @@ export function ProtocolSetupModulesAndDeck({
 
   const hasModules = attachedProtocolModuleMatches.length > 0
 
-  const {
-    missingModuleIds,
-    remainingAttachedModules,
-  } = getUnmatchedModulesForProtocol(attachedModules, protocolModulesInfo)
+  const { missingModuleIds, remainingAttachedModules } =
+    getUnmatchedModulesForProtocol(attachedModules, protocolModulesInfo)
 
   const isModuleMismatch =
     remainingAttachedModules.length > 0 && missingModuleIds.length > 0
@@ -182,16 +182,14 @@ export function ProtocolSetupModulesAndDeck({
                     attachedProtocolModuleMatches={
                       attachedProtocolModuleMatches
                     }
+                    deckConfigCompatibility={deckConfigCompatibility}
                     deckDef={deckDef}
                     runId={runId}
                   />
                 ) : null}
                 <FixtureTable
                   robotType={FLEX_ROBOT_TYPE}
-                  mostRecentAnalysis={mostRecentAnalysis}
-                  setSetupScreen={setSetupScreen}
-                  setCutoutId={setCutoutId}
-                  setProvidedFixtureOptions={setProvidedFixtureOptions}
+                  deckConfigCompatibility={deckConfigCompatibility}
                 />
               </Flex>
             </Flex>

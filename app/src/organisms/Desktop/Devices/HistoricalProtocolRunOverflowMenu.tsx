@@ -1,49 +1,71 @@
-import type * as React from 'react'
+import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { NavLink, useNavigate } from 'react-router-dom'
+import NiceModal, { useModal } from '@ebay/nice-modal-react'
+import { css } from 'styled-components'
 
 import {
   ALIGN_CENTER,
   ALIGN_FLEX_END,
-  FLEX_MAX_CONTENT,
   Box,
   COLORS,
   DIRECTION_COLUMN,
   Flex,
+  FLEX_MAX_CONTENT,
   Icon,
+  JUSTIFY_END,
+  JUSTIFY_SPACE_BETWEEN,
   MenuItem,
+  ModalHeader,
+  ModalShell,
   NO_WRAP,
   OverflowBtn,
   POSITION_ABSOLUTE,
   POSITION_RELATIVE,
+  PrimaryButton,
+  SecondaryButton,
   SIZE_1,
   SPACING,
+  StyledText,
   Tooltip,
   useHoverTooltip,
   useMenuHandleClickOutside,
   useOnClickOutside,
 } from '@opentrons/components'
-import { useDeleteRunMutation } from '@opentrons/react-api-client'
+import {
+  useDeleteRunImages,
+  useDeleteRunMutation,
+} from '@opentrons/react-api-client'
 
+import { getModalPortalEl } from '/app/App/portal'
 import { Divider } from '/app/atoms/structure'
 import { useRunControls } from '/app/organisms/RunTimeControl'
+import { useTrackProtocolRunEvent } from '/app/redux-resources/analytics'
 import {
-  useTrackEvent,
+  SOURCE_RUN_RECORD,
+  useCameraAnalytics,
+} from '/app/redux-resources/analytics/'
+import { useRobot, useRobotType } from '/app/redux-resources/robots'
+import {
   ANALYTICS_PROTOCOL_PROCEED_TO_RUN,
   ANALYTICS_PROTOCOL_RUN_ACTION,
+  useTrackEvent,
 } from '/app/redux/analytics'
 import { useIsRobotOnWrongVersionOfSoftware } from '/app/redux/robot-update'
-import { useDownloadRunLog } from './hooks'
 import { useIsEstopNotDisengaged } from '/app/resources/devices'
-import { useTrackProtocolRunEvent } from '/app/redux-resources/analytics'
-import { useRobot } from '/app/redux-resources/robots'
 
+import { useDownloadRunLog } from './hooks'
+
+import type { MouseEventHandler } from 'react'
 import type { Run } from '@opentrons/api-client'
+import type { IconProps } from '@opentrons/components'
 
 export interface HistoricalProtocolRunOverflowMenuProps {
   runId: string
   robotName: string
   robotIsBusy: boolean
+  runHasImages: boolean
 }
 
 export function HistoricalProtocolRunOverflowMenu(
@@ -99,7 +121,7 @@ export function HistoricalProtocolRunOverflowMenu(
 }
 
 interface MenuDropdownProps extends HistoricalProtocolRunOverflowMenuProps {
-  closeOverflowMenu: React.MouseEventHandler<HTMLButtonElement>
+  closeOverflowMenu: MouseEventHandler<HTMLButtonElement>
   downloadRunLog: () => void
   isRunLogLoading: boolean
 }
@@ -114,11 +136,12 @@ function MenuDropdown(props: MenuDropdownProps): JSX.Element {
     closeOverflowMenu,
     downloadRunLog,
     isRunLogLoading,
+    runHasImages,
   } = props
 
-  const isRobotOnWrongVersionOfSoftware = useIsRobotOnWrongVersionOfSoftware(
-    robotName
-  )
+  const isRobotOnWrongVersionOfSoftware =
+    useIsRobotOnWrongVersionOfSoftware(robotName)
+  const { mutateAsync: deleteRunImages } = useDeleteRunImages()
 
   const [targetProps, tooltipProps] = useHoverTooltip()
   const onResetSuccess = (createRunResponse: Run): void => {
@@ -126,7 +149,7 @@ function MenuDropdown(props: MenuDropdownProps): JSX.Element {
       `/devices/${robotName}/protocol-runs/${createRunResponse.data.id}/run-preview`
     )
   }
-  const onDownloadClick: React.MouseEventHandler<HTMLButtonElement> = e => {
+  const onDownloadClick: MouseEventHandler<HTMLButtonElement> = e => {
     e.preventDefault()
     e.stopPropagation()
     downloadRunLog()
@@ -138,14 +161,13 @@ function MenuDropdown(props: MenuDropdownProps): JSX.Element {
     runId,
     onResetSuccess
   )
-  const { deleteRun } = useDeleteRunMutation()
+  const { deleteRun, isLoading: isDeletingImages } = useDeleteRunMutation()
   const robot = useRobot(robotName)
+  const robotType = useRobotType(robotName)
+
   const robotSerialNumber =
     robot?.health?.robot_serial ?? robot?.serverHealth?.serialNumber ?? null
-
-  const handleResetClick: React.MouseEventHandler<HTMLButtonElement> = (
-    e
-  ): void => {
+  const handleResetClick: MouseEventHandler<HTMLButtonElement> = (e): void => {
     e.preventDefault()
     e.stopPropagation()
 
@@ -160,11 +182,31 @@ function MenuDropdown(props: MenuDropdownProps): JSX.Element {
     trackProtocolRunEvent({ name: ANALYTICS_PROTOCOL_RUN_ACTION.AGAIN })
   }
 
-  const handleDeleteClick: React.MouseEventHandler<HTMLButtonElement> = e => {
+  const handleDeleteClick: MouseEventHandler<HTMLButtonElement> = e => {
     e.preventDefault()
     e.stopPropagation()
     deleteRun(runId)
     closeOverflowMenu(e)
+  }
+
+  const onDeleteRunImages = (onClose: () => void): void => {
+    void deleteRunImages(runId).finally(() => {
+      onClose()
+    })
+  }
+  const { reportPhotoAccessUsage } = useCameraAnalytics({
+    source: SOURCE_RUN_RECORD,
+    robotType: robotType,
+  })
+  const onClearRunImages: MouseEventHandler<HTMLButtonElement> = e => {
+    handleDeleteRunImagesModal({ onDeleteRunImages })
+    e.preventDefault()
+    e.stopPropagation()
+    closeOverflowMenu(e)
+
+    reportPhotoAccessUsage({
+      action: 'delete',
+    })
   }
 
   return (
@@ -234,6 +276,15 @@ function MenuDropdown(props: MenuDropdownProps): JSX.Element {
           ) : null}
         </Flex>
       </MenuItem>
+      {runHasImages && (
+        <MenuItem
+          onClick={onClearRunImages}
+          data-testid="RecentProtocolRun_OverflowMenu_clearRunImages"
+          disabled={isDeletingImages}
+        >
+          {t('clear_run_images')}
+        </MenuItem>
+      )}
       <Divider marginY="0" />
       <MenuItem
         onClick={handleDeleteClick}
@@ -244,3 +295,82 @@ function MenuDropdown(props: MenuDropdownProps): JSX.Element {
     </Flex>
   )
 }
+
+interface DeleteRunImagesModalProps {
+  onDeleteRunImages: (onClose: () => void) => void
+}
+
+const handleDeleteRunImagesModal = (props: DeleteRunImagesModalProps): void => {
+  NiceModal.show(DeleteRunImagesModal, props)
+}
+
+const DeleteRunImagesModal = NiceModal.create(
+  ({ onDeleteRunImages }: DeleteRunImagesModalProps): JSX.Element => {
+    const { t } = useTranslation('device_details')
+    const modal = useModal()
+    const [isDeleting, setIsDeleting] = useState(false)
+
+    const onCancel = (): void => {
+      modal.remove()
+    }
+
+    const onDelete = (): void => {
+      if (!isDeleting) {
+        setIsDeleting(true)
+        onDeleteRunImages(modal.remove)
+      }
+    }
+
+    const buildIcon = (): IconProps => {
+      return {
+        name: 'information',
+        color: COLORS.yellow50,
+        size: SPACING.spacing20,
+        style: {
+          marginRight: SPACING.spacing8,
+        },
+      }
+    }
+
+    const buildHeader = (): JSX.Element => {
+      return (
+        <ModalHeader
+          title={t('clear_images_from_run_record')}
+          icon={buildIcon()}
+          color={COLORS.black90}
+          backgroundColor={COLORS.white}
+          onClose={onCancel}
+        />
+      )
+    }
+
+    return createPortal(
+      <ModalShell header={buildHeader()} css={MODAL_STYLE}>
+        <Flex
+          padding={SPACING.spacing24}
+          gridGap={SPACING.spacing24}
+          flexDirection={DIRECTION_COLUMN}
+          justifyContent={JUSTIFY_SPACE_BETWEEN}
+        >
+          <StyledText desktopStyle="bodyDefaultRegular">
+            {t('all_images_deleted')}
+          </StyledText>
+          <Flex gridGap={SPACING.spacing8} justifyContent={JUSTIFY_END}>
+            <SecondaryButton onClick={onCancel}>{t('cancel')}</SecondaryButton>
+            <PrimaryButton onClick={onDelete}>
+              <Flex alignItems={ALIGN_CENTER} gridGap={SPACING.spacing6}>
+                {isDeleting && <Icon name="ot-spinner" spin size="1rem" />}
+                {t('clear_images')}
+              </Flex>
+            </PrimaryButton>
+          </Flex>
+        </Flex>
+      </ModalShell>,
+      getModalPortalEl()
+    )
+  }
+)
+
+const MODAL_STYLE = css`
+  width: 500px;
+`

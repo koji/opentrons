@@ -1,9 +1,7 @@
-import type * as React from 'react'
-import { css } from 'styled-components'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { useDispatch } from 'react-redux'
-import { useNavigate } from 'react-router-dom'
+import { css } from 'styled-components'
 
 import {
   ALIGN_FLEX_END,
@@ -19,22 +17,23 @@ import {
   useConditionalConfirm,
   useMenuHandleClickOutside,
 } from '@opentrons/components'
-import { FLEX_DISPLAY_NAME, FLEX_ROBOT_TYPE } from '@opentrons/shared-data'
+import { FLEX_DISPLAY_NAME } from '@opentrons/shared-data'
 
 import { getTopPortalEl } from '/app/App/portal'
 import {
-  useTrackEvent,
-  ANALYTICS_PROTOCOL_PROCEED_TO_RUN,
   ANALYTICS_DELETE_PROTOCOL_FROM_APP,
+  ANALYTICS_PROTOCOL_PROCEED_TO_RUN,
+  useTrackEvent,
 } from '/app/redux/analytics'
-import { useFeatureFlag } from '/app/redux/config'
 import {
   analyzeProtocol,
   removeProtocol,
   viewProtocolSourceFolder,
 } from '/app/redux/protocol-storage'
+
 import { ConfirmDeleteProtocolModal } from './ConfirmDeleteProtocolModal'
 
+import type { MouseEvent, MouseEventHandler } from 'react'
 import type { StyleProps } from '@opentrons/components'
 import type { StoredProtocolData } from '/app/redux/protocol-storage'
 import type { Dispatch } from '/app/redux/types'
@@ -48,14 +47,10 @@ interface ProtocolOverflowMenuProps extends StyleProps {
 export function ProtocolOverflowMenu(
   props: ProtocolOverflowMenuProps
 ): JSX.Element {
-  const {
-    storedProtocolData,
-    handleRunProtocol,
-    handleSendProtocolToFlex,
-  } = props
+  const { storedProtocolData, handleRunProtocol, handleSendProtocolToFlex } =
+    props
   const { mostRecentAnalysis, protocolKey } = storedProtocolData
   const { t } = useTranslation(['protocol_list', 'shared'])
-  const enableProtocolTimeline = useFeatureFlag('protocolTimeline')
   const {
     menuOverlay,
     handleOverflowClick,
@@ -63,7 +58,6 @@ export function ProtocolOverflowMenu(
     setShowOverflowMenu,
   } = useMenuHandleClickOutside()
   const dispatch = useDispatch<Dispatch>()
-  const navigate = useNavigate()
   const trackEvent = useTrackEvent()
   const {
     confirm: confirmDeleteProtocol,
@@ -75,15 +69,15 @@ export function ProtocolOverflowMenu(
   }, true)
 
   const robotType =
-    mostRecentAnalysis != null ? mostRecentAnalysis?.robotType ?? null : null
+    mostRecentAnalysis != null ? (mostRecentAnalysis?.robotType ?? null) : null
 
-  const handleClickShowInFolder: React.MouseEventHandler<HTMLButtonElement> = e => {
+  const handleClickShowInFolder: MouseEventHandler<HTMLButtonElement> = e => {
     e.preventDefault()
     e.stopPropagation()
     dispatch(viewProtocolSourceFolder(protocolKey))
     setShowOverflowMenu(currentShowOverflowMenu => !currentShowOverflowMenu)
   }
-  const handleClickRun: React.MouseEventHandler<HTMLButtonElement> = e => {
+  const handleClickRun: MouseEventHandler<HTMLButtonElement> = e => {
     e.preventDefault()
     e.stopPropagation()
     trackEvent({
@@ -93,35 +87,30 @@ export function ProtocolOverflowMenu(
     handleRunProtocol(storedProtocolData)
     setShowOverflowMenu(currentShowOverflowMenu => !currentShowOverflowMenu)
   }
-  const handleClickSendToOT3: React.MouseEventHandler<HTMLButtonElement> = e => {
+  const handleClickSendToOT3: MouseEventHandler<HTMLButtonElement> = e => {
     e.preventDefault()
     e.stopPropagation()
     handleSendProtocolToFlex(storedProtocolData)
     setShowOverflowMenu(currentShowOverflowMenu => !currentShowOverflowMenu)
   }
-  const handleClickDelete: React.MouseEventHandler<HTMLButtonElement> = e => {
+  const handleClickDelete: MouseEventHandler<HTMLButtonElement> = e => {
     e.preventDefault()
     e.stopPropagation()
     confirmDeleteProtocol()
     setShowOverflowMenu(currentShowOverflowMenu => !currentShowOverflowMenu)
   }
-  const handleClickReanalyze: React.MouseEventHandler<HTMLButtonElement> = e => {
+  const handleClickReanalyze: MouseEventHandler<HTMLButtonElement> = e => {
     e.preventDefault()
     e.stopPropagation()
     dispatch(analyzeProtocol(protocolKey))
     setShowOverflowMenu(currentShowOverflowMenu => !currentShowOverflowMenu)
-  }
-  const handleClickTimeline: React.MouseEventHandler<HTMLButtonElement> = e => {
-    e.preventDefault()
-    navigate(`/protocols/${protocolKey}/timeline`)
-    setShowOverflowMenu(prevShowOverflowMenu => !prevShowOverflowMenu)
   }
 
   return (
     <Flex
       flexDirection={DIRECTION_COLUMN}
       position={POSITION_RELATIVE}
-      onClick={(e: React.MouseEvent) => {
+      onClick={(e: MouseEvent) => {
         e.stopPropagation()
       }}
     >
@@ -158,11 +147,6 @@ export function ProtocolOverflowMenu(
           >
             {t('shared:reanalyze')}
           </MenuItem>
-          {enableProtocolTimeline && robotType === FLEX_ROBOT_TYPE ? (
-            <MenuItem onClick={handleClickTimeline}>
-              {t('go_to_timeline')}
-            </MenuItem>
-          ) : null}
           {robotType !== 'OT-2 Standard' ? (
             <MenuItem
               onClick={handleClickSendToOT3}
@@ -195,7 +179,7 @@ export function ProtocolOverflowMenu(
       {showDeleteConfirmation
         ? createPortal(
             <ConfirmDeleteProtocolModal
-              cancelDeleteProtocol={(e: React.MouseEvent) => {
+              cancelDeleteProtocol={(e: MouseEvent) => {
                 e.preventDefault()
                 e.stopPropagation()
                 cancelDeleteProtocol()

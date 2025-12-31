@@ -1,7 +1,8 @@
-import type * as React from 'react'
 import { wellBottomShapeOptions, wellShapeOptions } from '../../fields'
-import type { Options } from '../../fields'
 import styles from './optionsWithImages.module.css'
+
+import type * as React from 'react'
+import type { Options } from '../../fields'
 
 const WELL_SHAPE_IMAGES = {
   rectangular: new URL('../../../images/rectangularWell.svg', import.meta.url)
@@ -38,12 +39,8 @@ const makeOptionsWithImages = (
     ),
   }))
 
-export const wellShapeOptionsWithIcons: OptionsWithImages = makeOptionsWithImages(
-  wellShapeOptions,
-  WELL_SHAPE_IMAGES
-)
+export const wellShapeOptionsWithIcons: OptionsWithImages =
+  makeOptionsWithImages(wellShapeOptions, WELL_SHAPE_IMAGES)
 
-export const wellBottomShapeOptionsWithIcons: OptionsWithImages = makeOptionsWithImages(
-  wellBottomShapeOptions,
-  WELL_BOTTOM_IMAGES
-)
+export const wellBottomShapeOptionsWithIcons: OptionsWithImages =
+  makeOptionsWithImages(wellBottomShapeOptions, WELL_BOTTOM_IMAGES)

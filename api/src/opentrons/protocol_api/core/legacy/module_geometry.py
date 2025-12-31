@@ -1,4 +1,4 @@
-""" opentrons.protocol_api.module_geometry: classes and functions for modules
+"""opentrons.protocol_api.module_geometry: classes and functions for modules
 as deck objects
 
 This module provides things like :py:class:`ModuleGeometry` and
@@ -6,15 +6,16 @@ This module provides things like :py:class:`ModuleGeometry` and
 objects on the deck (as opposed to calling commands on them, which is handled
 by :py:mod:`.module_contexts`)
 """
+
 from __future__ import annotations
 
 import logging
-from enum import Enum
 from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 from numpy.typing import NDArray
 
+from opentrons_shared_data.util import StrEnum
 from opentrons_shared_data import module
 from opentrons_shared_data.module.types import ModuleDefinitionV3
 from opentrons_shared_data.module import OLD_TC_GEN2_LABWARE_OFFSET
@@ -41,7 +42,7 @@ if TYPE_CHECKING:
 _log = logging.getLogger(__name__)
 
 
-class ThermocyclerConfiguration(str, Enum):
+class ThermocyclerConfiguration(StrEnum):
     FULL = "full"
     SEMI = "semi"
 
@@ -273,8 +274,13 @@ class ThermocyclerGeometry(ModuleGeometry):
             LegacyLabwareCore,
         )
 
-        # Block first three columns from being accessed
         definition = labware._core.get_definition()
+
+        # For type checking. This should always pass because
+        # opentrons.protocol_api.core.legacy should only load labware with schema 2.
+        assert definition["schemaVersion"] == 2
+
+        # Block first three columns from being accessed
         definition["ordering"] = definition["ordering"][2::]
         return Labware(
             core=LegacyLabwareCore(definition, super().location),
@@ -383,9 +389,9 @@ class HeaterShakerGeometry(ModuleGeometry):
 
         heater_shaker_slot = self.parent
 
-        assert isinstance(
-            heater_shaker_slot, str
-        ), "Could not determine module slot location"
+        assert isinstance(heater_shaker_slot, str), (
+            "Could not determine module slot location"
+        )
 
         return heater_shaker_slot == pipette_location_slot or int(
             pipette_location_slot
@@ -414,9 +420,9 @@ class HeaterShakerGeometry(ModuleGeometry):
 
         heater_shaker_slot = self.parent
 
-        assert isinstance(
-            heater_shaker_slot, str
-        ), "Could not determine module slot location"
+        assert isinstance(heater_shaker_slot, str), (
+            "Could not determine module slot location"
+        )
 
         return heater_shaker_slot == pipette_location_slot or int(
             pipette_location_slot

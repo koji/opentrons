@@ -1,6 +1,16 @@
-import * as React from 'react'
+import { useState } from 'react'
+import { useSelector } from 'react-redux'
 import { KeyboardReact as Keyboard } from 'react-simple-keyboard'
-import { customDisplay, fullKeyboardLayout } from '../constants'
+
+import { getAppLanguage } from '/app/redux/config'
+
+import {
+  customDisplay,
+  fullKeyboardLayout,
+  layoutCandidates,
+} from '../constants'
+
+import type { MutableRefObject } from 'react'
 import type { KeyboardReactInterface } from 'react-simple-keyboard'
 
 import '../index.css'
@@ -9,7 +19,7 @@ import './index.css'
 // TODO (kk:04/05/2024) add debug to make debugging easy
 interface FullKeyboardProps {
   onChange: (input: string) => void
-  keyboardRef: React.MutableRefObject<KeyboardReactInterface | any>
+  keyboardRef: MutableRefObject<KeyboardReactInterface | any>
   debug?: boolean
 }
 
@@ -18,7 +28,8 @@ export function FullKeyboard({
   keyboardRef,
   debug = false,
 }: FullKeyboardProps): JSX.Element {
-  const [layoutName, setLayoutName] = React.useState<string>('default')
+  const [layoutName, setLayoutName] = useState<string>('default')
+  const appLanguage = useSelector(getAppLanguage)
   const handleShift = (button: string): void => {
     switch (button) {
       case '{shift}':
@@ -51,11 +62,14 @@ export function FullKeyboard({
   return (
     <Keyboard
       keyboardRef={r => (keyboardRef.current = r)}
-      theme={'hg-theme-default oddTheme1'}
+      theme="hg-theme-default oddTheme1"
       onChange={onChange}
       onKeyPress={onKeyPress}
       layoutName={layoutName}
       layout={fullKeyboardLayout}
+      layoutCandidates={
+        appLanguage != null ? layoutCandidates[appLanguage] : undefined
+      }
       display={customDisplay}
       mergeDisplay={true}
       useButtonTag={true}

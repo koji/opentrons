@@ -1,16 +1,18 @@
 import { useTranslation } from 'react-i18next'
+
 import {
   ALIGN_CENTER,
   Box,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
-import { useTrackEvent, ANALYTICS_JUPYTER_OPEN } from '/app/redux/analytics'
+
 import { TertiaryButton } from '/app/atoms/buttons'
 import { ExternalLink } from '/app/atoms/Link/ExternalLink'
+import { ANALYTICS_JUPYTER_OPEN, useTrackEvent } from '/app/redux/analytics'
 
 const EVENT_JUPYTER_OPEN = { name: ANALYTICS_JUPYTER_OPEN, properties: {} }
 
@@ -45,7 +47,7 @@ export function OpenJupyterControl({
         >
           {t('jupyter_notebook')}
         </LegacyStyledText>
-        <LegacyStyledText as="p" marginBottom={SPACING.spacing8}>
+        <LegacyStyledText forwardedAs="p" marginBottom={SPACING.spacing8}>
           {t('jupyter_notebook_description')}
         </LegacyStyledText>
         <ExternalLink href={JUPYTER_NOTEBOOK_LINK}>

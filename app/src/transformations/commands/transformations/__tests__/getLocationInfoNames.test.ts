@@ -1,9 +1,12 @@
-import { describe, it, vi, expect, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import {
   getLabwareDisplayName,
   getLabwareStackCountAndLocation,
 } from '@opentrons/shared-data'
+
 import { getLocationInfoNames } from '../getLocationInfoNames'
+
 import type { ModuleModel } from '@opentrons/shared-data'
 
 const ADAPTER_DISPLAY_NAME = 'Opentrons 96 Flat Bottom Adapter'
@@ -152,7 +155,16 @@ const MOCK_ADAPTER_EXTENSION_COMMANDS = [
   },
 ]
 
-vi.mock('@opentrons/shared-data')
+vi.mock('@opentrons/shared-data', async importOriginal => {
+  const original =
+    // eslint-disable-next-line @typescript-eslint/consistent-type-imports
+    await importOriginal<typeof import('@opentrons/shared-data')>()
+  return {
+    ...original,
+    getLabwareDisplayName: vi.fn(),
+    getLabwareStackCountAndLocation: vi.fn(),
+  }
+})
 
 describe('getLocationInfoNames', () => {
   beforeEach(() => {

@@ -1,8 +1,9 @@
 """Tests for motion planning."""
+
 import numpy as np
 from hypothesis import given, assume, strategies as st
 from hypothesis.extra import numpy as hynp
-from typing import Iterator, List, Tuple
+from typing import Iterator, List, Tuple, Dict
 
 from opentrons_hardware.hardware_control.motion_planning import move_manager
 from opentrons_hardware.hardware_control.motion_planning.types import (
@@ -210,3 +211,137 @@ def test_close_move_plan(
     )
 
     assert converged, f"Failed to converge: {blend_log}"
+
+
+def test_pipette_high_speed_motion() -> None:
+    """Test that updated motion constraint doesn't get overridden by motion planning."""
+    origin: Dict[str, int] = {
+        "X": 499,
+        "Y": 499,
+        "Z": 499,
+        "A": 499,
+        "B": 499,
+        "C": 499,
+    }
+    target_list = []
+    axis_kinds = ["X", "Y", "Z", "A", "B", "C"]
+    constraints: SystemConstraints[str] = {}
+    for axis_kind in axis_kinds:
+        constraints[axis_kind] = AxisConstraints.build(
+            max_acceleration=500,
+            max_speed_discont=500,
+            max_direction_change_speed_discont=500,
+            max_speed=500,
+        )
+        origin_mapping: Dict[str, float] = {axis_kind: float(origin[axis_kind])}
+        target_list.append(MoveTarget.build(origin_mapping, 500))
+
+    set_axis_kind = "A"
+    dummy_em_pipette_max_speed = 90.0
+    manager = move_manager.MoveManager(constraints=constraints)
+
+    new_axis_constraint = AxisConstraints.build(
+        max_acceleration=float(constraints[set_axis_kind].max_acceleration),
+        max_speed_discont=float(constraints[set_axis_kind].max_speed_discont),
+        max_direction_change_speed_discont=float(
+            constraints[set_axis_kind].max_direction_change_speed_discont
+        ),
+        max_speed=90.0,
+    )
+    new_constraints = {}
+
+    for axis_kind in constraints.keys():
+        if axis_kind == set_axis_kind:
+            new_constraints[axis_kind] = new_axis_constraint
+        else:
+            new_constraints[axis_kind] = constraints[axis_kind]
+
+    manager.update_constraints(constraints=new_constraints)
+    converged, blend_log = manager.plan_motion(
+        origin=origin,
+        target_list=target_list,
+        iteration_limit=20,
+    )
+    for move in blend_log[0]:
+        unit_vector = move.unit_vector
+        for block in move.blocks:
+            top_set_axis_speed = unit_vector[set_axis_kind] * block.final_speed
+            if top_set_axis_speed != 0:
+                assert abs(top_set_axis_speed) == dummy_em_pipette_max_speed
+
+
+@given(
+    x_constraint=generate_axis_constraint(),
+    y_constraint=generate_axis_constraint(),
+    z_constraint=generate_axis_constraint(),
+    a_constraint=generate_axis_constraint(),
+    b_constraint=generate_axis_constraint(),
+    c_constraint=generate_axis_constraint(),
+)
+async def test_plunger_devectorize(
+    x_constraint: AxisConstraints,
+    y_constraint: AxisConstraints,
+    z_constraint: AxisConstraints,
+    a_constraint: AxisConstraints,
+    b_constraint: AxisConstraints,
+    c_constraint: AxisConstraints,
+) -> None:
+    """Test to make sure the devectorize function can isolate an axis from the move target speed limit."""
+    constraints: SystemConstraints[str] = {
+        "X": x_constraint,
+        "Y": y_constraint,
+        "Z": z_constraint,
+        "A": a_constraint,
+        "B": b_constraint,
+        "C": c_constraint,
+    }
+    manager = move_manager.MoveManager(constraints=constraints)
+    origin = {"X": 0, "Y": 0, "Z": 0, "A": 0}
+    target = {"X": 10, "Y": 10, "Z": 10, "A": 20}
+    speed = 10
+    devectorized = manager.devectorize_axes(origin, target, speed, ["A"])
+
+    converged, blend_log = manager.plan_motion(
+        origin=origin,
+        target_list=[devectorized],
+        iteration_limit=20,
+    )
+    uv = blend_log[0][0].unit_vector
+
+    assert (uv["A"]) * devectorized.max_speed == speed
+
+    # make sure that if the axis isn't included it doesn't effect other axes.
+    target = {"X": 10, "Y": 10, "Z": 10}
+    speed = 10
+    devectorized = manager.devectorize_axes(origin, target, speed, ["A"])
+
+    converged, blend_log = manager.plan_motion(
+        origin=origin,
+        target_list=[devectorized],
+        iteration_limit=20,
+    )
+    uv = blend_log[0][0].unit_vector
+
+    assert devectorized.max_speed == speed
+
+    # make sure negative directions work
+    origin = {"A": 20}
+    target = {"A": 0}
+    speed = 10
+    devectorized = manager.devectorize_axes(origin, target, speed, ["A"])
+
+    converged, blend_log = manager.plan_motion(
+        origin=origin,
+        target_list=[devectorized],
+        iteration_limit=20,
+    )
+    uv = blend_log[0][0].unit_vector
+
+    assert devectorized.max_speed == speed
+
+    # make sure not to fail if passed a bad target.
+    origin = {"X": 0, "Y": 0, "Z": 0, "A": 0}
+    target = {"X": 5, "Y": 5, "Z": 5, "A": 0}
+    speed = 10
+    devectorized = manager.devectorize_axes(origin, target, speed, ["A"])
+    assert devectorized.max_speed == speed

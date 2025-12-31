@@ -1,15 +1,16 @@
 import {
-  SPAN7_8_10_11_SLOT,
-  getModuleDef2,
   getLoadedLabwareDefinitionsByUri,
+  getModuleDef,
   getPositionFromSlotId,
-  NON_USER_ADDRESSABLE_LABWARE,
+  SPAN7_8_10_11_SLOT,
 } from '@opentrons/shared-data'
+
 import { getModuleInitialLoadInfo } from '../commands'
+
 import type {
   CompletedProtocolAnalysis,
   DeckDefinition,
-  LabwareDefinition2,
+  LabwareDefinition,
   LoadLabwareRunTimeCommand,
   ModuleDefinition,
   ProtocolAnalysisOutput,
@@ -21,7 +22,7 @@ export interface ProtocolModuleInfo {
   y: number
   z: number
   moduleDef: ModuleDefinition
-  nestedLabwareDef: LabwareDefinition2 | null
+  nestedLabwareDef: LabwareDefinition | null
   nestedLabwareDisplayName: string | null
   nestedLabwareId: string | null
   protocolLoadOrder: number
@@ -34,13 +35,12 @@ export const getProtocolModulesInfo = (
 ): ProtocolModuleInfo[] => {
   if (protocolData != null && 'modules' in protocolData) {
     return protocolData.modules.reduce<ProtocolModuleInfo[]>((acc, module) => {
-      const moduleDef = getModuleDef2(module.model)
+      const moduleDef = getModuleDef(module.model)
       const nestedLabwareId =
         protocolData.commands
           .filter(
             (command): command is LoadLabwareRunTimeCommand =>
-              command.commandType === 'loadLabware' &&
-              !NON_USER_ADDRESSABLE_LABWARE.includes(command.params.loadName)
+              command.commandType === 'loadLabware'
           )
           .find(
             (command: LoadLabwareRunTimeCommand) =>

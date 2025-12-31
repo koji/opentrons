@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+
 import {
   DIRECTION_COLUMN,
   EmptySelectorButton,
   Flex,
+  FLEX_MAX_CONTENT,
   InfoScreen,
   JUSTIFY_FLEX_END,
   Modal,
+  OVERFLOW_AUTO,
   PrimaryButton,
   SecondaryButton,
   SPACING,
@@ -16,7 +19,8 @@ import {
 import { ThermocyclerCycle } from './ThermocyclerCycle'
 import { ThermocyclerStep } from './ThermocyclerStep'
 
-import type { FormData } from '../../../../../../form-types'
+import type { Dispatch, SetStateAction } from 'react'
+import type { FormData } from '/protocol-designer/form-types'
 import type { FieldPropsByName } from '../../types'
 import type { ThermocyclerCycleType } from './ThermocyclerCycle'
 import type { ThermocyclerStepType } from './ThermocyclerStep'
@@ -28,7 +32,7 @@ export type ThermocyclerStepTypeGeneral =
 interface ThermocyclerModalProps {
   formData: FormData
   propsForFields: FieldPropsByName
-  setShowProfileModal: React.Dispatch<React.SetStateAction<boolean>>
+  setShowProfileModal: Dispatch<SetStateAction<boolean>>
 }
 
 export function ThermocyclerProfileModal(
@@ -59,6 +63,7 @@ export function ThermocyclerProfileModal(
 
   return (
     <Modal
+      marginLeft="0"
       zIndexOverlay={11} // toolbox zIndex is set to 10
       title={t('form:step_edit_form.field.thermocyclerProfile.edit')}
       width="45rem"
@@ -89,33 +94,48 @@ export function ThermocyclerProfileModal(
         </Flex>
       }
     >
-      <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing24}>
+      <Flex
+        flexDirection={DIRECTION_COLUMN}
+        gridGap={SPACING.spacing24}
+        maxHeight="31.875rem"
+      >
         <Flex justifyContent={JUSTIFY_FLEX_END} gridGap={SPACING.spacing4}>
-          <EmptySelectorButton
-            text={t('form:step_edit_form.field.thermocyclerProfile.add_cycle')}
-            onClick={() => {
-              if (canAddStepOrProfile) {
-                setShowCreateNewCycle(true)
-              }
-            }}
-            textAlignment="left"
-            iconName="plus"
-            disabled={!canAddStepOrProfile}
-          />
-          <EmptySelectorButton
-            text={t('form:step_edit_form.field.thermocyclerProfile.add_step')}
-            onClick={() => {
-              if (canAddStepOrProfile) {
-                setShowCreateNewStep(true)
-              }
-            }}
-            textAlignment="left"
-            iconName="plus"
-            disabled={!canAddStepOrProfile}
-          />
+          <Flex width={FLEX_MAX_CONTENT}>
+            <EmptySelectorButton
+              text={t(
+                'form:step_edit_form.field.thermocyclerProfile.add_cycle'
+              )}
+              onClick={() => {
+                if (canAddStepOrProfile) {
+                  setShowCreateNewCycle(true)
+                }
+              }}
+              textAlignment="left"
+              iconName="plus"
+              disabled={!canAddStepOrProfile}
+            />
+          </Flex>
+          <Flex width={FLEX_MAX_CONTENT}>
+            <EmptySelectorButton
+              text={t('form:step_edit_form.field.thermocyclerProfile.add_step')}
+              onClick={() => {
+                if (canAddStepOrProfile) {
+                  setShowCreateNewStep(true)
+                }
+              }}
+              textAlignment="left"
+              iconName="plus"
+              disabled={!canAddStepOrProfile}
+            />
+          </Flex>
         </Flex>
         {steps.length > 0 || showCreateNewStep || showCreateNewCycle ? (
-          <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing4}>
+          <Flex
+            flexDirection={DIRECTION_COLUMN}
+            gridGap={SPACING.spacing4}
+            maxHeight="28.375rem"
+            overflowY={OVERFLOW_AUTO}
+          >
             {steps.map(step => {
               return step.type === 'profileStep' ? (
                 <ThermocyclerStep

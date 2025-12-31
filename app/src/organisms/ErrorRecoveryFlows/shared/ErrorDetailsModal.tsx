@@ -1,39 +1,41 @@
-import * as React from 'react'
-import { useTranslation } from 'react-i18next'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
 import { css } from 'styled-components'
 
 import {
-  Flex,
-  StyledText,
-  SPACING,
-  COLORS,
-  ModalShell,
-  ModalHeader,
   BORDERS,
+  COLORS,
   DIRECTION_COLUMN,
+  Flex,
+  InlineNotification,
+  ModalHeader,
+  ModalShell,
+  SPACING,
+  StyledText,
 } from '@opentrons/components'
 
-import { useErrorName } from '../hooks'
-import { OddModal } from '/app/molecules/OddModal'
 import { getModalPortalEl, getTopPortalEl } from '/app/App/portal'
-import { ERROR_KINDS } from '../constants'
-import { InlineNotification } from '/app/atoms/InlineNotification'
-import { StepInfo } from './StepInfo'
-import { getErrorKind } from '../utils'
+import { OddModal } from '/app/molecules/OddModal'
 
-import type { LabwareDefinition2, RobotType } from '@opentrons/shared-data'
+import { ERROR_KINDS } from '../constants'
+import { useErrorName } from '../hooks'
+import { getErrorKind } from '../utils'
+import { StepInfo } from './StepInfo'
+
+import type { ReactNode } from 'react'
 import type { IconProps } from '@opentrons/components'
+import type { LabwareDefinition, RobotType } from '@opentrons/shared-data'
 import type { OddModalHeaderBaseProps } from '/app/molecules/OddModal/types'
-import type { ERUtilsResults, useRetainedFailedCommandBySource } from '../hooks'
 import type { ErrorRecoveryFlowsProps } from '..'
+import type { ERUtilsResults, useRetainedFailedCommandBySource } from '../hooks'
 import type { DesktopSizeType, ErrorKind } from '../types'
 
 export function useErrorDetailsModal(): {
   showModal: boolean
   toggleModal: () => void
 } {
-  const [showModal, setShowModal] = React.useState(false)
+  const [showModal, setShowModal] = useState(false)
 
   const toggleModal = (): void => {
     setShowModal(!showModal)
@@ -44,7 +46,7 @@ export function useErrorDetailsModal(): {
 
 type ErrorDetailsModalProps = Omit<
   ErrorRecoveryFlowsProps,
-  'failedCommandByRunRecord'
+  'unvalidatedFailedCommand'
 > &
   ERUtilsResults & {
     toggleModal: () => void
@@ -52,12 +54,12 @@ type ErrorDetailsModalProps = Omit<
     robotType: RobotType
     desktopType: DesktopSizeType
     failedCommand: ReturnType<typeof useRetainedFailedCommandBySource>
-    allRunDefs: LabwareDefinition2[]
+    allRunDefs: LabwareDefinition[]
   }
 
 export function ErrorDetailsModal(props: ErrorDetailsModalProps): JSX.Element {
   const { failedCommand, toggleModal, isOnDevice } = props
-  const errorKind = getErrorKind(failedCommand?.byRunRecord ?? null)
+  const errorKind = getErrorKind(failedCommand)
   const errorName = useErrorName(errorKind)
 
   const isNotificationErrorKind = (): boolean => {
@@ -67,6 +69,15 @@ export function ErrorDetailsModal(props: ErrorDetailsModalProps): JSX.Element {
       case ERROR_KINDS.OVERPRESSURE_WHILE_DISPENSING:
       case ERROR_KINDS.TIP_NOT_DETECTED:
       case ERROR_KINDS.GRIPPER_ERROR:
+      case ERROR_KINDS.STALL_OR_COLLISION:
+      case ERROR_KINDS.NO_LIQUID_DETECTED:
+      case ERROR_KINDS.STACKER_STALLED:
+      case ERROR_KINDS.STACKER_HOPPER_EMPTY:
+      case ERROR_KINDS.STACKER_SHUTTLE_EMPTY:
+      case ERROR_KINDS.STACKER_SHUTTLE_MISSING:
+      case ERROR_KINDS.STACKER_SHUTTLE_STORE_EMPTY:
+      case ERROR_KINDS.STACKER_SHUTTLE_OCCUPIED:
+      case ERROR_KINDS.STACKER_HOPPER_OR_SHUTTLE_EMPTY:
         return true
       default:
         return false
@@ -112,7 +123,7 @@ export function ErrorDetailsModal(props: ErrorDetailsModalProps): JSX.Element {
 }
 
 type ErrorDetailsModalType = ErrorDetailsModalProps & {
-  children: React.ReactNode
+  children: ReactNode
   modalHeader: OddModalHeaderBaseProps
   toggleModal: () => void
   desktopType: DesktopSizeType
@@ -122,14 +133,14 @@ export function ErrorDetailsModalDesktop(
   props: ErrorDetailsModalType
 ): JSX.Element {
   const { children, modalHeader, toggleModal, desktopType } = props
-  const { t } = useTranslation('error_recovery')
+  const { t } = useTranslation(['error_recovery', 'branded'])
 
   const buildIcon = (): IconProps => {
     return {
       name: 'information',
       color: COLORS.grey60,
       size: SPACING.spacing20,
-      marginRight: SPACING.spacing8,
+      style: { marginRight: SPACING.spacing8 },
     }
   }
 
@@ -213,6 +224,24 @@ export function NotificationBanner({
         return <TipNotDetectedBanner />
       case ERROR_KINDS.GRIPPER_ERROR:
         return <GripperErrorBanner />
+      case ERROR_KINDS.STALL_OR_COLLISION:
+        return <StallErrorBanner />
+      case ERROR_KINDS.NO_LIQUID_DETECTED:
+        return <NoLiquidDetectedBanner />
+      case ERROR_KINDS.STACKER_STALLED:
+        return <StackerStallErrorBanner />
+      case ERROR_KINDS.STACKER_HOPPER_EMPTY:
+        return <LabwareMissingErrorBanner />
+      case ERROR_KINDS.STACKER_SHUTTLE_EMPTY:
+        return <LabwareMissingOnShuttleErrorBanner />
+      case ERROR_KINDS.STACKER_SHUTTLE_MISSING:
+        return <StackerShuttleMissingErrorBanner />
+      case ERROR_KINDS.STACKER_SHUTTLE_STORE_EMPTY:
+        return <StackerShuttleStoreEmptyErrorBanner />
+      case ERROR_KINDS.STACKER_SHUTTLE_OCCUPIED:
+        return <StackerShuttleOccupiedErrorBanner />
+      case ERROR_KINDS.STACKER_HOPPER_OR_SHUTTLE_EMPTY:
+        return <StackerHopperOrShuttleEmptyErrorBanner />
       default:
         console.error('Handle error kind notification banners explicitly.')
         return <div />
@@ -254,6 +283,114 @@ export function GripperErrorBanner(): JSX.Element {
       type="alert"
       heading={t('gripper_errors_occur_when')}
       message={t('if_issue_persists_gripper_error')}
+    />
+  )
+}
+
+export function StallErrorBanner(): JSX.Element {
+  const { t } = useTranslation('error_recovery')
+
+  return (
+    <InlineNotification
+      type="alert"
+      heading={t('stall_or_collision_detected_when')}
+      message={t('the_robot_must_return_to_home_position')}
+    />
+  )
+}
+
+export function StackerStallErrorBanner(): JSX.Element {
+  const { t } = useTranslation('error_recovery')
+
+  return (
+    <InlineNotification
+      type="alert"
+      heading={t('stall_or_collision_detected_when')}
+      message={t('clear_obstructions_before_proceeding')}
+    />
+  )
+}
+
+export function LabwareMissingErrorBanner(): JSX.Element {
+  const { t } = useTranslation('error_recovery')
+
+  return (
+    <InlineNotification
+      type="alert"
+      heading={t('labware_missing_detected_when')}
+      message={t('load_stacker_with_correct_labware')}
+    />
+  )
+}
+
+export function StackerShuttleMissingErrorBanner(): JSX.Element {
+  const { t } = useTranslation('error_recovery')
+
+  return (
+    <InlineNotification
+      type="alert"
+      heading={t('stacker_shuttle_missing_error_occurs_when')}
+      message={t('load_stacker_shuttle_to_proceed')}
+    />
+  )
+}
+
+export function StackerShuttleStoreEmptyErrorBanner(): JSX.Element {
+  const { t } = useTranslation('error_recovery')
+
+  return (
+    <InlineNotification
+      type="alert"
+      heading={t('stacker_shuttle_store_empty_error_occurs_when')}
+      message={t('load_labware_shuttle_to_proceed')}
+    />
+  )
+}
+
+export function StackerShuttleOccupiedErrorBanner(): JSX.Element {
+  const { t } = useTranslation('error_recovery')
+
+  return (
+    <InlineNotification
+      type="alert"
+      heading={t('stacker_shuttle_occupied_error_occurs_when')}
+      message={t('remove_labware_from_shuttle_to_proceed')}
+    />
+  )
+}
+
+export function StackerHopperOrShuttleEmptyErrorBanner(): JSX.Element {
+  const { t } = useTranslation('error_recovery')
+
+  return (
+    <InlineNotification
+      type="alert"
+      heading={t('stacker_hopper_or_shuttle_empty_error_occurs_when')}
+      message={t('troubleshoot_issue_complete_retrieve_step')}
+    />
+  )
+}
+
+export function LabwareMissingOnShuttleErrorBanner(): JSX.Element {
+  const { t } = useTranslation('error_recovery')
+
+  return (
+    <InlineNotification
+      type="alert"
+      heading={t('stacker_latch_jammed_errors_occur_when')}
+      message={t('branded:if_issue_persists_call_support')}
+    />
+  )
+}
+
+export function NoLiquidDetectedBanner(): JSX.Element {
+  const { t } = useTranslation('error_recovery')
+
+  return (
+    <InlineNotification
+      type="alert"
+      heading={t('droplets_or_liquid_cause_failure')}
+      message={t('use_dry_unused_tips')}
     />
   )
 }

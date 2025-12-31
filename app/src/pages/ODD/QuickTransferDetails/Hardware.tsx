@@ -1,22 +1,24 @@
 import { useTranslation } from 'react-i18next'
 import styled from 'styled-components'
+
 import {
   ALIGN_CENTER,
   BORDERS,
   COLORS,
-  DeckInfoLabel,
   Flex,
-  ModuleIcon,
-  SPACING,
   LegacyStyledText,
+  ModuleIcon,
+  RobotInfoLabel,
+  SPACING,
   TYPOGRAPHY,
   WRAP,
 } from '@opentrons/components'
 import {
   getCutoutDisplayName,
+  getFixtureDisplayName,
+  getModuleDeckLabel,
   getModuleDisplayName,
   getModuleType,
-  getFixtureDisplayName,
   GRIPPER_V1_2,
   MAGNETIC_BLOCK_FIXTURES,
   MAGNETIC_BLOCK_TYPE,
@@ -28,11 +30,11 @@ import {
 } from '/app/local-resources/instruments'
 import { useRequiredProtocolHardware } from '/app/resources/protocols'
 
+import type { TFunction } from 'i18next'
 import type {
   ProtocolHardware,
   ProtocolPipette,
 } from '/app/transformations/commands'
-import type { TFunction } from 'i18next'
 
 const Table = styled('table')`
   ${TYPOGRAPHY.labelRegular}
@@ -83,7 +85,10 @@ const getHardwareLocation = (
 
 // convert to anon
 
-const useHardwareName = (protocolHardware: ProtocolHardware): string => {
+const useHardwareName = (
+  protocolHardware: ProtocolHardware,
+  t: TFunction
+): string => {
   const gripperDisplayName = useGripperDisplayName(GRIPPER_V1_2)
 
   const pipetteDisplayName =
@@ -97,7 +102,7 @@ const useHardwareName = (protocolHardware: ProtocolHardware): string => {
   } else if (protocolHardware.hardwareType === 'module') {
     return getModuleDisplayName(protocolHardware.moduleModel)
   } else {
-    return getFixtureDisplayName(protocolHardware.cutoutFixtureId)
+    return getFixtureDisplayName(t, protocolHardware.cutoutFixtureId)
   }
 }
 
@@ -106,20 +111,30 @@ function HardwareItem({
 }: {
   hardware: ProtocolHardware
 }): JSX.Element {
-  const { t, i18n } = useTranslation('protocol_details')
+  const { t, i18n } = useTranslation(['protocol_details', 'deck_configuration'])
 
-  const hardwareName = useHardwareName(hardware)
+  const hardwareName = useHardwareName(hardware, t as TFunction)
 
   let location: JSX.Element = (
-    <LegacyStyledText as="p" fontWeight={TYPOGRAPHY.fontWeightSemiBold}>
+    <LegacyStyledText
+      forwardedAs="p"
+      fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+    >
       {i18n.format(getHardwareLocation(hardware, t as TFunction), 'titleCase')}
     </LegacyStyledText>
   )
   if (hardware.hardwareType === 'module') {
-    location = <DeckInfoLabel deckLabel={hardware.slot} />
+    location = (
+      <RobotInfoLabel
+        deckLabel={getModuleDeckLabel(
+          getModuleType(hardware.moduleModel),
+          hardware.slot
+        )}
+      />
+    )
   } else if (hardware.hardwareType === 'fixture') {
     location = (
-      <DeckInfoLabel
+      <RobotInfoLabel
         deckLabel={getCutoutDisplayName(hardware.location.cutout)}
       />
     )
@@ -151,7 +166,7 @@ function HardwareItem({
               <ModuleIcon moduleType={iconModuleType} size="1.75rem" />
             </Flex>
           ) : null}
-          <LegacyStyledText as="p">{hardwareName}</LegacyStyledText>
+          <LegacyStyledText forwardedAs="p">{hardwareName}</LegacyStyledText>
         </Flex>
       </TableDatum>
     </TableRow>

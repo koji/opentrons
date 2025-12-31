@@ -1,13 +1,18 @@
-import type * as React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import '@testing-library/jest-dom/vitest'
-import { renderWithProviders } from '/app/__testing-utils__'
+
 import { fireEvent, screen } from '@testing-library/react'
+
+import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
+
 import { ConnectionTroubleshootingModal } from '../ConnectionTroubleshootingModal'
 
+import type { ComponentProps } from 'react'
+
 const render = (
-  props: React.ComponentProps<typeof ConnectionTroubleshootingModal>
+  props: ComponentProps<typeof ConnectionTroubleshootingModal>
 ) => {
   return renderWithProviders(<ConnectionTroubleshootingModal {...props} />, {
     i18nInstance: i18n,
@@ -15,7 +20,7 @@ const render = (
 }
 
 describe('ConnectionTroubleshootingModal', () => {
-  let props: React.ComponentProps<typeof ConnectionTroubleshootingModal>
+  let props: ComponentProps<typeof ConnectionTroubleshootingModal>
   beforeEach(() => {
     props = {
       onClose: vi.fn(),

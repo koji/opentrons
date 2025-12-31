@@ -1,10 +1,11 @@
-import { useState, useRef } from 'react'
-import last from 'lodash/last'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from 'react-query'
-import { deleteProtocol, deleteRun, getProtocol } from '@opentrons/api-client'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate, useParams } from 'react-router-dom'
+import last from 'lodash/last'
+
+import { deleteProtocol, deleteRun, getProtocol } from '@opentrons/api-client'
 import {
   ALIGN_CENTER,
   BORDERS,
@@ -17,13 +18,13 @@ import {
   Icon,
   JUSTIFY_CENTER,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   OVERFLOW_WRAP_ANYWHERE,
   POSITION_STICKY,
   SPACING,
-  LegacyStyledText,
+  Tabs,
   truncateString,
   TYPOGRAPHY,
-  Tabs,
 } from '@opentrons/components'
 import {
   useCreateRunMutation,
@@ -31,36 +32,34 @@ import {
   useProtocolAnalysisAsDocumentQuery,
   useProtocolQuery,
 } from '@opentrons/react-api-client'
+
 import { MAXIMUM_PINNED_PROTOCOLS } from '/app/App/constants'
 import { MediumButton, SmallButton } from '/app/atoms/buttons'
+import { useScrollPosition } from '/app/local-resources/dom-utils'
+import { OddModal, SmallModalChildren } from '/app/molecules/OddModal'
 import {
   ProtocolDetailsHeaderChipSkeleton,
-  ProcotolDetailsHeaderTitleSkeleton,
+  ProtocolDetailsHeaderTitleSkeleton,
   ProtocolDetailsSectionContentSkeleton,
 } from '/app/organisms/ODD/ProtocolDetails'
-import { useHardwareStatusText } from '/app/organisms/ODD/RobotDashboard/hooks'
-import { OddModal, SmallModalChildren } from '/app/molecules/OddModal'
-import { useToaster } from '/app/organisms/ToasterOven'
-import {
-  getApplyHistoricOffsets,
-  getPinnedProtocolIds,
-  updateConfigValue,
-} from '/app/redux/config'
-import { useOffsetCandidatesForAnalysis } from '/app/organisms/ApplyHistoricOffsets/hooks/useOffsetCandidatesForAnalysis'
-import { useRunTimeParameters } from '/app/resources/protocols'
-import { useMissingProtocolHardware } from '/app/transformations/commands'
 import { ProtocolSetupParameters } from '/app/organisms/ODD/ProtocolSetup/ProtocolSetupParameters'
-import { Parameters } from './Parameters'
+import { useHardwareStatusText } from '/app/organisms/ODD/RobotDashboard/hooks'
+import { useToaster } from '/app/organisms/ToasterOven'
+import { getPinnedProtocolIds, updateConfigValue } from '/app/redux/config'
+import { useRunTimeParameters } from '/app/resources/protocols'
+import { formatTimeWithUtcLabel } from '/app/resources/runs'
+import { useMissingProtocolHardware } from '/app/transformations/commands'
+
 import { Deck } from './Deck'
 import { Hardware } from './Hardware'
 import { Labware } from './Labware'
 import { Liquids } from './Liquids'
-import { formatTimeWithUtcLabel } from '/app/resources/runs'
+import { Parameters } from './Parameters'
 
 import type { Protocol } from '@opentrons/api-client'
+import type { OnDeviceRouteParams } from '/app/App/types'
 import type { OddModalHeaderBaseProps } from '/app/molecules/OddModal/types'
 import type { Dispatch } from '/app/redux/types'
-import type { OnDeviceRouteParams } from '/app/App/types'
 
 interface ProtocolHeaderProps {
   title?: string | null
@@ -135,7 +134,7 @@ const ProtocolHeader = ({
           </Flex>
           {!isProtocolFetching ? (
             <LegacyStyledText
-              as="h2"
+              forwardedAs="h2"
               fontWeight={TYPOGRAPHY.fontWeightBold}
               onClick={toggleTruncate}
               overflowWrap={OVERFLOW_WRAP_ANYWHERE}
@@ -143,7 +142,7 @@ const ProtocolHeader = ({
               {displayedTitle}
             </LegacyStyledText>
           ) : (
-            <ProcotolDetailsHeaderTitleSkeleton />
+            <ProtocolDetailsHeaderTitleSkeleton />
           )}
         </Flex>
       </Flex>
@@ -163,24 +162,24 @@ const ProtocolHeader = ({
 }
 
 const protocolSectionTabOptions = [
-  'Summary',
-  'Parameters',
-  'Hardware',
-  'Labware',
-  'Liquids',
-  'Deck',
+  'summary',
+  'parameters',
+  'hardware',
+  'labware',
+  'liquids',
+  'deck',
 ] as const
 const protocolSectionTabOptionsWithoutParameters = [
-  'Summary',
-  'Hardware',
-  'Labware',
-  'Liquids',
-  'Deck',
+  'summary',
+  'hardware',
+  'labware',
+  'liquids',
+  'deck',
 ] as const
 
 type TabOption =
-  | typeof protocolSectionTabOptions[number]
-  | typeof protocolSectionTabOptionsWithoutParameters[number]
+  | (typeof protocolSectionTabOptions)[number]
+  | (typeof protocolSectionTabOptionsWithoutParameters)[number]
 
 interface ProtocolSectionTabsProps {
   currentOption: TabOption
@@ -191,11 +190,12 @@ const ProtocolSectionTabs = ({
   currentOption,
   setCurrentOption,
 }: ProtocolSectionTabsProps): JSX.Element => {
+  const { t, i18n } = useTranslation('protocol_details')
   return (
     <Flex gridGap={SPACING.spacing8}>
       <Tabs
         tabs={protocolSectionTabOptions.map(option => ({
-          text: option,
+          text: i18n.format(t(option), 'capitalize'),
           onClick: () => {
             setCurrentOption(option)
           },
@@ -222,15 +222,18 @@ const Summary = ({ author, description, date }: SummaryProps): JSX.Element => {
         gridGap={SPACING.spacing4}
       >
         <LegacyStyledText
-          as="p"
+          forwardedAs="p"
           fontWeight={TYPOGRAPHY.fontWeightSemiBold}
         >{`${i18n.format(t('author'), 'capitalize')}: `}</LegacyStyledText>
-        <LegacyStyledText as="p" fontWeight={TYPOGRAPHY.fontWeightSemiBold}>
+        <LegacyStyledText
+          forwardedAs="p"
+          fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+        >
           {author}
         </LegacyStyledText>
       </Flex>
       <LegacyStyledText
-        as="p"
+        forwardedAs="p"
         color={description === null ? COLORS.grey60 : undefined}
         overflowWrap={OVERFLOW_WRAP_ANYWHERE}
       >
@@ -243,7 +246,7 @@ const Summary = ({ author, description, date }: SummaryProps): JSX.Element => {
         width="max-content"
         padding={`${SPACING.spacing8} ${SPACING.spacing12}`}
       >
-        <LegacyStyledText as="p">{`${t('protocol_info:date_added')}: ${
+        <LegacyStyledText forwardedAs="p">{`${t('protocol_info:date_added')}: ${
           date != null ? formatTimeWithUtcLabel(date) : t('shared:no_data')
         }`}</LegacyStyledText>
       </Flex>
@@ -265,7 +268,7 @@ const ProtocolSectionContent = ({
 
   let protocolSection: JSX.Element | null = null
   switch (currentOption) {
-    case 'Summary':
+    case 'summary':
       protocolSection = (
         <Summary
           author={protocolData.data.metadata.author ?? null}
@@ -274,26 +277,26 @@ const ProtocolSectionContent = ({
         />
       )
       break
-    case 'Parameters':
+    case 'parameters':
       protocolSection = <Parameters protocolId={protocolId} />
       break
-    case 'Hardware':
+    case 'hardware':
       protocolSection = <Hardware protocolId={protocolId} />
       break
-    case 'Labware':
+    case 'labware':
       protocolSection = <Labware protocolId={protocolId} />
       break
-    case 'Liquids':
+    case 'liquids':
       protocolSection = <Liquids protocolId={protocolId} />
       break
-    case 'Deck':
+    case 'deck':
       protocolSection = <Deck protocolId={protocolId} />
       break
   }
   return (
     <Flex
       paddingTop={SPACING.spacing32}
-      justifyContent={currentOption === 'Deck' ? JUSTIFY_CENTER : undefined}
+      justifyContent={currentOption === 'deck' ? JUSTIFY_CENTER : undefined}
     >
       {protocolSection}
     </Flex>
@@ -309,10 +312,8 @@ export function ProtocolDetails(): JSX.Element | null {
   const { protocolId } = useParams<
     keyof OnDeviceRouteParams
   >() as OnDeviceRouteParams
-  const {
-    missingProtocolHardware,
-    conflictedSlots,
-  } = useMissingProtocolHardware(protocolId)
+  const { missingProtocolHardware, conflictedSlots } =
+    useMissingProtocolHardware(protocolId)
   let chipText = useHardwareStatusText(missingProtocolHardware, conflictedSlots)
 
   const runTimeParameters = useRunTimeParameters(protocolId)
@@ -327,46 +328,22 @@ export function ProtocolDetails(): JSX.Element | null {
   )
 
   const [showMaxPinsAlert, setShowMaxPinsAlert] = useState<boolean>(false)
-  const {
-    data: protocolRecord,
-    isLoading: isProtocolFetching,
-  } = useProtocolQuery(protocolId, {
-    staleTime: Infinity,
-  })
+  const { data: protocolRecord, isLoading: isProtocolFetching } =
+    useProtocolQuery(protocolId, {
+      staleTime: Infinity,
+    })
 
   // Watch for scrolling to toggle dropshadow
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const [isScrolled, setIsScrolled] = useState<boolean>(false)
-  const observer = new IntersectionObserver(([entry]) => {
-    setIsScrolled(!entry.isIntersecting)
-  })
-  if (scrollRef.current != null) {
-    observer.observe(scrollRef.current)
-  }
+  const { scrollRef, isScrolled } = useScrollPosition()
 
   let pinnedProtocolIds = useSelector(getPinnedProtocolIds) ?? []
   const pinned = pinnedProtocolIds.includes(protocolId)
 
-  const {
-    data: mostRecentAnalysis,
-  } = useProtocolAnalysisAsDocumentQuery(
+  const { data: mostRecentAnalysis } = useProtocolAnalysisAsDocumentQuery(
     protocolId,
     last(protocolRecord?.data.analysisSummaries)?.id ?? null,
     { enabled: protocolRecord != null }
   )
-
-  const shouldApplyOffsets = useSelector(getApplyHistoricOffsets)
-  // I'd love to skip scraping altogether if we aren't applying
-  // conditional offsets, but React won't let us use hooks conditionally.
-  // So, we'll scrape regardless and just toss them if we don't need them.
-  const scrapedLabwareOffsets = useOffsetCandidatesForAnalysis(
-    mostRecentAnalysis ?? null
-  ).map(({ vector, location, definitionUri }) => ({
-    vector,
-    location,
-    definitionUri,
-  }))
-  const labwareOffsets = shouldApplyOffsets ? scrapedLabwareOffsets : []
 
   const { createRun } = useCreateRunMutation({
     onSuccess: data => {
@@ -405,12 +382,10 @@ export function ProtocolDetails(): JSX.Element | null {
   const handleRunProtocol = (): void => {
     runTimeParameters.length > 0
       ? setShowParameters(true)
-      : createRun({ protocolId, labwareOffsets })
+      : createRun({ protocolId })
   }
-  const [
-    showConfirmDeleteProtocol,
-    setShowConfirmationDeleteProtocol,
-  ] = useState<boolean>(false)
+  const [showConfirmDeleteProtocol, setShowConfirmationDeleteProtocol] =
+    useState<boolean>(false)
 
   const handleDeleteClick = (): void => {
     setShowConfirmationDeleteProtocol(false)
@@ -440,8 +415,8 @@ export function ProtocolDetails(): JSX.Element | null {
 
   const displayName =
     !isProtocolFetching && protocolRecord != null
-      ? protocolRecord?.data.metadata.protocolName ??
-        protocolRecord?.data.files[0].name
+      ? (protocolRecord?.data.metadata.protocolName ??
+        protocolRecord?.data.files[0].name)
       : null
 
   const deleteModalHeader: OddModalHeaderBaseProps = {
@@ -452,7 +427,6 @@ export function ProtocolDetails(): JSX.Element | null {
   return showParameters ? (
     <ProtocolSetupParameters
       protocolId={protocolId}
-      labwareOffsets={labwareOffsets}
       runTimeParameters={runTimeParameters}
       mostRecentAnalysis={mostRecentAnalysis}
     />
@@ -470,7 +444,7 @@ export function ProtocolDetails(): JSX.Element | null {
             >
               <Flex flexDirection={DIRECTION_COLUMN} width="100%">
                 <LegacyStyledText
-                  as="h4"
+                  forwardedAs="h4"
                   fontWeight={TYPOGRAPHY.fontWeightRegular}
                   marginBottom={SPACING.spacing40}
                 >

@@ -6,7 +6,7 @@ import json
 import textwrap
 import mock
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Generator, List, TextIO, cast
+from typing import TYPE_CHECKING, Any, Callable, Generator, List, TextIO, cast, Iterator
 
 import pytest
 from _pytest.fixtures import SubRequest
@@ -30,6 +30,16 @@ if TYPE_CHECKING:
 
 
 HERE = Path(__file__).parent
+
+
+@pytest.fixture(autouse=True)
+def clean_up_hw() -> Iterator[None]:
+    """Make sure hardware objects are cleaned up."""
+    yield
+    execute._LIVE_PROTOCOL_ENGINE_CONTEXTS.close()
+    if execute._THREAD_MANAGED_HW is not None:
+        execute._THREAD_MANAGED_HW.clean_up()
+        execute._THREAD_MANAGED_HW = None
 
 
 @pytest.fixture(params=[APIVersion(2, 0), ENGINE_CORE_API_VERSION])
@@ -131,6 +141,7 @@ def test_execute_function_apiv2(
             converted_model_v15.pipette_type,
             converted_model_v15.pipette_channels,
             converted_model_v15.pipette_version,
+            converted_model_v15.oem_type,
         ),
         "id": "testid",
     }
@@ -139,6 +150,7 @@ def test_execute_function_apiv2(
             converted_model_v1.pipette_type,
             converted_model_v1.pipette_channels,
             converted_model_v1.pipette_version,
+            converted_model_v1.oem_type,
         ),
         "id": "testid2",
     }
@@ -177,6 +189,7 @@ def test_execute_function_json_v3(
             converted_model_v15.pipette_type,
             converted_model_v15.pipette_channels,
             converted_model_v15.pipette_version,
+            converted_model_v15.oem_type,
         ),
         "id": "testid",
     }
@@ -187,7 +200,7 @@ def test_execute_function_json_v3(
         "Delaying for 0 minutes and 42.0 seconds",
         "Dispensing 4.5 uL into B1 of Dest Plate on 3 at 2.5 uL/sec",
         "Touching tip",
-        "Blowing out at B1 of Dest Plate on 3",
+        "Blowing out into B1 of Dest Plate on 3 at 2.0 uL/sec",
         "Moving to 5",
         "Dropping tip into A1 of Trash on 12",
     ]
@@ -215,6 +228,7 @@ def test_execute_function_json_v4(
             converted_model_v15.pipette_type,
             converted_model_v15.pipette_channels,
             converted_model_v15.pipette_version,
+            converted_model_v15.oem_type,
         ),
         "id": "testid",
     }
@@ -225,7 +239,7 @@ def test_execute_function_json_v4(
         "Delaying for 0 minutes and 42.0 seconds",
         "Dispensing 4.5 uL into B1 of Dest Plate on 3 at 2.5 uL/sec",
         "Touching tip",
-        "Blowing out at B1 of Dest Plate on 3",
+        "Blowing out into B1 of Dest Plate on 3 at 2.0 uL/sec",
         "Moving to 5",
         "Dropping tip into A1 of Trash on 12",
     ]
@@ -253,6 +267,7 @@ def test_execute_function_json_v5(
             converted_model_v15.pipette_type,
             converted_model_v15.pipette_channels,
             converted_model_v15.pipette_version,
+            converted_model_v15.oem_type,
         ),
         "id": "testid",
     }
@@ -263,7 +278,7 @@ def test_execute_function_json_v5(
         "Delaying for 0 minutes and 42.0 seconds",
         "Dispensing 4.5 uL into B1 of Dest Plate on 3 at 2.5 uL/sec",
         "Touching tip",
-        "Blowing out at B1 of Dest Plate on 3",
+        "Blowing out into B1 of Dest Plate on 3 at 2.0 uL/sec",
         "Moving to 5",
         "Moving to B2 of Dest Plate on 3",
         "Moving to B2 of Dest Plate on 3",
@@ -292,6 +307,7 @@ def test_execute_function_bundle_apiv2(
             converted_model_v15.pipette_type,
             converted_model_v15.pipette_channels,
             converted_model_v15.pipette_version,
+            converted_model_v15.oem_type,
         ),
         "id": "testid",
     }
@@ -303,18 +319,18 @@ def test_execute_function_bundle_apiv2(
     assert [item["payload"]["text"] for item in entries if item["$"] == "before"] == [
         "Transferring 1.0 from A1 of FAKE example labware on 1 to A4 of FAKE example labware on 1",
         "Picking up tip from A1 of Opentrons OT-2 96 Tip Rack 10 µL on 3",
-        "Aspirating 1.0 uL from A1 of FAKE example labware on 1 at" " 5.0 uL/sec",
-        "Dispensing 1.0 uL into A4 of FAKE example labware on 1 at" " 10.0 uL/sec",
+        "Aspirating 1.0 uL from A1 of FAKE example labware on 1 at 5.0 uL/sec",
+        "Dispensing 1.0 uL into A4 of FAKE example labware on 1 at 10.0 uL/sec",
         "Dropping tip into A1 of Opentrons Fixed Trash on 12",
         "Transferring 2.0 from A1 of FAKE example labware on 1 to A4 of FAKE example labware on 1",
         "Picking up tip from B1 of Opentrons OT-2 96 Tip Rack 10 µL on 3",
         "Aspirating 2.0 uL from A1 of FAKE example labware on 1 at 5.0 uL/sec",
-        "Dispensing 2.0 uL into A4 of FAKE example labware on 1 at" " 10.0 uL/sec",
+        "Dispensing 2.0 uL into A4 of FAKE example labware on 1 at 10.0 uL/sec",
         "Dropping tip into A1 of Opentrons Fixed Trash on 12",
         "Transferring 3.0 from A1 of FAKE example labware on 1 to A4 of FAKE example labware on 1",
         "Picking up tip from C1 of Opentrons OT-2 96 Tip Rack 10 µL on 3",
         "Aspirating 3.0 uL from A1 of FAKE example labware on 1 at 5.0 uL/sec",
-        "Dispensing 3.0 uL into A4 of FAKE example labware on 1 at" " 10.0 uL/sec",
+        "Dispensing 3.0 uL into A4 of FAKE example labware on 1 at 10.0 uL/sec",
         "Dropping tip into A1 of Opentrons Fixed Trash on 12",
     ]
 

@@ -8,6 +8,7 @@ disk into the runner, and the protocols are run to completion. From
 there, the ProtocolEngine state is inspected to check that
 everything was loaded and run as expected.
 """
+
 from datetime import datetime
 from decoy import matchers
 from pathlib import Path
@@ -58,13 +59,13 @@ async def test_runner_with_python(
     pipette_id_captor = matchers.Captor()
     labware_id_captor = matchers.Captor()
 
-    expected_pipette = LoadedPipette.construct(
+    expected_pipette = LoadedPipette.model_construct(
         id=pipette_id_captor,
         pipetteName=PipetteNameType.P300_SINGLE,
         mount=MountType.LEFT,
     )
 
-    expected_labware = LoadedLabware.construct(
+    expected_labware = LoadedLabware.model_construct(
         id=labware_id_captor,
         location=DeckSlotLocation(slotName=DeckSlotName.SLOT_1),
         loadName="opentrons_96_tiprack_300ul",
@@ -75,7 +76,7 @@ async def test_runner_with_python(
         offsetId=None,
     )
 
-    expected_module = LoadedModule.construct(
+    expected_module = LoadedModule.model_construct(
         id=matchers.IsA(str),
         model=ModuleModel.TEMPERATURE_MODULE_V1,
         location=DeckSlotLocation(slotName=DeckSlotName.SLOT_3),
@@ -86,7 +87,7 @@ async def test_runner_with_python(
     assert expected_labware in labware_result
     assert expected_module in modules_result
 
-    expected_command = commands.PickUpTip.construct(
+    expected_command = commands.PickUpTip.model_construct(
         id=matchers.IsA(str),
         key=matchers.IsA(str),
         status=commands.CommandStatus.SUCCEEDED,
@@ -108,6 +109,7 @@ async def test_runner_with_python(
     )
 
     assert expected_command in commands_result
+    await subject.finish()
 
 
 async def test_runner_with_json(json_protocol_file: Path) -> None:
@@ -148,7 +150,7 @@ async def test_runner_with_json(json_protocol_file: Path) -> None:
     assert expected_pipette in pipettes_result
     assert expected_labware in labware_result
 
-    expected_command = commands.PickUpTip.construct(
+    expected_command = commands.PickUpTip.model_construct(
         id=matchers.IsA(str),
         key=matchers.IsA(str),
         status=commands.CommandStatus.SUCCEEDED,
@@ -170,6 +172,7 @@ async def test_runner_with_json(json_protocol_file: Path) -> None:
     )
 
     assert expected_command in commands_result
+    await subject.finish()
 
 
 async def test_runner_with_legacy_python(legacy_python_protocol_file: Path) -> None:
@@ -196,13 +199,13 @@ async def test_runner_with_legacy_python(legacy_python_protocol_file: Path) -> N
     pipette_id_captor = matchers.Captor()
     labware_id_captor = matchers.Captor()
 
-    expected_pipette = LoadedPipette.construct(
+    expected_pipette = LoadedPipette.model_construct(
         id=pipette_id_captor,
         pipetteName=PipetteNameType.P300_SINGLE,
         mount=MountType.LEFT,
     )
 
-    expected_labware = LoadedLabware.construct(
+    expected_labware = LoadedLabware.model_construct(
         id=labware_id_captor,
         location=DeckSlotLocation(slotName=DeckSlotName.SLOT_1),
         loadName="opentrons_96_tiprack_300ul",
@@ -215,7 +218,7 @@ async def test_runner_with_legacy_python(legacy_python_protocol_file: Path) -> N
     assert expected_pipette in pipettes_result
     assert expected_labware in labware_result
 
-    expected_command = commands.PickUpTip.construct(
+    expected_command = commands.PickUpTip.model_construct(
         id=matchers.IsA(str),
         key=matchers.IsA(str),
         status=commands.CommandStatus.SUCCEEDED,
@@ -234,6 +237,7 @@ async def test_runner_with_legacy_python(legacy_python_protocol_file: Path) -> N
     )
 
     assert expected_command in commands_result
+    await subject.finish()
 
 
 async def test_runner_with_legacy_json(legacy_json_protocol_file: Path) -> None:
@@ -260,13 +264,13 @@ async def test_runner_with_legacy_json(legacy_json_protocol_file: Path) -> None:
     pipette_id_captor = matchers.Captor()
     labware_id_captor = matchers.Captor()
 
-    expected_pipette = LoadedPipette.construct(
+    expected_pipette = LoadedPipette.model_construct(
         id=pipette_id_captor,
         pipetteName=PipetteNameType.P300_SINGLE,
         mount=MountType.LEFT,
     )
 
-    expected_labware = LoadedLabware.construct(
+    expected_labware = LoadedLabware.model_construct(
         id=labware_id_captor,
         location=DeckSlotLocation(slotName=DeckSlotName.SLOT_1),
         loadName="opentrons_96_tiprack_300ul",
@@ -280,7 +284,7 @@ async def test_runner_with_legacy_json(legacy_json_protocol_file: Path) -> None:
     assert expected_pipette in pipettes_result
     assert expected_labware in labware_result
 
-    expected_command = commands.PickUpTip.construct(
+    expected_command = commands.PickUpTip.model_construct(
         id=matchers.IsA(str),
         key=matchers.IsA(str),
         status=commands.CommandStatus.SUCCEEDED,
@@ -299,6 +303,7 @@ async def test_runner_with_legacy_json(legacy_json_protocol_file: Path) -> None:
     )
 
     assert expected_command in commands_result
+    await subject.finish()
 
 
 async def test_runner_with_python_and_run_time_parameters(
@@ -327,13 +332,13 @@ async def test_runner_with_python_and_run_time_parameters(
     tiprack_id_captor = matchers.Captor()
     reservoir_id_captor = matchers.Captor()
 
-    expected_pipette = LoadedPipette.construct(
+    expected_pipette = LoadedPipette.model_construct(
         id=pipette_id_captor,
         pipetteName=PipetteNameType.P300_SINGLE,
         mount=MountType.LEFT,
     )
 
-    expected_tiprack = LoadedLabware.construct(
+    expected_tiprack = LoadedLabware.model_construct(
         id=tiprack_id_captor,
         location=DeckSlotLocation(slotName=DeckSlotName.SLOT_1),
         loadName="opentrons_96_tiprack_300ul",
@@ -344,7 +349,7 @@ async def test_runner_with_python_and_run_time_parameters(
         offsetId=None,
     )
 
-    expected_reservoir = LoadedLabware.construct(
+    expected_reservoir = LoadedLabware.model_construct(
         id=reservoir_id_captor,
         location=DeckSlotLocation(slotName=DeckSlotName.SLOT_2),
         loadName="nest_1_reservoir_195ml",
@@ -361,14 +366,14 @@ async def test_runner_with_python_and_run_time_parameters(
 
     assert result.state_summary.status == EngineStatus.SUCCEEDED
 
-    expected_command = commands.Aspirate.construct(
+    expected_command = commands.Aspirate.model_construct(
         id=matchers.IsA(str),
         key=matchers.IsA(str),
         status=commands.CommandStatus.SUCCEEDED,
         createdAt=matchers.IsA(datetime),
         startedAt=matchers.IsA(datetime),
         completedAt=matchers.IsA(datetime),
-        params=commands.AspirateParams.construct(
+        params=commands.AspirateParams.model_construct(
             labwareId=reservoir_id_captor.value,
             wellName=matchers.IsA(str),
             wellLocation=matchers.Anything(),
@@ -381,3 +386,4 @@ async def test_runner_with_python_and_run_time_parameters(
     )
 
     assert expected_command in commands_result
+    await subject.finish()

@@ -8,23 +8,23 @@ import {
   Flex,
   Icon,
   JUSTIFY_SPACE_BETWEEN,
-  Link,
-  SPACING_AUTO,
-  SPACING,
   LegacyStyledText,
+  Link,
+  SPACING,
+  SPACING_AUTO,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
 import { TertiaryButton } from '/app/atoms/buttons'
 import {
+  ANALYTICS_CHANGE_CUSTOM_LABWARE_SOURCE_FOLDER,
+  useTrackEvent,
+} from '/app/redux/analytics'
+import {
   changeCustomLabwareDirectory,
   getCustomLabwareDirectory,
   openCustomLabwareDirectory,
 } from '/app/redux/custom-labware'
-import {
-  useTrackEvent,
-  ANALYTICS_CHANGE_CUSTOM_LABWARE_SOURCE_FOLDER,
-} from '/app/redux/analytics'
 
 import type { Dispatch } from '/app/redux/types'
 
@@ -48,11 +48,11 @@ export function AdditionalCustomLabwareSourceFolder(): JSX.Element {
         >
           {t('additional_labware_folder_title')}
         </LegacyStyledText>
-        <LegacyStyledText as="p" paddingBottom={SPACING.spacing8}>
+        <LegacyStyledText forwardedAs="p" paddingBottom={SPACING.spacing8}>
           {t('additional_folder_description')}
         </LegacyStyledText>
         <LegacyStyledText
-          as="h6"
+          forwardedAs="h6"
           textTransform={TYPOGRAPHY.textTransformUppercase}
           color={COLORS.grey50}
           paddingBottom={SPACING.spacing4}
@@ -75,7 +75,7 @@ export function AdditionalCustomLabwareSourceFolder(): JSX.Element {
             />
           </Link>
         ) : (
-          <LegacyStyledText as="p">{t('no_folder')}</LegacyStyledText>
+          <LegacyStyledText forwardedAs="p">{t('no_folder')}</LegacyStyledText>
         )}
       </Flex>
       {

@@ -1,4 +1,5 @@
-import type { CommonCommandRunTimeInfo, CommonCommandCreateInfo } from '.'
+import type { CommonCommandCreateInfo, CommonCommandRunTimeInfo } from '.'
+
 export type PipettingRunTimeCommand =
   | AspirateRunTimeCommand
   | DispenseRunTimeCommand
@@ -19,8 +20,7 @@ export interface AspirateCreateCommand extends CommonCommandCreateInfo {
   params: AspDispAirgapParams
 }
 export interface AspirateRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    AspirateCreateCommand {
+  extends CommonCommandRunTimeInfo, AspirateCreateCommand {
   result?: BasicLiquidHandlingResult
 }
 export interface DispenseCreateCommand extends CommonCommandCreateInfo {
@@ -28,8 +28,7 @@ export interface DispenseCreateCommand extends CommonCommandCreateInfo {
   params: AspDispAirgapParams
 }
 export interface DispenseRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    DispenseCreateCommand {
+  extends CommonCommandRunTimeInfo, DispenseCreateCommand {
   result?: BasicLiquidHandlingResult
 }
 export interface BlowoutCreateCommand extends CommonCommandCreateInfo {
@@ -37,8 +36,7 @@ export interface BlowoutCreateCommand extends CommonCommandCreateInfo {
   params: BlowoutParams
 }
 export interface BlowoutRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    BlowoutCreateCommand {
+  extends CommonCommandRunTimeInfo, BlowoutCreateCommand {
   result?: BasicLiquidHandlingResult
 }
 export interface TouchTipCreateCommand extends CommonCommandCreateInfo {
@@ -46,8 +44,7 @@ export interface TouchTipCreateCommand extends CommonCommandCreateInfo {
   params: TouchTipParams
 }
 export interface TouchTipRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    TouchTipCreateCommand {
+  extends CommonCommandRunTimeInfo, TouchTipCreateCommand {
   result?: BasicLiquidHandlingResult
 }
 export interface PickUpTipCreateCommand extends CommonCommandCreateInfo {
@@ -55,8 +52,7 @@ export interface PickUpTipCreateCommand extends CommonCommandCreateInfo {
   params: PickUpTipParams
 }
 export interface PickUpTipRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    PickUpTipCreateCommand {
+  extends CommonCommandRunTimeInfo, PickUpTipCreateCommand {
   result?: any
 }
 export interface DropTipCreateCommand extends CommonCommandCreateInfo {
@@ -64,8 +60,7 @@ export interface DropTipCreateCommand extends CommonCommandCreateInfo {
   params: DropTipParams
 }
 export interface DropTipRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    DropTipCreateCommand {
+  extends CommonCommandRunTimeInfo, DropTipCreateCommand {
   result?: any
 }
 

@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { css } from 'styled-components'
+
 import {
   ALIGN_CENTER,
   BORDERS,
@@ -8,12 +9,13 @@ import {
   DIRECTION_ROW,
   Flex,
   JUSTIFY_CENTER,
+  LegacyStyledText,
   SIZE_AUTO,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
 import { getPipetteNameSpecs } from '@opentrons/shared-data'
+
 import type { ProtocolAnalysisOutput } from '@opentrons/shared-data'
 
 interface ProtocolStatsProps {
@@ -54,11 +56,12 @@ export const ProtocolStats = (
   )
   const pipettePickUpStats = Object.entries(pickUpTipCountsByPipetteId).map(
     ([pipetteId, pickUpCount]) => {
-      const pipetteName = analysis.pipettes.find(p => p.id === pipetteId)
-        ?.pipetteName
+      const pipetteName = analysis.pipettes.find(
+        p => p.id === pipetteId
+      )?.pipetteName
       const displayName =
         pipetteName != null
-          ? getPipetteNameSpecs(pipetteName)?.displayName ?? pipetteName
+          ? (getPipetteNameSpecs(pipetteName)?.displayName ?? pipetteName)
           : pipetteId
       return {
         displayName: t('pipette_pick_up_count', { pipette: displayName }),
@@ -79,11 +82,12 @@ export const ProtocolStats = (
   )
   const pipetteAspirateStats = Object.entries(aspirateCountsByPipetteId).map(
     ([pipetteId, pickUpCount]) => {
-      const pipetteName = analysis.pipettes.find(p => p.id === pipetteId)
-        ?.pipetteName
+      const pipetteName = analysis.pipettes.find(
+        p => p.id === pipetteId
+      )?.pipetteName
       const displayName =
         pipetteName != null
-          ? getPipetteNameSpecs(pipetteName)?.displayName ?? pipetteName
+          ? (getPipetteNameSpecs(pipetteName)?.displayName ?? pipetteName)
           : pipetteId
       return {
         displayName: t('pipette_aspirate_count', { pipette: displayName }),
@@ -104,11 +108,12 @@ export const ProtocolStats = (
   )
   const pipetteDispenseStats = Object.entries(dispenseCountsByPipetteId).map(
     ([pipetteId, pickUpCount]) => {
-      const pipetteName = analysis.pipettes.find(p => p.id === pipetteId)
-        ?.pipetteName
+      const pipetteName = analysis.pipettes.find(
+        p => p.id === pipetteId
+      )?.pipetteName
       const displayName =
         pipetteName != null
-          ? getPipetteNameSpecs(pipetteName)?.displayName ?? pipetteName
+          ? (getPipetteNameSpecs(pipetteName)?.displayName ?? pipetteName)
           : pipetteId
       return {
         displayName: t('pipette_dispense_count', { pipette: displayName }),
@@ -176,14 +181,14 @@ export const StatRow = (props: StatRowProps): JSX.Element => {
     <Flex flexDirection={DIRECTION_ROW}>
       <Flex flexDirection={DIRECTION_COLUMN} justifyContent={JUSTIFY_CENTER}>
         <LegacyStyledText
-          as="p"
+          forwardedAs="p"
           fontWeight={TYPOGRAPHY.fontWeightSemiBold}
           marginX={SPACING.spacing16}
         >
           {displayName}
         </LegacyStyledText>
         <LegacyStyledText
-          as="p"
+          forwardedAs="p"
           fontWeight={TYPOGRAPHY.fontWeightRegular}
           color={COLORS.grey50}
           marginX={SPACING.spacing16}
@@ -200,7 +205,10 @@ export const StatRow = (props: StatRowProps): JSX.Element => {
         alignSelf={ALIGN_CENTER}
         marginLeft={SIZE_AUTO}
       >
-        <LegacyStyledText as="p" fontWeight={TYPOGRAPHY.fontWeightRegular}>
+        <LegacyStyledText
+          forwardedAs="p"
+          fontWeight={TYPOGRAPHY.fontWeightRegular}
+        >
           {datum}
         </LegacyStyledText>
       </Flex>

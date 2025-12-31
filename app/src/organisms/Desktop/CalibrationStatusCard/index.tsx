@@ -10,9 +10,9 @@ import {
   Flex,
   JUSTIFY_CENTER,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   Link,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
@@ -84,7 +84,7 @@ export function CalibrationStatusCard({
             iconSize="0.313rem"
           />
         </Flex>
-        <LegacyStyledText as="p">
+        <LegacyStyledText forwardedAs="p">
           {t('calibration_status_description')}
         </LegacyStyledText>
         <Link

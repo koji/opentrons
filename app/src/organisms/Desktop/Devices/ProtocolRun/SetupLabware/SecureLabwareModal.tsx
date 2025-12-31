@@ -1,21 +1,24 @@
 import { createPortal } from 'react-dom'
-import snakeCase from 'lodash/snakeCase'
 import { Trans, useTranslation } from 'react-i18next'
+import snakeCase from 'lodash/snakeCase'
+
 import {
   ALIGN_FLEX_END,
   DIRECTION_COLUMN,
   DIRECTION_ROW,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
+  Modal,
   PrimaryButton,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
-  Modal,
 } from '@opentrons/components'
+
 import { getTopPortalEl } from '/app/App/portal'
 import secureMagModBracketImage from '/app/assets/images/secure_mag_mod_bracket.png'
 import secureTCLatchImage from '/app/assets/images/secure_tc_latch.png'
+
 import { getModuleName } from '../utils/getModuleName'
 
 import type { ModuleTypesThatRequireExtraAttention } from '../utils/getModuleTypesThatRequireExtraAttention'
@@ -53,7 +56,7 @@ export const SecureLabwareModal = (
                 components={{
                   block: (
                     <LegacyStyledText
-                      as="p"
+                      forwardedAs="p"
                       marginBottom={SPACING.spacing4}
                       marginRight="3.625rem"
                     />
@@ -74,7 +77,7 @@ export const SecureLabwareModal = (
             flexDirection={DIRECTION_ROW}
             justifyContent={JUSTIFY_SPACE_BETWEEN}
           >
-            <LegacyStyledText as="p" marginRight="3.625rem">
+            <LegacyStyledText forwardedAs="p" marginRight="3.625rem">
               {t(`branded:secure_labware_explanation_${snakeCase(moduleName)}`)}
             </LegacyStyledText>
             <img

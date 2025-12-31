@@ -1,29 +1,52 @@
-import { getWellRatio } from '../../../../../steplist/utils'
-import type { PathOption, StepType } from '../../../../../form-types'
-import { getPipetteCapacity } from '../../../../../pipettes/pipetteData'
+import round from 'lodash/round'
+
+import { getPipetteWithTipMaxVol } from '@opentrons/step-generation'
+
+import { CHANNELS_MAPPED_TO_MAX_SPEED } from '/protocol-designer/constants'
+import { getPipetteCapacity } from '/protocol-designer/pipettes/pipetteData'
 import {
-  volumeInCapacityForMultiDispense,
   volumeInCapacityForMultiAspirate,
-} from '../../../../../steplist/formLevel/handleFormChange/utils'
+  volumeInCapacityForMultiDispense,
+} from '/protocol-designer/steplist/formLevel/handleFormChange/utils'
+import { getWellRatio } from '/protocol-designer/steplist/utils/getWellRatio'
+
+import type {
+  PipetteChannels,
+  RobotType,
+  SupportedTip,
+} from '@opentrons/shared-data'
 import type {
   ChangeTipOptions,
+  InvariantContext,
   PipetteEntities,
 } from '@opentrons/step-generation'
+import type {
+  FormData,
+  PathOption,
+  StepType,
+} from '/protocol-designer/form-types'
+import type { FlowRateType } from '/protocol-designer/resources/types'
 
 export interface DisabledChangeTipArgs {
   aspirateWells?: string[]
   dispenseWells?: string[]
   stepType?: StepType
   path?: PathOption | null | undefined
+  isDisposalLocation?: boolean
 }
 export const getDisabledChangeTipOptions = (
   args: DisabledChangeTipArgs
 ): Set<ChangeTipOptions> | null | undefined => {
-  const { path, aspirateWells, dispenseWells, stepType } = args
+  const { path, aspirateWells, dispenseWells, stepType, isDisposalLocation } =
+    args
 
   switch (stepType) {
     case 'moveLiquid': {
-      const wellRatio = getWellRatio(aspirateWells, dispenseWells)
+      const wellRatio = getWellRatio(
+        aspirateWells,
+        dispenseWells,
+        isDisposalLocation
+      )
 
       //  ensure wells are selected
       if (wellRatio != null && path === 'single') {
@@ -63,6 +86,7 @@ export interface ValuesForPath {
   pipette?: string | null
   volume?: string | null
   tipRack?: string | null
+  isDisposalLocation?: boolean
 }
 export function getDisabledPathMap(
   values: ValuesForPath,
@@ -76,9 +100,15 @@ export function getDisabledPathMap(
     dispense_wells,
     pipette,
     tipRack,
+    isDisposalLocation,
   } = values
   if (!pipette) return null
-  const wellRatio = getWellRatio(aspirate_wells, dispense_wells)
+  const wellRatio = getWellRatio(
+    aspirate_wells,
+    dispense_wells,
+    isDisposalLocation
+  )
+
   let disabledPathMap: Partial<Record<PathOption, string>> = {}
 
   // changeTip is lowest priority disable reasoning
@@ -117,14 +147,21 @@ export function getDisabledPathMap(
     airGapVolume,
   })
 
-  if (!withinCapacityForMultiDispense) {
+  if (
+    !withinCapacityForMultiDispense &&
+    values.volume != null &&
+    values.volume !== ''
+  ) {
     disabledPathMap = {
       ...disabledPathMap,
       multiDispense: t('step_edit_form.field.path.subtitle.volume_too_high'),
     }
   }
-
-  if (!withinCapacityForMultiAspirate) {
+  if (
+    !withinCapacityForMultiAspirate &&
+    values.volume != null &&
+    values.volume !== ''
+  ) {
     disabledPathMap = {
       ...disabledPathMap,
       multiAspirate: t('step_edit_form.field.path.subtitle.volume_too_high'),
@@ -150,4 +187,129 @@ export function getDisabledPathMap(
     }
   }
   return disabledPathMap
+}
+
+const _getPipetteAccuracyUlPerMm = (args: {
+  targetVolume: number
+  tipLiquidSpecs: SupportedTip
+  flowRateType: Exclude<FlowRateType, 'blowout'>
+}): number => {
+  const { targetVolume, tipLiquidSpecs, flowRateType } = args
+
+  const flowRateFunction = tipLiquidSpecs[flowRateType].default['1']
+  let pipetteAccuracyUlPerMm = null
+  for (let i = 0; i < flowRateFunction.length; i++) {
+    const [x, y, z] = flowRateFunction[i]
+    if (targetVolume <= x) {
+      pipetteAccuracyUlPerMm = y * targetVolume + z
+      return pipetteAccuracyUlPerMm
+    }
+  }
+  const lastEntry = flowRateFunction[flowRateFunction.length - 1]
+  return lastEntry[1] * targetVolume + lastEntry[2]
+}
+
+interface BaseGetMaxUiFlowRateArgs {
+  channels: PipetteChannels
+  robotType: RobotType
+  shaftULperMM: number
+}
+interface BlowoutMaxUiFlowRateArgs extends BaseGetMaxUiFlowRateArgs {
+  flowRateType: 'blowout'
+}
+interface AspirateDispenseMaxUiFlowRateArgs extends BaseGetMaxUiFlowRateArgs {
+  flowRateType: 'aspirate' | 'dispense'
+  tipLiquidSpecs: SupportedTip
+  targetVolume: number
+  correctionVolume?: number
+}
+export const getMaxUiFlowRate = (
+  args: BlowoutMaxUiFlowRateArgs | AspirateDispenseMaxUiFlowRateArgs
+): number => {
+  const { channels, robotType, flowRateType, shaftULperMM } = args
+
+  const maxPlungerSpeed =
+    CHANNELS_MAPPED_TO_MAX_SPEED[robotType][channels].plunger
+  if (flowRateType === 'blowout') {
+    return round(shaftULperMM * maxPlungerSpeed)
+  }
+  const { targetVolume, tipLiquidSpecs, correctionVolume = 0 } = args
+  const pipetteAccuracyUlPerMm = _getPipetteAccuracyUlPerMm({
+    targetVolume,
+    tipLiquidSpecs,
+    flowRateType,
+  })
+  const correctionMultiplier = 1.0 + correctionVolume / targetVolume
+  const travelMm = targetVolume / pipetteAccuracyUlPerMm
+  const travelMmCorrected = travelMm * correctionMultiplier
+  return round(targetVolume / (travelMmCorrected / maxPlungerSpeed))
+}
+
+export const getNumPickups = (args: {
+  formData: FormData
+  invariantContext: InvariantContext
+  multiWellHandling?: {
+    isSupported: boolean
+    numWellsToFitInTip?: number
+  }
+}): number => {
+  const { formData, multiWellHandling, invariantContext } = args
+
+  if (formData.stepType !== 'moveLiquid' && formData.stepType !== 'mix') {
+    console.warn(
+      'getNumPickups called for step type other than moveLiquid or mix'
+    )
+    return 0
+  }
+
+  // next 2 if statements are relevant for both moveLiquid and mix steps
+  if (formData.changeTip === 'never') {
+    return 0
+  }
+  if (formData.changeTip === 'once') {
+    return 1
+  }
+
+  if (formData.stepType === 'moveLiquid') {
+    if (formData.changeTip === 'perSource') {
+      return formData.aspirate_wells.length
+    }
+    if (formData.changeTip === 'perDest') {
+      return formData.dispense_wells.length
+    }
+
+    let numWellsToConsider: number
+    const isMultiWellHandlingSupported = multiWellHandling?.isSupported
+    const numWellsToFitInTip = multiWellHandling?.numWellsToFitInTip
+    if (
+      isMultiWellHandlingSupported &&
+      numWellsToFitInTip != null &&
+      numWellsToFitInTip > 0 &&
+      formData.path !== 'single'
+    ) {
+      numWellsToConsider =
+        formData.path === 'multiDispense'
+          ? formData.dispense_wells.length
+          : formData.aspirate_wells.length
+      return Math.ceil(numWellsToConsider / numWellsToFitInTip)
+    } else {
+      const effectiveTransferVol =
+        getPipetteWithTipMaxVol(
+          formData.pipette as string,
+          invariantContext,
+          formData.tipRack as string
+        ) - (formData.aspirate_airGap_volume as number)
+      const chunksPerSubTransfer = Math.ceil(
+        (formData.volume as number) / effectiveTransferVol
+      )
+      numWellsToConsider = Math.max(
+        (formData.dispense_wells as string[]).length,
+        (formData.aspirate_wells as string[]).length
+      )
+      return chunksPerSubTransfer * numWellsToConsider
+    }
+  } else {
+    // if form type is 'mix', we will use single path and assume volume can be accommdated in tip
+    return formData.wells.length
+  }
 }

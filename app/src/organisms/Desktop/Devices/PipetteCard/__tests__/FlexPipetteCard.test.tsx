@@ -1,18 +1,21 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, vi, beforeEach, afterEach, expect } from 'vitest'
-import { renderWithProviders } from '/app/__testing-utils__'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { useCurrentSubsystemUpdateQuery } from '@opentrons/react-api-client'
+
+import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { mockLeftSpecs } from '/app/redux/pipettes/__fixtures__'
+import { useDropTipWizardFlows } from '/app/organisms/DropTipWizardFlows'
 import { handlePipetteWizardFlows } from '/app/organisms/PipetteWizardFlows'
+import { ChoosePipette } from '/app/organisms/PipetteWizardFlows/ChoosePipette'
+import { mockLeftSpecs } from '/app/redux/pipettes/__fixtures__'
+
 import { AboutPipetteSlideout } from '../AboutPipetteSlideout'
 import { FlexPipetteCard } from '../FlexPipetteCard'
-import { ChoosePipette } from '/app/organisms/PipetteWizardFlows/ChoosePipette'
-import { useDropTipWizardFlows } from '/app/organisms/DropTipWizardFlows'
 
-import type { PipetteData } from '@opentrons/api-client'
 import type { Mock } from 'vitest'
+import type { ComponentProps } from 'react'
+import type { PipetteData } from '@opentrons/api-client'
 
 vi.mock('/app/organisms/PipetteWizardFlows')
 vi.mock('/app/organisms/PipetteWizardFlows/ChoosePipette')
@@ -20,7 +23,7 @@ vi.mock('../AboutPipetteSlideout')
 vi.mock('/app/organisms/DropTipWizardFlows')
 vi.mock('@opentrons/react-api-client')
 
-const render = (props: React.ComponentProps<typeof FlexPipetteCard>) => {
+const render = (props: ComponentProps<typeof FlexPipetteCard>) => {
   return renderWithProviders(<FlexPipetteCard {...props} />, {
     i18nInstance: i18n,
   })[0]
@@ -29,7 +32,7 @@ const render = (props: React.ComponentProps<typeof FlexPipetteCard>) => {
 let mockDTWizToggle: Mock
 
 describe('FlexPipetteCard', () => {
-  let props: React.ComponentProps<typeof FlexPipetteCard>
+  let props: ComponentProps<typeof FlexPipetteCard>
   mockDTWizToggle = vi.fn()
   beforeEach(() => {
     props = {

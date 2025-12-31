@@ -1,24 +1,27 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 import { updateConfigValue } from '/app/redux/config'
+
 import { TouchScreenSleep } from '../TouchScreenSleep'
-import { renderWithProviders } from '/app/__testing-utils__'
+
+import type { ComponentProps } from 'react'
 
 vi.mock('/app/redux/config')
 
 // Note (kj:06/28/2023) this line is to avoid causing errors for scrollIntoView
 window.HTMLElement.prototype.scrollIntoView = vi.fn()
 
-const render = (props: React.ComponentProps<typeof TouchScreenSleep>) => {
+const render = (props: ComponentProps<typeof TouchScreenSleep>) => {
   return renderWithProviders(<TouchScreenSleep {...props} />, {
     i18nInstance: i18n,
   })
 }
 
 describe('TouchScreenSleep', () => {
-  let props: React.ComponentProps<typeof TouchScreenSleep>
+  let props: ComponentProps<typeof TouchScreenSleep>
 
   beforeEach(() => {
     props = {

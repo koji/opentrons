@@ -1,6 +1,6 @@
-import * as React from 'react'
-import { useTranslation } from 'react-i18next'
+import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
 
 import {
   ALIGN_CENTER,
@@ -8,28 +8,32 @@ import {
   DIRECTION_COLUMN,
   Flex,
   InputField,
-  RadioButton,
   POSITION_FIXED,
+  RadioButton,
   SPACING,
+  StyledText,
 } from '@opentrons/components'
-import { ANALYTICS_QUICK_TRANSFER_SETTING_SAVED } from '/app/redux/analytics'
+
 import { getTopPortalEl } from '/app/App/portal'
+import { NumericalKeyboard } from '/app/atoms/SoftwareKeyboard'
+import { i18n } from '/app/i18n'
 import { ChildNavigation } from '/app/organisms/ODD/ChildNavigation'
 import { useTrackEventWithRobotSerial } from '/app/redux-resources/analytics'
+import { ANALYTICS_QUICK_TRANSFER_SETTING_SAVED } from '/app/redux/analytics'
+
 import { ACTIONS } from '../constants'
 
+import type { Dispatch } from 'react'
 import type {
-  QuickTransferSummaryState,
-  QuickTransferSummaryAction,
   FlowRateKind,
+  QuickTransferSummaryAction,
+  QuickTransferSummaryState,
 } from '../types'
-import { i18n } from '/app/i18n'
-import { NumericalKeyboard } from '/app/atoms/SoftwareKeyboard'
 
 interface DelayProps {
   onBack: () => void
   state: QuickTransferSummaryState
-  dispatch: React.Dispatch<QuickTransferSummaryAction>
+  dispatch: Dispatch<QuickTransferSummaryAction>
   kind: FlowRateKind
 }
 
@@ -37,23 +41,18 @@ export function Delay(props: DelayProps): JSX.Element {
   const { kind, onBack, state, dispatch } = props
   const { t } = useTranslation('quick_transfer')
   const { trackEventWithRobotSerial } = useTrackEventWithRobotSerial()
-  const keyboardRef = React.useRef(null)
+  const keyboardRef = useRef(null)
 
-  const [currentStep, setCurrentStep] = React.useState<number>(1)
-  const [delayIsEnabled, setDelayIsEnabled] = React.useState<boolean>(
+  const [currentStep, setCurrentStep] = useState<number>(1)
+  const [delayIsEnabled, setDelayIsEnabled] = useState<boolean>(
     kind === 'aspirate'
       ? state.delayAspirate != null
       : state.delayDispense != null
   )
-  const [delayDuration, setDelayDuration] = React.useState<number | null>(
+  const [delayDuration, setDelayDuration] = useState<number | null>(
     kind === 'aspirate'
-      ? state.delayAspirate?.delayDuration ?? null
-      : state.delayDispense?.delayDuration ?? null
-  )
-  const [position, setPosition] = React.useState<number | null>(
-    kind === 'aspirate'
-      ? state.delayAspirate?.positionFromBottom ?? null
-      : state.delayDispense?.positionFromBottom ?? null
+      ? (state.delayAspirate?.delayDuration ?? null)
+      : (state.delayDispense?.delayDuration ?? null)
   )
 
   const action =
@@ -92,7 +91,7 @@ export function Delay(props: DelayProps): JSX.Element {
         trackEventWithRobotSerial({
           name: ANALYTICS_QUICK_TRANSFER_SETTING_SAVED,
           properties: {
-            settting: `Delay_${kind}`,
+            setting: `Delay_${kind}`,
           },
         })
         onBack()
@@ -100,20 +99,17 @@ export function Delay(props: DelayProps): JSX.Element {
         setCurrentStep(2)
       }
     } else if (currentStep === 2) {
-      setCurrentStep(3)
-    } else {
-      if (delayDuration != null && position != null) {
+      if (delayDuration != null) {
         dispatch({
           type: action,
           delaySettings: {
             delayDuration,
-            positionFromBottom: position,
           },
         })
         trackEventWithRobotSerial({
           name: ANALYTICS_QUICK_TRANSFER_SETTING_SAVED,
           properties: {
-            settting: `Delay_${kind}`,
+            setting: `Delay_${kind}`,
           },
         })
       }
@@ -122,40 +118,10 @@ export function Delay(props: DelayProps): JSX.Element {
   }
 
   const setSaveOrContinueButtonText =
-    delayIsEnabled && currentStep < 3 ? t('shared:continue') : t('shared:save')
-
-  let wellHeight = 1
-  if (kind === 'aspirate') {
-    wellHeight = Math.max(
-      ...state.sourceWells.map(well =>
-        state.source != null ? state.source.wells[well].depth : 0
-      )
-    )
-  } else if (kind === 'dispense') {
-    const destLabwareDefinition =
-      state.destination === 'source' ? state.source : state.destination
-    wellHeight = Math.max(
-      ...state.destinationWells.map(well =>
-        destLabwareDefinition != null
-          ? destLabwareDefinition.wells[well].depth
-          : 0
-      )
-    )
-  }
-
-  // the maxiumum allowed position for delay is 2x the height of the well
-  const positionRange = { min: 1, max: Math.floor(wellHeight * 2) }
-  const positionError =
-    position != null &&
-    (position < positionRange.min || position > positionRange.max)
-      ? t(`value_out_of_range`, {
-          min: positionRange.min,
-          max: positionRange.max,
-        })
-      : null
+    delayIsEnabled && currentStep < 2 ? t('shared:continue') : t('shared:save')
 
   // allow a maximum of 10 digits for delay duration
-  const durationRange = { min: 1, max: 9999999999 }
+  const durationRange = { min: 0.1, max: 9999999999 }
   const durationError =
     delayDuration != null &&
     (delayDuration < durationRange.min || delayDuration > durationRange.max)
@@ -167,8 +133,6 @@ export function Delay(props: DelayProps): JSX.Element {
   let buttonIsDisabled = false
   if (currentStep === 2) {
     buttonIsDisabled = delayDuration == null || durationError != null
-  } else if (currentStep === 3) {
-    buttonIsDisabled = positionError != null || position == null
   }
 
   return createPortal(
@@ -176,7 +140,7 @@ export function Delay(props: DelayProps): JSX.Element {
       <ChildNavigation
         header={
           kind === 'aspirate'
-            ? t('delay_before_aspirating')
+            ? t('delay_after_aspirating')
             : t('delay_before_dispensing')
         }
         buttonText={i18n.format(setSaveOrContinueButtonText, 'capitalize')}
@@ -190,19 +154,26 @@ export function Delay(props: DelayProps): JSX.Element {
           marginTop={SPACING.spacing120}
           flexDirection={DIRECTION_COLUMN}
           padding={`${SPACING.spacing16} ${SPACING.spacing60} ${SPACING.spacing40} ${SPACING.spacing60}`}
-          gridGap={SPACING.spacing4}
+          gridGap={SPACING.spacing24}
           width="100%"
         >
-          {delayEnabledDisplayItems.map(displayItem => (
-            <RadioButton
-              key={displayItem.description}
-              isSelected={delayIsEnabled === displayItem.option}
-              onChange={displayItem.onClick}
-              buttonValue={displayItem.description}
-              buttonLabel={displayItem.description}
-              radioButtonType="large"
-            />
-          ))}
+          <StyledText oddStyle="level4HeaderRegular">
+            {kind === 'aspirate'
+              ? t('delay_description_aspirate')
+              : t('delay_description_dispense')}
+          </StyledText>
+          <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing8}>
+            {delayEnabledDisplayItems.map(displayItem => (
+              <RadioButton
+                key={displayItem.description}
+                isSelected={delayIsEnabled === displayItem.option}
+                onChange={displayItem.onClick}
+                buttonValue={displayItem.description}
+                buttonLabel={displayItem.description}
+                radioButtonType="large"
+              />
+            ))}
+          </Flex>
         </Flex>
       ) : null}
       {currentStep === 2 ? (
@@ -239,49 +210,9 @@ export function Delay(props: DelayProps): JSX.Element {
             <NumericalKeyboard
               keyboardRef={keyboardRef}
               initialValue={String(delayDuration ?? '')}
+              isDecimal
               onChange={e => {
                 setDelayDuration(Number(e))
-              }}
-            />
-          </Flex>
-        </Flex>
-      ) : null}
-      {currentStep === 3 ? (
-        <Flex
-          alignSelf={ALIGN_CENTER}
-          gridGap={SPACING.spacing48}
-          paddingX={SPACING.spacing40}
-          padding={`${SPACING.spacing16} ${SPACING.spacing40} ${SPACING.spacing40}`}
-          marginTop="7.75rem" // using margin rather than justify due to content moving with error message
-          alignItems={ALIGN_CENTER}
-          height="22rem"
-        >
-          <Flex
-            width="30.5rem"
-            height="100%"
-            gridGap={SPACING.spacing24}
-            flexDirection={DIRECTION_COLUMN}
-            marginTop={SPACING.spacing68}
-          >
-            <InputField
-              type="number"
-              value={position}
-              title={t('delay_position_mm')}
-              error={positionError}
-              readOnly
-            />
-          </Flex>
-          <Flex
-            paddingX={SPACING.spacing24}
-            height="21.25rem"
-            marginTop="7.75rem"
-            borderRadius="0"
-          >
-            <NumericalKeyboard
-              keyboardRef={keyboardRef}
-              initialValue={String(position ?? '')}
-              onChange={e => {
-                setPosition(Number(e))
               }}
             />
           </Flex>

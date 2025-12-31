@@ -1,4 +1,5 @@
 """setStatusBar command request, result, and implementation models."""
+
 from __future__ import annotations
 from pydantic import BaseModel, Field
 from typing import TYPE_CHECKING, Optional, Type
@@ -75,7 +76,7 @@ class SetStatusBar(
 
     commandType: SetStatusBarCommandType = "setStatusBar"
     params: SetStatusBarParams
-    result: Optional[SetStatusBarResult]
+    result: Optional[SetStatusBarResult] = None
 
     _ImplementationCls: Type[SetStatusBarImplementation] = SetStatusBarImplementation
 

@@ -1,8 +1,10 @@
 """In-memory storage of ProtocolEngine instances."""
+
 import asyncio
 import logging
-from typing import List, Optional, Callable, Dict
+from typing import Dict, List, Optional, Callable, Mapping, Sequence
 
+from opentrons.types import NozzleMapInterface
 from opentrons.protocol_engine.errors.exceptions import EStopActivatedError
 from opentrons.protocol_engine.types import (
     PostRunHardwareState,
@@ -13,15 +15,17 @@ from opentrons.protocol_engine.types import (
 from opentrons_shared_data.labware.labware_definition import LabwareDefinition
 from opentrons_shared_data.robot.types import RobotType
 from opentrons_shared_data.robot.types import RobotTypeEnum
+from opentrons_shared_data.errors.exceptions import ModuleNotPresent
 
 from opentrons.config import feature_flags
 from opentrons.hardware_control import HardwareControlAPI
-from opentrons.hardware_control.nozzle_manager import NozzleMap
 from opentrons.hardware_control.types import (
     EstopState,
     HardwareEvent,
     EstopStateNotification,
     HardwareEventHandler,
+    AsynchronousModuleErrorNotification,
+    ModuleDisconnectedNotification,
 )
 from opentrons.protocols.api_support.deck_type import should_load_fixed_trash
 from opentrons.protocol_runner import (
@@ -32,6 +36,7 @@ from opentrons.protocol_runner.run_orchestrator import ParseMode
 from opentrons.protocol_engine import (
     DeckType,
     LabwareOffsetCreate,
+    LegacyLabwareOffsetCreate,
     StateSummary,
     CommandSlice,
     CommandErrorSlice,
@@ -53,6 +58,12 @@ from opentrons.protocol_engine.types import (
 )
 from opentrons_shared_data.labware.types import LabwareUri
 from opentrons.protocol_engine.resources.file_provider import FileProvider
+from opentrons.protocol_engine.resources.camera_provider import (
+    CameraProvider,
+    CameraSettings,
+)
+from robot_server.service.legacy.models.settings import CameraCaptureImageSettings
+from opentrons.protocol_engine.state.module_substates import FlexStackerSubState
 
 _log = logging.getLogger(__name__)
 
@@ -68,7 +79,47 @@ class NoRunOrchestrator(RuntimeError):
     """Raised if you try to get the current run orchestrator while there is none."""
 
 
-async def handle_estop_event(
+async def _do_handle_hardware_event(  # noqa: C901
+    run_orchestrator_store: "RunOrchestratorStore", event: HardwareEvent
+) -> None:
+    if isinstance(event, EstopStateNotification):
+        if event.new_state is not EstopState.PHYSICALLY_ENGAGED:
+            return
+        if run_orchestrator_store.current_run_id is None:
+            return
+        # todo(mm, 2024-04-17): This estop teardown sequencing belongs in the
+        # runner layer.
+        run_orchestrator_store.run_orchestrator.estop()
+        await run_orchestrator_store.run_orchestrator.finish(
+            error=EStopActivatedError()
+        )
+    elif isinstance(event, AsynchronousModuleErrorNotification):
+        if run_orchestrator_store.current_run_id is None:
+            return
+        should_finish = (
+            await run_orchestrator_store.run_orchestrator.asynchronous_module_error(
+                module_model=event.module_model, module_serial=event.module_serial
+            )
+        )
+        if should_finish:
+            await run_orchestrator_store.run_orchestrator.finish(error=event.exception)
+    elif isinstance(event, ModuleDisconnectedNotification):
+        if run_orchestrator_store.current_run_id is None:
+            return
+        should_finish = (
+            await run_orchestrator_store.run_orchestrator.module_disconnected(
+                module_model=event.module_model, module_serial=event.module_serial
+            )
+        )
+        if should_finish:
+            await run_orchestrator_store.run_orchestrator.finish(
+                error=ModuleNotPresent(
+                    identifier=event.module_serial or event.module_model
+                )
+            )
+
+
+async def handle_hardware_event(
     run_orchestrator_store: "RunOrchestratorStore", event: HardwareEvent
 ) -> None:
     """Handle an E-stop event from the hardware API.
@@ -77,26 +128,18 @@ async def handle_estop_event(
 
     This is a public function for unit-testing purposes, but it's an implementation
     detail of the store.
+
+    Implementation is in _do_handle_hardware_event, so this can just catch exceptions.
     """
     try:
-        if isinstance(event, EstopStateNotification):
-            if event.new_state is not EstopState.PHYSICALLY_ENGAGED:
-                return
-            if run_orchestrator_store.current_run_id is None:
-                return
-            # todo(mm, 2024-04-17): This estop teardown sequencing belongs in the
-            # runner layer.
-            run_orchestrator_store.run_orchestrator.estop()
-            await run_orchestrator_store.run_orchestrator.finish(
-                error=EStopActivatedError()
-            )
+        await _do_handle_hardware_event(run_orchestrator_store, event)
     except Exception:
         # This is a background task kicked off by a hardware event,
         # so there's no one to propagate this exception to.
         _log.exception("Exception handling E-stop event.")
 
 
-def _get_estop_listener(
+def _get_hardware_listener(
     run_orchestrator_store: "RunOrchestratorStore",
 ) -> HardwareEventHandler:
     """Create a callback for estop events.
@@ -109,7 +152,7 @@ def _get_estop_listener(
         event: HardwareEvent,
     ) -> None:
         asyncio.run_coroutine_threadsafe(
-            handle_estop_event(run_orchestrator_store, event), engine_loop
+            handle_hardware_event(run_orchestrator_store, event), engine_loop
         )
 
     return run_handler_in_engine_thread_from_hardware_thread
@@ -137,7 +180,7 @@ class RunOrchestratorStore:
         self._deck_type = deck_type
         self._run_orchestrator: Optional[RunOrchestrator] = None
         self._default_run_orchestrator: Optional[RunOrchestrator] = None
-        hardware_api.register_callback(_get_estop_listener(self))
+        hardware_api.register_callback(_get_hardware_listener(self))
 
     @property
     def run_orchestrator(self) -> RunOrchestrator:
@@ -191,10 +234,11 @@ class RunOrchestratorStore:
     async def create(
         self,
         run_id: str,
-        labware_offsets: List[LabwareOffsetCreate],
+        labware_offsets: Sequence[LabwareOffsetCreate | LegacyLabwareOffsetCreate],
         initial_error_recovery_policy: error_recovery_policy.ErrorRecoveryPolicy,
         deck_configuration: DeckConfigurationType,
         file_provider: FileProvider,
+        camera_provider: CameraProvider,
         notify_publishers: Callable[[], None],
         protocol: Optional[ProtocolResource],
         run_time_param_values: Optional[PrimitiveRunTimeParamValuesType] = None,
@@ -206,8 +250,10 @@ class RunOrchestratorStore:
         Args:
             run_id: The run resource the run orchestrator is assigned to.
             labware_offsets: Labware offsets to create the run with.
+            initial_error_recovery_policy: How to recover from errors.
             deck_configuration: A mapping of fixtures to cutout fixtures the deck will be loaded with.
             file_provider: Wrapper to let the engine read/write data files.
+            camera_provider: Wrapper to let the engine use the camera.
             notify_publishers: Utilized by the engine to notify publishers of state changes.
             protocol: The protocol to load the runner with, if any.
             run_time_param_values: Any runtime parameter values to set.
@@ -240,13 +286,15 @@ class RunOrchestratorStore:
             load_fixed_trash=load_fixed_trash,
             deck_configuration=deck_configuration,
             file_provider=file_provider,
+            camera_provider=camera_provider,
             notify_publishers=notify_publishers,
         )
 
-        self._run_orchestrator = RunOrchestrator.build_orchestrator(
+        orchestrator = RunOrchestrator.build_orchestrator(
             run_id=run_id,
             protocol_engine=engine,
             hardware_api=self._hardware_api,
+            camera_provider=camera_provider,
             protocol_config=protocol.source.config if protocol else None,
         )
 
@@ -255,19 +303,21 @@ class RunOrchestratorStore:
         # they will both "succeed" (with undefined results) instead of one
         # raising RunConflictError.
         if protocol:
-            await self.run_orchestrator.load(
+            await orchestrator.load(
                 protocol.source,
                 run_time_param_values=run_time_param_values,
                 run_time_param_paths=run_time_param_paths,
                 parse_mode=ParseMode.ALLOW_LEGACY_METADATA_AND_REQUIREMENTS,
             )
         else:
-            self.run_orchestrator.prepare()
+            orchestrator.prepare()
 
         for offset in labware_offsets:
-            self.run_orchestrator.add_labware_offset(offset)
+            orchestrator.add_labware_offset(offset)
 
-        return self.run_orchestrator.get_state_summary()
+        summary = orchestrator.get_state_summary()
+        self._run_orchestrator = orchestrator
+        return summary
 
     async def clear(self) -> RunResult:
         """Remove the current run orchestrator.
@@ -288,12 +338,23 @@ class RunOrchestratorStore:
         run_data = self.run_orchestrator.get_state_summary()
         commands = self.run_orchestrator.get_all_commands()
         run_time_parameters = self.run_orchestrator.get_run_time_parameters()
+        command_annotations = self.run_orchestrator.get_command_annotations()
+        preconditions = self.run_orchestrator.get_preconditions()
 
-        self._run_orchestrator = None
+        if self._run_orchestrator is not None:
+            self._run_orchestrator.clear_command_history()
+            self._run_orchestrator = None
 
         return RunResult(
-            state_summary=run_data, commands=commands, parameters=run_time_parameters
+            state_summary=run_data,
+            commands=commands,
+            parameters=run_time_parameters,
+            command_annotations=command_annotations,
+            command_preconditions=preconditions,
         )
+
+    # todo(mm, 2024-11-15): Are all of these pass-through methods helpful?
+    # Can we delete them and make callers just call .run_orchestrator.play(), etc.?
 
     def play(self, deck_configuration: Optional[DeckConfigurationType] = None) -> None:
         """Start or resume the run."""
@@ -327,13 +388,21 @@ class RunOrchestratorStore:
         """Get loaded labware definitions."""
         return self.run_orchestrator.get_loaded_labware_definitions()
 
-    def get_nozzle_maps(self) -> Dict[str, NozzleMap]:
+    def get_nozzle_maps(self) -> Mapping[str, NozzleMapInterface]:
         """Get the current nozzle map keyed by pipette id."""
         return self.run_orchestrator.get_nozzle_maps()
+
+    def get_tip_attached(self) -> Dict[str, bool]:
+        """Get current tip state keyed by pipette id."""
+        return self.run_orchestrator.get_tip_attached()
 
     def get_run_time_parameters(self) -> List[RunTimeParameter]:
         """Parameter definitions defined by protocol, if any. Will always be empty before execution."""
         return self.run_orchestrator.get_run_time_parameters()
+
+    def get_flex_stacker_substate(self) -> Mapping[str, FlexStackerSubState]:
+        """Get the current (if any) Flex Stacker Substates keyed by modile id."""
+        return self.run_orchestrator.get_flex_stacker_substate()
 
     def get_current_command(self) -> Optional[CommandPointer]:
         """Get the current running command, if any."""
@@ -396,7 +465,9 @@ class RunOrchestratorStore:
         """Get whether the run has started."""
         return self.run_orchestrator.run_has_started()
 
-    def add_labware_offset(self, request: LabwareOffsetCreate) -> LabwareOffset:
+    def add_labware_offset(
+        self, request: LabwareOffsetCreate | LegacyLabwareOffsetCreate
+    ) -> LabwareOffset:
         """Add a new labware offset to state."""
         return self.run_orchestrator.add_labware_offset(request)
 
@@ -409,6 +480,26 @@ class RunOrchestratorStore:
     ) -> None:
         """Create run policy rules for error recovery."""
         self.run_orchestrator.set_error_recovery_policy(policy)
+
+    def add_camera_enablement_settings(
+        self, enablement_settings: CameraSettings
+    ) -> CameraSettings:
+        """Add new camera enablement settings to state."""
+        return self.run_orchestrator.add_camera_enablement_settings(enablement_settings)
+
+    def add_camera_capture_image_settings(
+        self, capture_image_settings: CameraCaptureImageSettings
+    ) -> None:
+        """Add new camera capture image settings to state."""
+        self.run_orchestrator.add_camera_capture_image_settings(
+            camera_id=capture_image_settings.cameraId,
+            resolution=capture_image_settings.resolution,
+            zoom=capture_image_settings.zoom,
+            pan=capture_image_settings.pan,
+            contrast=capture_image_settings.contrast,
+            brightness=capture_image_settings.brightness,
+            saturation=capture_image_settings.saturation,
+        )
 
     async def add_command_and_wait_for_interval(
         self,

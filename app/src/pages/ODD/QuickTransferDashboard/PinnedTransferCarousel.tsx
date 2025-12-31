@@ -1,5 +1,5 @@
-import type * as React from 'react'
 import styled from 'styled-components'
+
 import {
   ALIGN_FLEX_START,
   DIRECTION_ROW,
@@ -11,12 +11,13 @@ import {
 
 import { PinnedTransfer } from './PinnedTransfer'
 
+import type { Dispatch, SetStateAction } from 'react'
 import type { ProtocolResource } from '@opentrons/shared-data'
 import type { CardSizeType } from './PinnedTransfer'
 
 export function PinnedTransferCarousel(props: {
   pinnedTransfers: ProtocolResource[]
-  longPress: React.Dispatch<React.SetStateAction<boolean>>
+  longPress: Dispatch<SetStateAction<boolean>>
   setShowDeleteConfirmationModal: (showDeleteConfirmationModal: boolean) => void
   setTargetTransferId: (targetTransferId: string) => void
 }): JSX.Element {

@@ -1,12 +1,13 @@
 import Electron from 'electron'
-import { describe, it, vi, expect } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
 import * as Dialogs from '..'
 
 vi.mock('electron')
 
-const mockMainWindow = ({
+const mockMainWindow = {
   mainWindow: true,
-} as unknown) as Electron.BrowserWindow
+} as unknown as Electron.BrowserWindow
 
 describe('dialog boxes', () => {
   describe('showOpenDirectoryDialog', () => {

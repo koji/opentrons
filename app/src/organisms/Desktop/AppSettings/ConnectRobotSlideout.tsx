@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
-import { useSelector, useDispatch } from 'react-redux'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useDispatch, useSelector } from 'react-redux'
 
 import {
   ALIGN_FLEX_END,
@@ -9,19 +9,20 @@ import {
   DIRECTION_ROW,
   Flex,
   Icon,
+  LegacyStyledText,
   Link,
   PrimaryButton,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
-import { ManualIpHostnameForm } from './ManualIpHostnameForm'
-import { ManualIpHostnameList } from './ManualIpHostnameList'
-import { Slideout } from '/app/atoms/Slideout'
 import { ExternalLink } from '/app/atoms/Link/ExternalLink'
+import { Slideout } from '/app/atoms/Slideout'
 import { Divider } from '/app/atoms/structure'
 import { getScanning, startDiscovery } from '/app/redux/discovery'
+
+import { ManualIpHostnameForm } from './ManualIpHostnameForm'
+import { ManualIpHostnameList } from './ManualIpHostnameList'
 
 import type { Dispatch, State } from '/app/redux/types'
 
@@ -78,10 +79,10 @@ export function ConnectRobotSlideout({
       }
     >
       <Flex flexDirection={DIRECTION_COLUMN}>
-        <LegacyStyledText as="p" marginBottom={SPACING.spacing8}>
+        <LegacyStyledText forwardedAs="p" marginBottom={SPACING.spacing8}>
           {t('ip_description_first')}
         </LegacyStyledText>
-        <LegacyStyledText as="p">
+        <LegacyStyledText forwardedAs="p">
           {t('branded:ip_description_second')}
         </LegacyStyledText>
         <ExternalLink
@@ -93,7 +94,7 @@ export function ConnectRobotSlideout({
           {t('connect_ip_link')}
         </ExternalLink>
         <Divider marginY={SPACING.spacing24} />
-        <LegacyStyledText as="p" css={TYPOGRAPHY.pSemiBold}>
+        <LegacyStyledText forwardedAs="p" css={TYPOGRAPHY.pSemiBold}>
           {t('add_ip_hostname')}
         </LegacyStyledText>
         <ManualIpHostnameForm setMostRecentAddition={setMostRecentAddition} />
@@ -106,7 +107,7 @@ export function ConnectRobotSlideout({
           {Boolean(isScanning) ? (
             <Flex flexDirection={DIRECTION_ROW}>
               <LegacyStyledText
-                as="p"
+                forwardedAs="p"
                 color={COLORS.grey50}
                 marginRight={SPACING.spacing8}
               >
@@ -119,7 +120,7 @@ export function ConnectRobotSlideout({
               mostRecentAddition != null && !(mostRecentDiscovered ?? false) ? (
                 <>
                   <LegacyStyledText
-                    as="p"
+                    forwardedAs="p"
                     color={COLORS.grey50}
                     marginX={SPACING.spacing4}
                   >

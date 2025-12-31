@@ -1,46 +1,49 @@
-import { getTimeFromForm } from '../../utils/getTimeFromForm'
 import {
-  PAUSE_UNTIL_TIME,
-  PAUSE_UNTIL_TEMP,
   PAUSE_UNTIL_RESUME,
+  PAUSE_UNTIL_TC_PROFILE_COMPLETE,
+  PAUSE_UNTIL_TEMP,
+  PAUSE_UNTIL_TIME,
 } from '../../../constants'
-import type { FormData } from '../../../form-types'
+import { getTimeFromForm } from '../../utils/getTimeFromForm'
+
 import type {
-  WaitForTemperatureArgs,
   PauseArgs,
+  WaitForModuleTaskArgs,
+  WaitForTemperatureArgs,
 } from '@opentrons/step-generation'
+import type { HydratedPauseFormData } from '../../../form-types'
+import type { GetCastFormData } from '../../fieldLevel'
 
 export const pauseFormToArgs = (
-  formData: FormData
-): PauseArgs | WaitForTemperatureArgs | null => {
+  castFormData: GetCastFormData<HydratedPauseFormData>
+): PauseArgs | WaitForModuleTaskArgs | WaitForTemperatureArgs | null => {
   const { hours, minutes, seconds } = getTimeFromForm(
-    formData,
-    'pauseTime',
-    'pauseSecond',
-    'pauseMinute',
-    'pauseHour'
+    'pauseTime' in castFormData ? (castFormData.pauseTime ?? null) : null
   )
   const totalSeconds = (hours ?? 0) * 3600 + minutes * 60 + seconds
-  const temperature = parseFloat(formData.pauseTemperature as string)
-  const message = formData.pauseMessage ?? ''
+  // @ts-expect-error - todo(mm, 2025-10-09): Type error inherited from prior code.
+  // targetHeaterShakerTemperature seems to already be a number. Confirm that
+  // and remove this if it's safe.
+  const temperature = parseFloat(castFormData.pauseTemperature)
+  const message = castFormData.pauseMessage ?? ''
 
-  switch (formData.pauseAction) {
+  switch (castFormData.pauseAction) {
     case PAUSE_UNTIL_TEMP:
       return {
         commandCreatorFnName: 'waitForTemperature',
-        temperature,
-        module: formData.moduleId,
+        name: castFormData.stepName,
+        description: castFormData.stepDetails ?? '',
+        celsius: temperature,
+        moduleId: castFormData.moduleId ?? '',
         message,
       }
 
     case PAUSE_UNTIL_TIME:
       return {
         commandCreatorFnName: 'delay',
-        name: `Pause ${formData.id}`,
-        // TODO real name for steps
-        description: formData.description ?? '',
-        // TODO get from form
-        wait: totalSeconds,
+        name: castFormData.stepName,
+        description: castFormData.stepDetails ?? '',
+        seconds: totalSeconds,
         message,
         meta: {
           hours,
@@ -52,17 +55,21 @@ export const pauseFormToArgs = (
     case PAUSE_UNTIL_RESUME:
       return {
         commandCreatorFnName: 'delay',
-        name: `Pause ${formData.id}`,
-        // TODO real name for steps
-        description: formData.description ?? '',
-        // TODO get from form
-        wait: true,
+        name: castFormData.stepName,
+        description: castFormData.stepDetails ?? '',
         message,
         meta: {
           hours,
           minutes,
           seconds,
         },
+      }
+
+    case PAUSE_UNTIL_TC_PROFILE_COMPLETE:
+      return {
+        commandCreatorFnName: 'waitForModuleTask',
+        waitCondition: 'thermocyclerProfileComplete',
+        moduleId: castFormData.moduleId ?? '',
       }
 
     default:

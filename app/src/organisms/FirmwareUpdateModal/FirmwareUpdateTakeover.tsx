@@ -1,28 +1,28 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import {
-  useInstrumentsQuery,
   useCurrentAllSubsystemUpdatesQuery,
+  useInstrumentsQuery,
   useSubsystemUpdateQuery,
 } from '@opentrons/react-api-client'
-import { useNotifyCurrentMaintenanceRun } from '/app/resources/maintenance_runs'
+
 import { getTopPortalEl } from '/app/App/portal'
 import { useIsUnboxingFlowOngoing } from '/app/redux-resources/config'
+import { useNotifyCurrentMaintenanceRun } from '/app/resources/maintenance_runs'
+
 import { UpdateInProgressModal } from './UpdateInProgressModal'
 import { UpdateNeededModal } from './UpdateNeededModal'
-import type { Subsystem, InstrumentData } from '@opentrons/api-client'
+
+import type { InstrumentData, Subsystem } from '@opentrons/api-client'
 
 const POLL_INTERVAL_MS = 5000
 
 export function FirmwareUpdateTakeover(): JSX.Element {
-  const [showUpdateNeededModal, setShowUpdateNeededModal] = useState<boolean>(
-    false
-  )
-  const [
-    initiatedSubsystemUpdate,
-    setInitiatedSubsystemUpdate,
-  ] = useState<Subsystem | null>(null)
+  const [showUpdateNeededModal, setShowUpdateNeededModal] =
+    useState<boolean>(false)
+  const [initiatedSubsystemUpdate, setInitiatedSubsystemUpdate] =
+    useState<Subsystem | null>(null)
 
   const instrumentsData = useInstrumentsQuery({
     refetchInterval: POLL_INTERVAL_MS,
@@ -47,11 +47,10 @@ export function FirmwareUpdateTakeover(): JSX.Element {
   })
   const isUnboxingFlowOngoing = useIsUnboxingFlowOngoing()
 
-  const {
-    data: currentSubsystemsUpdatesData,
-  } = useCurrentAllSubsystemUpdatesQuery({
-    refetchInterval: POLL_INTERVAL_MS,
-  })
+  const { data: currentSubsystemsUpdatesData } =
+    useCurrentAllSubsystemUpdatesQuery({
+      refetchInterval: POLL_INTERVAL_MS,
+    })
   const externalSubsystemUpdate = currentSubsystemsUpdatesData?.data.find(
     update =>
       (update.updateStatus === 'queued' ||

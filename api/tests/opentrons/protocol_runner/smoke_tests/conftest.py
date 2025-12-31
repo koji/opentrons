@@ -3,6 +3,7 @@
 These fixtures consist of two "matching" JSON and Python protocols,
 saved to disk.
 """
+
 import pytest
 import json
 import textwrap
@@ -17,7 +18,7 @@ from opentrons.protocol_engine import ModuleDefinition
 def tempdeck_v1_def() -> ModuleDefinition:
     """Get the definition of a V1 tempdeck."""
     definition = load_shared_data("module/definitions/3/temperatureModuleV1.json")
-    return ModuleDefinition.parse_raw(definition)
+    return ModuleDefinition.model_validate_json(definition)
 
 
 @pytest.fixture()

@@ -1,22 +1,22 @@
-import type * as React from 'react'
-import { useDispatch } from 'react-redux'
 import { useTranslation } from 'react-i18next'
+import { useDispatch } from 'react-redux'
 
 import {
   ALIGN_CENTER,
   Box,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
 import { ToggleButton } from '/app/atoms/buttons'
 import { updateSetting } from '/app/redux/robot-settings'
 
-import type { Dispatch } from '/app/redux/types'
+import type { MouseEventHandler } from 'react'
 import type { RobotSettingsField } from '/app/redux/robot-settings/types'
+import type { Dispatch } from '/app/redux/types'
 
 interface LegacySettingsProps {
   settings: RobotSettingsField | undefined
@@ -34,7 +34,7 @@ export function LegacySettings({
   const value = settings?.value ? settings.value : false
   const id = settings?.id ? settings.id : 'deckCalibrationDots'
 
-  const handleClick: React.MouseEventHandler<Element> = () => {
+  const handleClick: MouseEventHandler<Element> = () => {
     if (!isRobotBusy) {
       dispatch(updateSetting(robotName, id, !value))
     }
@@ -48,17 +48,17 @@ export function LegacySettings({
     >
       <Box width="70%">
         <LegacyStyledText
-          as="h2"
+          forwardedAs="h2"
           fontWeight={TYPOGRAPHY.fontWeightSemiBold}
           marginBottom={SPACING.spacing16}
           id="AdvancedSettings_showLink"
         >
           {t('legacy_settings')}
         </LegacyStyledText>
-        <LegacyStyledText as="p" css={TYPOGRAPHY.pSemiBold}>
+        <LegacyStyledText forwardedAs="p" css={TYPOGRAPHY.pSemiBold}>
           {t('calibrate_deck_to_dots')}
         </LegacyStyledText>
-        <LegacyStyledText as="p">
+        <LegacyStyledText forwardedAs="p">
           {t('calibrate_deck_description')}
         </LegacyStyledText>
       </Box>

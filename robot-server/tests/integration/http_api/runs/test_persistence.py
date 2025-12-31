@@ -6,8 +6,12 @@ from typing import Any, AsyncGenerator, Dict, NamedTuple, cast
 import anyio
 import pytest
 
+from tests.conftest import zulu_iso8601_to_datetime
 from tests.integration.dev_server import DevServer
 from tests.integration.robot_client import RobotClient
+
+
+pytestmark = pytest.mark.slow
 
 
 class ClientServerFixture(NamedTuple):
@@ -298,13 +302,13 @@ async def test_runs_completed_started_at_persist_via_actions_router(
     get_run_response = await client.get_run(run_id=run_id)
     run_data = get_run_response.json()["data"]
 
-    assert datetime.fromisoformat(run_data["startedAt"]).timestamp() == pytest.approx(
+    assert zulu_iso8601_to_datetime(run_data["startedAt"]).timestamp() == pytest.approx(
         expected_started_at.timestamp(), abs=2
     )
 
-    assert datetime.fromisoformat(run_data["completedAt"]).timestamp() == pytest.approx(
-        expected_completed_at.timestamp(), abs=2
-    )
+    assert zulu_iso8601_to_datetime(
+        run_data["completedAt"]
+    ).timestamp() == pytest.approx(expected_completed_at.timestamp(), abs=2)
 
     # make sure the times are in order
     assert run_data["startedAt"] < run_data["completedAt"]
@@ -332,6 +336,6 @@ async def test_runs_completed_filled_started_at_none_persist(
     run_data = get_run_response.json()["data"]
 
     assert "startedAt" not in run_data
-    assert datetime.fromisoformat(run_data["completedAt"]).timestamp() == pytest.approx(
-        expected_completed_at.timestamp(), abs=2
-    )
+    assert zulu_iso8601_to_datetime(
+        run_data["completedAt"]
+    ).timestamp() == pytest.approx(expected_completed_at.timestamp(), abs=2)

@@ -1,12 +1,14 @@
-import { useSelector } from 'react-redux'
 import { useTranslation } from 'react-i18next'
-import { selectors as uiLabwareSelectors } from '../../../../../ui/labware'
-import { DropdownStepFormField } from '../../../../../molecules'
-import type { Options } from '@opentrons/components'
+import { useSelector } from 'react-redux'
+
+import { DropdownStepFormField } from '/protocol-designer/components/molecules'
+import { selectors as uiLabwareSelectors } from '/protocol-designer/ui/labware'
+
+import type { DropdownOption } from '@opentrons/components'
 import type { FieldProps } from '../types'
 
 type BlowoutLocationDropdownProps = FieldProps & {
-  options: Options
+  options: DropdownOption[]
 }
 
 export function BlowoutLocationField(
@@ -21,9 +23,8 @@ export function BlowoutLocationField(
     <DropdownStepFormField
       title={t('blowout_location')}
       options={options}
-      addPadding={false}
       {...restProps}
-      width="16.5rem"
+      width="100%"
     />
   )
 }

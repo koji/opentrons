@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 
 import {
   ALIGN_CENTER,
@@ -7,8 +7,8 @@ import {
   COLORS,
   DIRECTION_COLUMN,
   DIRECTION_ROW,
-  FLEX_NONE,
   Flex,
+  FLEX_NONE,
   Icon,
   JUSTIFY_CENTER,
   JUSTIFY_SPACE_BETWEEN,
@@ -23,6 +23,7 @@ import {
 import { TertiaryButton } from '/app/atoms/buttons'
 
 import type { SubTaskProps, TaskListProps, TaskProps } from './types'
+
 export type * from './types'
 
 const TASK_CONNECTOR_STYLE = `1px solid ${COLORS.grey40}`
@@ -95,7 +96,7 @@ function ProgressTrackerItem({
           width="1.25rem"
           borderRadius="0.625rem"
         >
-          <LegacyStyledText as="label">
+          <LegacyStyledText forwardedAs="label">
             {(taskIndex + 1).toString()}
           </LegacyStyledText>
         </Flex>
@@ -147,8 +148,8 @@ function ProgressTrackerItem({
                     isTaskListComplete || isPastSubTask
                       ? COLORS.blue50
                       : subTask.isComplete === true
-                      ? COLORS.grey40
-                      : 'initial'
+                        ? COLORS.grey40
+                        : 'initial'
                   }
                   border={TASK_CONNECTOR_STYLE}
                   borderColor={isFutureSubTask ? COLORS.grey40 : COLORS.blue50}
@@ -168,8 +169,8 @@ function ProgressTrackerItem({
                     isFinalSubTaskOfTaskList
                       ? COLORS.transparent
                       : isTaskListComplete || isPastSubTask
-                      ? COLORS.blue50
-                      : COLORS.grey40
+                        ? COLORS.blue50
+                        : COLORS.grey40
                   }
                   marginTop={`-${SPACING.spacing8}`}
                   marginBottom={
@@ -235,7 +236,10 @@ function SubTask({
         flexDirection={DIRECTION_COLUMN}
         gridGap={SPACING.spacing4}
       >
-        <LegacyStyledText as="h3" fontWeight={TYPOGRAPHY.fontWeightSemiBold}>
+        <LegacyStyledText
+          forwardedAs="h3"
+          fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+        >
           <Flex
             alignItems={ALIGN_CENTER}
             flexDirection={DIRECTION_ROW}
@@ -244,9 +248,9 @@ function SubTask({
             {title}
           </Flex>
         </LegacyStyledText>
-        <LegacyStyledText as="p">{description}</LegacyStyledText>
+        <LegacyStyledText forwardedAs="p">{description}</LegacyStyledText>
         {footer != null ? (
-          <LegacyStyledText as="p" color={COLORS.grey60}>
+          <LegacyStyledText forwardedAs="p" color={COLORS.grey60}>
             <Flex
               alignItems={ALIGN_CENTER}
               flexDirection={DIRECTION_ROW}
@@ -254,7 +258,7 @@ function SubTask({
             >
               {markedBad === true && (
                 <Icon
-                  name="alert-circle"
+                  name="ot-alert"
                   backgroundColor={COLORS.yellow20}
                   color={COLORS.yellow50}
                   height="1rem"
@@ -388,7 +392,7 @@ function Task({
             gridGap={SPACING.spacing4}
           >
             <LegacyStyledText
-              as="h3"
+              forwardedAs="h3"
               fontWeight={TYPOGRAPHY.fontWeightSemiBold}
             >
               <Flex
@@ -398,7 +402,7 @@ function Task({
               >
                 {markedBad === true && (
                   <Icon
-                    name="alert-circle"
+                    name="ot-alert"
                     backgroundColor={COLORS.yellow20}
                     color={COLORS.yellow50}
                     height="1rem"
@@ -408,9 +412,9 @@ function Task({
                 {title}
               </Flex>
             </LegacyStyledText>
-            <LegacyStyledText as="p">{description}</LegacyStyledText>
+            <LegacyStyledText forwardedAs="p">{description}</LegacyStyledText>
             {footer != null ? (
-              <LegacyStyledText as="p" color={COLORS.grey50}>
+              <LegacyStyledText forwardedAs="p" color={COLORS.grey50}>
                 <Flex
                   alignItems={ALIGN_CENTER}
                   flexDirection={DIRECTION_ROW}

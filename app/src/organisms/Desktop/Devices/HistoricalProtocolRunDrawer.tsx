@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { format } from 'date-fns'
 import isEqual from 'lodash/isEqual'
 import { css } from 'styled-components'
+
 import {
   ALIGN_CENTER,
   ALIGN_END,
@@ -9,31 +10,52 @@ import {
   BORDERS,
   Box,
   COLORS,
-  DeckInfoLabel,
   DIRECTION_COLUMN,
   Flex,
+  Icon,
   InfoScreen,
   JUSTIFY_FLEX_START,
   LegacyStyledText,
+  Link,
+  MODULE_ICON_NAME_BY_TYPE,
   OVERFLOW_HIDDEN,
+  RobotInfoLabel,
   SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
 import {
+  useAllRunImagesRaw,
+  useDataFileQuery,
+} from '@opentrons/react-api-client'
+import {
   getLabwareDefURI,
   getLabwareDisplayName,
   getLoadedLabwareDefinitionsByUri,
-  getModuleDisplayName,
+  getModuleType,
+  TC_MODULE_LOCATION_OT2,
+  TC_MODULE_LOCATION_OT3,
+  THERMOCYCLER_MODULE_TYPE,
 } from '@opentrons/shared-data'
-import { useCsvFileQuery } from '@opentrons/react-api-client'
-import { DownloadCsvFileLink } from './DownloadCsvFileLink'
+
+import { downloadFile } from '/app/organisms/Desktop/Devices/utils'
+import {
+  SOURCE_RUN_RECORD,
+  useCameraAnalytics,
+} from '/app/redux-resources/analytics/'
+import { useIsFlex, useRobotType } from '/app/redux-resources/robots'
+import { useRunGeneratedDataFiles } from '/app/resources/dataFiles/useRunGeneratedDataFiles'
 import { useMostRecentCompletedAnalysis } from '/app/resources/runs'
+
+import { OffsetTag } from '../../LabwarePositionCheck'
+import { DownloadCsvFileLink } from './DownloadCsvFileLink'
 import { useDeckCalibrationData } from './hooks'
-import { OffsetVector } from '/app/molecules/OffsetVector'
-import type { RunData } from '@opentrons/api-client'
+
+import type { LabwareOffset, RunData } from '@opentrons/api-client'
+import type { CompletedProtocolAnalysis } from '@opentrons/shared-data'
 
 interface HistoricalProtocolRunDrawerProps {
   run: RunData
+  protocolName: string
   robotName: string
 }
 
@@ -42,10 +64,17 @@ export function HistoricalProtocolRunDrawer(
 ): JSX.Element | null {
   const { i18n, t } = useTranslation('run_details')
   const { run, robotName } = props
-  const allLabwareOffsets = run.labwareOffsets?.sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  )
-  const runDataFileIds =
+  const isFlex = useIsFlex(robotName)
+  const outputFileIds = useRunGeneratedDataFiles(run.id)
+  const allLabwareOffsets: LabwareOffset[] =
+    run.labwareOffsets?.sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    ) ?? []
+  const totalImageFileCount = outputFileIds.jpeg.length
+  const totalOutputFileCount = totalImageFileCount + outputFileIds.csv.length
+
+  const runCsvFileIds =
     'runTimeParameters' in run
       ? run.runTimeParameters.reduce<string[]>((acc, parameter) => {
           if (parameter.type === 'csv_file') {
@@ -56,37 +85,49 @@ export function HistoricalProtocolRunDrawer(
           return acc
         }, [])
       : []
-  if ('outputFileIds' in run && run.outputFileIds.length > 0) {
-    runDataFileIds.push(...run.outputFileIds)
-  }
+  runCsvFileIds.push(...outputFileIds.csv)
 
-  const uniqueLabwareOffsets = allLabwareOffsets?.filter(
+  const uniqueLabwareOffsets = allLabwareOffsets.filter(
     (offset, index, array) => {
       return (
         array.findIndex(
           firstOffset =>
-            firstOffset.location.slotName === offset.location.slotName &&
-            firstOffset.definitionUri === offset.definitionUri
-        ) === index && !isEqual(offset.vector, { x: 0, y: 0, z: 0 })
+            isEqual(firstOffset.locationSequence, offset.locationSequence) &&
+            isEqual(firstOffset.definitionUri, offset.definitionUri)
+        ) === index
       )
     }
   )
 
-  const deckCalibrationData = useDeckCalibrationData(robotName)
-    .deckCalibrationData
+  const deckCalibrationData =
+    useDeckCalibrationData(robotName).deckCalibrationData
   const lastModifiedDeckCal =
     deckCalibrationData != null && 'lastModified' in deckCalibrationData
       ? deckCalibrationData.lastModified
       : null
   const protocolDetails = useMostRecentCompletedAnalysis(run.id)
 
+  const sortedUniqueLwOffsets = uniqueLabwareOffsets.sort((a, b) => {
+    const aLabwareName = getLabwareNameForOffset(a, protocolDetails)
+    const bLabwareName = getLabwareNameForOffset(b, protocolDetails)
+
+    const nameCompare = aLabwareName.localeCompare(bLabwareName, 'en')
+    // Use the original slot name comparison as secondary sort
+    if (nameCompare === 0) {
+      return a.location.slotName.localeCompare(b.location.slotName, 'en', {
+        numeric: true,
+      })
+    } else {
+      return nameCompare
+    }
+  })
+
   const isOutOfDate =
     typeof lastModifiedDeckCal === 'string' &&
-    uniqueLabwareOffsets != null &&
-    uniqueLabwareOffsets.length > 0 &&
+    sortedUniqueLwOffsets.length > 0 &&
     new Date(lastModifiedDeckCal).getTime() >
       new Date(
-        uniqueLabwareOffsets[uniqueLabwareOffsets?.length - 1].createdAt
+        sortedUniqueLwOffsets[sortedUniqueLwOffsets?.length - 1].createdAt
       ).getTime()
   const outOfDateBanner = isOutOfDate ? (
     <Banner
@@ -95,10 +136,13 @@ export function HistoricalProtocolRunDrawer(
       iconMarginLeft={SPACING.spacing4}
     >
       <Flex flexDirection={DIRECTION_COLUMN}>
-        <LegacyStyledText as="p" fontWeight={TYPOGRAPHY.fontWeightSemiBold}>
+        <LegacyStyledText
+          forwardedAs="p"
+          fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+        >
           {t('data_out_of_date')}
         </LegacyStyledText>
-        <LegacyStyledText as="p">
+        <LegacyStyledText forwardedAs="p">
           {t('robot_was_recalibrated')}
         </LegacyStyledText>
       </Flex>
@@ -106,13 +150,13 @@ export function HistoricalProtocolRunDrawer(
   ) : null
 
   const protocolFilesData =
-    runDataFileIds.length === 0 ? (
+    totalOutputFileCount === 0 ? (
       <InfoScreen content={t('no_files_included')} />
     ) : (
       <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing4}>
         <LegacyStyledText>{t('protocol_files')}</LegacyStyledText>
         <Flex
-          direction={DIRECTION_COLUMN}
+          flexDirection={DIRECTION_COLUMN}
           justifyContent={JUSTIFY_FLEX_START}
           alignItems={ALIGN_END}
           gridGap={SPACING.spacing24}
@@ -121,7 +165,7 @@ export function HistoricalProtocolRunDrawer(
         >
           <Box width="33%">
             <LegacyStyledText
-              as="p"
+              forwardedAs="p"
               datatest-id="RecentProtocolRun_Drawer_fileNameTitle"
             >
               {t('name')}
@@ -129,7 +173,7 @@ export function HistoricalProtocolRunDrawer(
           </Box>
           <Box width="33%">
             <LegacyStyledText
-              as="p"
+              forwardedAs="p"
               datatest-id="RecentProtocolRun_Drawer_fileDateTitle"
             >
               {t('date')}
@@ -137,7 +181,7 @@ export function HistoricalProtocolRunDrawer(
           </Box>
           <Box width="34%">
             <LegacyStyledText
-              as="p"
+              forwardedAs="p"
               datatest-id="RecentProtocolRun_Drawer_fileDownloadTitle"
             >
               {t('download')}
@@ -145,7 +189,14 @@ export function HistoricalProtocolRunDrawer(
           </Box>
         </Flex>
         <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing4}>
-          {runDataFileIds.map((fileId, index) => {
+          {outputFileIds.jpeg.length > 0 && (
+            <ImagesFileDataRow
+              run={run}
+              robotName={robotName}
+              protocolName={props.protocolName}
+            />
+          )}
+          {runCsvFileIds.map((fileId, index) => {
             return <CsvFileDataRow key={`csv_file_${index}`} fileId={fileId} />
           })}
         </Flex>
@@ -153,7 +204,7 @@ export function HistoricalProtocolRunDrawer(
     )
 
   const labwareOffsets =
-    uniqueLabwareOffsets == null || uniqueLabwareOffsets.length === 0 ? (
+    sortedUniqueLwOffsets == null || sortedUniqueLwOffsets.length === 0 ? (
       <InfoScreen content={t('no_offsets_available')} />
     ) : (
       <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing4}>
@@ -162,7 +213,7 @@ export function HistoricalProtocolRunDrawer(
           {i18n.format(t('labware_offset_data'), 'capitalize')}
         </LegacyStyledText>
         <Flex
-          direction={DIRECTION_COLUMN}
+          flexDirection={DIRECTION_COLUMN}
           justifyContent={JUSTIFY_FLEX_START}
           alignItems={ALIGN_END}
           gridGap={SPACING.spacing4}
@@ -170,27 +221,27 @@ export function HistoricalProtocolRunDrawer(
           padding={`${SPACING.spacing4} ${SPACING.spacing12}`}
         >
           <Box
-            width="33%"
+            width="75%"
             paddingY={`${SPACING.spacing4} ${SPACING.spacing8} ${SPACING.spacing4} ${SPACING.spacing4}`}
           >
             <LegacyStyledText
-              as="p"
+              forwardedAs="p"
               datatest-id="RecentProtocolRun_Drawer_locationTitle"
-            >
-              {i18n.format(t('location'), 'capitalize')}
-            </LegacyStyledText>
-          </Box>
-          <Box width="33%" padding={`${SPACING.spacing4} ${SPACING.spacing8}`}>
-            <LegacyStyledText
-              as="p"
-              datatest-id="RecentProtocolRun_Drawer_labwareTitle"
             >
               {i18n.format(t('labware'), 'capitalize')}
             </LegacyStyledText>
           </Box>
-          <Box width="34%" padding={`${SPACING.spacing4} ${SPACING.spacing8}`}>
+          <Box width="25%" padding={`${SPACING.spacing4} 0`}>
             <LegacyStyledText
-              as="p"
+              forwardedAs="p"
+              datatest-id="RecentProtocolRun_Drawer_labwareTitle"
+            >
+              {i18n.format(t('location'), 'capitalize')}
+            </LegacyStyledText>
+          </Box>
+          <Box width="25%" padding={`${SPACING.spacing4} 0`}>
+            <LegacyStyledText
+              forwardedAs="p"
               datatest-id="RecentProtocolRun_Drawer_labwareOffsetDataTitle"
             >
               {i18n.format(t('labware_offset_data'), 'sentenceCase')}
@@ -198,7 +249,7 @@ export function HistoricalProtocolRunDrawer(
           </Box>
         </Flex>
         <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing4}>
-          {uniqueLabwareOffsets.map((offset, index) => {
+          {sortedUniqueLwOffsets.map((offset, index) => {
             const labwareDefinitions =
               protocolDetails?.commands != null
                 ? getLoadedLabwareDefinitionsByUri(protocolDetails?.commands)
@@ -210,7 +261,15 @@ export function HistoricalProtocolRunDrawer(
               definition != null
                 ? getLabwareDisplayName(definition)
                 : offset.definitionUri
-
+            const thermocyclerLocation = isFlex
+              ? TC_MODULE_LOCATION_OT3
+              : TC_MODULE_LOCATION_OT2
+            const slotName =
+              offset.location.moduleModel != null &&
+              getModuleType(offset.location.moduleModel) ===
+                THERMOCYCLER_MODULE_TYPE
+                ? thermocyclerLocation
+                : offset.location.slotName
             return (
               <Flex
                 key={`labware_offset_${index}`}
@@ -221,29 +280,37 @@ export function HistoricalProtocolRunDrawer(
                 borderRadius={BORDERS.borderRadius4}
                 gridGap={SPACING.spacing24}
               >
-                <Flex
-                  width="33%"
-                  gridGap={SPACING.spacing4}
-                  alignItems={ALIGN_CENTER}
-                >
-                  <DeckInfoLabel deckLabel={offset.location.slotName} />
-                  <LegacyStyledText as="p">
-                    {offset.location.moduleModel != null
-                      ? getModuleDisplayName(offset.location.moduleModel)
-                      : null}
-                  </LegacyStyledText>
-                </Flex>
-                <Box width="33%">
-                  <LegacyStyledText as="p" title={labwareName}>
+                <Box width="75%">
+                  <LegacyStyledText forwardedAs="p" title={labwareName}>
                     {labwareName}
                   </LegacyStyledText>
                 </Box>
-                <Box width="34%">
-                  <OffsetVector
-                    {...offset.vector}
-                    fontSize={TYPOGRAPHY.fontSizeLabel}
-                    as="p"
-                  />
+                <Flex
+                  width="24%"
+                  gridGap={SPACING.spacing4}
+                  alignItems={ALIGN_CENTER}
+                >
+                  <RobotInfoLabel deckLabel={slotName} />
+                  {offset.locationSequence?.some(
+                    seq => seq.kind === 'onLabware'
+                  ) && <RobotInfoLabel iconName="stacked" key="stacked-icon" />}
+                  {offset.location.moduleModel && (
+                    <RobotInfoLabel
+                      iconName={
+                        MODULE_ICON_NAME_BY_TYPE[
+                          getModuleType(offset.location.moduleModel)
+                        ]
+                      }
+                    />
+                  )}
+                </Flex>
+                <Box width="26%">
+                  <Flex
+                    flexDirection={DIRECTION_COLUMN}
+                    gridGap={SPACING.spacing8}
+                  >
+                    <OffsetTag kind="vector" {...offset.vector} />
+                  </Flex>
                 </Box>
               </Flex>
             )
@@ -273,7 +340,7 @@ interface CsvFileDataRowProps {
 function CsvFileDataRow(props: CsvFileDataRowProps): JSX.Element | null {
   const { fileId } = props
 
-  const { data: fileData } = useCsvFileQuery(fileId)
+  const { data: fileData } = useDataFileQuery(fileId)
   if (fileData == null) {
     return null
   }
@@ -289,7 +356,7 @@ function CsvFileDataRow(props: CsvFileDataRowProps): JSX.Element | null {
     >
       <Flex width="33%" gridGap={SPACING.spacing4} alignItems={ALIGN_CENTER}>
         <LegacyStyledText
-          as="p"
+          forwardedAs="p"
           css={css`
             overflow: ${OVERFLOW_HIDDEN};
             text-overflow: ellipsis;
@@ -299,7 +366,7 @@ function CsvFileDataRow(props: CsvFileDataRowProps): JSX.Element | null {
         </LegacyStyledText>
       </Flex>
       <Box width="33%">
-        <LegacyStyledText as="p">
+        <LegacyStyledText forwardedAs="p">
           {format(new Date(createdAt), 'M/d/yy HH:mm:ss')}
         </LegacyStyledText>
       </Box>
@@ -308,4 +375,92 @@ function CsvFileDataRow(props: CsvFileDataRowProps): JSX.Element | null {
       </Box>
     </Flex>
   )
+}
+
+function ImagesFileDataRow({
+  run,
+  protocolName,
+  robotName,
+}: {
+  run: RunData
+  protocolName: string
+  robotName: string
+}): JSX.Element {
+  const { t } = useTranslation('run_details')
+  const robotType = useRobotType(robotName)
+  const { reportPhotoAccessUsage } = useCameraAnalytics({
+    source: SOURCE_RUN_RECORD,
+    robotType: robotType,
+  })
+  const { data: imagesZipFile, isLoading } = useAllRunImagesRaw(run.id)
+  const formattedRunTs = format(new Date(run.createdAt), 'yyyyMMdd-HHmmss')
+  const buildImagesZipName = (): string =>
+    `${robotName}_${protocolName}_${formattedRunTs}.zip`
+
+  return (
+    <Flex
+      justifyContent={JUSTIFY_FLEX_START}
+      alignItems={ALIGN_CENTER}
+      padding={SPACING.spacing12}
+      backgroundColor={COLORS.white}
+      borderRadius={BORDERS.borderRadius4}
+      gridGap={SPACING.spacing24}
+    >
+      <Flex width="33%" gridGap={SPACING.spacing4} alignItems={ALIGN_CENTER}>
+        <LegacyStyledText
+          forwardedAs="p"
+          css={css`
+            overflow: ${OVERFLOW_HIDDEN};
+            text-overflow: ellipsis;
+          `}
+        >
+          {buildImagesZipName()}
+        </LegacyStyledText>
+      </Flex>
+      <Box width="33%">
+        <LegacyStyledText forwardedAs="p">{formattedRunTs}</LegacyStyledText>
+      </Box>
+      <Box width="34%">
+        <Link
+          role="button"
+          css={
+            imagesZipFile == null
+              ? TYPOGRAPHY.darkLinkLabelSemiBoldDisabled
+              : TYPOGRAPHY.linkPSemiBold
+          }
+          onClick={() => {
+            if (imagesZipFile != null) {
+              downloadFile(imagesZipFile, buildImagesZipName())
+              reportPhotoAccessUsage({
+                action: 'downloadZip',
+              })
+            }
+          }}
+        >
+          <Flex alignItems={ALIGN_CENTER} gridGap={SPACING.spacing4}>
+            <LegacyStyledText forwardedAs="p">
+              {isLoading ? t('loading') : t('download')}
+            </LegacyStyledText>
+            {!isLoading && <Icon name="download" size="1rem" />}
+          </Flex>
+        </Link>
+      </Box>
+    </Flex>
+  )
+}
+
+const getLabwareNameForOffset = (
+  offset: LabwareOffset,
+  protocolDetails: CompletedProtocolAnalysis | null
+): string => {
+  const labwareDefinitions =
+    protocolDetails?.commands != null
+      ? getLoadedLabwareDefinitionsByUri(protocolDetails?.commands)
+      : {}
+  const definition = Object.values(labwareDefinitions).find(
+    def => getLabwareDefURI(def) === offset.definitionUri
+  )
+  return definition != null
+    ? getLabwareDisplayName(definition)
+    : offset.definitionUri
 }

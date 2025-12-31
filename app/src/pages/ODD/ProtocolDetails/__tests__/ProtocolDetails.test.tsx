@@ -1,24 +1,29 @@
-import { vi, it, describe, expect, beforeEach, afterEach } from 'vitest'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { when } from 'vitest-when'
-import { Route, MemoryRouter, Routes } from 'react-router-dom'
+
 import '@testing-library/jest-dom/vitest'
-import { renderWithProviders } from '/app/__testing-utils__'
+
 import { deleteProtocol, deleteRun, getProtocol } from '@opentrons/api-client'
 import {
   useCreateRunMutation,
   useHost,
-  useProtocolQuery,
   useProtocolAnalysisAsDocumentQuery,
+  useProtocolQuery,
 } from '@opentrons/react-api-client'
+
+import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { useHardwareStatusText } from '/app/organisms/ODD/RobotDashboard/hooks'
-import { useOffsetCandidatesForAnalysis } from '/app/organisms/ApplyHistoricOffsets/hooks/useOffsetCandidatesForAnalysis'
-import { useRunTimeParameters } from '/app/resources/protocols'
-import { ProtocolSetupParameters } from '/app/organisms/ODD/ProtocolSetup/ProtocolSetupParameters'
+import { useScrollPosition } from '/app/local-resources/dom-utils'
+import { useOffsetCandidatesForAnalysis } from '/app/organisms/LegacyApplyHistoricOffsets/hooks/useOffsetCandidatesForAnalysis'
 import { mockRunTimeParameterData } from '/app/organisms/ODD/ProtocolSetup/__fixtures__'
+import { ProtocolSetupParameters } from '/app/organisms/ODD/ProtocolSetup/ProtocolSetupParameters'
+import { useHardwareStatusText } from '/app/organisms/ODD/RobotDashboard/hooks'
+import { useRunTimeParameters } from '/app/resources/protocols'
 import { formatTimeWithUtcLabel } from '/app/resources/runs'
 import { useMissingProtocolHardware } from '/app/transformations/commands'
+
 import { ProtocolDetails } from '..'
 import { Deck } from '../Deck'
 import { Hardware } from '../Hardware'
@@ -27,18 +32,6 @@ import { Parameters } from '../Parameters'
 
 import type { HostConfig } from '@opentrons/api-client'
 
-// Mock IntersectionObserver
-class IntersectionObserver {
-  observe = vi.fn()
-  disconnect = vi.fn()
-  unobserve = vi.fn()
-}
-
-Object.defineProperty(window, 'IntersectionObserver', {
-  writable: true,
-  configurable: true,
-  value: IntersectionObserver,
-})
 vi.mock(
   '/app/organisms/ODD/ProtocolSetup/ProtocolSetupParameters/ProtocolSetupParameters'
 )
@@ -46,7 +39,7 @@ vi.mock('@opentrons/api-client')
 vi.mock('@opentrons/react-api-client')
 vi.mock('/app/organisms/ODD/RobotDashboard/hooks')
 vi.mock(
-  '/app/organisms/ApplyHistoricOffsets/hooks/useOffsetCandidatesForAnalysis'
+  '/app/organisms/LegacyApplyHistoricOffsets/hooks/useOffsetCandidatesForAnalysis'
 )
 vi.mock('/app/resources/protocols')
 vi.mock('/app/transformations/commands')
@@ -55,6 +48,7 @@ vi.mock('../Hardware')
 vi.mock('../Labware')
 vi.mock('../Parameters')
 vi.mock('/app/redux/config')
+vi.mock('/app/local-resources/dom-utils')
 
 const MOCK_HOST_CONFIG = {} as HostConfig
 const mockCreateRun = vi.fn((id: string) => {})
@@ -119,6 +113,10 @@ describe('ODDProtocolDetails', () => {
     vi.mocked(getProtocol).mockResolvedValue({
       data: { links: { referencingRuns: [{ id: '1' }, { id: '2' }] } },
     } as any)
+    vi.mocked(useScrollPosition).mockReturnValue({
+      isScrolled: false,
+      scrollRef: {} as any,
+    })
   })
   afterEach(() => {
     vi.resetAllMocks()

@@ -6,32 +6,30 @@ import {
   COLORS,
   DIRECTION_COLUMN,
   Flex,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
-import { useAllProtocolsQuery } from '@opentrons/react-api-client'
 
 import { Navigation } from '/app/organisms/ODD/Navigation'
 import {
   EmptyRecentRun,
   RecentRunProtocolCarousel,
 } from '/app/organisms/ODD/RobotDashboard'
-import { getOnDeviceDisplaySettings } from '/app/redux/config'
-import { WelcomeModal } from './WelcomeModal'
 import { ServerInitializing } from '/app/organisms/ODD/RobotDashboard/ServerInitializing'
+import { getOnDeviceDisplaySettings } from '/app/redux/config'
 import { useNotifyAllRunsQuery } from '/app/resources/runs'
+
+import { WelcomeModal } from './WelcomeModal'
+
 import type { RunData } from '@opentrons/api-client'
 
 export const MAXIMUM_RECENT_RUN_PROTOCOLS = 8
 
 export function RobotDashboard(): JSX.Element {
   const { t } = useTranslation('device_details')
-  const {
-    data: allRunsQueryData,
-    error: allRunsQueryError,
-  } = useNotifyAllRunsQuery()
-  const protocols = useAllProtocolsQuery()
+  const { data: allRunsQueryData, error: allRunsQueryError } =
+    useNotifyAllRunsQuery()
 
   const { unfinishedUnboxingFlowRoute } = useSelector(
     getOnDeviceDisplaySettings
@@ -44,11 +42,6 @@ export function RobotDashboard(): JSX.Element {
     .reduceRight<RunData[]>((acc, run) => {
       if (
         acc.some(collectedRun => collectedRun.protocolId === run.protocolId)
-      ) {
-        return acc
-      } else if (
-        protocols?.data?.data.find(protocol => protocol.id === run.protocolId)
-          ?.protocolKind === 'quick-transfer'
       ) {
         return acc
       } else {
@@ -67,7 +60,7 @@ export function RobotDashboard(): JSX.Element {
     contents = (
       <>
         <LegacyStyledText
-          as="p"
+          forwardedAs="p"
           fontWeight={TYPOGRAPHY.fontWeightSemiBold}
           color={COLORS.grey60}
         >

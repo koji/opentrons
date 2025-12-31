@@ -1,4 +1,4 @@
-import * as React from 'react'
+import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSelector } from 'react-redux'
 import { css } from 'styled-components'
@@ -7,23 +7,27 @@ import {
   ALIGN_CENTER,
   Banner,
   Box,
+  DIRECTION_COLUMN,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
-  DIRECTION_COLUMN,
-  SPACING_AUTO,
-  SPACING,
   LegacyStyledText,
+  SPACING,
+  SPACING_AUTO,
+  StyledText,
   Tooltip,
   TYPOGRAPHY,
   useHoverTooltip,
-  StyledText,
 } from '@opentrons/components'
 
-import { ExternalLink } from '/app/atoms/Link/ExternalLink'
 import { TertiaryButton } from '/app/atoms/buttons'
+import { ExternalLink } from '/app/atoms/Link/ExternalLink'
+import { isTerminalRunStatus } from '/app/local-resources/runs/utils'
 import { getRobotUpdateDisplayInfo } from '/app/redux/robot-update'
 import { useDispatchStartRobotUpdate } from '/app/redux/robot-update/hooks'
+import { remote } from '/app/redux/shell/remote'
 
+import type { ChangeEventHandler, MouseEventHandler } from 'react'
+import type { Run } from '@opentrons/api-client'
 import type { State } from '/app/redux/types'
 
 const OT_APP_UPDATE_PAGE_LINK = 'https://opentrons.com/ot-app/'
@@ -35,13 +39,13 @@ const HIDDEN_CSS = css`
 interface UpdateRobotSoftwareProps {
   robotName: string
   onUpdateStart: () => void
-  isRobotBusy: boolean
+  currentRun: Run | null
 }
 
 export function UpdateRobotSoftware({
   robotName,
   onUpdateStart,
-  isRobotBusy,
+  currentRun,
 }: UpdateRobotSoftwareProps): JSX.Element {
   const { t } = useTranslation(['device_settings', 'branded'])
   const { updateFromFileDisabledReason } = useSelector((state: State) => {
@@ -49,23 +53,30 @@ export function UpdateRobotSoftware({
   })
   const updateDisabled = updateFromFileDisabledReason !== null
   const [updateButtonProps, updateButtonTooltipProps] = useHoverTooltip()
-  const inputRef = React.useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const dispatchStartRobotUpdate = useDispatchStartRobotUpdate()
+  const isRunActive =
+    currentRun != null && !isTerminalRunStatus(currentRun.data.status)
 
-  const handleChange: React.ChangeEventHandler<HTMLInputElement> = event => {
+  const handleChange: ChangeEventHandler<HTMLInputElement> = event => {
     const { files } = event.target
-    if (files?.length === 1 && !updateDisabled) {
-      dispatchStartRobotUpdate(robotName, files[0].path)
-      onUpdateStart()
-    }
-    // this is to reset the state of the file picker so users can reselect the same
-    // system image if the upload fails
-    if (inputRef.current?.value != null) {
-      inputRef.current.value = ''
+
+    if (files != null) {
+      void remote.getFilePathFrom(files[0]).then(filePath => {
+        if (files.length === 1 && !updateDisabled) {
+          dispatchStartRobotUpdate(robotName, filePath)
+          onUpdateStart()
+        }
+        // this is to reset the state of the file picker so users can reselect the same
+        // system image if the upload fails
+        if (inputRef.current?.value != null) {
+          inputRef.current.value = ''
+        }
+      })
     }
   }
 
-  const handleClick: React.MouseEventHandler<HTMLButtonElement> = () => {
+  const handleClick: MouseEventHandler<HTMLButtonElement> = () => {
     inputRef.current?.click()
   }
 
@@ -80,7 +91,7 @@ export function UpdateRobotSoftware({
           >
             {t('update_robot_software')}
           </LegacyStyledText>
-          <LegacyStyledText as="p" marginBottom={SPACING.spacing8}>
+          <LegacyStyledText forwardedAs="p" marginBottom={SPACING.spacing8}>
             {t('branded:update_robot_software_description')}
           </LegacyStyledText>
           <ExternalLink href={OT_APP_UPDATE_PAGE_LINK}>
@@ -91,7 +102,7 @@ export function UpdateRobotSoftware({
           marginLeft={SPACING_AUTO}
           id="AdvancedSettings_softwareUpdateButton"
           {...updateButtonProps}
-          disabled={updateDisabled || isRobotBusy}
+          disabled={updateDisabled || isRunActive}
           onClick={handleClick}
         >
           {t('browse_file_system')}
@@ -105,7 +116,7 @@ export function UpdateRobotSoftware({
         </TertiaryButton>
         {updateFromFileDisabledReason != null && (
           <Tooltip tooltipProps={updateButtonTooltipProps}>
-            {updateFromFileDisabledReason}
+            {t(updateFromFileDisabledReason)}
           </Tooltip>
         )}
       </Flex>

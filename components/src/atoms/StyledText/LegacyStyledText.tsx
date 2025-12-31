@@ -1,12 +1,15 @@
 import styled, { css } from 'styled-components'
+
 import { Text } from '../../primitives'
-import { TYPOGRAPHY, RESPONSIVENESS } from '../../ui-style-constants'
+import { RESPONSIVENESS, TYPOGRAPHY } from '../../ui-style-constants'
 
-import type * as React from 'react'
 import type { FlattenSimpleInterpolation } from 'styled-components'
+import type { ComponentProps, ReactNode } from 'react'
 
-export interface LegacyProps extends React.ComponentProps<typeof Text> {
-  children?: React.ReactNode
+export interface LegacyProps extends Omit<ComponentProps<typeof Text>, 'as'> {
+  children?: ReactNode
+  as?: keyof JSX.IntrinsicElements | React.ComponentType<any> // Note this would be temporary
+  forwardedAs?: keyof JSX.IntrinsicElements | React.ComponentType<any> // to avoid stopping apply the color style
 }
 
 const styleMap: { [tag: string]: FlattenSimpleInterpolation } = {
@@ -90,6 +93,7 @@ export const LegacyStyledText: (props: LegacyProps) => JSX.Element = styled(
     } else if (props.fontWeight === TYPOGRAPHY.fontWeightBold) {
       fontWeight = 'Bold'
     }
-    return styleMap[`${props.as}${fontWeight}`]
+    const tag = props.forwardedAs ?? props.as
+    return styleMap[`${tag}${fontWeight}`]
   }}
 `

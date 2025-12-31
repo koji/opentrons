@@ -1,4 +1,8 @@
 {
+  "commandAnnotations": [],
+  "commandPreconditions": {
+    "isCameraUsed": false
+  },
   "commands": [
     {
       "commandType": "home",
@@ -1159,7 +1163,20 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "D1",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutoutD1",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "singleLeftSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -1233,12 +1250,7 @@
       ]
     }
   ],
-  "files": [
-    {
-      "name": "Flex_X_v2_20_96_None_Overrides_TooTallLabware_Override_bottom_left_edge.py",
-      "role": "main"
-    }
-  ],
+  "files": [],
   "labware": [
     {
       "definitionUri": "opentrons/opentrons_96_tiprack_1000ul/1",
@@ -1249,6 +1261,7 @@
       }
     }
   ],
+  "liquidClasses": [],
   "liquids": [],
   "metadata": {
     "description": "oooo",

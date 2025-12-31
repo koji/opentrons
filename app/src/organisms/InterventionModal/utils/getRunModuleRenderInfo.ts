@@ -1,34 +1,43 @@
 import {
-  SPAN7_8_10_11_SLOT,
-  getModuleDef2,
+  getModuleDef,
   getPositionFromSlotId,
+  SPAN7_8_10_11_SLOT,
 } from '@opentrons/shared-data'
 
+import type { ComponentProps } from 'react'
 import type { RunData } from '@opentrons/api-client'
+import type { Module } from '@opentrons/components'
 import type {
   DeckDefinition,
-  LabwareDefinition2,
-  LabwareDefinitionsByUri,
+  LabwareDefinition,
+  LabwareDefinitionsByURI,
   ModuleDefinition,
 } from '@opentrons/shared-data'
 
 export interface RunModuleInfo {
   moduleId: string
+  /**
+   * The name/ID of the slot that the module is in (on an OT-2) or replacing (on a Flex),
+   * as found in the deck definition.
+   */
+  slotName: string
   x: number
   y: number
   moduleDef: ModuleDefinition
-  nestedLabwareDef: LabwareDefinition2 | null
+  nestedLabwareDef: LabwareDefinition | null
   nestedLabwareId: string | null
+  targetDeckId: NonNullable<ComponentProps<typeof Module>['targetDeckId']>
+  targetSlotId: NonNullable<ComponentProps<typeof Module>['targetSlotId']>
 }
 
 export function getRunModuleRenderInfo(
   runData: RunData,
   deckDef: DeckDefinition,
-  labwareDefs: LabwareDefinitionsByUri
+  labwareDefs: LabwareDefinitionsByURI
 ): RunModuleInfo[] {
   if (runData.modules.length > 0) {
     return runData.modules.reduce<RunModuleInfo[]>((acc, module) => {
-      const moduleDef = getModuleDef2(module.model)
+      const moduleDef = getModuleDef(module.model)
       const nestedLabware = runData.labware.find(
         labware =>
           typeof labware.location === 'object' &&
@@ -47,11 +56,14 @@ export function getRunModuleRenderInfo(
         ...acc,
         {
           moduleId: module.id,
+          slotName,
           x: slotPosition?.[0] ?? 0,
           y: slotPosition?.[1] ?? 0,
           moduleDef,
           nestedLabwareDef,
           nestedLabwareId: nestedLabware?.id ?? null,
+          targetDeckId: deckDef.otId,
+          targetSlotId: slotName,
         },
       ]
     }, [])

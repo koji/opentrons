@@ -1,20 +1,22 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { i18n } from '/app/i18n'
 import { renderWithProviders } from '/app/__testing-utils__'
+import { i18n } from '/app/i18n'
+
 import { TextSize } from '../TextSize'
 
+import type { ComponentProps } from 'react'
+
 const mockFunc = vi.fn()
-const render = (props: React.ComponentProps<typeof TextSize>) => {
+const render = (props: ComponentProps<typeof TextSize>) => {
   return renderWithProviders(<TextSize {...props} />, {
     i18nInstance: i18n,
   })
 }
 
 describe('TextSize', () => {
-  let props: React.ComponentProps<typeof TextSize>
+  let props: ComponentProps<typeof TextSize>
 
   beforeEach(() => {
     props = {

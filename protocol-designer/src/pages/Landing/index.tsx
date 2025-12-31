@@ -1,14 +1,13 @@
-import { useEffect, useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
-import styled from 'styled-components'
-import { useDispatch, useSelector } from 'react-redux'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useDispatch, useSelector } from 'react-redux'
+import { NavLink, useNavigate } from 'react-router-dom'
+
 import {
   ALIGN_CENTER,
+  BasicButton,
   COLORS,
-  CURSOR_POINTER,
   DIRECTION_COLUMN,
-  EndUserAgreementFooter,
   Flex,
   INFO_TOAST,
   JUSTIFY_CENTER,
@@ -17,28 +16,37 @@ import {
   StyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
-import { BUTTON_LINK_STYLE } from '../../atoms'
-import { AnnouncementModal } from '../../organisms'
-import { actions as loadFileActions } from '../../load-file'
-import { getFileMetadata } from '../../file-data/selectors'
-import { toggleNewProtocolModal } from '../../navigation/actions'
-import { useKitchen } from '../../organisms/Kitchen/hooks'
-import { getHasOptedIn } from '../../analytics/selectors'
-import { useAnnouncements } from '../../organisms/AnnouncementModal/announcements'
-import { getLocalStorageItem, localStorageAnnouncementKey } from '../../persist'
-import welcomeImage from '../../assets/images/welcome_page.png'
 
+import { getHasOptedIn } from '../../analytics/selectors'
+import { EndUserAgreementFooter } from '../../components/molecules'
+import { AnnouncementModal } from '../../components/organisms'
+import { useAnnouncements } from '../../components/organisms/AnnouncementModal/announcements'
+import { useKitchen } from '../../components/organisms/Kitchen/useKitchen'
+import { ACCEPTED_PROTOCOL_FILE_TYPES } from '../../constants'
+import { getFileMetadata } from '../../file-data/selectors'
+import { actions as loadFileActions } from '../../load-file'
+import { toggleNewProtocolModal } from '../../navigation/actions'
+import {
+  getLocalStorageItem,
+  localStorageAnnouncementKey,
+  setLocalStorageItem,
+} from '../../persist'
+import styles from './landing.module.css'
+
+import type { ChangeEvent } from 'react'
 import type { ThunkDispatch } from '../../types'
+
+import welcomeImage from '../../assets/images/welcome_page.png'
 
 export function Landing(): JSX.Element {
   const { t } = useTranslation('shared')
   const dispatch: ThunkDispatch<any> = useDispatch()
   const metadata = useSelector(getFileMetadata)
   const navigate = useNavigate()
-  const [showAnnouncementModal, setShowAnnouncementModal] = useState<boolean>(
-    false
-  )
-  const hasOptedIn = useSelector(getHasOptedIn)
+  const [showAnnouncementModal, setShowAnnouncementModal] =
+    useState<boolean>(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { hasOptedIn, appVersion } = useSelector(getHasOptedIn)
   const { bakeToast, eatToast } = useKitchen()
   const announcements = useAnnouncements()
   const lastAnnouncement = announcements[announcements.length - 1]
@@ -51,14 +59,21 @@ export function Landing(): JSX.Element {
     hasOptedIn != null
 
   useEffect(() => {
-    if (userHasNotSeenAnnouncement) {
+    if (
+      userHasNotSeenAnnouncement &&
+      appVersion != null &&
+      hasOptedIn != null
+    ) {
       const toastId = bakeToast(
-        t('learn_more', { version: process.env.OT_PD_VERSION }) as string,
+        t('learn_more', { version: _OT_PD_VERSION_ }) as string,
         INFO_TOAST,
         {
           heading: t('updated_protocol_designer'),
           closeButton: true,
           linkText: t('view_release_notes'),
+          onClose: () => {
+            setLocalStorageItem(localStorageAnnouncementKey, announcementKey)
+          },
           onLinkClick: () => {
             eatToast(toastId)
             setShowAnnouncementModal(true)
@@ -68,7 +83,7 @@ export function Landing(): JSX.Element {
         }
       )
     }
-  }, [userHasNotSeenAnnouncement])
+  }, [userHasNotSeenAnnouncement, appVersion, hasOptedIn])
 
   useEffect(() => {
     if (metadata?.created != null) {
@@ -77,10 +92,14 @@ export function Landing(): JSX.Element {
     }
   }, [metadata, navigate])
 
-  const loadFile = (
-    fileChangeEvent: React.ChangeEvent<HTMLInputElement>
-  ): void => {
+  const loadFile = (fileChangeEvent: ChangeEvent<HTMLInputElement>): void => {
     dispatch(loadFileActions.loadProtocolFile(fileChangeEvent))
+  }
+
+  const handleImportClick = (): void => {
+    if (fileInputRef.current != null) {
+      fileInputRef.current.click()
+    }
   }
 
   return (
@@ -94,7 +113,8 @@ export function Landing(): JSX.Element {
         />
       ) : null}
       <Flex
-        backgroundColor={COLORS.grey20}
+        data-cy="landing-page"
+        backgroundColor={COLORS.grey10}
         flexDirection={DIRECTION_COLUMN}
         alignItems={ALIGN_CENTER}
         justifyContent={JUSTIFY_CENTER}
@@ -102,7 +122,11 @@ export function Landing(): JSX.Element {
         width="100%"
         gridGap={SPACING.spacing32}
       >
-        <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing16}>
+        <Flex
+          flexDirection={DIRECTION_COLUMN}
+          gridGap={SPACING.spacing16}
+          alignItems={ALIGN_CENTER}
+        >
           <img
             src={welcomeImage}
             height="132px"
@@ -127,44 +151,33 @@ export function Landing(): JSX.Element {
             </StyledText>
           </Flex>
         </Flex>
-        <StyledNavLink to={'/createNew'}>
+        <NavLink to="/createNew" className={styles.nav_link}>
           <LargeButton
             onClick={() => {
               dispatch(toggleNewProtocolModal(true))
             }}
-            buttonText={<ButtonText>{t('create_a_protocol')}</ButtonText>}
+            buttonText={
+              <span className={styles.button_text}>
+                {t('create_a_protocol')}
+              </span>
+            }
           />
-        </StyledNavLink>
-        <StyledLabel>
-          <Flex css={BUTTON_LINK_STYLE}>
-            <StyledText desktopStyle="bodyLargeRegular">
-              {t('edit_existing')}
-            </StyledText>
-          </Flex>
-          <input type="file" onChange={loadFile}></input>
-        </StyledLabel>
+        </NavLink>
+        <label className={styles.label}>
+          <BasicButton onClick={handleImportClick} underLine>
+            {t('import_existing_protocol')}
+          </BasicButton>
+          <input
+            type="file"
+            onChange={loadFile}
+            ref={fileInputRef}
+            aria-label={`${t('import')}_from_landing`}
+            className={styles.hiddenInput}
+            accept={ACCEPTED_PROTOCOL_FILE_TYPES}
+          />
+        </label>
       </Flex>
       <EndUserAgreementFooter />
     </>
   )
 }
-
-const StyledLabel = styled.label`
-  display: inline-block;
-  cursor: ${CURSOR_POINTER};
-  input[type='file'] {
-    display: none;
-  }
-`
-
-const ButtonText = styled.span`
-  line-height: ${TYPOGRAPHY.lineHeight24};
-  font-size: 1rem;
-  font-style: normal;
-  font-weight: ${TYPOGRAPHY.fontWeightSemiBold};
-`
-
-const StyledNavLink = styled(NavLink)<React.ComponentProps<typeof NavLink>>`
-  color: ${COLORS.white};
-  text-decoration: none;
-`

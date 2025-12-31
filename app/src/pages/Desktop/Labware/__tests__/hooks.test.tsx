@@ -1,16 +1,17 @@
-import type * as React from 'react'
-import { Provider } from 'react-redux'
-import { createStore } from 'redux'
-import { vi, it, describe, expect, beforeEach, afterEach } from 'vitest'
-import { renderHook } from '@testing-library/react'
-import { i18n } from '/app/i18n'
 import { I18nextProvider } from 'react-i18next'
-import { getAllDefs } from '/app/local-resources/labware/utils/getAllDefs'
+import { Provider } from 'react-redux'
+import { renderHook } from '@testing-library/react'
+import { legacy_createStore } from 'redux'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { getAllDefinitions } from '@opentrons/shared-data'
+
+import { i18n } from '/app/i18n'
+import { useAllLabware } from '/app/local-resources/labware'
 import {
-  getValidCustomLabware,
   getAddLabwareFailure,
   getAddNewLabwareName,
+  getValidCustomLabware,
 } from '/app/redux/custom-labware'
 import {
   mockDefinition,
@@ -18,19 +19,28 @@ import {
 } from '/app/redux/custom-labware/__fixtures__'
 
 import { useLabwareFailure, useNewLabwareName } from '../hooks'
-import { useAllLabware } from '/app/local-resources/labware'
 
 import type { Store } from 'redux'
-import type { State } from '/app/redux/types'
+import type { FunctionComponent, ReactNode } from 'react'
+import type * as SharedData from '@opentrons/shared-data'
 import type { FailedLabwareFile } from '/app/redux/custom-labware/types'
+import type { State } from '/app/redux/types'
 
 vi.mock('/app/redux/custom-labware')
-vi.mock('/app/local-resources/labware/utils/getAllDefs')
+vi.mock('@opentrons/shared-data', async importOriginal => {
+  const actualSharedData = await importOriginal<typeof SharedData>()
+  return {
+    ...actualSharedData,
+    getAllDefinitions: vi.fn(),
+  }
+})
 
 describe('useAllLabware hook', () => {
-  const store: Store<State> = createStore(vi.fn(), {})
+  const store: Store<State> = legacy_createStore(vi.fn(), {})
   beforeEach(() => {
-    vi.mocked(getAllDefs).mockReturnValue([mockDefinition])
+    vi.mocked(getAllDefinitions).mockReturnValue({
+      'custom/mock_definition/1': mockDefinition,
+    })
     vi.mocked(getValidCustomLabware).mockReturnValue([mockValidLabware])
     store.dispatch = vi.fn()
   })
@@ -39,7 +49,7 @@ describe('useAllLabware hook', () => {
   })
 
   it('should return object with only definition and modified date', () => {
-    const wrapper: React.FunctionComponent<{ children: React.ReactNode }> = ({
+    const wrapper: FunctionComponent<{ children: ReactNode }> = ({
       children,
     }) => <Provider store={store}>{children}</Provider>
     const { result } = renderHook(() => useAllLabware('reverse', 'all'), {
@@ -53,7 +63,7 @@ describe('useAllLabware hook', () => {
     expect(labware2.definition).toBe(mockValidLabware.definition)
   })
   it('should return alphabetically sorted list', () => {
-    const wrapper: React.FunctionComponent<{ children: React.ReactNode }> = ({
+    const wrapper: FunctionComponent<{ children: ReactNode }> = ({
       children,
     }) => <Provider store={store}>{children}</Provider>
     const { result } = renderHook(() => useAllLabware('alphabetical', 'all'), {
@@ -67,7 +77,7 @@ describe('useAllLabware hook', () => {
     expect(labware1.definition).toBe(mockValidLabware.definition)
   })
   it('should return no labware if not the right filter', () => {
-    const wrapper: React.FunctionComponent<{ children: React.ReactNode }> = ({
+    const wrapper: FunctionComponent<{ children: ReactNode }> = ({
       children,
     }) => <Provider store={store}>{children}</Provider>
     const { result } = renderHook(() => useAllLabware('reverse', 'reservoir'), {
@@ -80,7 +90,7 @@ describe('useAllLabware hook', () => {
     expect(labware2).toBe(undefined)
   })
   it('should return labware with wellPlate filter', () => {
-    const wrapper: React.FunctionComponent<{ children: React.ReactNode }> = ({
+    const wrapper: FunctionComponent<{ children: ReactNode }> = ({
       children,
     }) => <Provider store={store}>{children}</Provider>
     const { result } = renderHook(() => useAllLabware('reverse', 'wellPlate'), {
@@ -94,7 +104,7 @@ describe('useAllLabware hook', () => {
     expect(labware2.definition).toBe(mockValidLabware.definition)
   })
   it('should return custom labware with customLabware filter', () => {
-    const wrapper: React.FunctionComponent<{ children: React.ReactNode }> = ({
+    const wrapper: FunctionComponent<{ children: ReactNode }> = ({
       children,
     }) => <Provider store={store}>{children}</Provider>
     const { result } = renderHook(
@@ -112,7 +122,7 @@ describe('useAllLabware hook', () => {
 })
 
 describe('useLabwareFailure hook', () => {
-  const store: Store<State> = createStore(vi.fn(), {})
+  const store: Store<State> = legacy_createStore(vi.fn(), {})
   beforeEach(() => {
     vi.mocked(getAddLabwareFailure).mockReturnValue({
       file: {
@@ -127,7 +137,7 @@ describe('useLabwareFailure hook', () => {
     vi.restoreAllMocks()
   })
   it('should return invalid labware definition', () => {
-    const wrapper: React.FunctionComponent<{ children: React.ReactNode }> = ({
+    const wrapper: FunctionComponent<{ children: ReactNode }> = ({
       children,
     }) => (
       <Provider store={store}>
@@ -147,7 +157,7 @@ describe('useLabwareFailure hook', () => {
       errorMessage: null,
     })
 
-    const wrapper: React.FunctionComponent<{ children: React.ReactNode }> = ({
+    const wrapper: FunctionComponent<{ children: ReactNode }> = ({
       children,
     }) => (
       <Provider store={store}>
@@ -170,7 +180,7 @@ describe('useLabwareFailure hook', () => {
       errorMessage: null,
     })
 
-    const wrapper: React.FunctionComponent<{ children: React.ReactNode }> = ({
+    const wrapper: FunctionComponent<{ children: ReactNode }> = ({
       children,
     }) => (
       <Provider store={store}>
@@ -190,7 +200,7 @@ describe('useLabwareFailure hook', () => {
       errorMessage: 'error',
     })
 
-    const wrapper: React.FunctionComponent<{ children: React.ReactNode }> = ({
+    const wrapper: FunctionComponent<{ children: ReactNode }> = ({
       children,
     }) => (
       <Provider store={store}>
@@ -205,7 +215,7 @@ describe('useLabwareFailure hook', () => {
 })
 
 describe('useNewLabwareName hook', () => {
-  const store: Store<State> = createStore(vi.fn(), {})
+  const store: Store<State> = legacy_createStore(vi.fn(), {})
   beforeEach(() => {
     vi.mocked(getAddNewLabwareName).mockReturnValue({
       filename: 'mock_filename',
@@ -217,7 +227,7 @@ describe('useNewLabwareName hook', () => {
   })
 
   it('should return filename as a string', () => {
-    const wrapper: React.FunctionComponent<{ children: React.ReactNode }> = ({
+    const wrapper: FunctionComponent<{ children: ReactNode }> = ({
       children,
     }) => <Provider store={store}>{children}</Provider>
     const { result } = renderHook(useNewLabwareName, { wrapper })

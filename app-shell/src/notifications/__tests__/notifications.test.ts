@@ -1,9 +1,9 @@
-import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { registerNotify, closeAllNotifyConnections } from '..'
+import { closeAllNotifyConnections, registerNotify } from '..'
+import { closeConnectionsForcefullyFor } from '../connect'
 import { connectionStore } from '../store'
 import { subscribe } from '../subscribe'
-import { closeConnectionsForcefullyFor } from '../connect'
 
 import type { Mock } from 'vitest'
 
@@ -38,7 +38,7 @@ describe('registerNotify', () => {
   it('should set browser window when connectionStore has no browser window', () => {
     registerNotify(dispatch, mainWindow as any)(MOCK_ACTION)
 
-    expect(connectionStore.setBrowserWindow).toHaveBeenCalledWith(mainWindow)
+    expect(connectionStore.addBrowserWindow).toHaveBeenCalledWith(mainWindow)
   })
 
   it('should subscribe when action type is shell:NOTIFY_SUBSCRIBE', () => {

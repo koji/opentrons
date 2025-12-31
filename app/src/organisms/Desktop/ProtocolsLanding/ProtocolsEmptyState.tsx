@@ -4,12 +4,13 @@ import {
   ALIGN_CENTER,
   DIRECTION_COLUMN,
   Flex,
-  SPACING,
   LegacyStyledText,
+  SPACING,
 } from '@opentrons/components'
 
-import { ProtocolUploadInput } from './ProtocolUploadInput'
 import { EmptyStateLinks } from './EmptyStateLinks'
+import { ProtocolUploadInput } from './ProtocolUploadInput'
+
 export function ProtocolsEmptyState(): JSX.Element | null {
   const { t } = useTranslation('protocol_info')
   return (
@@ -21,7 +22,7 @@ export function ProtocolsEmptyState(): JSX.Element | null {
       paddingTop={SPACING.spacing32}
       transform="translateY(25%)"
     >
-      <LegacyStyledText role="complementary" as="h1">
+      <LegacyStyledText role="complementary" forwardedAs="h1">
         {t('import_a_file')}
       </LegacyStyledText>
       <ProtocolUploadInput />

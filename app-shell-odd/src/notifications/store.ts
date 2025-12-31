@@ -1,11 +1,10 @@
-import type mqtt from 'mqtt'
-
 import { FAILURE_STATUSES } from '../constants'
 
-import type { NotifyTopic } from '@opentrons/app/src/redux/shell/types'
 import type { BrowserWindow } from 'electron'
+import type mqtt from 'mqtt'
+import type { NotifyTopic } from '@opentrons/app/src/redux/shell/types'
 
-type FailedConnStatus = typeof FAILURE_STATUSES[keyof typeof FAILURE_STATUSES]
+type FailedConnStatus = (typeof FAILURE_STATUSES)[keyof typeof FAILURE_STATUSES]
 
 /**
  * @description Manages the internal state of MQTT connections to various robot hosts.

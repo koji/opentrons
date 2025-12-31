@@ -1,21 +1,22 @@
-import { describe, it, vi, expect, beforeEach } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
-  RUN_STATUS_AWAITING_RECOVERY_BLOCKED_BY_OPEN_DOOR,
   RUN_STATUS_AWAITING_RECOVERY,
+  RUN_STATUS_AWAITING_RECOVERY_BLOCKED_BY_OPEN_DOOR,
 } from '@opentrons/api-client'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { RecoveryDoorOpenSpecial } from '../RecoveryDoorOpenSpecial'
-import { RECOVERY_MAP } from '../../constants'
-
-import type * as React from 'react'
 import { clickButtonLabeled } from '/app/organisms/ErrorRecoveryFlows/__tests__/util'
 
+import { RECOVERY_MAP } from '../../constants'
+import { RecoveryDoorOpenSpecial } from '../RecoveryDoorOpenSpecial'
+
+import type { ComponentProps } from 'react'
+
 describe('RecoveryDoorOpenSpecial', () => {
-  let props: React.ComponentProps<typeof RecoveryDoorOpenSpecial>
+  let props: ComponentProps<typeof RecoveryDoorOpenSpecial>
 
   beforeEach(() => {
     props = {
@@ -28,16 +29,18 @@ describe('RecoveryDoorOpenSpecial', () => {
       },
       routeUpdateActions: {
         proceedToRouteAndStep: vi.fn(),
+        handleMotionRouting: vi.fn().mockImplementation(_ => Promise.resolve()),
       },
       doorStatusUtils: {
         isDoorOpen: true,
       },
+      recoveryCommands: {
+        homeExceptPlungers: vi.fn().mockResolvedValue(undefined),
+      },
     } as any
   })
 
-  const render = (
-    props: React.ComponentProps<typeof RecoveryDoorOpenSpecial>
-  ) => {
+  const render = (props: ComponentProps<typeof RecoveryDoorOpenSpecial>) => {
     return renderWithProviders(<RecoveryDoorOpenSpecial {...props} />, {
       i18nInstance: i18n,
     })[0]
@@ -66,12 +69,56 @@ describe('RecoveryDoorOpenSpecial', () => {
     render(props)
     screen.getByText('Close the robot door')
     screen.getByText(
-      'The robot door must be closed for the gripper to home its Z-axis before you can continue manually moving labware.'
+      'The robot needs to safely move to its home location before you manually move the labware.'
     )
   })
 
-  it('renders default subtext for unhandled recovery option', () => {
-    props.currentRecoveryOptionUtils.selectedRecoveryOption = 'UNHANDLED_OPTION' as any
+  it.each([
+    {
+      recoveryOption: RECOVERY_MAP.MANUAL_REPLACE_AND_RETRY.ROUTE,
+      expectedRoute: RECOVERY_MAP.MANUAL_REPLACE_AND_RETRY.ROUTE,
+      expectedStep: RECOVERY_MAP.MANUAL_REPLACE_AND_RETRY.STEPS.MANUAL_REPLACE,
+    },
+    {
+      recoveryOption: RECOVERY_MAP.MANUAL_MOVE_AND_SKIP.ROUTE,
+      expectedRoute: RECOVERY_MAP.MANUAL_MOVE_AND_SKIP.ROUTE,
+      expectedStep: RECOVERY_MAP.MANUAL_MOVE_AND_SKIP.STEPS.MANUAL_MOVE,
+    },
+  ])(
+    'executes correct chain of actions when door is closed for $recoveryOption',
+    async ({ recoveryOption, expectedRoute, expectedStep }) => {
+      props.currentRecoveryOptionUtils.selectedRecoveryOption = recoveryOption
+      props.doorStatusUtils.isDoorOpen = false
+
+      render(props)
+
+      await waitFor(() => {
+        expect(
+          props.routeUpdateActions.handleMotionRouting
+        ).toHaveBeenCalledWith(true, RECOVERY_MAP.ROBOT_IN_MOTION.ROUTE)
+      })
+
+      await waitFor(() => {
+        expect(props.recoveryCommands.homeExceptPlungers).toHaveBeenCalled()
+      })
+
+      await waitFor(() => {
+        expect(
+          props.routeUpdateActions.handleMotionRouting
+        ).toHaveBeenCalledWith(false)
+      })
+
+      await waitFor(() => {
+        expect(
+          props.routeUpdateActions.proceedToRouteAndStep
+        ).toHaveBeenCalledWith(expectedRoute, expectedStep)
+      })
+    }
+  )
+
+  it('renders default subtext for an unhandled recovery option', () => {
+    props.currentRecoveryOptionUtils.selectedRecoveryOption =
+      'UNHANDLED_OPTION' as any
     render(props)
     screen.getByText('Close the robot door')
     screen.getByText(
@@ -79,28 +126,9 @@ describe('RecoveryDoorOpenSpecial', () => {
     )
   })
 
-  it(`calls proceedToRouteAndStep when door is closed for ${RECOVERY_MAP.MANUAL_REPLACE_AND_RETRY.ROUTE}`, () => {
-    props.doorStatusUtils.isDoorOpen = false
-    render(props)
-    expect(props.routeUpdateActions.proceedToRouteAndStep).toHaveBeenCalledWith(
-      RECOVERY_MAP.MANUAL_REPLACE_AND_RETRY.ROUTE,
-      RECOVERY_MAP.MANUAL_REPLACE_AND_RETRY.STEPS.MANUAL_REPLACE
-    )
-  })
-
-  it(`calls proceedToRouteAndStep when door is closed for ${RECOVERY_MAP.MANUAL_MOVE_AND_SKIP.ROUTE}`, () => {
-    props.currentRecoveryOptionUtils.selectedRecoveryOption =
-      RECOVERY_MAP.MANUAL_MOVE_AND_SKIP.ROUTE
-    props.doorStatusUtils.isDoorOpen = false
-    render(props)
-    expect(props.routeUpdateActions.proceedToRouteAndStep).toHaveBeenCalledWith(
-      RECOVERY_MAP.MANUAL_MOVE_AND_SKIP.ROUTE,
-      RECOVERY_MAP.MANUAL_MOVE_AND_SKIP.STEPS.MANUAL_MOVE
-    )
-  })
-
   it('calls proceedToRouteAndStep with OPTION_SELECTION for unhandled recovery option when door is closed', () => {
-    props.currentRecoveryOptionUtils.selectedRecoveryOption = 'UNHANDLED_OPTION' as any
+    props.currentRecoveryOptionUtils.selectedRecoveryOption =
+      'UNHANDLED_OPTION' as any
     props.doorStatusUtils.isDoorOpen = false
     render(props)
     expect(props.routeUpdateActions.proceedToRouteAndStep).toHaveBeenCalledWith(

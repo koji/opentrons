@@ -1,53 +1,42 @@
-import { useDispatch, useSelector } from 'react-redux'
 import { useTranslation } from 'react-i18next'
+import { useDispatch, useSelector } from 'react-redux'
 import { Link } from 'react-router-dom'
 
 import {
-  ALIGN_CENTER,
-  ALIGN_FLEX_START,
-  BORDERS,
-  Btn,
-  COLORS,
-  DIRECTION_COLUMN,
-  DIRECTION_ROW,
-  DISPLAY_FLEX,
-  Flex,
   Icon,
-  JUSTIFY_CENTER,
-  JUSTIFY_SPACE_BETWEEN,
-  SPACING,
+  InlineNotification,
   LegacyStyledText,
-  TYPOGRAPHY,
 } from '@opentrons/components'
 
-import { LANGUAGES } from '/app/i18n'
-import { getLocalRobot, getRobotApiVersion } from '/app/redux/discovery'
-import { getRobotUpdateAvailable } from '/app/redux/robot-update'
-import { useErrorRecoverySettingsToggle } from '/app/resources/errorRecovery'
+import { LANGUAGES, US_ENGLISH_DISPLAY_NAME } from '/app/i18n'
+import { Navigation } from '/app/organisms/ODD/Navigation'
+import {
+  OnOffToggle,
+  RobotSettingButton,
+} from '/app/organisms/ODD/RobotSettingsDashboard'
 import {
   DEV_INTERNAL_FLAGS,
   getAppLanguage,
-  getApplyHistoricOffsets,
   getDevtoolsEnabled,
   getFeatureFlags,
   toggleDevInternalFlag,
   toggleDevtools,
-  toggleHistoricOffsets,
-  useFeatureFlag,
 } from '/app/redux/config'
-import { InlineNotification } from '/app/atoms/InlineNotification'
-import { getRobotSettings, updateSetting } from '/app/redux/robot-settings'
+import { getLocalRobot, getRobotApiVersion } from '/app/redux/discovery'
 import { UNREACHABLE } from '/app/redux/discovery/constants'
-import { Navigation } from '/app/organisms/ODD/Navigation'
-import { useLEDLights } from '/app/resources/robot-settings'
+import { getRobotSettings, updateSetting } from '/app/redux/robot-settings'
+import { getRobotUpdateAvailable } from '/app/redux/robot-update'
+import { useErrorRecoverySettingsToggle } from '/app/resources/errorRecovery'
 import { useNetworkConnection } from '/app/resources/networking'
 import {
-  RobotSettingButton,
-  OnOffToggle,
-} from '/app/organisms/ODD/RobotSettingsDashboard'
+  useDisableStackerSensors,
+  useLEDLights,
+} from '/app/resources/robot-settings'
 
-import type { Dispatch, State } from '/app/redux/types'
+import styles from './robotsettingslist.module.css'
+
 import type { SetSettingOption } from '/app/organisms/ODD/RobotSettingsDashboard'
+import type { Dispatch, State } from '/app/redux/types'
 
 const HOME_GANTRY_SETTING_ID = 'disableHomeOnBoot'
 interface RobotSettingsListProps {
@@ -84,18 +73,17 @@ export function RobotSettingsList(props: RobotSettingsListProps): JSX.Element {
   })
   const isUpdateAvailable = robotUpdateType === 'upgrade'
   const devToolsOn = useSelector(getDevtoolsEnabled)
-  const historicOffsetsOn = useSelector(getApplyHistoricOffsets)
   const { lightsEnabled, toggleLights } = useLEDLights(robotName)
+  const { sensorsDisabled, toggleSensors } = useDisableStackerSensors(robotName)
   const { toggleERSettings, isEREnabled } = useErrorRecoverySettingsToggle()
 
   const appLanguage = useSelector(getAppLanguage)
   const currentLanguageOption = LANGUAGES.find(lng => lng.value === appLanguage)
-  const enableLocalization = useFeatureFlag('enableLocalization')
 
   return (
-    <Flex flexDirection={DIRECTION_COLUMN}>
+    <div className={styles.main_content}>
       <Navigation />
-      <Flex paddingX={SPACING.spacing40} flexDirection={DIRECTION_COLUMN}>
+      <div className={styles.settings_content}>
         <RobotSettingButton
           settingName={t('network_settings')}
           dataTestId="RobotSettingButton_network_settings"
@@ -128,7 +116,7 @@ export function RobotSettingsList(props: RobotSettingsListProps): JSX.Element {
           }}
           iconName="update"
           rightElement={
-            <Flex gridGap={SPACING.spacing40} alignItems={ALIGN_CENTER}>
+            <div className={styles.right_element_with_icon}>
               {isUpdateAvailable ? (
                 <InlineNotification
                   type="alert"
@@ -139,22 +127,22 @@ export function RobotSettingsList(props: RobotSettingsListProps): JSX.Element {
                   hug={true}
                 />
               ) : null}
-              <Icon name="more" size="3rem" color={COLORS.black90} />
-            </Flex>
+              <Icon name="more" className={styles.icon_large} color="#171717" />
+            </div>
           }
         />
-        {enableLocalization ? (
-          <RobotSettingButton
-            settingName={t('app_settings:language')}
-            settingInfo={
-              currentLanguageOption != null ? currentLanguageOption.name : ''
-            }
-            onClick={() => {
-              setCurrentOption('LanguageSetting')
-            }}
-            iconName="language"
-          />
-        ) : null}
+        <RobotSettingButton
+          settingName={t('app_settings:language')}
+          settingInfo={
+            currentLanguageOption != null
+              ? currentLanguageOption.name
+              : US_ENGLISH_DISPLAY_NAME
+          }
+          onClick={() => {
+            setCurrentOption('LanguageSetting')
+          }}
+          iconName="language"
+        />
         <RobotSettingButton
           settingName={t('display_led_lights')}
           dataTestId="RobotSettingButton_display_led_lights"
@@ -180,6 +168,15 @@ export function RobotSettingsList(props: RobotSettingsListProps): JSX.Element {
           iconName="brightness"
         />
         <RobotSettingButton
+          settingName={t('camera_preferences')}
+          settingInfo={t('camera_preferences_description')}
+          dataTestId="RobotSettingButton_camera_preferences"
+          onClick={() => {
+            setCurrentOption('CameraPreferences')
+          }}
+          iconName="camera"
+        />
+        <RobotSettingButton
           settingName={t('app_settings:privacy')}
           dataTestId="RobotSettingButton_privacy"
           settingInfo={t('branded:choose_what_data_to_share')}
@@ -189,18 +186,13 @@ export function RobotSettingsList(props: RobotSettingsListProps): JSX.Element {
           iconName="privacy"
         />
         <RobotSettingButton
-          settingName={t('apply_historic_offsets')}
-          dataTestId="RobotSettingButton_apply_historic_offsets"
-          settingInfo={t('historic_offsets_description')}
-          iconName="reticle"
-          rightElement={<OnOffToggle isOn={historicOffsetsOn} />}
-          onClick={() => dispatch(toggleHistoricOffsets())}
-        />
-        <RobotSettingButton
-          settingName={t('app_settings:error_recovery_mode')}
+          settingName={i18n.format(
+            t('app_settings:error_recovery_mode'),
+            'titleCase'
+          )}
           dataTestId="RobotSettingButton_error_recovery_mode"
           settingInfo={t('app_settings:error_recovery_mode_description')}
-          iconName="recovery"
+          iconName="recovery-alt"
           rightElement={<OnOffToggle isOn={isEREnabled} />}
           onClick={toggleERSettings}
         />
@@ -225,6 +217,14 @@ export function RobotSettingsList(props: RobotSettingsListProps): JSX.Element {
           }
         />
         <RobotSettingButton
+          settingName={t('disable_stacker_sensors')}
+          dataTestId="RobotSettingButton_disable_stacker_sensors"
+          settingInfo={t('disable_stacker_sensors_description')}
+          iconName="ot-flex-stacker"
+          rightElement={<OnOffToggle isOn={sensorsDisabled} />}
+          onClick={toggleSensors}
+        />
+        <RobotSettingButton
           settingName={t('app_settings:update_channel')}
           dataTestId="RobotSettingButton_update_channel"
           onClick={() => {
@@ -241,8 +241,8 @@ export function RobotSettingsList(props: RobotSettingsListProps): JSX.Element {
           onClick={() => dispatch(toggleDevtools())}
         />
         {devToolsOn ? <FeatureFlags /> : null}
-      </Flex>
-    </Flex>
+      </div>
+    </div>
   )
 }
 
@@ -253,45 +253,30 @@ function FeatureFlags(): JSX.Element {
   return (
     <>
       {DEV_INTERNAL_FLAGS.map(flag => (
-        <Btn
+        <button
           key={flag}
-          width="100%"
-          marginBottom={SPACING.spacing8}
-          backgroundColor={COLORS.grey35}
-          padding={`${SPACING.spacing20} ${SPACING.spacing24}`}
-          borderRadius={BORDERS.borderRadius16}
-          display={DISPLAY_FLEX}
-          flexDirection={DIRECTION_ROW}
-          gridGap={SPACING.spacing24}
-          justifyContent={JUSTIFY_SPACE_BETWEEN}
-          alignItems={ALIGN_CENTER}
+          className={styles.feature_flag_button}
           onClick={() => {
             dispatch(toggleDevInternalFlag(flag))
           }}
         >
-          <Flex
-            flexDirection={DIRECTION_ROW}
-            gridGap={SPACING.spacing24}
-            alignItems={ALIGN_CENTER}
-          >
-            <Icon name="alert-circle" size="3rem" color={COLORS.black90} />
-            <Flex
-              flexDirection={DIRECTION_COLUMN}
-              gridGap={SPACING.spacing2}
-              alignItems={ALIGN_FLEX_START}
-              justifyContent={JUSTIFY_CENTER}
-              width="46.25rem"
-            >
+          <div className={styles.feature_flag_content}>
+            <Icon
+              name="ot-alert"
+              className={styles.icon_large}
+              color="#171717"
+            />
+            <div className={styles.feature_flag_text_content}>
               <LegacyStyledText
-                as="h4"
-                fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+                forwardedAs="h4"
+                className={styles.feature_flag_title}
               >
                 {t(`__dev_internal__${flag}`)}
               </LegacyStyledText>
-            </Flex>
-          </Flex>
+            </div>
+          </div>
           <OnOffToggle isOn={Boolean(devInternalFlags?.[flag])} />
-        </Btn>
+        </button>
       ))}
     </>
   )

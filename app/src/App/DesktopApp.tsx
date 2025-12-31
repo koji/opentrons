@@ -1,6 +1,7 @@
-import { useState, Fragment } from 'react'
-import { Navigate, Route, Routes, useMatch } from 'react-router-dom'
+import { useState } from 'react'
 import { ErrorBoundary } from 'react-error-boundary'
+import { Navigate, Route, Routes, useMatch } from 'react-router-dom'
+import NiceModal from '@ebay/nice-modal-react'
 
 import {
   Box,
@@ -9,45 +10,60 @@ import {
   POSITION_RELATIVE,
 } from '@opentrons/components'
 import { ApiHostProvider } from '@opentrons/react-api-client'
-import NiceModal from '@ebay/nice-modal-react'
 
 import { LocalizationProvider } from '/app/LocalizationProvider'
 import { Alerts } from '/app/organisms/Desktop/Alerts'
 import { Breadcrumbs } from '/app/organisms/Desktop/Breadcrumbs'
 import { SystemLanguagePreferenceModal } from '/app/organisms/Desktop/SystemLanguagePreferenceModal'
+import {
+  EmergencyStopContext,
+  EstopTakeover,
+} from '/app/organisms/EmergencyStop'
+import { IncompatibleModuleTakeover } from '/app/organisms/IncompatibleModule'
 import { ToasterOven } from '/app/organisms/ToasterOven'
+import { AppSettings } from '/app/pages/Desktop/AppSettings'
 import { CalibrationDashboard } from '/app/pages/Desktop/Devices/CalibrationDashboard'
 import { DeviceDetails } from '/app/pages/Desktop/Devices/DeviceDetails'
 import { DevicesLanding } from '/app/pages/Desktop/Devices/DevicesLanding'
 import { ProtocolRunDetails } from '/app/pages/Desktop/Devices/ProtocolRunDetails'
 import { RobotSettings } from '/app/pages/Desktop/Devices/RobotSettings'
-import { ProtocolsLanding } from '/app/pages/Desktop/Protocols/ProtocolsLanding'
-import { ProtocolDetails } from '/app/pages/Desktop/Protocols/ProtocolDetails'
-import { AppSettings } from '/app/pages/Desktop/AppSettings'
 import { Labware } from '/app/pages/Desktop/Labware'
-import { useSoftwareUpdatePoll } from './hooks'
-import { Navbar } from './Navbar'
-import {
-  EstopTakeover,
-  EmergencyStopContext,
-} from '/app/organisms/EmergencyStop'
-import { IncompatibleModuleTakeover } from '/app/organisms/IncompatibleModule'
+import { ProtocolDetails } from '/app/pages/Desktop/Protocols/ProtocolDetails'
+import { ProtocolsLanding } from '/app/pages/Desktop/Protocols/ProtocolsLanding'
+import { useIsFlex, useRobot } from '/app/redux-resources/robots'
 import { OPENTRONS_USB } from '/app/redux/discovery'
 import { appShellRequestor } from '/app/redux/shell/remote'
-import { useRobot, useIsFlex } from '/app/redux-resources/robots'
-import { ProtocolTimeline } from '/app/pages/Desktop/Protocols/ProtocolDetails/ProtocolTimeline'
-import { PortalRoot as ModalPortalRoot } from './portal'
+
+import { ProtocolVisualization } from '../pages/Desktop/Protocols/ProtocolVisualization'
+import { useFeatureFlag } from '../redux/config'
 import { DesktopAppFallback } from './DesktopAppFallback'
+import { useSoftwareUpdatePoll } from './hooks'
+import { Navbar } from './Navbar'
+import { PortalRoot as ModalPortalRoot } from './portal'
 import { ReactQueryDevtools } from './tools'
 
 import type { RouteProps } from './types'
 
 export const DesktopApp = (): JSX.Element => {
   useSoftwareUpdatePoll()
-  const [
-    isEmergencyStopModalDismissed,
-    setIsEmergencyStopModalDismissed,
-  ] = useState<boolean>(false)
+  const [isEmergencyStopModalDismissed, setIsEmergencyStopModalDismissed] =
+    useState<boolean>(false)
+
+  // note for react-scan
+  const enableReactScan = useFeatureFlag('reactScan')
+  // Dynamically import `react-scan` to avoid build errors
+  if (typeof window !== 'undefined' && enableReactScan) {
+    import('react-scan')
+      .then(({ scan }) => {
+        scan({
+          enabled: enableReactScan,
+          log: true,
+        })
+      })
+      .catch(error => {
+        console.error('Failed to load react-scan:', error)
+      })
+  }
 
   const desktopRoutes: RouteProps[] = [
     {
@@ -62,9 +78,16 @@ export const DesktopApp = (): JSX.Element => {
       path: '/protocols/:protocolKey',
     },
     {
-      Component: ProtocolTimeline,
-      name: 'Protocol Timeline',
-      path: '/protocols/:protocolKey/timeline',
+      Component: ProtocolVisualization,
+      name: 'Visualization',
+      path: '/protocols/:protocolKey/visualization',
+    },
+    // for protocol visualization path from protocol setup page and back to protocol setup page
+    // protocolKey is for visualization page and runId is for back to protocol setup page
+    {
+      Component: ProtocolVisualization,
+      name: 'Visualization',
+      path: '/devices/:robotName/:runId/:runCreatedAtTimestamp/:protocolKey/visualization',
     },
     {
       Component: Labware,
@@ -106,8 +129,8 @@ export const DesktopApp = (): JSX.Element => {
   ]
 
   return (
-    <NiceModal.Provider>
-      <LocalizationProvider>
+    <LocalizationProvider>
+      <NiceModal.Provider>
         <ErrorBoundary FallbackComponent={DesktopAppFallback}>
           <ReactQueryDevtools />
           <SystemLanguagePreferenceModal />
@@ -119,7 +142,7 @@ export const DesktopApp = (): JSX.Element => {
                 setIsEmergencyStopModalDismissed,
               }}
             >
-              <Box width="100%">
+              <Box width="100%" height="100vh">
                 <Alerts>
                   <Routes>
                     {desktopRoutes.map(({ Component, path }: RouteProps) => {
@@ -127,12 +150,18 @@ export const DesktopApp = (): JSX.Element => {
                         <Route
                           key={path}
                           element={
-                            <Fragment key={Component.name}>
+                            <Box
+                              key={Component.name}
+                              display="flex"
+                              flexDirection="column"
+                              height="100%"
+                            >
                               <Breadcrumbs />
                               <Box
                                 position={POSITION_RELATIVE}
                                 width="100%"
-                                height="100%"
+                                flex="1"
+                                minHeight="0"
                               >
                                 <Box
                                   width="100%"
@@ -144,7 +173,7 @@ export const DesktopApp = (): JSX.Element => {
                                   <Component />
                                 </Box>
                               </Box>
-                            </Fragment>
+                            </Box>
                           }
                           path={path}
                         />
@@ -158,8 +187,8 @@ export const DesktopApp = (): JSX.Element => {
             </EmergencyStopContext.Provider>
           </ToasterOven>
         </ErrorBoundary>
-      </LocalizationProvider>
-    </NiceModal.Provider>
+      </NiceModal.Provider>
+    </LocalizationProvider>
   )
 }
 

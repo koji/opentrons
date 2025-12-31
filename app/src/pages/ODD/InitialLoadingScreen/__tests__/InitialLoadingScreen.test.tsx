@@ -1,10 +1,9 @@
-import { vi, it, describe, beforeEach, afterEach } from 'vitest'
 import { screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, it, vi } from 'vitest'
 
 import { useRobotSettingsQuery } from '@opentrons/react-api-client'
 
 import { renderWithProviders } from '/app/__testing-utils__'
-
 import { getIsShellReady } from '/app/redux/shell'
 
 import { InitialLoadingScreen } from '..'
@@ -23,9 +22,9 @@ const render = () => {
 describe('InitialLoadingScreen', () => {
   beforeEach(() => {
     vi.mocked(getIsShellReady).mockReturnValue(false)
-    vi.mocked(useRobotSettingsQuery).mockReturnValue(({
+    vi.mocked(useRobotSettingsQuery).mockReturnValue({
       data: { settings: [] },
-    } as unknown) as UseQueryResult<RobotSettingsResponse>)
+    } as unknown as UseQueryResult<RobotSettingsResponse>)
   })
 
   afterEach(() => {

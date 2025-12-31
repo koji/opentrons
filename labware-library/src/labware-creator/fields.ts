@@ -1,5 +1,7 @@
 import capitalize from 'lodash/capitalize'
+
 import { displayAsTube, getLabwareName } from './utils'
+
 import type {
   LabwareDefinition2,
   WellBottomShape,
@@ -17,6 +19,7 @@ export const SUGGESTED_XY_RANGE = 1
 
 export const MAX_Z_DIMENSION = 195
 export const MAX_SUGGESTED_Z = 124
+export const MAX_SUGGESTED_GRIPPER_Z = 129
 
 export const DISPLAY_VOLUME_UNITS = 'µL'
 
@@ -30,11 +33,6 @@ export const LOOSE_TIP_FIT_ERROR = 'LOOSE_TIP_FIT_ERROR'
 
 export const LABWARE_TOO_SMALL_ERROR = 'LABWARE_TOO_SMALL_ERROR'
 export const LABWARE_TOO_LARGE_ERROR = 'LABWARE_TOO_LARGE_ERROR'
-
-export const LINK_CUSTOM_LABWARE_FORM = 'https://lqilf9ng.paperform.co/'
-
-export const LINK_REQUEST_ADAPTER_FORM =
-  'https://docs.google.com/forms/d/e/1FAIpQLScvsHlXQrtIhIQYO0zr6mYwmzOCGpYPqepeDIorFIyj2jT-UQ/viewform'
 
 export type ImportErrorKey =
   | 'INVALID_FILE_TYPE'
@@ -113,6 +111,7 @@ export interface LabwareFields {
   footprintXDimension: string | null | undefined
   footprintYDimension: string | null | undefined
   labwareZDimension: string | null | undefined
+  stackedLabwareZDimension: number | null | undefined
 
   gridRows: string | null | undefined
   gridColumns: string | null | undefined
@@ -122,6 +121,7 @@ export interface LabwareFields {
   gridOffsetY: string | null | undefined
 
   homogeneousWells: BooleanString | null | undefined
+  hasLpcQuirk: BooleanString | null | undefined
   regularRowSpacing: BooleanString | null | undefined
   regularColumnSpacing: BooleanString | null | undefined
 
@@ -166,6 +166,7 @@ export interface ProcessedLabwareFields {
   footprintXDimension: number
   footprintYDimension: number
   labwareZDimension: number
+  stackedLabwareZDimension: number
 
   gridRows: number
   gridColumns: number
@@ -182,7 +183,7 @@ export interface ProcessedLabwareFields {
   wellBottomShape: WellBottomShape | null
   wellDepth: number
   wellShape: WellShape
-
+  hasLpcQuirk: BooleanString
   // used with circular well shape only
   wellDiameter: number
 
@@ -389,14 +390,14 @@ export const getDefaultFormState = (): LabwareFields => ({
   footprintXDimension: null,
   footprintYDimension: null,
   labwareZDimension: null,
-
+  stackedLabwareZDimension: null,
   gridRows: null,
   gridColumns: null,
   gridSpacingX: null,
   gridSpacingY: null,
   gridOffsetX: null,
   gridOffsetY: null,
-
+  hasLpcQuirk: 'false',
   homogeneousWells: null,
   regularRowSpacing: null,
   regularColumnSpacing: null,
@@ -431,6 +432,8 @@ export const LABELS: Record<keyof LabwareFields, string> = {
   aluminumBlockChildType: 'What labware is on top of your aluminum block?',
   handPlacedTipFit: 'Fit',
   homogeneousWells: 'Are all your wells the same shape and size?',
+  hasLpcQuirk:
+    'Do you want to exclude this labware from Labware Position Check?',
   footprintXDimension: 'Length',
   footprintYDimension: 'Width',
   labwareZDimension: 'Height',
@@ -457,6 +460,7 @@ export const LABELS: Record<keyof LabwareFields, string> = {
   loadName: 'API Load Name',
   compatibleAdapters: 'Is this labware compatible with an adapter?',
   compatibleModules: 'Is this labware compatible with a module?',
+  stackedLabwareZDimension: 'Stacked Labware Height',
 }
 
 export const getLabel = (

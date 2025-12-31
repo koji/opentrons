@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+
 import {
-  Box,
   Banner,
+  Box,
   DIRECTION_COLUMN,
   Flex,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
@@ -28,7 +29,7 @@ export const PipetteRecalibrationWarning = (): JSX.Element | null => {
       >
         <Flex flexDirection={DIRECTION_COLUMN}>
           <LegacyStyledText
-            as="p"
+            forwardedAs="p"
             fontWeight={TYPOGRAPHY.fontWeightSemiBold}
             data-testid="PipetteRecalibrationWarning_title"
           >
@@ -36,7 +37,7 @@ export const PipetteRecalibrationWarning = (): JSX.Element | null => {
           </LegacyStyledText>
 
           <LegacyStyledText
-            as="p"
+            forwardedAs="p"
             data-testid="PipetteRecalibrationWarning_body"
           >
             {`${t('pipette_calibrations_differ')}`}

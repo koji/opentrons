@@ -1,27 +1,32 @@
-import omitBy from 'lodash/omitBy'
-import { vi, it, describe, expect, beforeEach, afterEach } from 'vitest'
-import type { UseQueryResult } from 'react-query'
 import { renderHook } from '@testing-library/react'
-import type { Protocol } from '@opentrons/api-client'
+import omitBy from 'lodash/omitBy'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
 import {
-  useProtocolQuery,
-  useProtocolAnalysisAsDocumentQuery,
   useInstrumentsQuery,
   useModulesQuery,
+  useProtocolAnalysisAsDocumentQuery,
+  useProtocolQuery,
 } from '@opentrons/react-api-client'
 import {
+  fixtureTiprack300ul,
   FLEX_SIMPLEST_DECK_CONFIG,
   WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE,
-  fixtureTiprack300ul,
 } from '@opentrons/shared-data'
+
+import { mockHeaterShaker } from '/app/redux/modules/__fixtures__'
+import { useNotifyDeckConfigurationQuery } from '/app/resources/deck_configuration'
+
+import { useMissingProtocolHardware } from '../useMissingProtocolHardware'
+
+import type { FunctionComponent, ReactNode } from 'react'
+import type { UseQueryResult } from 'react-query'
+import type { Protocol } from '@opentrons/api-client'
 import type {
   CompletedProtocolAnalysis,
   DeckConfiguration,
-  LabwareDefinition2,
+  LabwareDefinition,
 } from '@opentrons/shared-data'
-import { useNotifyDeckConfigurationQuery } from '/app/resources/deck_configuration/useNotifyDeckConfigurationQuery'
-import { useMissingProtocolHardware } from '../useMissingProtocolHardware'
-import { mockHeaterShaker } from '/app/redux/modules/__fixtures__'
 
 vi.mock('@opentrons/react-api-client')
 vi.mock('/app/resources/deck_configuration/useNotifyDeckConfigurationQuery')
@@ -105,7 +110,7 @@ const mockRTPData = [
     default: 'none',
   },
 ]
-const mockLabwareDef = fixtureTiprack300ul as LabwareDefinition2
+const mockLabwareDef = fixtureTiprack300ul as LabwareDefinition
 const PROTOCOL_ANALYSIS = {
   id: 'fake analysis',
   status: 'completed',
@@ -161,7 +166,7 @@ const PROTOCOL_ANALYSIS = {
   runTimeParameters: mockRTPData,
 } as any
 describe.only('useMissingProtocolHardware', () => {
-  let wrapper: React.FunctionComponent<{ children: React.ReactNode }>
+  let wrapper: FunctionComponent<{ children: ReactNode }>
   beforeEach(() => {
     vi.mocked(useInstrumentsQuery).mockReturnValue({
       data: { data: [] },
@@ -204,6 +209,7 @@ describe.only('useMissingProtocolHardware', () => {
         {
           hardwareType: 'module',
           moduleModel: 'heaterShakerModuleV1',
+          comboFixtureId: null,
           slot: 'D3',
           connected: false,
           hasSlotConflict: false,
@@ -213,14 +219,14 @@ describe.only('useMissingProtocolHardware', () => {
     })
   })
   it('should return 1 conflicted slot', () => {
-    vi.mocked(useNotifyDeckConfigurationQuery).mockReturnValue(({
+    vi.mocked(useNotifyDeckConfigurationQuery).mockReturnValue({
       data: [
         {
           cutoutId: 'cutoutD3',
           cutoutFixtureId: WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE,
         },
       ],
-    } as any) as UseQueryResult<DeckConfiguration>)
+    } as any as UseQueryResult<DeckConfiguration>)
 
     const { result } = renderHook(
       () => useMissingProtocolHardware(PROTOCOL_ANALYSIS.id),
@@ -238,6 +244,7 @@ describe.only('useMissingProtocolHardware', () => {
         {
           hardwareType: 'module',
           moduleModel: 'heaterShakerModuleV1',
+          comboFixtureId: null,
           slot: 'D3',
           connected: false,
           hasSlotConflict: true,
@@ -333,6 +340,7 @@ describe.only('useMissingProtocolHardware', () => {
         {
           hardwareType: 'module',
           moduleModel: 'heaterShakerModuleV1',
+          comboFixtureId: null,
           slot: 'D3',
           connected: false,
           hasSlotConflict: true,

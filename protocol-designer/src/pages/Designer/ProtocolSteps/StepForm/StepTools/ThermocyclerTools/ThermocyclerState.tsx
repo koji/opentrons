@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next'
+
 import {
-  Flex,
   DIRECTION_COLUMN,
+  Flex,
   SPACING,
   StyledText,
 } from '@opentrons/components'
@@ -9,11 +10,9 @@ import {
 import {
   ToggleExpandStepFormField,
   ToggleStepFormField,
-} from '../../../../../../molecules'
-import { getFormErrorsMappedToField, getFormLevelError } from '../../utils'
+} from '/protocol-designer/components/molecules'
 
-import type { FormData } from '../../../../../../form-types'
-import type { StepFormErrors } from '../../../../../../steplist'
+import type { FormData } from '/protocol-designer/form-types'
 import type { FieldPropsByName } from '../../types'
 
 interface ThermocyclerStateProps {
@@ -21,24 +20,13 @@ interface ThermocyclerStateProps {
   formData: FormData
   propsForFields: FieldPropsByName
   isHold?: boolean
-  visibleFormErrors: StepFormErrors
   showFormErrors?: boolean
   focusedField?: string | null
 }
 
 export function ThermocyclerState(props: ThermocyclerStateProps): JSX.Element {
-  const {
-    title,
-    propsForFields,
-    formData,
-    isHold = false,
-    visibleFormErrors,
-    showFormErrors = true,
-    focusedField,
-  } = props
+  const { title, propsForFields, formData, isHold = false } = props
   const { i18n, t } = useTranslation(['application', 'form'])
-
-  const mappedErrorsToField = getFormErrorsMappedToField(visibleFormErrors)
 
   const {
     blockFieldActive,
@@ -65,8 +53,8 @@ export function ThermocyclerState(props: ThermocyclerStateProps): JSX.Element {
   return (
     <Flex
       flexDirection={DIRECTION_COLUMN}
-      gridGap={SPACING.spacing8}
-      padding={SPACING.spacing16}
+      gridGap={SPACING.spacing4}
+      paddingX={SPACING.spacing16}
     >
       <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing4}>
         <StyledText desktopStyle="bodyDefaultSemiBold">
@@ -83,12 +71,6 @@ export function ThermocyclerState(props: ThermocyclerStateProps): JSX.Element {
         isSelected={formData[blockFieldActive] === true}
         onLabel={t('form:step_edit_form.field.heaterShaker.shaker.toggleOn')}
         offLabel={t('form:step_edit_form.field.heaterShaker.shaker.toggleOff')}
-        formLevelError={getFormLevelError(
-          showFormErrors,
-          blockTempField,
-          mappedErrorsToField,
-          focusedField
-        )}
       />
       <ToggleExpandStepFormField
         {...propsForFields[lidTempField]}
@@ -101,12 +83,6 @@ export function ThermocyclerState(props: ThermocyclerStateProps): JSX.Element {
         onLabel={t('form:step_edit_form.field.thermocyclerState.lid.toggleOn')}
         offLabel={t(
           'form:step_edit_form.field.thermocyclerState.lid.toggleOff'
-        )}
-        formLevelError={getFormLevelError(
-          showFormErrors,
-          lidTempField,
-          mappedErrorsToField,
-          focusedField
         )}
       />
       <ToggleStepFormField
@@ -125,7 +101,7 @@ export function ThermocyclerState(props: ThermocyclerStateProps): JSX.Element {
         toggleValue={propsForFields[lidPositionField].value}
         tooltipContent={
           propsForFields[lidPositionField].disabled
-            ? propsForFields[lidPositionField].tooltipContent ?? null
+            ? (propsForFields[lidPositionField].tooltipContent ?? null)
             : null
         }
       />

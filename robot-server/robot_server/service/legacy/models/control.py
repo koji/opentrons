@@ -1,12 +1,14 @@
 import typing
 from functools import partial
-from enum import Enum
 
+from typing_extensions import Self
+from pydantic import model_validator, ConfigDict, BaseModel, Field
+
+from opentrons_shared_data.util import StrEnum
 from opentrons import types
-from pydantic import BaseModel, Field, root_validator
 
 
-class MotionTarget(str, Enum):
+class MotionTarget(StrEnum):
     """
     What should be moved. If mount, move the nominal position of the mount;
     if pipette, move the nozzle of the pipette
@@ -16,7 +18,7 @@ class MotionTarget(str, Enum):
     mount = "mount"
 
 
-class HomeTarget(str, Enum):
+class HomeTarget(StrEnum):
     pipette = "pipette"
     robot = "robot"
 
@@ -28,8 +30,8 @@ PointField = partial(
     Field,
     ...,
     description="A point in deck coordinates (x, y, z)",
-    min_items=3,
-    max_items=3,
+    min_length=3,
+    max_length=3,
 )
 
 
@@ -51,9 +53,8 @@ class RobotPositions(BaseModel):
 
 class RobotPositionsResponse(BaseModel):
     positions: RobotPositions
-
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "positions": {
                     "change_pipette": {
@@ -65,9 +66,10 @@ class RobotPositionsResponse(BaseModel):
                 }
             }
         }
+    )
 
 
-class Mount(str, Enum):
+class Mount(StrEnum):
     right = "right"
     left = "left"
 
@@ -95,21 +97,23 @@ class RobotMoveTarget(BaseModel):
         "if target is pipette",
     )
 
-    @root_validator(pre=True)
-    def root_validator(cls, values):
-        points = values.get("point", [])
-        target = values.get("target")
-        if target == MotionTarget.mount and len(points) == 3 and points[2] < 30:
+    @model_validator(mode="after")
+    def root_validator(self) -> Self:
+        if (
+            self.target == MotionTarget.mount
+            and len(self.point) == 3
+            and self.point[2] < 30
+        ):
             raise ValueError(
                 "Sending a mount to a z position lower than 30 "
                 "can cause a collision with the deck or reach the"
                 " end of the Z axis  movement screw. Z values for"
                 " mount movement must be >= 30"
             )
-        return values
+        return self
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "examples": [
                 {
                     "target": "mount",
@@ -124,6 +128,7 @@ class RobotMoveTarget(BaseModel):
                 },
             ]
         }
+    )
 
 
 class RobotHomeTarget(BaseModel):
@@ -137,21 +142,21 @@ class RobotHomeTarget(BaseModel):
     )
     mount: typing.Optional[Mount] = Field(
         None,
-        description="Which mount to home, if target is pipette (required"
-        " in that case)",
+        description="Which mount to home, if target is pipette (required in that case)",
     )
 
-    @root_validator(pre=True)
-    def root_validate(cls, values):
+    @model_validator(mode="after")
+    def root_validate(self) -> Self:
         # Make sure that mount is present if target is pipette
-        if values.get("target") == HomeTarget.pipette.value and not values.get("mount"):
+        if self.target == HomeTarget.pipette.value and not self.mount:
             raise ValueError("mount must be specified if target is pipette")
-        return values
+        return self
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "examples": [{"target": "robot"}, {"target": "pipette", "mount": "right"}]
         }
+    )
 
 
 class RobotLightState(BaseModel):

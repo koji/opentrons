@@ -1,5 +1,5 @@
 include ../scripts/push.mk
-include ../scripts/python.mk
+include ../scripts/python-uv.mk
 
 # using bash instead of /bin/bash in SHELL prevents macOS optimizing away our PATH update
 SHELL := bash
@@ -10,15 +10,10 @@ SHX := npx shx
 # add yarn CLI dev deps to PATH (for cross platform POSIX commands via shx)
 PATH := $(shell cd .. && yarn bin):$(PATH)
 
-ot_project := $(OPENTRONS_PROJECT)
-project_rs_default = $(if $(ot_project),$(ot_project),robot-stack)
-project_ir_default = $(if $(ot_project),$(ot_project),ot3)
-
 port ?= 34000
 tests ?= tests
 test_opts ?=
 wheel_file = $(call python_get_wheelname,update-server,$(project_rs_default),otupdate)
-sdist_file = $(call python_get_sdistname,update-server,$(project_rs_default),otupdate)
 # Find the branch, sha, version that will be used to update the VERSION.json file
 version_file = $(call python_get_git_version,update-server,$(project_rs_default),update-server)
 # Host key location for robot
@@ -27,10 +22,15 @@ ssh_key ?= $(default_ssh_key)
 ssh_opts ?= $(default_ssh_opts)
 
 
+
+
 .PHONY: setup
 setup:
-	$(pipenv) sync $(pipenv_opts)
-	$(pipenv) run pip freeze
+	@$(uv_sync_dev)
+	@$(UV) pip list
+
+.PHONY: setup-py
+setup-py: setup
 
 .PHONY: dev
 dev: export ENABLE_VIRTUAL_SMOOTHIE := true
@@ -50,33 +50,27 @@ clean:
 
 .PHONY: teardown
 teardown:
-	$(pipenv) --rm
+	$(SHX) rm -rf .venv
 
 .PHONY: test
 test:
-	$(python) -m pytest $(test_opts) $(tests)
+	$(pytest) $(test_opts) $(tests)
 
 .PHONY: lint
 lint:
 	$(python) -m mypy otupdate tests
-	$(python) -m black --check ./otupdate ./tests
-	$(python) -m flake8 otupdate tests
+	$(ruff) check otupdate tests
 
 .PHONY: format
 format:
-	$(python) -m black otupdate tests
+	$(ruff) format otupdate tests
 
 .PHONY: wheel
-wheel: export OPENTRONS_PROJECT=$(project_rs_default)
+wheel: export OPENTRONS_PROJECT=$(PROJECT)
+wheel: export HATCH_VCS_TUNABLE_TAG_PATTERN=$(call git_tag_regex_for_project,$(PROJECT))
+wheel: export HATCH_VCS_TUNABLE_RAW_OPTIONS=$(call hatch_raw_options_for_project,$(PROJECT))
 wheel: clean
-	$(python) setup.py bdist_wheel
-	$(SHX) rm -rf build
-	$(SHX) ls dist
-
-.PHONY: sdist
-sdist: export OPENTRONS_PROJECT=$(project_rs_default)
-sdist: clean
-	$(python) setup.py sdist
+	$(python) -m build --wheel .
 	$(SHX) rm -rf build
 	$(SHX) ls dist
 
@@ -93,12 +87,12 @@ restart:
 
 .PHONY: push
 push: wheel
-	$(call push-python-package,$(host),$(ssh_key),$(ssh_opts),dist/$(wheel_file))
+	$(call push-python,$(host),$(ssh_key),$(ssh_opts),dist/$(wheel_file),/usr/lib/python3.10/site-packages/)
 	$(call push-systemd-unit,$(host),$(ssh_key),$(ssh_opts),./opentrons-update-server.service)
 	$(call restart-service,$(host),$(ssh_key),$(ssh_opts),opentrons-update-server)
 
 
 .PHONY: push-ot3
-push-ot3: sdist
-	$(call push-python-sdist,$(host),$(ssh_key),$(ssh_opts),dist/$(sdist_file),/opt/opentrons-update-server,"otupdate",,,$(version_file))
+push-ot3: wheel
+	$(call push-python,$(host),$(ssh_key),$(ssh_opts),dist/$(wheel_file),/opt/opentrons-update-server/)
 	$(call restart-service,$(host),$(ssh_key),$(ssh_opts),opentrons-update-server)

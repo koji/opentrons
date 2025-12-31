@@ -1,27 +1,23 @@
 # hardware makefile
 
 include ../scripts/push.mk
-include ../scripts/python.mk
+include ../scripts/python-uv.mk
 
 SHX := npx shx
-
-ot_project := $(OPENTRONS_PROJECT)
-project_rs_default = $(if $(ot_project),$(ot_project),robot-stack)
-project_ir_default = $(if $(ot_project),$(ot_project),ot3)
 
 # Find the version of the wheel from git using a helper script. We
 # use python here so we can use the same version normalization that will be
 # used to create the wheel.
-wheel_file = dist/$(call python_get_wheelname,hardware,$(project_rs_default),opentrons_hardware,$(BUILD_NUMBER))
+wheel_file = dist/$(call python_get_wheelname,hardware,$(PROJECT),opentrons_hardware,$(BUILD_NUMBER))
 
 
 # Find the version of the sdist from git using a helper script. We
 # use python here so we can use the same version normalization that will be
 # used to create the sdist.
-sdist_file = dist/$(call python_get_sdistname,hardware,$(project_rs_default),opentrons_hardware)
+sdist_file = dist/$(call python_get_sdistname,hardware,$(PROJECT),opentrons_hardware)
 
 # Find the branch, sha, version that will be used to update the VERSION.json file
-version_file = $(call python_get_git_version,hardware,$(project_rs_default),opentrons_hardware)
+version_file = $(call python_get_git_version,hardware,$(PROJECT),opentrons_hardware)
 
 # These variables can be overriden when make is invoked to customize the
 # behavior of pytest. For instance,
@@ -59,36 +55,54 @@ clean_cache_cmd = $(SHX) rm -rf '**/__pycache__' '**/*.pyc' '**/.mypy_cache'
 .PHONY: all
 all: clean wheel
 
+
+
 .PHONY: setup
 setup:
-	$(pipenv) sync $(pipenv_opts)
-	$(pipenv) run pip freeze
+	@$(uv_sync_dev)
+	@$(UV) pip list
+
+.PHONY: setup-py
+setup-py: setup
 
 .PHONY: teardown
 teardown:
-	-$(pipenv) --rm
+	$(SHX) rm -rf .venv
 
 .PHONY: clean
 clean:
 	$(clean_cmd)
 	$(clean_cache_cmd)
 
-dist/opentrons_hardware-%-py2.py3-none-any.whl: export OPENTRONS_PROJECT=$(project_rs_default)
-dist/opentrons_hardware-%-py2.py3-none-any.whl: setup.py $(ot_sources)
-	$(python) setup.py $(wheel_opts) bdist_wheel
+dist/opentrons_hardware-%-py3-none-any.whl: export OPENTRONS_PROJECT=$(PROJECT)
+dist/opentrons_hardware-%-py3-none-any.whl: export HATCH_VCS_TUNABLE_TAG_PATTERN=$(call git_tag_regex_for_project,$(PROJECT))
+dist/opentrons_hardware-%-py3-none-any.whl: export HATCH_VCS_TUNABLE_RAW_OPTIONS=$(call hatch_raw_options_for_project,$(PROJECT))
+dist/opentrons_hardware-%-py3-none-any.whl: $(ot_sources)
+	$(python) -m build --wheel .
 	$(SHX) rm -rf build
 	$(SHX) ls dist
 
-wheel: $(wheel_file)
+# Only resolve the wheel filename when we actually build it so `make teardown`
+# (and similar targets) do not spin up a uv environment unnecessarily. Reinvoking
+# `$(MAKE)` with `$(wheel_file)` defers the python_get_wheelname call until the
+# recipe runs, keeping parse-time side effects away from unrelated targets.
+.PHONY: wheel
+wheel:
+	$(MAKE) $(wheel_file)
 
-$(sdist_file): export OPENTRONS_PROJECT=$(project_rs_default)
-$(sdist_file): setup.py $(ot_sources)
-	$(python) setup.py sdist
+dist/opentrons_hardware-%.tar.gz: export OPENTRONS_PROJECT=$(project_rs_default)
+dist/opentrons_hardware-%.tar.gz: export HATCH_VCS_TUNABLE_TAG_PATTERN=$(call git_tag_regex_for_project,$(PROJECT))
+dist/opentrons_hardware-%.tar.gz: export HATCH_VCS_TUNABLE_RAW_OPTIONS=$(call hatch_raw_options_for_project,$(PROJECT))
+dist/opentrons_hardware-%.tar.gz: $(ot_sources)
+	$(python) -m build --sdist .
 	$(SHX) rm -rf build
 	$(SHX) ls dist
 
+# Same lazy trick for sdist so python_get_sdistname only runs when we actually
+# ask for the source distribution (avoids uv spins during unrelated targets).
 .PHONY: sdist
-sdist: $(sdist_file)
+sdist:
+	$(MAKE) $(sdist_file)
 
 .PHONY: test
 test:
@@ -110,12 +124,11 @@ test-with-opentrons-sock-emulator: test-with-emulator
 .PHONY: lint
 lint:
 	$(python) -m mypy opentrons_hardware tests
-	$(python) -m black --check opentrons_hardware tests setup.py
-	$(python) -m flake8 opentrons_hardware tests setup.py
+	$(ruff) check opentrons_hardware tests
 
 .PHONY: format
 format:
-	$(python) -m black opentrons_hardware tests setup.py
+	$(ruff) format opentrons_hardware tests
 
 # launch hardware controller in dev mode
 .PHONY: dev
@@ -125,15 +138,15 @@ dev:
 
 .PHONY: push-no-restart
 push-no-restart: wheel
-	$(call push-python-package,$(host),$(ssh_key),$(ssh_opts),$(wheel_file))
+	$(call push-python,$(host),$(ssh_key),$(ssh_opts),$(wheel_file),/usr/lib/python3.10/site-packages/)
 
 .PHONY: push
 push: push-no-restart
 	$(call restart-service,$(host),$(ssh_key),$(ssh_opts),"jupyter-notebook opentrons-robot-server")
 
 .PHONY: push-no-restart-ot3
-push-no-restart-ot3: sdist Pipfile.lock
-	$(call push-python-sdist,$(host),$(ssh_key),$(ssh_opts),$(sdist_file),/opt/opentrons-robot-server,"opentrons_hardware",,,$(version_file))
+push-no-restart-ot3: wheel
+	$(call push-python,$(host),$(ssh_key),$(ssh_opts),$(wheel_file),/opt/opentrons-robot-server/)
 
 .PHONY: push-ot3
 push-ot3: push-no-restart-ot3

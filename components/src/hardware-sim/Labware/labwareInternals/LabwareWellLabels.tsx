@@ -1,10 +1,12 @@
-import * as React from 'react'
+import { memo } from 'react'
+
 import { C_BLACK, C_BLUE } from '../../../styles/colors'
+import { TYPOGRAPHY } from '../../../ui-style-constants'
 import { RobotCoordsText } from '../../Deck'
 
-import type { LabwareDefinition2 } from '@opentrons/shared-data'
+import type { MemoExoticComponent } from 'react'
+import type { LabwareDefinition } from '@opentrons/shared-data'
 import type { HighlightedWellLabels } from './types'
-import { TYPOGRAPHY } from '../../../ui-style-constants'
 
 // magic layout numbers to make the letters close to the edges of the labware
 // evaluate values for inside/outside labware outline when needed
@@ -12,13 +14,13 @@ const LETTER_COLUMN_X_ADJUSTMENT = -4
 const NUMBER_COLUMN_Y_ADJUSTMENT = 2
 
 interface LabwareWellLabelsProps {
-  definition: LabwareDefinition2
+  definition: LabwareDefinition
   highlightedWellLabels?: HighlightedWellLabels
   wellLabelColor?: string
 }
 
 const Labels = (props: {
-  definition: LabwareDefinition2
+  definition: LabwareDefinition
   wells: string[]
   isLetterColumn?: boolean
   highlightedWellLabels?: HighlightedWellLabels
@@ -63,14 +65,12 @@ const Labels = (props: {
             key={wellName}
             x={isLetterColumn ? firstWellXPosition : well.x}
             y={isLetterColumn ? well.y : firstWellYPosition}
-            style={{
-              fontSize: '0.2rem', // LEGACY --fs-micro
-              fontWeight: TYPOGRAPHY.fontWeightSemiBold,
-              textAnchor: 'middle',
-              dominantBaseline: isLetterColumn ? 'middle' : 'auto',
-            }}
+            fontSize="0.2rem" // LEGACY --fs-micro
+            fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+            textAnchor="middle"
+            dominantBaseline={isLetterColumn ? 'middle' : 'auto'}
             fill={
-              highlightedWellLabels?.wells.includes(wellName) ?? false
+              (highlightedWellLabels?.wells.includes(wellName) ?? false)
                 ? highlightColor
                 : fillColor
             }
@@ -113,6 +113,6 @@ export function LabwareWellLabelsComponent(
  * for use in Labware.tsx component
  * has ODD-specific styling
  */
-export const LabwareWellLabels: React.MemoExoticComponent<
+export const LabwareWellLabels: MemoExoticComponent<
   typeof LabwareWellLabelsComponent
-> = React.memo(LabwareWellLabelsComponent)
+> = memo(LabwareWellLabelsComponent)

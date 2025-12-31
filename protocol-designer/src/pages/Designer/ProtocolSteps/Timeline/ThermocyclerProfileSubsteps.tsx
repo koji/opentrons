@@ -1,19 +1,21 @@
-import { useSelector } from 'react-redux'
 import { Trans, useTranslation } from 'react-i18next'
+import { useSelector } from 'react-redux'
+
 import {
   ALIGN_CENTER,
   ALIGN_FLEX_END,
   DIRECTION_COLUMN,
-  FLEX_MAX_CONTENT,
   Flex,
+  FLEX_MAX_CONTENT,
   ListItem,
   SPACING,
   StyledText,
   Tag,
 } from '@opentrons/components'
-import { getSavedStepForms } from '../../../../step-forms/selectors'
 
-import type { ProfileStepItem } from '../../../../form-types'
+import { getSavedStepForms } from '/protocol-designer/step-forms/selectors'
+
+import type { ProfileStepItem } from '/protocol-designer/form-types'
 import type { ThermocyclerCycleType } from '../StepForm/StepTools/ThermocyclerTools/ThermocyclerCycle'
 import type { ThermocyclerStepType } from '../StepForm/StepTools/ThermocyclerTools/ThermocyclerStep'
 
@@ -48,11 +50,8 @@ export function ThermocyclerProfileSubsteps(
                 gridGap={SPACING.spacing12}
               >
                 {substep.steps.map((profileStep: ProfileStepItem) => {
-                  const {
-                    temperature,
-                    durationMinutes,
-                    durationSeconds,
-                  } = profileStep
+                  const { temperature, durationMinutes, durationSeconds } =
+                    profileStep
                   return (
                     <ThermocyclerSubstep
                       key={profileStep.id}
@@ -79,7 +78,7 @@ export function ThermocyclerProfileSubsteps(
           return (
             <ListItem
               key={substep.id}
-              type="noActive"
+              type="default"
               width="100%"
               padding={SPACING.spacing12}
             >

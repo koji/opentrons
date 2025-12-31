@@ -1,14 +1,15 @@
-import { useState, Fragment } from 'react'
+import { Fragment, useState } from 'react'
 import { createPortal } from 'react-dom'
-import map from 'lodash/map'
-import omit from 'lodash/omit'
-import isEmpty from 'lodash/isEmpty'
-import startCase from 'lodash/startCase'
-import { format } from 'date-fns'
-import { css } from 'styled-components'
+import { ErrorBoundary } from 'react-error-boundary'
 import { useTranslation } from 'react-i18next'
 import { useDispatch, useSelector } from 'react-redux'
-import { ErrorBoundary } from 'react-error-boundary'
+import { useNavigate } from 'react-router-dom'
+import { format } from 'date-fns'
+import isEmpty from 'lodash/isEmpty'
+import map from 'lodash/map'
+import omit from 'lodash/omit'
+import startCase from 'lodash/startCase'
+import { css } from 'styled-components'
 
 import {
   ALIGN_CENTER,
@@ -16,6 +17,7 @@ import {
   Box,
   Btn,
   COLORS,
+  CURSOR_POINTER,
   DIRECTION_COLUMN,
   DIRECTION_ROW,
   DISPLAY_FLEX,
@@ -23,6 +25,7 @@ import {
   Flex,
   Icon,
   JUSTIFY_CENTER,
+  JUSTIFY_END,
   JUSTIFY_SPACE_BETWEEN,
   LegacyStyledText,
   Link,
@@ -31,6 +34,7 @@ import {
   POSITION_RELATIVE,
   PrimaryButton,
   ProtocolDeck,
+  SecondaryButton,
   SIZE_1,
   SIZE_5,
   SPACING,
@@ -38,53 +42,48 @@ import {
   TYPOGRAPHY,
 } from '@opentrons/components'
 import {
-  MAGNETIC_BLOCK_TYPE,
+  FLEX_ROBOT_TYPE,
   getGripperDisplayName,
   getModuleType,
   getSimplestDeckConfigForProtocol,
-  parseInitialLoadedLabwareByAdapter,
-  parseInitialLoadedLabwareByModuleId,
-  parseInitialLoadedLabwareBySlot,
+  MAGNETIC_BLOCK_TYPE,
   parseInitialLoadedModulesBySlot,
   parseInitialPipetteNamesByMount,
-  NON_USER_ADDRESSABLE_LABWARE,
 } from '@opentrons/shared-data'
 
 import { getTopPortalEl } from '/app/App/portal'
 import { Divider } from '/app/atoms/structure'
-import {
-  useTrackEvent,
-  ANALYTICS_PROTOCOL_PROCEED_TO_RUN,
-} from '/app/redux/analytics'
-import {
-  getIsProtocolAnalysisInProgress,
-  analyzeProtocol,
-} from '/app/redux/protocol-storage'
-import { useFeatureFlag } from '/app/redux/config'
 import { ChooseRobotToRunProtocolSlideout } from '/app/organisms/Desktop/ChooseRobotToRunProtocolSlideout'
-import { SendProtocolToFlexSlideout } from '../SendProtocolToFlexSlideout'
-import { ProtocolAnalysisFailure } from '../ProtocolAnalysisFailure'
-import { ProtocolStatusBanner } from '../ProtocolStatusBanner'
+import {
+  ANALYTICS_PROTOCOL_PROCEED_TO_RUN,
+  useTrackEvent,
+} from '/app/redux/analytics'
+import { useFeatureFlag } from '/app/redux/config'
+import {
+  analyzeProtocol,
+  getIsProtocolAnalysisInProgress,
+} from '/app/redux/protocol-storage'
 import { getAnalysisStatus } from '/app/transformations/analysis'
-import { getProtocolDisplayName } from '/app/transformations/protocols'
 import { getProtocolUsesGripper } from '/app/transformations/commands'
+import { getProtocolDisplayName } from '/app/transformations/protocols'
+
+import { ProtocolAnalysisFailure } from '../ProtocolAnalysisFailure'
 import { ProtocolOverflowMenu } from '../ProtocolsLanding/ProtocolOverflowMenu'
-import { ProtocolStats } from './ProtocolStats'
+import { ProtocolStatusBanner } from '../ProtocolStatusBanner'
+import { SendProtocolToFlexSlideout } from '../SendProtocolToFlexSlideout'
+import { AnnotatedSteps } from './AnnotatedSteps'
 import { ProtocolLabwareDetails } from './ProtocolLabwareDetails'
 import { ProtocolLiquidsDetails } from './ProtocolLiquidsDetails'
-import { RobotConfigurationDetails } from './RobotConfigurationDetails'
 import { ProtocolParameters } from './ProtocolParameters'
-import { AnnotatedSteps } from './AnnotatedSteps'
+import { ProtocolStats } from './ProtocolStats'
+import { RobotConfigurationDetails } from './RobotConfigurationDetails'
 
 import type { JsonConfig, PythonConfig } from '@opentrons/shared-data'
-import type { StoredProtocolData } from '/app/redux/protocol-storage'
-import type { State, Dispatch } from '/app/redux/types'
-
-const GRID_STYLE = css`
-  display: ${DISPLAY_GRID};
-  width: 100%;
-  grid-template-columns: 26.6% 26.6% 26.6% 20.2%;
-`
+import type {
+  GroupedCommands,
+  StoredProtocolData,
+} from '/app/redux/protocol-storage'
+import type { Dispatch, State } from '/app/redux/types'
 
 const TWO_COL_GRID_STYLE = css`
   display: ${DISPLAY_GRID};
@@ -124,7 +123,7 @@ function MetadataDetails({
   protocolType,
 }: MetadataDetailsProps): JSX.Element {
   if (protocolType === 'json') {
-    return <LegacyStyledText as="p">{description}</LegacyStyledText>
+    return <LegacyStyledText forwardedAs="p">{description}</LegacyStyledText>
   } else {
     const filteredMetaData = Object.entries(
       omit(metadata, ['description', 'protocolName', 'author', 'apiLevel'])
@@ -136,20 +135,20 @@ function MetadataDetails({
         flexDirection={DIRECTION_COLUMN}
         data-testid="ProtocolDetails_description"
       >
-        <LegacyStyledText as="p" overflowWrap={OVERFLOW_WRAP_ANYWHERE}>
+        <LegacyStyledText forwardedAs="p" overflowWrap={OVERFLOW_WRAP_ANYWHERE}>
           {description}
         </LegacyStyledText>
         {filteredMetaData.map((item, index) => {
           return (
             <Fragment key={index}>
               <LegacyStyledText
-                as="h6"
+                forwardedAs="h6"
                 marginTop={SPACING.spacing8}
                 color={COLORS.grey60}
               >
                 {startCase(item.label)}
               </LegacyStyledText>
-              <LegacyStyledText as="p">{item.value}</LegacyStyledText>
+              <LegacyStyledText forwardedAs="p">{item.value}</LegacyStyledText>
             </Fragment>
           )
         })}
@@ -175,7 +174,7 @@ const ReadMoreContent = (props: ReadMoreContentProps): JSX.Element => {
   return (
     <Flex flexDirection={DIRECTION_COLUMN} paddingRight={SPACING.spacing16}>
       {isReadMore ? (
-        <LegacyStyledText as="p" overflowWrap={OVERFLOW_WRAP_ANYWHERE}>
+        <LegacyStyledText forwardedAs="p" overflowWrap={OVERFLOW_WRAP_ANYWHERE}>
           {description.slice(0, 160)}
         </LegacyStyledText>
       ) : (
@@ -203,15 +202,24 @@ const ReadMoreContent = (props: ReadMoreContentProps): JSX.Element => {
   )
 }
 
-interface ProtocolDetailsProps extends StoredProtocolData {}
+interface ProtocolDetailsProps extends StoredProtocolData {
+  groupedCommands: GroupedCommands | null
+}
 
 export function ProtocolDetails(
   props: ProtocolDetailsProps
 ): JSX.Element | null {
   const trackEvent = useTrackEvent()
   const dispatch = useDispatch<Dispatch>()
-  const { protocolKey, srcFileNames, mostRecentAnalysis, modified } = props
+  const {
+    protocolKey,
+    srcFileNames,
+    mostRecentAnalysis,
+    modified,
+    groupedCommands,
+  } = props
   const { t, i18n } = useTranslation(['protocol_details', 'shared'])
+  const navigate = useNavigate()
   const enableProtocolStats = useFeatureFlag('protocolStats')
   const enableProtocolTimeline = useFeatureFlag('protocolTimeline')
   const runTimeParameters = mostRecentAnalysis?.runTimeParameters ?? []
@@ -223,10 +231,8 @@ export function ProtocolDetails(
     showChooseRobotToRunProtocolSlideout,
     setShowChooseRobotToRunProtocolSlideout,
   ] = useState<boolean>(false)
-  const [
-    showSendProtocolToFlexSlideout,
-    setShowSendProtocolToFlexSlideout,
-  ] = useState<boolean>(false)
+  const [showSendProtocolToFlexSlideout, setShowSendProtocolToFlexSlideout] =
+    useState<boolean>(false)
   const [showDeckViewModal, setShowDeckViewModal] = useState(false)
 
   const isAnalyzing = useSelector((state: State) =>
@@ -266,57 +272,44 @@ export function ProtocolDetails(
       : null
   )
 
-  const requiredLabwareDetails =
-    mostRecentAnalysis != null
-      ? map({
-          ...parseInitialLoadedLabwareByModuleId(
-            mostRecentAnalysis.commands != null
-              ? mostRecentAnalysis.commands
-              : []
-          ),
-          ...parseInitialLoadedLabwareBySlot(
-            mostRecentAnalysis.commands != null
-              ? mostRecentAnalysis.commands
-              : []
-          ),
-          ...parseInitialLoadedLabwareByAdapter(
-            mostRecentAnalysis.commands != null
-              ? mostRecentAnalysis.commands
-              : []
-          ),
-        }).filter(
-          labware =>
-            labware.result?.definition?.parameters?.format !== 'trash' &&
-            !NON_USER_ADDRESSABLE_LABWARE.includes(labware?.params?.loadName)
-        )
-      : []
-
   const protocolDisplayName = getProtocolDisplayName(
     protocolKey,
     srcFileNames,
     mostRecentAnalysis
   )
 
-  const getCreationMethod = (config: JsonConfig | PythonConfig): string => {
+  const getCreationMethod = (
+    config: JsonConfig | PythonConfig,
+    metadata: { [key: string]: any }
+  ): string => {
     if (config.protocolType === 'json') {
       return t('protocol_designer_version', {
         version: config.schemaVersion.toFixed(1),
       })
     } else {
-      return t('python_api_version', {
-        version:
-          config.apiVersion != null ? config.apiVersion?.join('.') : null,
-      })
+      if ('protocolDesigner' in metadata) {
+        return t('protocol_designer_version', {
+          version: parseInt(metadata.protocolDesigner as string).toFixed(1),
+        })
+      } else {
+        return t('python_api_version', {
+          version:
+            config.apiVersion != null ? config.apiVersion?.join('.') : null,
+        })
+      }
     }
   }
 
   const creationMethod =
     mostRecentAnalysis != null
-      ? getCreationMethod(mostRecentAnalysis.config) ?? t('shared:no_data')
+      ? (getCreationMethod(
+          mostRecentAnalysis.config,
+          mostRecentAnalysis.metadata
+        ) ?? t('shared:no_data'))
       : t('shared:no_data')
   const author =
     mostRecentAnalysis != null
-      ? mostRecentAnalysis?.metadata?.author ?? t('shared:no_data')
+      ? (mostRecentAnalysis?.metadata?.author ?? t('shared:no_data'))
       : t('shared:no_data')
   const lastAnalyzed =
     mostRecentAnalysis?.createdAt != null
@@ -326,7 +319,7 @@ export function ProtocolDetails(
 
   const contentsByTabName = {
     labware: (
-      <ProtocolLabwareDetails requiredLabwareDetails={requiredLabwareDetails} />
+      <ProtocolLabwareDetails commands={mostRecentAnalysis?.commands ?? []} />
     ),
     robot_config: (
       <RobotConfigurationDetails
@@ -356,7 +349,10 @@ export function ProtocolDetails(
     ) : null,
     timeline:
       enableProtocolTimeline && mostRecentAnalysis != null ? (
-        <AnnotatedSteps analysis={mostRecentAnalysis} />
+        <AnnotatedSteps
+          analysis={mostRecentAnalysis}
+          groupedCommands={groupedCommands}
+        />
       ) : null,
     parameters: <ProtocolParameters runTimeParameters={runTimeParameters} />,
   }
@@ -382,6 +378,10 @@ export function ProtocolDetails(
       properties: { sourceLocation: 'ProtocolsDetail' },
     })
     setShowChooseRobotToRunProtocolSlideout(true)
+  }
+
+  const handleClickTimeline = (): void => {
+    navigate(`/protocols/${protocolKey}/visualization`)
   }
 
   const UNKNOWN_ATTACHMENT_ERROR = `${protocolDisplayName} protocol uses
@@ -463,15 +463,23 @@ export function ProtocolDetails(
               >
                 {protocolDisplayName}
               </LegacyStyledText>
-              <Flex css={GRID_STYLE}>
+              <Flex
+                display={DISPLAY_GRID}
+                width="100%"
+                gridTemplateColumns={
+                  enableProtocolTimeline && robotType === FLEX_ROBOT_TYPE
+                    ? '25.5% 25.5% 25.5% 22.9%'
+                    : '26.6% 26.6% 26.6% 20.2%'
+                }
+              >
                 <Flex
                   flexDirection={DIRECTION_COLUMN}
                   data-testid="ProtocolDetails_creationMethod"
                 >
-                  <LegacyStyledText as="h6" color={COLORS.grey60}>
+                  <LegacyStyledText forwardedAs="h6" color={COLORS.grey60}>
                     {t('creation_method')}
                   </LegacyStyledText>
-                  <LegacyStyledText as="p">
+                  <LegacyStyledText forwardedAs="p">
                     {analysisStatus === 'loading'
                       ? t('shared:loading')
                       : creationMethod}
@@ -481,10 +489,10 @@ export function ProtocolDetails(
                   flexDirection={DIRECTION_COLUMN}
                   data-testid="ProtocolDetails_lastUpdated"
                 >
-                  <LegacyStyledText as="h6" color={COLORS.grey60}>
+                  <LegacyStyledText forwardedAs="h6" color={COLORS.grey60}>
                     {t('last_updated')}
                   </LegacyStyledText>
-                  <LegacyStyledText as="p">
+                  <LegacyStyledText forwardedAs="p">
                     {analysisStatus === 'loading'
                       ? t('shared:loading')
                       : format(new Date(modified), 'M/d/yy HH:mm')}
@@ -494,27 +502,31 @@ export function ProtocolDetails(
                   flexDirection={DIRECTION_COLUMN}
                   data-testid="ProtocolDetails_lastAnalyzed"
                 >
-                  <LegacyStyledText as="h6" color={COLORS.grey60}>
+                  <LegacyStyledText forwardedAs="h6" color={COLORS.grey60}>
                     {t('last_analyzed')}
                   </LegacyStyledText>
-                  <LegacyStyledText as="p">
+                  <LegacyStyledText forwardedAs="p">
                     {analysisStatus === 'loading'
                       ? t('shared:loading')
                       : lastAnalyzed}
                   </LegacyStyledText>
                 </Flex>
-                <Flex
-                  css={css`
-                    display: ${DISPLAY_GRID};
-                    justify-self: end;
-                  `}
-                >
+                <Flex gridGap={SPACING.spacing4} justifySelf={JUSTIFY_END}>
+                  {enableProtocolTimeline ? (
+                    <SecondaryButton
+                      onClick={handleClickTimeline}
+                      cursor={CURSOR_POINTER}
+                    >
+                      {t('visualize')}
+                    </SecondaryButton>
+                  ) : null}
                   <PrimaryButton
                     onClick={() => {
                       handleRunProtocolButtonClick()
                     }}
                     data-testid="ProtocolDetails_runProtocol"
                     disabled={analysisStatus === 'loading'}
+                    whiteSpace="nowrap"
                   >
                     {t('start_setup')}
                   </PrimaryButton>
@@ -526,11 +538,11 @@ export function ProtocolDetails(
                   flexDirection={DIRECTION_COLUMN}
                   data-testid="ProtocolDetails_author"
                 >
-                  <LegacyStyledText as="h6" color={COLORS.grey60}>
+                  <LegacyStyledText forwardedAs="h6" color={COLORS.grey60}>
                     {t('org_or_author')}
                   </LegacyStyledText>
                   <LegacyStyledText
-                    as="p"
+                    forwardedAs="p"
                     overflowWrap={OVERFLOW_WRAP_ANYWHERE}
                   >
                     {analysisStatus === 'loading'
@@ -542,11 +554,11 @@ export function ProtocolDetails(
                   flexDirection={DIRECTION_COLUMN}
                   data-testid="ProtocolDetails_description"
                 >
-                  <LegacyStyledText as="h6" color={COLORS.grey60}>
+                  <LegacyStyledText forwardedAs="h6" color={COLORS.grey60}>
                     {t('description')}
                   </LegacyStyledText>
                   {analysisStatus === 'loading' ? (
-                    <LegacyStyledText as="p">
+                    <LegacyStyledText forwardedAs="p">
                       {t('shared:loading')}
                     </LegacyStyledText>
                   ) : null}
@@ -595,7 +607,7 @@ export function ProtocolDetails(
                 padding={SPACING.spacing16}
               >
                 <LegacyStyledText
-                  as="h3"
+                  forwardedAs="h3"
                   fontWeight={TYPOGRAPHY.fontWeightSemiBold}
                 >
                   {t('deck_view')}

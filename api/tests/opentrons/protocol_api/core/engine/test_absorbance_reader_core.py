@@ -1,4 +1,5 @@
 """Tests for the engine based Protocol API module core implementations."""
+
 import pytest
 from decoy import Decoy
 
@@ -10,6 +11,7 @@ from opentrons.hardware_control.modules.types import (
 from opentrons.protocol_engine import commands as cmd
 from opentrons.protocol_engine.clients import SyncClient as EngineClient
 from opentrons.protocol_api.core.engine.module_core import AbsorbanceReaderCore
+from opentrons.protocol_api.core.engine.protocol import ProtocolCore
 from opentrons.protocol_api import MAX_SUPPORTED_VERSION
 from opentrons.protocol_engine.errors.exceptions import CannotPerformModuleAction
 from opentrons.protocol_engine.state.module_substates import AbsorbanceReaderSubState
@@ -34,9 +36,16 @@ def mock_sync_module_hardware(decoy: Decoy) -> SyncAbsorbanceReaderHardware:
 
 
 @pytest.fixture
+def mock_protocol_core(decoy: Decoy) -> ProtocolCore:
+    """Get a mock protocol core."""
+    return decoy.mock(cls=ProtocolCore)
+
+
+@pytest.fixture
 def subject(
     mock_engine_client: EngineClient,
     mock_sync_module_hardware: SyncAbsorbanceReaderHardware,
+    mock_protocol_core: ProtocolCore,
 ) -> AbsorbanceReaderCore:
     """Get a AbsorbanceReaderCore test subject."""
     return AbsorbanceReaderCore(
@@ -44,6 +53,7 @@ def subject(
         engine_client=mock_engine_client,
         api_version=MAX_SUPPORTED_VERSION,
         sync_module_hardware=mock_sync_module_hardware,
+        protocol_core=mock_protocol_core,
     )
 
 
@@ -51,6 +61,7 @@ def test_create(
     decoy: Decoy,
     mock_engine_client: EngineClient,
     mock_sync_module_hardware: SyncAbsorbanceReaderHardware,
+    mock_protocol_core: ProtocolCore,
 ) -> None:
     """It should be able to create an absorbance plate reader module core."""
     result = AbsorbanceReaderCore(
@@ -58,6 +69,7 @@ def test_create(
         engine_client=mock_engine_client,
         api_version=MAX_SUPPORTED_VERSION,
         sync_module_hardware=mock_sync_module_hardware,
+        protocol_core=mock_protocol_core,
     )
 
     assert result.module_id == "1234"
@@ -69,59 +81,67 @@ def test_initialize(
 ) -> None:
     """It should set the sample wavelength with the engine client."""
     subject._ready_to_initialize = True
-    subject.initialize("single", [123])
+    subject.initialize("single", [350])
 
     decoy.verify(
         mock_engine_client.execute_command(
             cmd.absorbance_reader.InitializeParams(
                 moduleId="1234",
                 measureMode="single",
-                sampleWavelengths=[123],
+                sampleWavelengths=[350],
                 referenceWavelength=None,
             ),
         ),
         times=1,
     )
-    assert subject._initialized_value == [123]
+    assert subject._initialized_value == [350]
 
     # Test reference wavelength
-    subject.initialize("single", [124], 450)
+    subject.initialize("single", [350], 450)
 
     decoy.verify(
         mock_engine_client.execute_command(
             cmd.absorbance_reader.InitializeParams(
                 moduleId="1234",
                 measureMode="single",
-                sampleWavelengths=[124],
+                sampleWavelengths=[350],
                 referenceWavelength=450,
             ),
         ),
         times=1,
     )
-    assert subject._initialized_value == [124]
+    assert subject._initialized_value == [350]
 
     # Test initialize multi
-    subject.initialize("multi", [124, 125, 126])
+    subject.initialize("multi", [350, 400, 450])
 
     decoy.verify(
         mock_engine_client.execute_command(
             cmd.absorbance_reader.InitializeParams(
                 moduleId="1234",
                 measureMode="multi",
-                sampleWavelengths=[124, 125, 126],
+                sampleWavelengths=[350, 400, 450],
                 referenceWavelength=None,
             ),
         ),
         times=1,
     )
-    assert subject._initialized_value == [124, 125, 126]
+    assert subject._initialized_value == [350, 400, 450]
 
 
 def test_initialize_not_ready(subject: AbsorbanceReaderCore) -> None:
     """It should raise CannotPerformModuleAction if you dont call .close_lid() command."""
     subject._ready_to_initialize = False
     with pytest.raises(CannotPerformModuleAction):
-        subject.initialize("single", [123])
+        subject.initialize("single", [350])
+
+
+@pytest.mark.parametrize("wavelength", [-350, 0, 1200, "wda"])
+def test_invalid_wavelengths(wavelength: int, subject: AbsorbanceReaderCore) -> None:
+    """It should raise ValueError if you provide an invalid wavelengthi."""
+    subject._ready_to_initialize = True
+    with pytest.raises(ValueError):
+        subject.initialize("single", [wavelength])
 
 
 def test_read(
@@ -129,7 +149,7 @@ def test_read(
 ) -> None:
     """It should call absorbance reader to read with the engine client."""
     subject._ready_to_initialize = True
-    subject._initialized_value = [123]
+    subject._initialized_value = [350]
     substate = AbsorbanceReaderSubState(
         module_id=AbsorbanceReaderId(subject.module_id),
         configured=True,
@@ -139,7 +159,6 @@ def test_read(
         configured_wavelengths=subject._initialized_value,
         measure_mode=AbsorbanceReaderMeasureMode("single"),
         reference_wavelength=None,
-        lid_id="pr_lid_labware",
     )
     decoy.when(
         mock_engine_client.state.modules.get_absorbance_reader_substate(
@@ -152,6 +171,7 @@ def test_read(
         mock_engine_client.execute_command(
             cmd.absorbance_reader.ReadAbsorbanceParams(
                 moduleId="1234",
+                fileName=None,
             ),
         ),
         times=1,

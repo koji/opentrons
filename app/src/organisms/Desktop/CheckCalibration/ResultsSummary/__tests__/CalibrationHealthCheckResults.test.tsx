@@ -1,15 +1,17 @@
-import type * as React from 'react'
-import { it, describe, expect, beforeEach } from 'vitest'
 import { screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 import { COLORS, TYPOGRAPHY } from '@opentrons/components'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
+
 import { CalibrationHealthCheckResults } from '../CalibrationHealthCheckResults'
 
+import type { ComponentProps } from 'react'
+
 const render = (
-  props: React.ComponentProps<typeof CalibrationHealthCheckResults>
+  props: ComponentProps<typeof CalibrationHealthCheckResults>
 ) => {
   return renderWithProviders(<CalibrationHealthCheckResults {...props} />, {
     i18nInstance: i18n,
@@ -17,7 +19,7 @@ const render = (
 }
 
 describe('CalibrationHealthCheckResults', () => {
-  let props: React.ComponentProps<typeof CalibrationHealthCheckResults>
+  let props: ComponentProps<typeof CalibrationHealthCheckResults>
   beforeEach(() => {
     props = {
       isCalibrationRecommended: false,

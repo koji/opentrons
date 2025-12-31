@@ -1,33 +1,30 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { TEMPERATURE_MODULE_TYPE } from '@opentrons/shared-data'
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+
+import { getMockMixStep, getMockMoveLiquidStep } from '../__fixtures__'
+import { START_TERMINAL_ITEM_ID } from '../../../steplist/types'
+import * as utils from '../../modules/utils'
 import {
-  END_TERMINAL_ITEM_ID,
-  PRESAVED_STEP_ID,
-  START_TERMINAL_ITEM_ID,
-} from '../../../steplist/types'
-import {
-  SINGLE_STEP_SELECTION_TYPE,
   MULTI_STEP_SELECTION_TYPE,
+  SINGLE_STEP_SELECTION_TYPE,
   TERMINAL_ITEM_SELECTION_TYPE,
 } from '../reducers'
 import {
-  getHoveredStepLabware,
-  getSelectedStepTitleInfo,
-  getActiveItem,
-  getMultiSelectLastSelected,
   _getSavedMultiSelectFieldValues,
-  getMultiSelectFieldValues,
-  getMultiSelectDisabledFields,
-  getCountPerStepType,
+  getActiveItem,
   getBatchEditSelectedStepTypes,
+  getCountPerStepType,
+  getHoveredStepLabware,
+  getMultiSelectDisabledFields,
+  getMultiSelectFieldValues,
+  getMultiSelectLastSelected,
 } from '../selectors'
-import { getMockMoveLiquidStep, getMockMixStep } from '../__fixtures__'
 
-import * as utils from '../../modules/utils'
-
+import type { MoveLabwareArgs } from '@opentrons/step-generation'
 import type { FormData } from '../../../form-types'
-import type { StepArgsAndErrorsById } from '../../../steplist/types'
 import type { AllTemporalPropertiesForTimelineFrame } from '../../../step-forms'
+import type { StepArgsAndErrorsById } from '../../../steplist/types'
 
 vi.mock('../../modules/utils')
 
@@ -46,7 +43,6 @@ function createArgsForStepId(
 const hoveredStepId = 'hoveredStepId'
 const labware = 'well plate'
 const mixCommand = 'mix'
-const moveLabwareCommand = 'moveLabware'
 describe('getHoveredStepLabware', () => {
   let initialDeckState: AllTemporalPropertiesForTimelineFrame
   beforeEach(() => {
@@ -135,9 +131,13 @@ describe('getHoveredStepLabware', () => {
   })
 
   it('correct labware is returned when command is moveLabware', () => {
-    const stepArgs = {
-      commandCreatorFnName: moveLabwareCommand,
-      labware,
+    const stepArgs: MoveLabwareArgs = {
+      labwareId: labware,
+      strategy: 'usingGripper',
+      newLocation: { slotName: 'A1' },
+      commandCreatorFnName: 'moveLabware',
+      name: 'some name',
+      description: 'some description',
     }
     const argsByStepId = createArgsForStepId(hoveredStepId, stepArgs)
     const result = getHoveredStepLabware.resultFunc(
@@ -146,7 +146,7 @@ describe('getHoveredStepLabware', () => {
       initialDeckState
     )
 
-    expect(result).toEqual([labware])
+    expect(result).toEqual([stepArgs.labwareId])
   })
 
   describe('modules', () => {
@@ -182,7 +182,7 @@ describe('getHoveredStepLabware', () => {
       } as any)
       const stepArgs = {
         commandCreatorFnName: setTempCommand,
-        module: type,
+        moduleId: type,
       }
       const argsByStepId = createArgsForStepId(hoveredStepId, stepArgs)
       const result = getHoveredStepLabware.resultFunc(
@@ -212,57 +212,6 @@ describe('getHoveredStepLabware', () => {
   })
 })
 
-describe('getSelectedStepTitleInfo', () => {
-  it('should return title info of the presaved form when the presaved terminal item is selected', () => {
-    const unsavedForm = { stepName: 'The Step', stepType: 'transfer' }
-    // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
-    const result = getSelectedStepTitleInfo.resultFunc(
-      unsavedForm,
-      {},
-      null,
-      PRESAVED_STEP_ID
-    )
-    expect(result).toEqual({
-      stepName: unsavedForm.stepName,
-      stepType: unsavedForm.stepType,
-    })
-  })
-
-  it('should return null when the start or end terminal item is selected', () => {
-    const terminals = [START_TERMINAL_ITEM_ID, END_TERMINAL_ITEM_ID]
-    terminals.forEach(terminalId => {
-      const unsavedForm = { stepName: 'The Step', stepType: 'transfer' }
-      // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
-      const result = getSelectedStepTitleInfo.resultFunc(
-        unsavedForm,
-        {},
-        null,
-        PRESAVED_STEP_ID
-      )
-      expect(result).toEqual({
-        stepName: unsavedForm.stepName,
-        stepType: unsavedForm.stepType,
-      })
-    })
-  })
-
-  it('should return title info of the saved step when a saved step is selected', () => {
-    const savedForm = { stepName: 'The Step', stepType: 'transfer' }
-    const stepId = 'selectedAndSavedStepId'
-    // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
-    const result = getSelectedStepTitleInfo.resultFunc(
-      null,
-      { [stepId]: savedForm },
-      stepId,
-      null
-    )
-    expect(result).toEqual({
-      stepName: savedForm.stepName,
-      stepType: savedForm.stepType,
-    })
-  })
-})
-
 describe('getActiveItem', () => {
   const testCases = [
     {
@@ -270,6 +219,7 @@ describe('getActiveItem', () => {
       selected: {
         selectionType: MULTI_STEP_SELECTION_TYPE,
         ids: ['notTheseSteps', 'nope'],
+        lastSelected: 'nope',
       },
       hovered: {
         selectionType: SINGLE_STEP_SELECTION_TYPE,
@@ -286,6 +236,7 @@ describe('getActiveItem', () => {
       selected: {
         selectionType: MULTI_STEP_SELECTION_TYPE,
         ids: ['notTheseSteps', 'nope'],
+        lastSelected: 'nope',
       },
       hovered: null,
       expected: null,
@@ -307,19 +258,18 @@ describe('getActiveItem', () => {
         'should show the single-selected terminal item, if nothing is hovered',
       selected: {
         selectionType: TERMINAL_ITEM_SELECTION_TYPE,
-        id: 'someItem',
+        id: START_TERMINAL_ITEM_ID,
       },
       hovered: null,
       expected: {
         selectionType: TERMINAL_ITEM_SELECTION_TYPE,
-        id: 'someItem',
+        id: START_TERMINAL_ITEM_ID,
       },
     },
   ]
 
   testCases.forEach(({ title, selected, hovered, expected }) => {
     it(title, () => {
-      // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
       const result = getActiveItem.resultFunc(selected, hovered)
       expect(result).toEqual(expected)
     })
@@ -328,7 +278,6 @@ describe('getActiveItem', () => {
 
 describe('getMultiSelectLastSelected', () => {
   it('should return null if the selected item is a single step', () => {
-    // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
     const result = getMultiSelectLastSelected.resultFunc({
       selectionType: SINGLE_STEP_SELECTION_TYPE,
       id: 'foo',
@@ -336,15 +285,13 @@ describe('getMultiSelectLastSelected', () => {
     expect(result).toEqual(null)
   })
   it('should return null if the selected item is a terminal item', () => {
-    // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
     const result = getMultiSelectLastSelected.resultFunc({
       selectionType: TERMINAL_ITEM_SELECTION_TYPE,
-      id: 'foo',
+      id: START_TERMINAL_ITEM_ID,
     })
     expect(result).toEqual(null)
   })
   it('should return the lastSelected step Id if the selected item is a multi-selection', () => {
-    // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
     const result = getMultiSelectLastSelected.resultFunc({
       selectionType: MULTI_STEP_SELECTION_TYPE,
       ids: ['foo', 'spam', 'bar'],
@@ -382,9 +329,8 @@ describe('_getSavedMultiSelectFieldValues', () => {
       },
     }
     expect(
-      // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
       _getSavedMultiSelectFieldValues.resultFunc(
-        savedStepForms,
+        savedStepForms as any,
         mockmultiSelectItemIds
       )
     ).toBe(null)
@@ -396,8 +342,7 @@ describe('_getSavedMultiSelectFieldValues', () => {
       ...getMockMixStep(),
     }
     expect(
-      // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
-      _getSavedMultiSelectFieldValues.resultFunc(savedStepForms, [
+      _getSavedMultiSelectFieldValues.resultFunc(savedStepForms as any, [
         'move_liquid_step_id',
         'mix_step_id',
       ])
@@ -407,9 +352,8 @@ describe('_getSavedMultiSelectFieldValues', () => {
   describe('moveLiquid: when fields are NOT indeterminate', () => {
     it('should return the fields with the indeterminate boolean', () => {
       expect(
-        // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
         _getSavedMultiSelectFieldValues.resultFunc(
-          mockSavedStepForms,
+          mockSavedStepForms as any,
           mockmultiSelectItemIds
         )
       ).toEqual({
@@ -428,18 +372,19 @@ describe('_getSavedMultiSelectFieldValues', () => {
         },
         aspirate_x_position: {
           isIndeterminate: false,
+          value: undefined,
         },
         aspirate_y_position: {
           isIndeterminate: false,
+          value: undefined,
         },
         dispense_x_position: {
           isIndeterminate: false,
+          value: undefined,
         },
         dispense_y_position: {
           isIndeterminate: false,
-        },
-        blowout_z_offset: {
-          isIndeterminate: false,
+          value: undefined,
         },
         aspirate_wells: {
           isIndeterminate: true,
@@ -468,6 +413,22 @@ describe('_getSavedMultiSelectFieldValues', () => {
           value: false,
           isIndeterminate: false,
         },
+        pushOut_checkbox: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        pushOut_volume: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        conditioning_checkbox: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        conditioning_volume: {
+          isIndeterminate: false,
+          value: undefined,
+        },
         aspirate_mix_checkbox: {
           value: true,
           isIndeterminate: false,
@@ -488,10 +449,6 @@ describe('_getSavedMultiSelectFieldValues', () => {
           value: '2',
           isIndeterminate: false,
         },
-        aspirate_delay_mmFromBottom: {
-          value: '1',
-          isIndeterminate: false,
-        },
         aspirate_airGap_checkbox: {
           value: true,
           isIndeterminate: false,
@@ -504,9 +461,45 @@ describe('_getSavedMultiSelectFieldValues', () => {
           value: true,
           isIndeterminate: false,
         },
-        aspirate_touchTip_mmFromBottom: {
-          value: 1,
+        aspirate_touchTip_mmFromEdge: {
+          value: undefined,
           isIndeterminate: false,
+        },
+        aspirate_touchTip_mmFromTop: {
+          value: -1,
+          isIndeterminate: false,
+        },
+        aspirate_touchTip_speed: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_retract_delay_seconds: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_retract_mmFromBottom: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_retract_speed: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_retract_x_position: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_retract_y_position: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_submerge_delay_seconds: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_submerge_speed: {
+          isIndeterminate: false,
+          value: undefined,
         },
         // dispense settings
         dispense_labware: {
@@ -549,10 +542,6 @@ describe('_getSavedMultiSelectFieldValues', () => {
           value: '1',
           isIndeterminate: false,
         },
-        dispense_delay_mmFromBottom: {
-          value: '0.5',
-          isIndeterminate: false,
-        },
         dispense_airGap_checkbox: {
           value: true,
           isIndeterminate: false,
@@ -565,9 +554,45 @@ describe('_getSavedMultiSelectFieldValues', () => {
           value: true,
           isIndeterminate: false,
         },
-        dispense_touchTip_mmFromBottom: {
-          value: 1,
+        dispense_touchTip_mmFromEdge: {
+          value: undefined,
           isIndeterminate: false,
+        },
+        dispense_touchTip_mmFromTop: {
+          value: -1,
+          isIndeterminate: false,
+        },
+        dispense_touchTip_speed: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_retract_delay_seconds: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_retract_mmFromBottom: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_retract_speed: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_retract_x_position: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_retract_y_position: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_submerge_delay_seconds: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_submerge_speed: {
+          isIndeterminate: false,
+          value: undefined,
         },
         blowout_checkbox: {
           value: true,
@@ -624,6 +649,73 @@ describe('_getSavedMultiSelectFieldValues', () => {
           value: undefined,
           isIndeterminate: false,
         },
+        liquidClassesSupported: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        liquidClass: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_position_reference: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_submerge_position_reference: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_retract_position_reference: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_submerge_mmFromBottom: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_submerge_x_position: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_submerge_y_position: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_position_reference: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_submerge_position_reference: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_submerge_x_position: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_submerge_y_position: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_submerge_mmFromBottom: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_retract_position_reference: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        tip_tracking: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        // tip selection wizard fields
+        tiprack_selected: {
+          isIndeterminate: false,
+        },
+        tips_selected: {
+          isIndeterminate: false,
+        },
       })
     })
   })
@@ -650,7 +742,7 @@ describe('_getSavedMultiSelectFieldValues', () => {
           aspirate_airGap_checkbox: false,
           // same thing here with air gap volume
           aspirate_touchTip_checkbox: false,
-          // same thing with aspirate_touchTip_mmFromBottom
+          // same thing with aspirate_touchTip_mmFromTop
           dispense_labware: 'other_disp_labware',
           dispense_flowRate: 2,
           dispense_mmFromBottom: '2',
@@ -664,7 +756,7 @@ describe('_getSavedMultiSelectFieldValues', () => {
           dispense_airGap_checkbox: false,
           // same thing here with air gap volume
           dispense_touchTip_checkbox: false,
-          // same thing with dispense_touchTip_mmFromBottom
+          // same thing with dispense_touchTip_mmFromTop
           blowout_checkbox: false,
           // same thing here with blowout location
           nozzles: null,
@@ -673,7 +765,6 @@ describe('_getSavedMultiSelectFieldValues', () => {
     })
     it('should return the fields with the indeterminate boolean', () => {
       expect(
-        // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
         _getSavedMultiSelectFieldValues.resultFunc(
           mockSavedStepFormsIndeterminate,
           mockmultiSelectItemIds
@@ -685,6 +776,7 @@ describe('_getSavedMultiSelectFieldValues', () => {
         },
         tipRack: {
           isIndeterminate: false,
+          value: undefined,
         },
         blowout_flowRate: {
           isIndeterminate: true,
@@ -706,21 +798,38 @@ describe('_getSavedMultiSelectFieldValues', () => {
         },
         aspirate_x_position: {
           isIndeterminate: false,
+          value: undefined,
         },
         aspirate_y_position: {
           isIndeterminate: false,
+          value: undefined,
         },
         dispense_x_position: {
           isIndeterminate: false,
+          value: undefined,
         },
         dispense_y_position: {
           isIndeterminate: false,
-        },
-        blowout_z_offset: {
-          isIndeterminate: false,
+          value: undefined,
         },
         preWetTip: {
           isIndeterminate: true,
+        },
+        pushOut_checkbox: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        pushOut_volume: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        conditioning_checkbox: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        conditioning_volume: {
+          isIndeterminate: false,
+          value: undefined,
         },
         aspirate_mix_checkbox: {
           isIndeterminate: true,
@@ -740,10 +849,6 @@ describe('_getSavedMultiSelectFieldValues', () => {
           isIndeterminate: false,
           value: '2',
         },
-        aspirate_delay_mmFromBottom: {
-          isIndeterminate: false,
-          value: '1',
-        },
         aspirate_airGap_checkbox: {
           isIndeterminate: true,
         },
@@ -754,9 +859,45 @@ describe('_getSavedMultiSelectFieldValues', () => {
         aspirate_touchTip_checkbox: {
           isIndeterminate: true,
         },
-        aspirate_touchTip_mmFromBottom: {
+        aspirate_touchTip_mmFromTop: {
           isIndeterminate: false,
-          value: 1,
+          value: -1,
+        },
+        aspirate_touchTip_mmFromEdge: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_touchTip_speed: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_submerge_delay_seconds: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_submerge_speed: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_retract_delay_seconds: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_retract_mmFromBottom: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_retract_speed: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_retract_x_position: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_retract_y_position: {
+          isIndeterminate: false,
+          value: undefined,
         },
         // dispense settings
         dispense_labware: {
@@ -792,10 +933,6 @@ describe('_getSavedMultiSelectFieldValues', () => {
           isIndeterminate: false,
           value: '1',
         },
-        dispense_delay_mmFromBottom: {
-          isIndeterminate: false,
-          value: '0.5',
-        },
         dispense_airGap_checkbox: {
           isIndeterminate: true,
         },
@@ -806,9 +943,45 @@ describe('_getSavedMultiSelectFieldValues', () => {
         dispense_touchTip_checkbox: {
           isIndeterminate: true,
         },
-        dispense_touchTip_mmFromBottom: {
+        dispense_touchTip_mmFromEdge: {
           isIndeterminate: false,
-          value: 1,
+          value: undefined,
+        },
+        dispense_touchTip_mmFromTop: {
+          isIndeterminate: false,
+          value: -1,
+        },
+        dispense_touchTip_speed: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_retract_delay_seconds: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_retract_mmFromBottom: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_retract_speed: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_retract_x_position: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_retract_y_position: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_submerge_delay_seconds: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_submerge_speed: {
+          isIndeterminate: false,
+          value: undefined,
         },
         blowout_checkbox: {
           isIndeterminate: true,
@@ -866,6 +1039,69 @@ describe('_getSavedMultiSelectFieldValues', () => {
           value: undefined,
           isIndeterminate: false,
         },
+        liquidClassesSupported: { isIndeterminate: false },
+        liquidClass: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_position_reference: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_submerge_position_reference: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_retract_position_reference: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_submerge_mmFromBottom: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_submerge_x_position: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        aspirate_submerge_y_position: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_position_reference: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_submerge_position_reference: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_submerge_x_position: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_submerge_y_position: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_submerge_mmFromBottom: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        dispense_retract_position_reference: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        tip_tracking: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        tiprack_selected: {
+          isIndeterminate: false,
+        },
+        tips_selected: {
+          isIndeterminate: false,
+        },
       })
     })
   })
@@ -885,7 +1121,6 @@ describe('_getSavedMultiSelectFieldValues', () => {
     })
     it('should return the fields with the indeterminate boolean', () => {
       expect(
-        // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
         _getSavedMultiSelectFieldValues.resultFunc(
           mockMixSavedStepForms,
           mockMixMultiSelectItemIds
@@ -913,7 +1148,7 @@ describe('_getSavedMultiSelectFieldValues', () => {
         dispense_delay_checkbox: { value: false, isIndeterminate: false },
         dispense_delay_seconds: { value: '1', isIndeterminate: false },
         mix_touchTip_checkbox: { value: false, isIndeterminate: false },
-        mix_touchTip_mmFromBottom: { value: null, isIndeterminate: false },
+        mix_touchTip_mmFromTop: { value: null, isIndeterminate: false },
         nozzles: { value: undefined, isIndeterminate: false },
         mix_x_position: {
           isIndeterminate: false,
@@ -940,6 +1175,33 @@ describe('_getSavedMultiSelectFieldValues', () => {
           value: undefined,
           isIndeterminate: false,
         },
+        liquidClassesSupported: { isIndeterminate: false },
+        liquidClass: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        pushOut_checkbox: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        pushOut_volume: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        mix_position_reference: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        tip_tracking: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        tiprack_selected: {
+          isIndeterminate: false,
+        },
+        tips_selected: {
+          isIndeterminate: false,
+        },
       })
     })
   })
@@ -961,7 +1223,7 @@ describe('_getSavedMultiSelectFieldValues', () => {
           blowout_checkbox: true,
           blowout_location: 'some_blowout_location',
           mix_mmFromBottom: 2,
-          pipette: 'other_pipette_id',
+          pipette: 'some_pipette_id',
           wells: ['A2'],
           aspirate_flowRate: '11.1',
           dispense_flowRate: '11.2',
@@ -970,7 +1232,7 @@ describe('_getSavedMultiSelectFieldValues', () => {
           dispense_delay_checkbox: true,
           dispense_delay_seconds: '3',
           mix_touchTip_checkbox: true,
-          mix_touchTip_mmFromBottom: '14',
+          mix_touchTip_mmFromTop: '-14',
           nozzles: null,
         },
       }
@@ -979,7 +1241,6 @@ describe('_getSavedMultiSelectFieldValues', () => {
     })
     it('should return the fields with the indeterminate boolean', () => {
       expect(
-        // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
         _getSavedMultiSelectFieldValues.resultFunc(
           mockMixSavedStepFormsIndeterminate,
           mockMixMultiSelectItemIds
@@ -998,7 +1259,7 @@ describe('_getSavedMultiSelectFieldValues', () => {
         blowout_checkbox: { isIndeterminate: true },
         blowout_location: { isIndeterminate: true },
         mix_mmFromBottom: { isIndeterminate: true },
-        pipette: { isIndeterminate: true },
+        pipette: { isIndeterminate: false, value: 'some_pipette_id' },
         wells: { isIndeterminate: true },
         aspirate_flowRate: { isIndeterminate: true },
         dispense_flowRate: { isIndeterminate: true },
@@ -1007,7 +1268,7 @@ describe('_getSavedMultiSelectFieldValues', () => {
         dispense_delay_checkbox: { isIndeterminate: true },
         dispense_delay_seconds: { isIndeterminate: true },
         mix_touchTip_checkbox: { isIndeterminate: true },
-        mix_touchTip_mmFromBottom: { isIndeterminate: true },
+        mix_touchTip_mmFromTop: { isIndeterminate: true },
         nozzles: { isIndeterminate: true },
         mix_x_position: {
           isIndeterminate: false,
@@ -1031,6 +1292,33 @@ describe('_getSavedMultiSelectFieldValues', () => {
         pickUpTip_wellNames: {
           isIndeterminate: false,
         },
+        liquidClassesSupported: { isIndeterminate: false },
+        liquidClass: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        pushOut_checkbox: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        pushOut_volume: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        mix_position_reference: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        tip_tracking: {
+          isIndeterminate: false,
+          value: undefined,
+        },
+        tiprack_selected: {
+          isIndeterminate: false,
+        },
+        tips_selected: {
+          isIndeterminate: false,
+        },
       })
     })
   })
@@ -1040,7 +1328,6 @@ describe('getMultiSelectFieldValues', () => {
   it('should pass through saved changes when there are no saved', () => {
     const savedValues = { a: { value: 'blah', isIndeterminate: true } }
     const changes = {}
-    // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
     const result = getMultiSelectFieldValues.resultFunc(savedValues, changes)
     expect(result).toEqual(savedValues)
   })
@@ -1048,7 +1335,6 @@ describe('getMultiSelectFieldValues', () => {
   it('should apply unsaved changes to override saved changes', () => {
     const savedValues = { a: { value: 'blah', isIndeterminate: true } }
     const changes = { a: '123' }
-    // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
     const result = getMultiSelectFieldValues.resultFunc(savedValues, changes)
     expect(result).toEqual({ a: { value: '123', isIndeterminate: false } })
   })
@@ -1056,7 +1342,6 @@ describe('getMultiSelectFieldValues', () => {
   it('should return null when savedValues is null (signifying invalid combination of stepTypes)', () => {
     const savedValues = null
     const changes = { a: '123' }
-    // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
     const result = getMultiSelectFieldValues.resultFunc(savedValues, changes)
     expect(result).toBe(null)
   })
@@ -1082,7 +1367,6 @@ describe('getMultiSelectDisabledFields', () => {
     })
     it('should return an empty object when no fields are different and path is single', () => {
       expect(
-        // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
         getMultiSelectDisabledFields.resultFunc(
           mockSavedStepForms,
           mockmultiSelectItemIds
@@ -1103,7 +1387,6 @@ describe('getMultiSelectDisabledFields', () => {
       })
       it('should return fields being disabled with associated reasons', () => {
         expect(
-          // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
           getMultiSelectDisabledFields.resultFunc(
             savedStepForms,
             mockmultiSelectItemIds
@@ -1139,7 +1422,6 @@ describe('getMultiSelectDisabledFields', () => {
         const aspirateLabwareDifferentText = 'Incompatible with current path'
 
         expect(
-          // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
           getMultiSelectDisabledFields.resultFunc(
             savedStepForms,
             mockmultiSelectItemIds
@@ -1150,7 +1432,7 @@ describe('getMultiSelectDisabledFields', () => {
           aspirate_delay_seconds: aspirateLabwareDifferentText,
           aspirate_delay_mmFromBottom: aspirateLabwareDifferentText,
           aspirate_touchTip_checkbox: aspirateLabwareDifferentText,
-          aspirate_touchTip_mmFromBottom: aspirateLabwareDifferentText,
+          aspirate_touchTip_mmFromTop: aspirateLabwareDifferentText,
         })
       })
     })
@@ -1169,7 +1451,6 @@ describe('getMultiSelectDisabledFields', () => {
         const dispenseLabwareDifferentText = 'Incompatible with current path'
 
         expect(
-          // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
           getMultiSelectDisabledFields.resultFunc(
             savedStepForms,
             mockmultiSelectItemIds
@@ -1180,7 +1461,7 @@ describe('getMultiSelectDisabledFields', () => {
           dispense_delay_seconds: dispenseLabwareDifferentText,
           dispense_delay_mmFromBottom: dispenseLabwareDifferentText,
           dispense_touchTip_checkbox: dispenseLabwareDifferentText,
-          dispense_touchTip_mmFromBottom: dispenseLabwareDifferentText,
+          dispense_touchTip_mmFromTop: dispenseLabwareDifferentText,
         })
       })
     })
@@ -1197,7 +1478,6 @@ describe('getMultiSelectDisabledFields', () => {
       })
       it('should return fields being disabled with associated reasons', () => {
         expect(
-          // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
           getMultiSelectDisabledFields.resultFunc(
             savedStepForms,
             mockmultiSelectItemIds
@@ -1222,7 +1502,6 @@ describe('getMultiSelectDisabledFields', () => {
       })
       it('should return fields being disabled with associated reasons', () => {
         expect(
-          // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
           getMultiSelectDisabledFields.resultFunc(
             savedStepForms,
             mockmultiSelectItemIds
@@ -1250,7 +1529,6 @@ describe('getMultiSelectDisabledFields', () => {
       })
       it('should return aspirate mix being disabled for both reasons', () => {
         expect(
-          // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
           getMultiSelectDisabledFields.resultFunc(
             savedStepForms,
             mockmultiSelectItemIds
@@ -1278,7 +1556,6 @@ describe('getMultiSelectDisabledFields', () => {
       })
       it('should return aspirate mix being disabled for both reasons', () => {
         expect(
-          // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
           getMultiSelectDisabledFields.resultFunc(
             savedStepForms,
             mockmultiSelectItemIds
@@ -1310,7 +1587,6 @@ describe('getMultiSelectDisabledFields', () => {
     })
     it('should return an empty object when no fields are different', () => {
       expect(
-        // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
         getMultiSelectDisabledFields.resultFunc(
           mockSavedStepForms,
           mockmultiSelectItemIds
@@ -1330,7 +1606,6 @@ describe('getMultiSelectDisabledFields', () => {
       })
       it('should return flow rate fields being disabled with associated reasons', () => {
         expect(
-          // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
           getMultiSelectDisabledFields.resultFunc(
             savedStepForms,
             mockmultiSelectItemIds
@@ -1356,7 +1631,6 @@ describe('getMultiSelectDisabledFields', () => {
         const labwareDifferentText = 'Incompatible with current path'
 
         expect(
-          // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
           getMultiSelectDisabledFields.resultFunc(
             savedStepForms,
             mockmultiSelectItemIds
@@ -1368,7 +1642,7 @@ describe('getMultiSelectDisabledFields', () => {
           dispense_delay_checkbox: labwareDifferentText,
           dispense_delay_seconds: labwareDifferentText,
           mix_touchTip_checkbox: labwareDifferentText,
-          mix_touchTip_mmFromBottom: labwareDifferentText,
+          mix_touchTip_mmFromTop: labwareDifferentText,
         })
       })
     })
@@ -1382,7 +1656,6 @@ describe('getMultiSelectDisabledFields', () => {
 
     const multiSelectItemIds = ['move_liquid_step_id', 'mix_step_id']
     expect(
-      // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
       getMultiSelectDisabledFields.resultFunc(
         savedStepForms,
         multiSelectItemIds
@@ -1400,22 +1673,19 @@ describe('getCountPerStepType', () => {
       c: { stepType: 'mix' }, // not selected! 'mix' should not show in result
       d: { stepType: 'moveLiquid' },
     }
-    // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
     const result = getCountPerStepType.resultFunc(
       multiSelectItemIds,
-      savedStepForms
+      savedStepForms as any
     )
     expect(result).toEqual({ magnet: 2, moveLiquid: 1 })
   })
 
   it('should return an empty object when not in multi-select mode', () => {
-    // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
     const result = getCountPerStepType.resultFunc(null, {})
     expect(result).toEqual({})
   })
 
   it('should return an empty object when no steps are multi-selected', () => {
-    // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
     const result = getCountPerStepType.resultFunc([], {})
     expect(result).toEqual({})
   })
@@ -1423,7 +1693,6 @@ describe('getCountPerStepType', () => {
 
 describe('getBatchEditSelectedStepTypes', () => {
   it('should return a sorted array of selected step types that are in the multi-selection', () => {
-    // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
     const result = getBatchEditSelectedStepTypes.resultFunc({
       magnet: 1,
       mix: 3,
@@ -1433,7 +1702,6 @@ describe('getBatchEditSelectedStepTypes', () => {
   })
 
   it('should return an empty array when no steps are multi-selected', () => {
-    // @ts-expect-error(sa, 2021-6-15): resultFunc not part of Selector type
     const result = getBatchEditSelectedStepTypes.resultFunc({})
     expect(result).toEqual([])
   })

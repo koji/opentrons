@@ -1,4 +1,8 @@
 {
+  "commandAnnotations": [],
+  "commandPreconditions": {
+    "isCameraUsed": false
+  },
   "commands": [
     {
       "commandType": "home",
@@ -1160,7 +1164,20 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "A1",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutoutA1",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "singleLeftSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -1241,12 +1258,7 @@
       ]
     }
   ],
-  "files": [
-    {
-      "name": "Flex_X_v2_16_P300MGen2_None_OT2PipetteInFlexProtocol.py",
-      "role": "main"
-    }
-  ],
+  "files": [],
   "labware": [
     {
       "definitionUri": "opentrons/opentrons_96_tiprack_300ul/1",
@@ -1258,6 +1270,7 @@
       }
     }
   ],
+  "liquidClasses": [],
   "liquids": [],
   "metadata": {
     "author": "Derek Maggio <derek.maggio@opentrons.com>",

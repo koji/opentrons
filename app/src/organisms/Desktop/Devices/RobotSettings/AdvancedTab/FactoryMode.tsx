@@ -1,4 +1,3 @@
-import type * as React from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -6,17 +5,19 @@ import {
   Box,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
-  SPACING_AUTO,
-  SPACING,
   LegacyStyledText,
+  SPACING,
+  SPACING_AUTO,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
 import { TertiaryButton } from '/app/atoms/buttons'
 
+import type { Dispatch, SetStateAction } from 'react'
+
 interface FactoryModeProps {
   isRobotBusy: boolean
-  setShowFactoryModeSlideout: React.Dispatch<React.SetStateAction<boolean>>
+  setShowFactoryModeSlideout: Dispatch<SetStateAction<boolean>>
   sn: string | null
 }
 
@@ -34,7 +35,10 @@ export function FactoryMode({
       marginTop={SPACING.spacing24}
     >
       <Box width="70%">
-        <LegacyStyledText as="p" fontWeight={TYPOGRAPHY.fontWeightSemiBold}>
+        <LegacyStyledText
+          forwardedAs="p"
+          fontWeight={TYPOGRAPHY.fontWeightSemiBold}
+        >
           {t('factory_mode')}
         </LegacyStyledText>
       </Box>

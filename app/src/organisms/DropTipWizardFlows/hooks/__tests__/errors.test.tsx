@@ -1,6 +1,6 @@
-import { describe, it, vi, expect, beforeEach } from 'vitest'
-import { renderHook, act, render, screen } from '@testing-library/react'
 import { useTranslation } from 'react-i18next'
+import { act, render, renderHook, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DROP_TIP_SPECIAL_ERROR_TYPES } from '../../constants'
 import { useDropTipCommandErrors, useDropTipErrorComponents } from '../errors'
@@ -9,7 +9,22 @@ import type { Mock } from 'vitest'
 
 vi.mock('react-i18next', () => ({
   useTranslation: vi.fn(),
+  initReactI18next: vi.fn(),
 }))
+vi.mock('i18next', () => {
+  return {
+    default: {
+      use: () => ({ init: vi.fn() }),
+      createInstance: () => ({
+        use: () => ({ init: vi.fn() }),
+        init: vi.fn(),
+        t: (k: string) => k,
+      }),
+      init: vi.fn(),
+      t: (k: string) => k,
+    },
+  }
+})
 
 describe('useDropTipCommandErrors', () => {
   let setErrorDetails: Mock
@@ -29,9 +44,9 @@ describe('useDropTipCommandErrors', () => {
 
     act(() => {
       result.current({
-        runCommandError: {
-          errorType: DROP_TIP_SPECIAL_ERROR_TYPES.MUST_HOME_ERROR,
-        } as any,
+        type: DROP_TIP_SPECIAL_ERROR_TYPES.MUST_HOME_ERROR,
+        message: 'remove_the_tips_manually',
+        header: 'cant_safely_drop_tips',
       })
     })
 

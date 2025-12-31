@@ -1,24 +1,27 @@
 import * as Yup from 'yup'
-import { getAllLoadNames, getAllDisplayNames } from '../definitions'
-import { getDefaultLoadName, getDefaultDisplayName } from './formSelectors'
+
+import { getAllDisplayNames, getAllLoadNames } from '../definitions'
 import {
-  labwareTypeOptions,
-  wellBottomShapeOptions,
-  wellShapeOptions,
   DEFAULT_RACK_BRAND,
   IRREGULAR_LABWARE_ERROR,
-  LABWARE_TOO_SMALL_ERROR,
-  LABWARE_TOO_LARGE_ERROR,
   LABELS,
+  LABWARE_TOO_LARGE_ERROR,
+  LABWARE_TOO_SMALL_ERROR,
+  labwareTypeOptions,
   LOOSE_TIP_FIT_ERROR,
+  MAX_SUGGESTED_GRIPPER_Z,
   MAX_X_DIMENSION,
   MAX_Y_DIMENSION,
   MAX_Z_DIMENSION,
   MIN_X_DIMENSION,
   MIN_Y_DIMENSION,
-  REQUIRED_FIELD_ERROR,
   MUST_BE_A_NUMBER_ERROR,
+  REQUIRED_FIELD_ERROR,
+  wellBottomShapeOptions,
+  wellShapeOptions,
 } from './fields'
+import { getDefaultDisplayName, getDefaultLoadName } from './formSelectors'
+
 import type {
   LabwareFields,
   LabwareType,
@@ -91,6 +94,7 @@ export const labwareFormSchemaBaseObject = Yup.object({
   labwareType: requiredString(LABELS.labwareType).oneOf(
     labwareTypeOptions.map(o => o.value)
   ),
+  hasLpcQuirk: requiredString(LABELS.hasLpcQuirk),
   compatibleModules: Yup.object()
     .shape({})
     .test(
@@ -176,6 +180,12 @@ export const labwareFormSchemaBaseObject = Yup.object({
     MAX_Z_DIMENSION,
     IRREGULAR_LABWARE_ERROR
   ),
+  stackedLabwareZDimension: Yup.number()
+    .label(LABELS.labwareZDimension)
+    .max(MAX_SUGGESTED_GRIPPER_Z, IRREGULAR_LABWARE_ERROR)
+    .positive('stackedLabwareZDimension must be positive')
+    .nullable()
+    .notRequired(),
 
   gridRows: requiredPositiveInteger(LABELS.gridRows),
   gridColumns: requiredPositiveInteger(LABELS.gridColumns),
@@ -327,8 +337,8 @@ export const labwareFormSchemaBaseObject = Yup.object({
 })
 
 // @ts-expect-error(IL, 2021-03-25): something(s) about this schema don't match the flow type (labwareType: string problem??)
-export const labwareFormSchema: Yup.Schema<ProcessedLabwareFields> = labwareFormSchemaBaseObject.transform(
-  (currentValue, _originalValue) => {
+export const labwareFormSchema: Yup.Schema<ProcessedLabwareFields> =
+  labwareFormSchemaBaseObject.transform((currentValue, _originalValue) => {
     // "form-level" transforms
     // NOTE: the currentValue does NOT have field-level transforms applied :(
     // TODO: these results are not validated, ideally I could do these transforms in the fields
@@ -358,5 +368,4 @@ export const labwareFormSchema: Yup.Schema<ProcessedLabwareFields> = labwareForm
       loadName,
       displayName,
     }
-  }
-)
+  })

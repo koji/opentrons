@@ -1,18 +1,21 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+
 import {
-  Flex,
   ALIGN_CENTER,
   DIRECTION_ROW,
-  SPACING,
+  Flex,
   JUSTIFY_FLEX_END,
+  SPACING,
   WRAP,
 } from '@opentrons/components'
 import { getGripperDisplayName } from '@opentrons/shared-data'
+
 import { TertiaryButton } from '/app/atoms/buttons'
-import { SetupCalibrationItem } from './SetupCalibrationItem'
 import { GripperWizardFlows } from '/app/organisms/GripperWizardFlows'
 import { GRIPPER_FLOW_TYPES } from '/app/organisms/GripperWizardFlows/constants'
+
+import { SetupCalibrationItem } from './SetupCalibrationItem'
 
 import type { GripperData } from '@opentrons/api-client'
 import type { GripperModel } from '@opentrons/shared-data'
@@ -28,14 +31,12 @@ export function SetupGripperCalibrationItem({
   runId,
 }: SetupGripperCalibrationItemProps): JSX.Element | null {
   const { t, i18n } = useTranslation('protocol_setup')
-  const [
-    openWizardFlowType,
-    setOpenWizardFlowType,
-  ] = useState<GripperWizardFlowType | null>(null)
+  const [openWizardFlowType, setOpenWizardFlowType] =
+    useState<GripperWizardFlowType | null>(null)
 
   const gripperCalLastModified =
     gripperData != null
-      ? gripperData.data.calibratedOffset?.last_modified ?? null
+      ? (gripperData.data.calibratedOffset?.last_modified ?? null)
       : null
 
   let button: JSX.Element | undefined
@@ -78,7 +79,7 @@ export function SetupGripperCalibrationItem({
         button={button}
         calibratedDate={
           gripperData != null
-            ? gripperData.data.calibratedOffset?.last_modified ?? null
+            ? (gripperData.data.calibratedOffset?.last_modified ?? null)
             : null
         }
         label={t('extension_mount')}

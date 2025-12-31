@@ -1,4 +1,4 @@
-import type { CommonCommandRunTimeInfo, CommonCommandCreateInfo } from '.'
+import type { CommonCommandCreateInfo, CommonCommandRunTimeInfo } from '.'
 
 export type TimingCreateCommand =
   | WaitForResumeCreateCommand
@@ -17,12 +17,11 @@ export interface WaitForResumeCreateCommand extends CommonCommandCreateInfo {
 }
 
 export interface WaitForResumeRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    WaitForResumeCreateCommand {
+  extends CommonCommandRunTimeInfo, WaitForResumeCreateCommand {
   result?: any
 }
 
-interface WaitForResumeParams {
+export interface WaitForResumeParams {
   message?: string
 }
 
@@ -32,12 +31,11 @@ export interface WaitForDurationCreateCommand extends CommonCommandCreateInfo {
 }
 
 export interface WaitForDurationRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    WaitForDurationCreateCommand {
+  extends CommonCommandRunTimeInfo, WaitForDurationCreateCommand {
   result?: any
 }
 
-interface WaitForDurationParams {
+export interface WaitForDurationParams {
   seconds: number
   message?: string
 }
@@ -48,8 +46,7 @@ export interface DeprecatedDelayCreateCommand extends CommonCommandCreateInfo {
 }
 
 export interface DeprecatedDelayRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    DeprecatedDelayCreateCommand {
+  extends CommonCommandRunTimeInfo, DeprecatedDelayCreateCommand {
   result?: {}
 }
 

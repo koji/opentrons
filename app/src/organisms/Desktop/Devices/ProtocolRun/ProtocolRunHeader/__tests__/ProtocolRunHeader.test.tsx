@@ -1,30 +1,33 @@
-import type * as React from 'react'
-import { describe, it, vi, expect, beforeEach, afterEach } from 'vitest'
-import { screen } from '@testing-library/react'
 import { useNavigate } from 'react-router-dom'
+import { screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { RUN_STATUS_RUNNING } from '@opentrons/api-client'
 import { useModulesQuery } from '@opentrons/react-api-client'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { ProtocolRunHeader } from '..'
 import { useIsRobotViewable } from '/app/redux-resources/robots'
+import { useRunGeneratedDataFiles } from '/app/resources/dataFiles/useRunGeneratedDataFiles'
 import {
-  useRunStatus,
-  useProtocolDetailsForRun,
+  useCloseCurrentRun,
   useNotifyRunQuery,
+  useProtocolDetailsForRun,
 } from '/app/resources/runs'
-import { RunHeaderModalContainer } from '../RunHeaderModalContainer'
-import { RunHeaderBannerContainer } from '../RunHeaderBannerContainer'
-import { RunHeaderContent } from '../RunHeaderContent'
+
+import { ProtocolRunHeader } from '..'
 import { RunProgressMeter } from '../../../../RunProgressMeter'
-import { RunHeaderProtocolName } from '../RunHeaderProtocolName'
 import {
   useRunAnalytics,
   useRunErrors,
   useRunHeaderRunControls,
 } from '../hooks'
+import { RunHeaderBannerContainer } from '../RunHeaderBannerContainer'
+import { RunHeaderContent } from '../RunHeaderContent'
+import { RunHeaderModalContainer } from '../RunHeaderModalContainer'
+import { RunHeaderProtocolName } from '../RunHeaderProtocolName'
+
+import type { ComponentProps } from 'react'
 
 vi.mock('react-router-dom')
 vi.mock('@opentrons/react-api-client')
@@ -36,14 +39,16 @@ vi.mock('../RunHeaderBannerContainer')
 vi.mock('../RunHeaderContent')
 vi.mock('../../../../RunProgressMeter')
 vi.mock('../RunHeaderProtocolName')
+vi.mock('/app/resources/dataFiles/useRunGeneratedDataFiles')
 vi.mock('../hooks')
+vi.mock('/app/local-resources/images/hooks/useInitializeCameraState')
 
 const MOCK_PROTOCOL = 'MOCK_PROTOCOL'
 const MOCK_RUN_ID = 'MOCK_RUN_ID'
 const MOCK_ROBOT = 'MOCK_ROBOT'
 
 describe('ProtocolRunHeader', () => {
-  let props: React.ComponentProps<typeof ProtocolRunHeader>
+  let props: ComponentProps<typeof ProtocolRunHeader>
   const mockNavigate = vi.fn()
 
   beforeEach(() => {
@@ -55,18 +60,27 @@ describe('ProtocolRunHeader', () => {
     }
 
     vi.mocked(useNavigate).mockReturnValue(mockNavigate)
-    vi.mocked(useRunStatus).mockReturnValue(RUN_STATUS_RUNNING)
     vi.mocked(useIsRobotViewable).mockReturnValue(true)
     vi.mocked(useProtocolDetailsForRun).mockReturnValue({
       protocolData: {} as any,
       displayName: MOCK_PROTOCOL,
     } as any)
     vi.mocked(useNotifyRunQuery).mockReturnValue({
-      data: { data: { hasEverEnteredErrorRecovery: false } },
+      data: {
+        data: {
+          hasEverEnteredErrorRecovery: false,
+          status: RUN_STATUS_RUNNING,
+        },
+      },
     } as any)
     vi.mocked(useModulesQuery).mockReturnValue({
       data: { data: [] },
     } as any)
+    vi.mocked(useCloseCurrentRun).mockReturnValue({
+      isClosingCurrentRun: false,
+      closeCurrentRun: vi.fn(),
+    })
+    vi.mocked(useRunGeneratedDataFiles).mockReturnValue({ jpeg: [], csv: [] })
     vi.mocked(useRunAnalytics).mockImplementation(() => {})
     vi.mocked(useRunErrors).mockReturnValue([] as any)
     vi.mocked(useRunHeaderRunControls).mockReturnValue({} as any)
@@ -92,7 +106,7 @@ describe('ProtocolRunHeader', () => {
     vi.resetAllMocks()
   })
 
-  const render = (props: React.ComponentProps<typeof ProtocolRunHeader>) => {
+  const render = (props: ComponentProps<typeof ProtocolRunHeader>) => {
     return renderWithProviders(<ProtocolRunHeader {...props} />, {
       i18nInstance: i18n,
     })[0]

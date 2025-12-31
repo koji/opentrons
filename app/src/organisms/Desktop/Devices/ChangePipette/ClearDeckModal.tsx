@@ -1,11 +1,12 @@
 import { Trans, useTranslation } from 'react-i18next'
+
 import {
   DIRECTION_COLUMN,
   Flex,
   JUSTIFY_FLEX_END,
+  LegacyStyledText,
   PrimaryButton,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
@@ -35,7 +36,7 @@ export function ClearDeckModal(props: ClearDeckModalProps): JSX.Element {
                 marginBottom={SPACING.spacing16}
               />
             ),
-            block: <LegacyStyledText as="p" />,
+            block: <LegacyStyledText forwardedAs="p" />,
           }}
         />
       </Flex>

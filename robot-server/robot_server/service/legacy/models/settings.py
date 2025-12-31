@@ -1,10 +1,9 @@
-from enum import Enum
 import logging
+from typing import Optional, List, Dict, Any, Union, Tuple
 
-from typing import Optional, List, Dict, Any, Union
+from pydantic import field_validator, BaseModel, Field, create_model
 
-from pydantic import BaseModel, Field, create_model, validator
-
+from opentrons_shared_data.util import StrEnum
 from opentrons_shared_data.pipette import model_constants
 from opentrons.config.reset import ResetOptionId
 
@@ -17,7 +16,7 @@ class AdvancedSetting(BaseModel):
         ...,
         description="The ID by which the property used to be known; not"
         " useful now and may contain spaces or hyphens",
-        deprecated=True,
+        json_schema_extra={"deprecated": True},
     )
     title: str = Field(
         ...,
@@ -71,12 +70,12 @@ class AdvancedSettingRequest(BaseModel):
     )
 
 
-class LogLevels(str, Enum):
+class LogLevels(StrEnum):
     _level_id: int
 
     """Valid log levels"""
 
-    def __new__(cls, value, level):
+    def __new__(cls, value: str, level: int) -> "LogLevels":
         # https://docs.python.org/3/library/enum.html#when-to-use-new-vs-init
         obj = str.__new__(cls, value)
         obj._value_ = value
@@ -89,7 +88,7 @@ class LogLevels(str, Enum):
     error = ("error", logging.ERROR)
 
     @property
-    def level_id(self):
+    def level_id(self) -> int:
         """The log level id as defined in logging lib"""
         return self._level_id
 
@@ -99,9 +98,19 @@ class LogLevel(BaseModel):
         None, description="The value to set (conforming to Python log levels)"
     )
 
-    @validator("log_level", pre=True)
-    def lower_case_log_keys(cls, value):
-        return value if value is None else LogLevels(value.lower(), None)
+    @field_validator("log_level", mode="before")
+    @classmethod
+    def lower_case_log_keys(cls, value: object) -> object:
+        if value is None:
+            return value
+        else:
+            # This `type: ignore[call-arg]` is because mypy thinks there needs to be
+            # a second arg here for the int level, but there does not.
+            return LogLevels(  # type: ignore[call-arg]
+                # todo(mm, 2025-03-18): We probably do actually need to check that
+                # the value is a str before calling .lower() on it.
+                value.lower(),  # type: ignore[attr-defined]
+            )
 
 
 class FactoryResetOption(BaseModel):
@@ -110,7 +119,7 @@ class FactoryResetOption(BaseModel):
     )
     name: str = Field(..., description="A short human-readable name for the setting")
     description: str = Field(
-        ..., description="A longer human-readable description of the " "setting"
+        ..., description="A longer human-readable description of the setting"
     )
 
 
@@ -123,7 +132,7 @@ class FactoryResetOptions(BaseModel):
 RobotConfigs = Dict[str, Any]
 
 
-class PipetteSettingsFieldType(str, Enum):
+class PipetteSettingsFieldType(StrEnum):
     """The type of the property"""
 
     float = "float"
@@ -136,7 +145,7 @@ class PipetteSettingsField(BaseModel):
     units: Optional[str] = Field(
         None, description="The physical units this value is in (e.g. mm, uL)"
     )
-    type: Optional[PipetteSettingsFieldType]
+    type: Optional[PipetteSettingsFieldType] = None
     min: float = Field(..., description="The minimum acceptable value of the property")
     max: float = Field(..., description="The maximum acceptable value of the property")
     default: float = Field(..., description="The default value of the property")
@@ -148,7 +157,7 @@ class PipetteSettingsInfo(BaseModel):
 
     name: str = Field(..., description='A pipette name (e.g. "p300_single")')
     model: str = Field(
-        ..., description='The exact pipette model (e.g. "' 'p300_single_v1.5")'
+        ..., description='The exact pipette model (e.g. "p300_single_v1.5")'
     )
 
 
@@ -185,10 +194,7 @@ PipetteSettingsFields.__doc__ = "The fields of the pipette settings"
 
 class PipetteSettings(BaseModel):
     info: PipetteSettingsInfo
-    setting_fields: PipetteSettingsFields  # type: ignore
-
-    class Config:
-        fields = {"setting_fields": "fields"}
+    setting_fields: PipetteSettingsFields = Field(..., alias="fields")  # type: ignore
 
 
 MultiPipetteSettings = Dict[str, PipetteSettings]
@@ -208,22 +214,128 @@ class PipetteSettingsUpdate(BaseModel):
         None, alias="fields"
     )
 
-    @validator("setting_fields")
-    def validate_fields(cls, v):
+    @field_validator("setting_fields")
+    @classmethod
+    def validate_fields(
+        cls, v: Optional[Dict[str, Optional[PipetteUpdateField]]]
+    ) -> Optional[Dict[str, Optional[PipetteUpdateField]]]:
         """A validator to ensure that values for mutable configs are
         floats and booleans for quirks."""
-        for key, value in v.items():
-            if value is None:
-                pass
-            elif key in model_constants.MUTABLE_CONFIGS_V1:
-                if value.value is not None:
-                    # Must be a float for overriding a config field
-                    value.value = float(value.value)
-            elif key in model_constants.VALID_QUIRKS:
-                if not isinstance(value.value, bool):
-                    raise ValueError(
-                        f"{key} quirk value must " f"be a boolean. Got {value.value}"
-                    )
-            else:
-                raise ValueError(f"{key} is not a valid field or quirk name")
+        if v is not None:
+            for key, value in v.items():
+                if value is None:
+                    pass
+                elif key in model_constants.MUTABLE_CONFIGS_V1:
+                    if value.value is not None:
+                        # Must be a float for overriding a config field
+                        value.value = float(value.value)
+                elif key in model_constants.VALID_QUIRKS:
+                    if not isinstance(value.value, bool):
+                        raise ValueError(
+                            f"{key} quirk value must be a boolean. Got {value.value}"
+                        )
+                else:
+                    raise ValueError(f"{key} is not a valid field or quirk name")
         return v
+
+
+class CameraEnable(BaseModel):
+    """Configuration value for Opentrons Camera and Live Stream enablement.
+    Disabling the Camera also disables the Live Stream and Error Recovery Camera useage.
+    Enabling the Camera retains the existing Live Stream and Error Recovery enablement settings.
+    """
+
+    cameraEnabled: Optional[bool] = Field(
+        ...,
+        description="Enable or disable the general use of the Opentrons Camera.",
+    )
+    liveStreamEnabled: Optional[bool] = Field(
+        ...,
+        description="Enable or disable the Opentrons Live Stream.",
+    )
+    errorRecoveryCameraEnabled: Optional[bool] = Field(
+        ...,
+        description="Enable or disable the Opentrons Camera to record error recovery.",
+    )
+
+
+class CameraCaptureImageSettings(BaseModel):
+    """Parameters for Capture Image to determine filters. These inputs are replacements for the defaults used by the `capture_image` engine command."""
+
+    cameraId: Optional[str] = Field(
+        None,
+        description="Id of the Camera to use in image capture. Defaults to the `ot_system_camera`.",
+    )
+    resolution: Optional[Tuple[int, int]] = Field(
+        None,
+        description="Width by height resolution in pixels for the image to be captured with.",
+    )
+    zoom: Optional[float] = Field(
+        None,
+        description="Multiplier to use when cropping and scaling a captured image. Scale is 1.0 to 2.0.",
+    )
+    pan: Optional[Tuple[int, int]] = Field(
+        None,
+        description="X/Y (pixels) position to pan to for a given zoom. Default is the center of the image.",
+    )
+    contrast: Optional[float] = Field(
+        None,
+        description="The contrast to use when processing an image. Scale is 0% to 100%.",
+    )
+    brightness: Optional[float] = Field(
+        None,
+        description="The brightness to use when processing an image. Scale is 0% to 100%.",
+    )
+    saturation: Optional[float] = Field(
+        None,
+        description="The saturation to use when processing an image. Scale is 0% to 100%.",
+    )
+
+
+class LiveStreamData(BaseModel):
+    """Opentrons Live Stream enablement and URL values."""
+
+    enabled: bool = Field(
+        ..., description="Enable status of the Opentrons Live Stream."
+    )
+    hls: str = Field(..., description="URL for the HLS browser-compatible stream.")
+    rtmp: str = Field(..., description="URL for the RTMP raw stream in FLV format.")
+
+
+class StreamStatusType(StrEnum):
+    """Status types of the Opentrons Live Stream Service.
+
+    * `"ON"`: Start the live stream.
+
+    * `"OFF"`: Stop (cancel) the live stream.
+    """
+
+    OFF = "OFF"
+    ON = "ON"
+
+
+class Resolution(BaseModel):
+    """Resolution width and height data for the Opentrons Live Stream service."""
+
+    width: int = Field(
+        ..., description="Resolution width in pixels of the live stream."
+    )
+    height: int = Field(
+        ..., description="Resolution height in pixels of the live stream."
+    )
+
+
+class LiveStreamSettings(BaseModel):
+    """Configuration values of Opentrons Live Stream service."""
+
+    source: str = Field(
+        ..., description="Source video device for the live stream feed."
+    )
+    resolution: Resolution = Field(
+        ..., description="Video resolution for the live stream."
+    )
+    framerate: int = Field(..., description="Framerate of the live stream.")
+    bitrate_k: int = Field(
+        ...,
+        description="Bitrate in Kbps to use when broadcasting the live stream video over the network.",
+    )

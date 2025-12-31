@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import head from 'lodash/head'
 import last from 'lodash/last'
 
@@ -109,7 +109,7 @@ export function useDropTipRouting(
       if (step == null || isStepNotInRoute) {
         setDropTipFlowsMap({
           currentRoute: route,
-          currentStep: head(route) as DropTipFlowsStep,
+          currentStep: head(route)!,
           currentStepIdx: 0,
         })
         if (isStepNotInRoute) {
@@ -218,7 +218,10 @@ export function getInitialRouteAndStep(
 ): [DropTipFlowsRoute, DropTipFlowsStep] {
   const routeOverride = fixitUtils?.routeOverride
   const initialRoute = routeOverride?.route ?? DT_ROUTES.BEFORE_BEGINNING
-  const initialStep = routeOverride?.step ?? BEFORE_BEGINNING_STEPS[0]
+  const initialStep =
+    routeOverride?.step ??
+    routeOverride?.route?.[0] ??
+    BEFORE_BEGINNING_STEPS[0]
 
   return [initialRoute, initialStep]
 }

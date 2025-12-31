@@ -1,10 +1,11 @@
 """Request and response models for run resources."""
+
 from datetime import datetime
 
-from enum import Enum
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal, Dict
 
+from opentrons_shared_data.util import StrEnum
 from opentrons.protocol_engine import (
     CommandStatus,
     CommandIntent,
@@ -16,8 +17,10 @@ from opentrons.protocol_engine import (
     LoadedLabware,
     LoadedModule,
     LabwareOffset,
+    LegacyLabwareOffsetCreate,
     LabwareOffsetCreate,
     Liquid,
+    LiquidClassRecordWithId,
     CommandNote,
 )
 from opentrons.protocol_engine.types import (
@@ -26,7 +29,9 @@ from opentrons.protocol_engine.types import (
     PrimitiveRunTimeParamValuesType,
     CSVRunTimeParamFilesType,
 )
+from opentrons.protocol_engine.resources.camera_provider import CameraSettings
 from opentrons_shared_data.errors import GeneralError
+
 from robot_server.service.json_api import ResourceModel
 from robot_server.errors.error_responses import ErrorDetails
 from .action_models import RunAction
@@ -134,6 +139,10 @@ class Run(ResourceModel):
         ...,
         description="Liquids loaded to the run.",
     )
+    liquidClasses: List[LiquidClassRecordWithId] = Field(
+        ...,
+        description="Liquid classes loaded to the run.",
+    )
     labwareOffsets: List[LabwareOffset] = Field(
         ...,
         description="Labware offsets to apply as labware are loaded.",
@@ -165,6 +174,10 @@ class Run(ResourceModel):
     startedAt: Optional[datetime] = Field(
         None,
         description="Run started at timestamp.",
+    )
+    cameraSettings: Optional[CameraSettings] = Field(
+        None,
+        description="Override Camera Settings provided during a run.",
     )
 
 
@@ -215,6 +228,10 @@ class BadRun(ResourceModel):
         ...,
         description="Liquids loaded to the run.",
     )
+    liquidClasses: List[LiquidClassRecordWithId] = Field(
+        ...,
+        description="Liquid classes loaded to the run.",
+    )
     labwareOffsets: List[LabwareOffset] = Field(
         ...,
         description="Labware offsets to apply as labware are loaded.",
@@ -256,7 +273,7 @@ class RunCreate(BaseModel):
         None,
         description="Protocol resource ID that this run will be using, if applicable.",
     )
-    labwareOffsets: List[LabwareOffsetCreate] = Field(
+    labwareOffsets: List[LegacyLabwareOffsetCreate | LabwareOffsetCreate] = Field(
         default_factory=list,
         description="Labware offsets to apply as labware are loaded.",
     )
@@ -291,7 +308,7 @@ class LabwareDefinitionSummary(BaseModel):
     )
 
 
-class NozzleLayoutConfig(str, Enum):
+class NozzleLayoutConfig(StrEnum):
     """Possible valid nozzle configurations."""
 
     COLUMN = "column"
@@ -316,10 +333,20 @@ class ActiveNozzleLayout(BaseModel):
     )
 
 
+class TipState(BaseModel):
+    """Information about the tip, if any, currently attached to a pipette."""
+
+    hasTip: bool
+
+    # todo(mm, 2024-11-15): I think the frontend is currently scraping the commands
+    # list to figure out where the current tip came from. Extend this class with that
+    # information so the frontend doesn't have to do that.
+
+
 class PlaceLabwareState(BaseModel):
     """Details the labware being placed by the gripper."""
 
-    labwareId: str = Field(..., description="The ID of the labware to place.")
+    labwareURI: str = Field(..., description="The URI of the labware to place.")
     location: OnDeckLabwareLocation = Field(
         ..., description="The location the labware should be in."
     )
@@ -328,12 +355,43 @@ class PlaceLabwareState(BaseModel):
     )
 
 
+class FlexStackerState(BaseModel):
+    """Provides the current state of a Flex Stacker."""
+
+    primaryLabwareURI: Optional[str] = Field(
+        None, description="The URI of the primary labware."
+    )
+    adapterLabwareURI: Optional[str] = Field(
+        None, description="The URI of the adapter labware."
+    )
+    lidLabwareURI: Optional[str] = Field(
+        None, description="The URI of the lid labware."
+    )
+    count: int = Field(0, description="The number of labware current in the hopper.")
+    maxCount: int = Field(
+        0, description="The maximum number of labware allowed in the hopper."
+    )
+
+
 class RunCurrentState(BaseModel):
     """Current details about a run."""
 
-    estopEngaged: bool = Field(..., description="")
-    activeNozzleLayouts: Dict[str, ActiveNozzleLayout] = Field(...)
-    placeLabwareState: Optional[PlaceLabwareState] = Field(None)
+    # todo(mm, 2024-11-15): Having estopEngaged here is a bit of an odd man out because
+    # it's sensor state that can change on its own at any time, whereas the rest of
+    # these fields are logical state that changes only when commands are run.
+    #
+    # Our current mechanism for anchoring these fields to a specific point in time
+    # (important for avoiding torn-read problems when a client combines this info with
+    # info from other endpoints) is `links.currentCommand`, which is based on the idea
+    # that these fields only change when the current command changes.
+    #
+    # We should see if clients can replace this with `GET /robot/control/estopStatus`.
+    estopEngaged: bool
+
+    activeNozzleLayouts: Dict[str, ActiveNozzleLayout]
+    tipStates: Dict[str, TipState]
+    placeLabwareState: Optional[PlaceLabwareState]
+    flexStackerStates: Optional[Dict[str, FlexStackerState]]
 
 
 class CommandLinkNoMeta(BaseModel):

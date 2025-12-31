@@ -1,11 +1,14 @@
-import { getCalibrationTipLength } from '@opentrons/api-client'
 import { useQuery } from 'react-query'
+
+import { getCalibrationTipLength } from '@opentrons/api-client'
+
 import { useHost } from '../api'
+
+import type { UseQueryOptions, UseQueryResult } from 'react-query'
 import type {
-  HostConfig,
   AllTipLengthCalibrations,
+  HostConfig,
 } from '@opentrons/api-client'
-import type { UseQueryResult, UseQueryOptions } from 'react-query'
 
 export function useAllTipLengthCalibrationsQuery(
   options: UseQueryOptions<
@@ -20,11 +23,8 @@ export function useAllTipLengthCalibrationsQuery(
   const host =
     hostOverride != null ? { ...contextHost, ...hostOverride } : contextHost
   const query = useQuery(
-    [host as HostConfig, 'calibration', 'tip_length'],
-    () =>
-      getCalibrationTipLength(host as HostConfig).then(
-        response => response.data
-      ),
+    [host!, 'calibration', 'tip_length'],
+    () => getCalibrationTipLength(host!).then(response => response.data),
     { enabled: host !== null, ...options }
   )
 

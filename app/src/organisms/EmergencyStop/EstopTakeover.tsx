@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useSelector } from 'react-redux'
+
 import { useEstopQuery } from '@opentrons/react-api-client'
 
-import { EstopPressedModal } from './EstopPressedModal'
-import { EstopMissingModal } from './EstopMissingModal'
 import { useIsUnboxingFlowOngoing } from '/app/redux-resources/config'
 import { getLocalRobot } from '/app/redux/discovery'
-import { PHYSICALLY_ENGAGED, NOT_PRESENT, DISENGAGED } from './constants'
+
+import { DISENGAGED, NOT_PRESENT, PHYSICALLY_ENGAGED } from './constants'
+import { EstopMissingModal } from './EstopMissingModal'
+import { EstopPressedModal } from './EstopPressedModal'
+
 import type { EstopState } from '@opentrons/api-client'
 
 const ESTOP_CURRENTLY_DISENGAGED_REFETCH_INTERVAL_MS = 10000
@@ -18,15 +21,12 @@ interface EstopTakeoverProps {
 
 export function EstopTakeover({ robotName }: EstopTakeoverProps): JSX.Element {
   const [isDismissedModal, setIsDismissedModal] = useState<boolean>(false)
-  const [
-    isWaitingForResumeOperation,
-    setIsWatingForResumeOperation,
-  ] = useState<boolean>(false)
+  const [isWaitingForResumeOperation, setIsWatingForResumeOperation] =
+    useState<boolean>(false)
 
   const [estopState, setEstopState] = useState<EstopState>()
-  const [showEmergencyStopModal, setShowEmergencyStopModal] = useState<boolean>(
-    false
-  )
+  const [showEmergencyStopModal, setShowEmergencyStopModal] =
+    useState<boolean>(false)
 
   // TODO: (ba, 2024-10-24): Use notifications instead of polling
   const { data: estopStatus } = useEstopQuery({

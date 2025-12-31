@@ -1,20 +1,19 @@
-import type { CommonCommandRunTimeInfo, CommonCommandCreateInfo } from '.'
+import type { CommonCommandCreateInfo, CommonCommandRunTimeInfo } from '.'
 import type { AddressableAreaName } from '../../deck'
-import type { WellLocation } from './support'
 import type {
-  Coordinates,
+  GantryMount,
   MotorAxes,
   MotorAxis,
-  GantryMount,
+  Vector3D,
 } from '../../js/types'
+import type { WellLocation } from './support'
 
 export interface MoveToSlotCreateCommand extends CommonCommandCreateInfo {
   commandType: 'moveToSlot'
   params: MoveToSlotParams
 }
 export interface MoveToSlotRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    MoveToSlotCreateCommand {
+  extends CommonCommandRunTimeInfo, MoveToSlotCreateCommand {
   result?: {}
 }
 export interface MoveToWellCreateCommand extends CommonCommandCreateInfo {
@@ -22,18 +21,15 @@ export interface MoveToWellCreateCommand extends CommonCommandCreateInfo {
   params: MoveToWellParams
 }
 export interface MoveToWellRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    MoveToWellCreateCommand {
+  extends CommonCommandRunTimeInfo, MoveToWellCreateCommand {
   result?: {}
 }
-export interface MoveToCoordinatesCreateCommand
-  extends CommonCommandCreateInfo {
+export interface MoveToCoordinatesCreateCommand extends CommonCommandCreateInfo {
   commandType: 'moveToCoordinates'
   params: MoveToCoordinatesParams
 }
 export interface MoveToCoordinatesRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    MoveToCoordinatesCreateCommand {
+  extends CommonCommandRunTimeInfo, MoveToCoordinatesCreateCommand {
   result?: {}
 }
 export interface MoveRelativeCreateCommand extends CommonCommandCreateInfo {
@@ -41,10 +37,9 @@ export interface MoveRelativeCreateCommand extends CommonCommandCreateInfo {
   params: MoveRelativeParams
 }
 export interface MoveRelativeRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    MoveRelativeCreateCommand {
+  extends CommonCommandRunTimeInfo, MoveRelativeCreateCommand {
   result?: {
-    position: Coordinates
+    position: Vector3D
   }
 }
 export interface SavePositionCreateCommand extends CommonCommandCreateInfo {
@@ -52,11 +47,10 @@ export interface SavePositionCreateCommand extends CommonCommandCreateInfo {
   params: SavePositionParams
 }
 export interface SavePositionRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    SavePositionCreateCommand {
+  extends CommonCommandRunTimeInfo, SavePositionCreateCommand {
   result?: {
     positionId: string
-    position: Coordinates
+    position: Vector3D
   }
 }
 export interface HomeCreateCommand extends CommonCommandCreateInfo {
@@ -64,8 +58,7 @@ export interface HomeCreateCommand extends CommonCommandCreateInfo {
   params: HomeParams
 }
 export interface HomeRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    HomeCreateCommand {
+  extends CommonCommandRunTimeInfo, HomeCreateCommand {
   result?: {}
 }
 
@@ -74,19 +67,16 @@ export interface RetractAxisCreateCommand extends CommonCommandCreateInfo {
   params: RetractAxisParams
 }
 export interface RetractAxisRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    RetractAxisCreateCommand {
+  extends CommonCommandRunTimeInfo, RetractAxisCreateCommand {
   result?: {}
 }
 
-export interface MoveToAddressableAreaCreateCommand
-  extends CommonCommandCreateInfo {
+export interface MoveToAddressableAreaCreateCommand extends CommonCommandCreateInfo {
   commandType: 'moveToAddressableArea'
   params: MoveToAddressableAreaParams
 }
 export interface MoveToAddressableAreaRunTimeCommand
-  extends CommonCommandRunTimeInfo,
-    MoveToAddressableAreaCreateCommand {
+  extends CommonCommandRunTimeInfo, MoveToAddressableAreaCreateCommand {
   //  TODO(jr, 11/6/23): add to result type
   result?: {}
 }
@@ -129,6 +119,7 @@ export interface MoveToWellParams {
   wellLocation?: WellLocation
   minimumZHeight?: number
   forceDirect?: boolean
+  speed?: number
 }
 
 interface MoveToCoordinatesParams {
@@ -163,7 +154,7 @@ interface RetractAxisParams {
   axis: MotorAxis
 }
 
-interface AddressableOffsetVector {
+export interface AddressableOffsetVector {
   x: number
   y: number
   z: number

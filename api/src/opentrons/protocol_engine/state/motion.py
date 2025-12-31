@@ -1,8 +1,10 @@
 """Motion state store and getters."""
+
 from dataclasses import dataclass
 from typing import List, Optional, Union
+import logging
 
-from opentrons.types import MountType, Point
+from opentrons.types import MountType, Point, StagingSlotName
 from opentrons.hardware_control.types import CriticalPoint
 from opentrons.motion_planning.adjacent_slots_getters import (
     get_east_west_slots,
@@ -27,6 +29,8 @@ from .addressable_areas import AddressableAreaView
 from .geometry import GeometryView
 from .modules import ModuleView
 from .module_substates import HeaterShakerModuleId
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -75,15 +79,57 @@ class MotionView:
             isinstance(current_location, CurrentWell)
             and current_location.pipette_id == pipette_id
         ):
-            if self._labware.get_should_center_column_on_target_well(
+            critical_point = self.get_critical_point_for_wells_in_labware(
                 current_location.labware_id
-            ):
-                critical_point = CriticalPoint.Y_CENTER
-            elif self._labware.get_should_center_pipette_on_target_well(
-                current_location.labware_id
-            ):
-                critical_point = CriticalPoint.XY_CENTER
+            )
         return PipetteLocationData(mount=mount, critical_point=critical_point)
+
+    def _get_pipette_offset_for_reservoirs(
+        self, labware_id: str, well_name: str, pipette_id: str
+    ) -> Point:
+        #   8 rows, 12 columns
+        subwells_96 = self._labware.get_has_96_subwells(labware_id)
+        #   1 row, 12 columns
+        subwells_12 = self._labware.get_has_12_subwells(labware_id)
+        if subwells_12 and subwells_96:
+            log.warning(
+                f"{self._labware.get_display_name(labware_id)} has both offsetPipetteFor96GridSubwells and"
+                " offsetPipetteFor12GridSubwells quirks."
+            )
+
+        pipette_rows = self._pipettes.get_nozzle_configuration(pipette_id).rows
+        pipette_cols = self._pipettes.get_nozzle_configuration(pipette_id).columns
+
+        even_labware_rows = subwells_96
+        even_labware_columns = subwells_96 or subwells_12
+        odd_pipette_rows = len(pipette_rows) % 2 == 1
+        odd_pipette_cols = len(pipette_cols) % 2 == 1
+
+        well_x_dim, well_y_dim, well_z_dim = self._labware.get_well_size(
+            labware_id=labware_id, well_name=well_name
+        )
+        x_offset = 0.0
+        y_offset = 0.0
+        if even_labware_rows and odd_pipette_rows:
+            # need to move up half a row
+            # there's 8 rows, so move 1/16 of reservoir length
+            y_offset = well_y_dim / 16
+        if even_labware_columns and odd_pipette_cols:
+            # need to move left half a column
+            # there's 12 columns, so move 1/24 of reservoir width
+            x_offset = -1 * well_x_dim / 24
+        return Point(x=x_offset, y=y_offset)
+
+    def get_critical_point_for_wells_in_labware(
+        self, labware_id: str
+    ) -> CriticalPoint | None:
+        """Get the appropriate critical point override for this labware."""
+        if self._labware.get_should_center_column_on_target_well(labware_id):
+            return CriticalPoint.Y_CENTER
+        elif self._labware.get_should_center_pipette_on_target_well(labware_id):
+            return CriticalPoint.XY_CENTER
+        else:
+            return None
 
     def get_movement_waypoints_to_well(
         self,
@@ -98,15 +144,12 @@ class MotionView:
         force_direct: bool = False,
         minimum_z_height: Optional[float] = None,
         operation_volume: Optional[float] = None,
+        offset_pipette_for_reservoir_subwells: bool = False,
     ) -> List[motion_planning.Waypoint]:
         """Calculate waypoints to a destination that's specified as a well."""
         location = current_well or self._pipettes.get_current_location()
 
-        destination_cp: Optional[CriticalPoint] = None
-        if self._labware.get_should_center_column_on_target_well(labware_id):
-            destination_cp = CriticalPoint.Y_CENTER
-        elif self._labware.get_should_center_pipette_on_target_well(labware_id):
-            destination_cp = CriticalPoint.XY_CENTER
+        destination_cp = self.get_critical_point_for_wells_in_labware(labware_id)
 
         destination = self._geometry.get_well_position(
             labware_id=labware_id,
@@ -115,6 +158,10 @@ class MotionView:
             operation_volume=operation_volume,
             pipette_id=pipette_id,
         )
+        if offset_pipette_for_reservoir_subwells:
+            destination += self._get_pipette_offset_for_reservoirs(
+                labware_id=labware_id, well_name=well_name, pipette_id=pipette_id
+            )
 
         move_type = _move_types.get_move_type_to_well(
             pipette_id, labware_id, well_name, location, force_direct
@@ -277,9 +324,13 @@ class MotionView:
         current_location = self._pipettes.get_current_location()
         if current_location is not None:
             if isinstance(current_location, CurrentWell):
-                pipette_deck_slot = self._geometry.get_ancestor_slot_name(
+                ancestor = self._geometry.get_ancestor_slot_name(
                     current_location.labware_id
-                ).as_int()
+                )
+                if isinstance(ancestor, StagingSlotName):
+                    # Staging Area Slots cannot intersect with the h/s
+                    return False
+                pipette_deck_slot = ancestor.as_int()
             else:
                 pipette_deck_slot = (
                     self._addressable_areas.get_addressable_area_base_slot(
@@ -299,9 +350,13 @@ class MotionView:
         current_location = self._pipettes.get_current_location()
         if current_location is not None:
             if isinstance(current_location, CurrentWell):
-                pipette_deck_slot = self._geometry.get_ancestor_slot_name(
+                ancestor = self._geometry.get_ancestor_slot_name(
                     current_location.labware_id
-                ).as_int()
+                )
+                if isinstance(ancestor, StagingSlotName):
+                    # Staging Area Slots cannot intersect with the h/s
+                    return False
+                pipette_deck_slot = ancestor.as_int()
             else:
                 pipette_deck_slot = (
                     self._addressable_areas.get_addressable_area_base_slot(
@@ -319,11 +374,16 @@ class MotionView:
         labware_id: str,
         well_name: str,
         center_point: Point,
+        mm_from_edge: float = 0,
         radius: float = 1.0,
     ) -> List[motion_planning.Waypoint]:
         """Get a list of touch points for a touch tip operation."""
         mount = self._pipettes.get_mount(pipette_id)
         labware_slot = self._geometry.get_ancestor_slot_name(labware_id)
+        if isinstance(labware_slot, StagingSlotName):
+            raise errors.LocationIsStagingSlotError(
+                "Cannot perform Touch Tip on labware in Staging Area Slot."
+            )
         next_to_module = self._modules.is_edge_move_unsafe(mount, labware_slot)
         edge_path_type = self._labware.get_edge_path_type(
             labware_id, well_name, mount, labware_slot, next_to_module
@@ -334,14 +394,13 @@ class MotionView:
         )
 
         positions = _move_types.get_edge_point_list(
-            center_point, x_offset, y_offset, edge_path_type
+            center=center_point,
+            x_radius=x_offset,
+            y_radius=y_offset,
+            mm_from_edge=mm_from_edge,
+            edge_path_type=edge_path_type,
         )
-        critical_point: Optional[CriticalPoint] = None
-
-        if self._labware.get_should_center_column_on_target_well(labware_id):
-            critical_point = CriticalPoint.Y_CENTER
-        elif self._labware.get_should_center_pipette_on_target_well(labware_id):
-            critical_point = CriticalPoint.XY_CENTER
+        critical_point = self.get_critical_point_for_wells_in_labware(labware_id)
 
         return [
             motion_planning.Waypoint(position=p, critical_point=critical_point)

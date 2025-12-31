@@ -1,5 +1,6 @@
-import { useTranslation } from 'react-i18next'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+
 import {
   DIRECTION_COLUMN,
   Divider,
@@ -8,10 +9,12 @@ import {
   StyledText,
   Tabs,
 } from '@opentrons/components'
+
 import {
   CheckboxExpandStepFormField,
   InputStepFormField,
-} from '../../../../molecules'
+} from '/protocol-designer/components/molecules'
+
 import {
   BlowoutLocationField,
   FlowRateField,
@@ -22,8 +25,9 @@ import {
   getBlowoutLocationOptionsForForm,
   getLabwareFieldForPositioningField,
 } from '../StepForm/utils'
-import type { WellOrderOption } from '../../../../form-types'
-import type { FieldPropsByName } from '../StepForm/types'
+
+import type { WellOrderOption } from '/protocol-designer/form-types'
+import type { FieldPropsByName, LiquidHandlingTab } from '../StepForm/types'
 
 interface BatchEditMixToolsProps {
   propsForFields: FieldPropsByName
@@ -32,7 +36,7 @@ interface BatchEditMixToolsProps {
 export function BatchEditMixTools(props: BatchEditMixToolsProps): JSX.Element {
   const { propsForFields } = props
   const { t, i18n } = useTranslation(['form', 'button', 'tooltip'])
-  const [tab, setTab] = useState<'aspirate' | 'dispense'>('aspirate')
+  const [tab, setTab] = useState<LiquidHandlingTab>('aspirate')
   const aspirateTab = {
     text: i18n.format(t('aspirate'), 'capitalize'),
     isActive: tab === 'aspirate',
@@ -59,24 +63,19 @@ export function BatchEditMixTools(props: BatchEditMixToolsProps): JSX.Element {
     return pipetteId ? String(pipetteId) : null
   }
 
-  const getWellOrderFieldValue = (
-    name: string
-  ): WellOrderOption | null | undefined => {
-    const val = propsForFields[name]?.value
-    if (val === 'l2r' || val === 'r2l' || val === 't2b' || val === 'b2t') {
-      return val
-    } else {
-      return null
-    }
-  }
-
   return (
-    <Flex flexDirection={DIRECTION_COLUMN} width="100%">
-      <Flex padding={SPACING.spacing16}>
+    <Flex
+      flexDirection={DIRECTION_COLUMN}
+      width="100%"
+      padding={SPACING.spacing12}
+      gridGap={SPACING.spacing16}
+      backgroundColor="red"
+    >
+      <Flex padding={`${SPACING.spacing16} ${SPACING.spacing16} 0`}>
         <Tabs tabs={[aspirateTab, dispenseTab]} />
       </Flex>
       <Divider marginY="0" />
-      <Flex padding={SPACING.spacing16} width="100%">
+      <Flex width="100%">
         <FlowRateField
           {...propsForFields[`${tab}_flowRate`]}
           pipetteId={getPipetteIdForForm()}
@@ -96,8 +95,14 @@ export function BatchEditMixTools(props: BatchEditMixToolsProps): JSX.Element {
             updateSecondWellOrder={
               propsForFields.mix_wellOrder_second.updateValue
             }
-            firstValue={getWellOrderFieldValue('mix_wellOrder_first')}
-            secondValue={getWellOrderFieldValue('mix_wellOrder_second')}
+            firstValue={
+              (propsForFields.mix_wellOrder_first?.value ??
+                't2b') as WellOrderOption
+            }
+            secondValue={
+              (propsForFields.mix_wellOrder_second?.value ??
+                'l2r') as WellOrderOption
+            }
             firstName="mix_wellOrder_first"
             secondName="mix_wellOrder_second"
           />
@@ -109,14 +114,15 @@ export function BatchEditMixTools(props: BatchEditMixToolsProps): JSX.Element {
             xField="mix_x_position"
             yField="mix_y_position"
             labwareId={getLabwareIdForPositioningField('mix_mmFromBottom')}
+            referenceField="mix_position_reference"
           />
           <Divider marginY="0" />
         </>
       ) : null}
       <Flex
         flexDirection={DIRECTION_COLUMN}
-        padding={SPACING.spacing12}
-        gridGap={SPACING.spacing8}
+        padding={`0 ${SPACING.spacing16}`}
+        gridGap={SPACING.spacing4}
       >
         <StyledText desktopStyle="bodyDefaultSemiBold">
           {t('protocol_steps:advanced_settings')}
@@ -126,11 +132,7 @@ export function BatchEditMixTools(props: BatchEditMixToolsProps): JSX.Element {
             t('form:step_edit_form.field.delay.label'),
             'capitalize'
           )}
-          checkboxValue={propsForFields[`${tab}_delay_checkbox`].value}
-          isChecked={propsForFields[`${tab}_delay_checkbox`].value === true}
-          checkboxUpdateValue={
-            propsForFields[`${tab}_delay_checkbox`].updateValue
-          }
+          fieldProps={propsForFields[`${tab}_delay_checkbox`]}
         >
           {propsForFields[`${tab}_delay_checkbox`].value === true ? (
             <InputStepFormField
@@ -149,9 +151,7 @@ export function BatchEditMixTools(props: BatchEditMixToolsProps): JSX.Element {
                 t('form:step_edit_form.field.blowout.label'),
                 'capitalize'
               )}
-              checkboxValue={propsForFields.blowout_checkbox.value}
-              isChecked={propsForFields.blowout_checkbox.value === true}
-              checkboxUpdateValue={propsForFields.blowout_checkbox.updateValue}
+              fieldProps={propsForFields.blowout_checkbox}
             >
               {propsForFields.blowout_checkbox.value === true ? (
                 <BlowoutLocationField
@@ -159,6 +159,7 @@ export function BatchEditMixTools(props: BatchEditMixToolsProps): JSX.Element {
                   options={getBlowoutLocationOptionsForForm({
                     stepType: 'mix',
                   })}
+                  padding="0"
                 />
               ) : null}
             </CheckboxExpandStepFormField>
@@ -167,19 +168,15 @@ export function BatchEditMixTools(props: BatchEditMixToolsProps): JSX.Element {
                 t('form:step_edit_form.field.touchTip.label'),
                 'capitalize'
               )}
-              checkboxValue={propsForFields.mix_touchTip_checkbox.value}
-              isChecked={propsForFields.mix_touchTip_checkbox.value === true}
-              checkboxUpdateValue={
-                propsForFields.mix_touchTip_checkbox.updateValue
-              }
+              fieldProps={propsForFields.mix_touchTip_checkbox}
             >
               {propsForFields.mix_touchTip_checkbox.value === true ? (
                 <PositionField
                   prefix="dispense"
                   propsForFields={propsForFields}
-                  zField="mix_touchTip_mmFromBottom"
+                  zField="mix_touchTip_mmFromTop"
                   labwareId={getLabwareIdForPositioningField(
-                    'mix_touchTip_mmFromBottom'
+                    'mix_touchTip_mmFromTop'
                   )}
                 />
               ) : null}

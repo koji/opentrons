@@ -59,25 +59,29 @@ no_python_bundle ?=
 
 builder := yarn electron-builder \
 	--config electron-builder.config.js \
-	--config.electronVersion=27.0.0 \
+	--config.electronVersion=39.1.2 \
 	--publish never
 
+# Resolve the API python interpreter lazily so `make setup` (and other targets
+# that do not actually launch Electron) do not spin up the uv environment at
+# parse time. The $$() command substitution runs when the recipe executes.
+PYTHON_OVERRIDE_COMMAND = cd ../api && uv run --python 3.10 python -c "import sys, pathlib; print(pathlib.Path(sys.executable).resolve())"
 
-electron := yarn electron . \
+electron = yarn electron . \
 	--devtools \
 	--log.level.console="debug" \
 	--disable_ui.webPreferences.webSecurity \
 	--ui.url.protocol="http:" \
 	--ui.url.path="localhost:$(PORT)" \
-	--python.pathToPythonOverride=$(shell cd ../api && pipenv --venv)
+	--python.pathToPythonOverride=$$($(PYTHON_OVERRIDE_COMMAND))
 
-electron-dist := yarn electron . \
+electron-dist = yarn electron . \
 	--devtools \
 	--log.level.console="debug" \
 	--disable_ui.webPreferences.webSecurity \
 	--ui.url.protocol="file:" \
-	--ui.url.path="$(ui_dir)/dist/index.html"
-	--python.pathToPythonOverride=$(shell cd ../api && pipenv --venv)
+	--ui.url.path="$(ui_dir)/dist/index.html" \
+	--python.pathToPythonOverride=$$($(PYTHON_OVERRIDE_COMMAND))
 
 
 # standard targets
@@ -98,7 +102,11 @@ setup:
 
 .PHONY: clean
 clean:
-	yarn shx rm -rf lib dist python
+	yarn shx rm -rf lib dist python/install
+
+.PHONY: cleanall
+cleanall: clean
+	yarn shx rm -rf python
 
 # artifacts
 #####################################################################
@@ -121,32 +129,34 @@ package dist-posix dist-osx dist-linux dist-win: export BUILD_ID := $(build_id)
 package dist-posix dist-osx dist-linux dist-win: export NO_PYTHON := $(if $(no_python_bundle),true,false)
 package dist-posix dist-osx dist-linux dist-win: export USE_HARD_LINKS := false
 
+# Note: these depend on make -C app dist having been run; do not do this automatically because we separate these
+# tasks in CI and even if you have a file dep it's easy to accidentally make the dist run.
 .PHONY: package
-package: package-deps
+package:
 	$(builder) --dir
 
 .PHONY: dist-posix
-dist-posix: package-deps
+dist-posix: clean lib
 	$(builder) --linux --mac
 	$(MAKE) _dist-collect-artifacts
 
 .PHONY: dist-osx
-dist-osx: package-deps
-	$(builder) --mac --x64
+dist-osx: clean lib
+	$(builder) --mac --universal
 	$(MAKE) _dist-collect-artifacts
 
 .PHONY: dist-linux
-dist-linux: package-deps
+dist-linux:  clean lib
 	$(builder) --linux
 	$(MAKE) _dist-collect-artifacts
 
 .PHONY: dist-win
-dist-win: package-deps
+dist-win: clean lib
 	$(builder) --win --x64
 	$(MAKE) _dist-collect-artifacts
 
 .PHONY: dist-ot3
-dist-ot3: package-deps
+dist-ot3: clean lib
 	NO_PYTHON=true $(builder) --linux --arm64 --dir
 	cd dist/linux-arm64-unpacked
 
@@ -158,8 +168,8 @@ dist-macos-latest: dist-osx
 .PHONY: dist-ubuntu-latest
 dist-ubuntu-latest: dist-linux
 
-.PHONY: dist-ubuntu-22.04
-dist-ubuntu-22.04: dist-linux
+.PHONY: dist-ubuntu-24.04
+dist-ubuntu-24.04: dist-linux
 
 .PHONY: dist-windows-2019
 dist-windows-2019: dist-win

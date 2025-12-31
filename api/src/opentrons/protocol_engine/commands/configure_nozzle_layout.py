@@ -1,4 +1,5 @@
 """Configure nozzle layout command request, result, and implementation models."""
+
 from __future__ import annotations
 from opentrons.protocol_engine.state.update_types import StateUpdate
 from pydantic import BaseModel
@@ -61,9 +62,11 @@ class ConfigureNozzleLayoutImplementation(
         self, params: ConfigureNozzleLayoutParams
     ) -> SuccessData[ConfigureNozzleLayoutResult]:
         """Check that requested pipette can support the requested nozzle layout."""
-        primary_nozzle = params.configurationParams.dict().get("primaryNozzle")
-        front_right_nozzle = params.configurationParams.dict().get("frontRightNozzle")
-        back_left_nozzle = params.configurationParams.dict().get("backLeftNozzle")
+        primary_nozzle = params.configurationParams.model_dump().get("primaryNozzle")
+        front_right_nozzle = params.configurationParams.model_dump().get(
+            "frontRightNozzle"
+        )
+        back_left_nozzle = params.configurationParams.model_dump().get("backLeftNozzle")
         nozzle_params = await self._tip_handler.available_for_nozzle_layout(
             pipette_id=params.pipetteId,
             style=params.configurationParams.style,
@@ -97,11 +100,11 @@ class ConfigureNozzleLayout(
 
     commandType: ConfigureNozzleLayoutCommandType = "configureNozzleLayout"
     params: ConfigureNozzleLayoutParams
-    result: Optional[ConfigureNozzleLayoutResult]
+    result: Optional[ConfigureNozzleLayoutResult] = None
 
-    _ImplementationCls: Type[
+    _ImplementationCls: Type[ConfigureNozzleLayoutImplementation] = (
         ConfigureNozzleLayoutImplementation
-    ] = ConfigureNozzleLayoutImplementation
+    )
 
 
 class ConfigureNozzleLayoutCreate(BaseCommandCreate[ConfigureNozzleLayoutParams]):

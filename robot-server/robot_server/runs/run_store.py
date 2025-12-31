@@ -1,4 +1,5 @@
 """Runs' on-db store."""
+
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
@@ -7,12 +8,19 @@ from functools import lru_cache
 from typing import Dict, List, Optional, Literal, Union
 
 import sqlalchemy
+from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import and_
-from pydantic import ValidationError
 
 from opentrons.util.helpers import utc_now
-from opentrons.protocol_engine import StateSummary, CommandSlice, CommandIntent
-from opentrons.protocol_engine.commands import Command
+from opentrons.protocol_engine import (
+    StateSummary,
+    CommandSlice,
+    CommandIntent,
+    ErrorOccurrence,
+    CommandErrorSlice,
+    CommandStatus,
+)
+from opentrons.protocol_engine.commands import Command, CommandAdapter
 from opentrons.protocol_engine.types import RunTimeParameter
 
 from opentrons_shared_data.errors.exceptions import (
@@ -27,21 +35,25 @@ from robot_server.persistence.tables import (
     run_command_table,
     action_table,
     run_csv_rtp_table,
+    input_data_files_table,
+    output_data_files_table,
 )
 from robot_server.persistence.pydantic import (
     json_to_pydantic,
     pydantic_to_json,
-    json_to_pydantic_list,
     pydantic_list_to_json,
 )
 from robot_server.protocols.protocol_store import ProtocolNotFoundError
 
 from .action_models import RunAction, RunActionType
 from .run_models import RunNotFoundError
+from ..persistence.tables import CommandStatusSQLEnum
 
 log = logging.getLogger(__name__)
 
 _CACHE_ENTRIES = 32
+
+_rtp_list_adapter = TypeAdapter(list[RunTimeParameter])
 
 
 @dataclass(frozen=True)
@@ -179,6 +191,12 @@ class RunStore:
                         "command_intent": str(command.intent.value)
                         if command.intent
                         else CommandIntent.PROTOCOL,
+                        "command_error": pydantic_to_json(command.error)
+                        if command.error
+                        else None,
+                        "command_status": _convert_commands_status_to_sql_command_status(
+                            command.status
+                        ),
                     },
                 )
 
@@ -280,9 +298,9 @@ class RunStore:
             try:
                 transaction.execute(insert)
             except sqlalchemy.exc.IntegrityError:
-                assert (
-                    run.protocol_id is not None
-                ), "Insert run failed due to unexpected IntegrityError"
+                assert run.protocol_id is not None, (
+                    "Insert run failed due to unexpected IntegrityError"
+                )
                 raise ProtocolNotFoundError(protocol_id=run.protocol_id)
 
         self._clear_caches()
@@ -419,7 +437,7 @@ class RunStore:
 
         try:
             return (
-                json_to_pydantic_list(RunTimeParameter, row.run_time_parameters)  # type: ignore[arg-type]
+                json_to_pydantic(_rtp_list_adapter, row.run_time_parameters)
                 if row.run_time_parameters is not None
                 else []
             )
@@ -501,8 +519,7 @@ class RunStore:
             slice_result = transaction.execute(select_slice).all()
 
         sliced_commands: List[Command] = [
-            json_to_pydantic(Command, row.command)  # type: ignore[arg-type]
-            for row in slice_result
+            _parse_command(row.command) for row in slice_result
         ]
 
         return CommandSlice(
@@ -537,6 +554,107 @@ class RunStore:
             commands_result = transaction.scalars(select_commands).all()
         return commands_result
 
+    def get_command_errors_count(self, run_id: str) -> int:
+        """Get run commands errors count from the store.
+
+        Args:
+            run_id: Run ID to pull commands from.
+
+        Returns:
+            The number of commands errors.
+
+        Raises:
+            RunNotFoundError: The given run ID was not found.
+        """
+        with self._sql_engine.begin() as transaction:
+            if not self._run_exists(run_id, transaction):
+                raise RunNotFoundError(run_id=run_id)
+
+            select_count = sqlalchemy.select(sqlalchemy.func.count()).where(
+                and_(
+                    run_command_table.c.run_id == run_id,
+                    run_command_table.c.command_status == CommandStatusSQLEnum.FAILED,
+                )
+            )
+            errors_count: int = transaction.execute(select_count).scalar_one()
+            return errors_count
+
+    def get_commands_errors_slice(
+        self,
+        run_id: str,
+        length: int,
+        cursor: Optional[int],
+    ) -> CommandErrorSlice:
+        """Get a slice of run commands errors from the store.
+
+        Args:
+            run_id: Run ID to pull commands from.
+            length: Number of commands to return.
+            cursor: The starting index of the slice in the whole collection.
+                If `None`, up to `length` elements at the end of the collection will
+                be returned.
+
+        Returns:
+            A collection of command errors as well as the actual cursor used and
+            the total length of the collection.
+
+        Raises:
+            RunNotFoundError: The given run ID was not found.
+        """
+        with self._sql_engine.begin() as transaction:
+            if not self._run_exists(run_id, transaction):
+                raise RunNotFoundError(run_id=run_id)
+
+            select_count = sqlalchemy.select(sqlalchemy.func.count()).where(
+                and_(
+                    run_command_table.c.run_id == run_id,
+                    run_command_table.c.command_status == CommandStatusSQLEnum.FAILED,
+                )
+            )
+            count_result: int = transaction.execute(select_count).scalar_one()
+
+            actual_cursor = cursor if cursor is not None else count_result - length
+            # Clamp to [0, count_result).
+            # cursor is 0 based index and row number starts from 1.
+            actual_cursor = max(0, min(actual_cursor, count_result - 1)) + 1
+            select_command_errors = (
+                sqlalchemy.select(
+                    sqlalchemy.func.row_number().over().label("row_num"),
+                    run_command_table,
+                )
+                .where(
+                    and_(
+                        run_command_table.c.run_id == run_id,
+                        run_command_table.c.command_status
+                        == CommandStatusSQLEnum.FAILED,
+                    )
+                )
+                .order_by(run_command_table.c.index_in_run)
+                .subquery()
+            )
+
+            select_slice = (
+                sqlalchemy.select(select_command_errors.c.command_error)
+                .where(
+                    and_(
+                        select_command_errors.c.row_num >= actual_cursor,
+                        select_command_errors.c.row_num < actual_cursor + length,
+                    )
+                )
+                .order_by(select_command_errors.c.index_in_run)
+            )
+            slice_result = transaction.execute(select_slice).all()
+
+        sliced_commands: List[ErrorOccurrence] = [
+            json_to_pydantic(ErrorOccurrence, row.command_error) for row in slice_result
+        ]
+
+        return CommandErrorSlice(
+            cursor=actual_cursor,
+            total_length=count_result,
+            commands_errors=sliced_commands,
+        )
+
     @lru_cache(maxsize=_CACHE_ENTRIES)
     def get_command(self, run_id: str, command_id: str) -> Command:
         """Get run command by id.
@@ -565,17 +683,10 @@ class RunStore:
             if command is None:
                 raise CommandNotFoundError(command_id=command_id)
 
-        return json_to_pydantic(Command, command)  # type: ignore[arg-type]
+        return _parse_command(command)
 
     def remove(self, run_id: str) -> None:
-        """Remove a run by its unique identifier.
-
-        Arguments:
-            run_id: The run's unique identifier.
-
-        Raises:
-            RunNotFoundError: The specified run ID was not found.
-        """
+        """Remove a run by its unique identifier."""
         delete_run = sqlalchemy.delete(run_table).where(run_table.c.id == run_id)
         delete_actions = sqlalchemy.delete(action_table).where(
             action_table.c.run_id == run_id
@@ -586,10 +697,19 @@ class RunStore:
         delete_csv_rtps = sqlalchemy.delete(run_csv_rtp_table).where(
             run_csv_rtp_table.c.run_id == run_id
         )
+        delete_input_files = sqlalchemy.delete(input_data_files_table).where(
+            input_data_files_table.c.run_id == run_id
+        )
+        delete_output_files = sqlalchemy.delete(output_data_files_table).where(
+            output_data_files_table.c.run_id == run_id
+        )
+
         with self._sql_engine.begin() as transaction:
             transaction.execute(delete_actions)
             transaction.execute(delete_commands)
             transaction.execute(delete_csv_rtps)
+            transaction.execute(delete_input_files)
+            transaction.execute(delete_output_files)
             result = transaction.execute(delete_run)
 
         if result.rowcount < 1:
@@ -647,9 +767,9 @@ def _convert_row_to_run(
     # other way to delete it. It's also unclear how it could happen without the table schema
     # changing out from under us.
     assert isinstance(run_id, str), f"Run ID {run_id} is not a string"
-    assert protocol_id is None or isinstance(
-        protocol_id, str
-    ), f"Protocol ID {protocol_id} is not a string or None"
+    assert protocol_id is None or isinstance(protocol_id, str), (
+        f"Protocol ID {protocol_id} is not a string or None"
+    )
     try:
         actions = [
             RunAction(
@@ -712,3 +832,22 @@ def _convert_state_to_sql_values(
         "_updated_at": utc_now(),
         "run_time_parameters": pydantic_list_to_json(run_time_parameters),
     }
+
+
+def _parse_command(json_str: str) -> Command:
+    """Parse a JSON string from the database into a `Command`."""
+    return json_to_pydantic(CommandAdapter, json_str)
+
+
+def _convert_commands_status_to_sql_command_status(
+    status: CommandStatus,
+) -> CommandStatusSQLEnum:
+    match status:
+        case CommandStatus.QUEUED:
+            return CommandStatusSQLEnum.QUEUED
+        case CommandStatus.RUNNING:
+            return CommandStatusSQLEnum.RUNNING
+        case CommandStatus.FAILED:
+            return CommandStatusSQLEnum.FAILED
+        case CommandStatus.SUCCEEDED:
+            return CommandStatusSQLEnum.SUCCEEDED

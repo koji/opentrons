@@ -148,20 +148,18 @@ async def run_test(
 ) -> AsyncGenerator[StatisticElement, Optional[bool]]:
     """Run the test and yield results.
 
-    Params
-    ------
-    driver: A pre-constructed canbus driver to use
-    load_percentage: between 0 and 1, how much of the network bandwidth to use
-                     during the test.
-    bitrate: The network bitrate.
-    duration: How long to run the test for. If None, until stopped by a signal.
-    mode: The mode to run in (see the docs on StimulusMode)
+    Arguments:
+        driver: A pre-constructed canbus driver to use
+        load_percentage: between 0 and 1, how much of the network bandwidth to use
+                         during the test.
+        bitrate: The network bitrate.
+        duration: How long to run the test for. If None, until stopped by a signal.
+        mode: The mode to run in (see the docs on StimulusMode)
 
-    Returns
-    -------
-    An iterator of lists of statistic elements. Because this test may run for a long
-    time and generate a lot of data, rather than doing the test blindly it's a
-    coroutine that can be controlled by the caller.
+    Returns:
+        An iterator of lists of statistic elements. Because this test may run for a long
+        time and generate a lot of data, rather than doing the test blindly it's a
+         coroutine that can be controlled by the caller.
 
     Sending the value True into the generator will stop the test.
 
@@ -170,14 +168,14 @@ async def run_test(
     task = asyncio.get_event_loop().create_task(
         _do_test(driver, load_percentage, bitrate, results_queue, mode)
     )
-    started = time.time()
+    started = time.monotonic()
     should_quit = False
     try:
         while not should_quit:
             results = await results_queue.get()
             sent_in = yield results
             should_quit = bool(sent_in)
-            if duration and (time.time() - started > duration):
+            if duration and (time.monotonic() - started > duration):
                 should_quit = True
     finally:
         task.cancel()
@@ -191,12 +189,12 @@ class WarningsWithCooldown:
 
     def __init__(self, cooldown_secs: float = 10) -> None:
         """Build the warner."""
-        self.last_warning = time.time()
+        self.last_warning = time.monotonic()
         self.cooldown_secs = cooldown_secs
 
     def warning(self, message: str) -> None:
         """Send a warning to logging.warning."""
-        now = time.time()
+        now = time.monotonic()
         if now > self.last_warning + self.cooldown_secs:
             log.warning(message)
             sys.stderr.write(message)
@@ -208,9 +206,9 @@ def _test_details_for_mode(
 ) -> Tuple[NodeId, Union[Type[DeviceInfoRequest], Type[HeartbeatResponse]], int]:
     if mode == StimulusMode.ONE_TO_ONE:
         target = present.pop()
-        message: Union[
-            Type[DeviceInfoRequest], Type[HeartbeatResponse]
-        ] = DeviceInfoRequest
+        message: Union[Type[DeviceInfoRequest], Type[HeartbeatResponse]] = (
+            DeviceInfoRequest
+        )
         response_size = _canbus_message_length_bits(DeviceInfoResponse)
     elif mode == StimulusMode.ONE_TO_NONE:
         target = NodeId.broadcast
@@ -262,12 +260,12 @@ async def _do_test(
     transaction_size = message_size + response_size
 
     time_per_transaction = float(transaction_size) / (bitrate * load_percentage)
-    started = time.time()
+    started = time.monotonic()
 
     def listener(definition: MessageDefinition, arb_id: ArbitrationId) -> None:
         result_queue.put_nowait(
             StatisticElement(
-                sec_since_start=time.time() - started,
+                sec_since_start=time.monotonic() - started,
                 sending_node=arb_id.parts.originating_node,
                 bits=definition.payload.get_size(),
                 error=False,
@@ -277,7 +275,7 @@ async def _do_test(
     try:
         messenger.add_listener(listener)
         while True:
-            then = time.time()
+            then = time.monotonic()
             try:
                 await messenger.send(target, message(payload=EmptyPayload()))
                 error = False
@@ -288,18 +286,18 @@ async def _do_test(
                 bits = 0
             await result_queue.put(
                 StatisticElement(
-                    sec_since_start=(time.time() - started),
+                    sec_since_start=(time.monotonic() - started),
                     sending_node=NodeId.host,
                     bits=bits,
                     error=error,
                 )
             )
-            now = time.time()
+            now = time.monotonic()
             left = time_per_transaction - now - then
             if left > 0:
                 await asyncio.sleep(left)
             else:
-                warner.warning(f"cant keep up with messages, overran by {left*-1}sec")
+                warner.warning(f"cant keep up with messages, overran by {left * -1}sec")
                 await asyncio.sleep(0)
     finally:
         await messenger.stop()

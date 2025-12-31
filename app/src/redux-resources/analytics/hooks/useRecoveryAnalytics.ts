@@ -9,14 +9,14 @@ import {
   useTrackEvent,
 } from '/app/redux/analytics'
 
-import type { RunStatus, RunCommandSummary } from '@opentrons/api-client'
+import type { RunCommandSummary, RunStatus } from '@opentrons/api-client'
 
 type InitialActionType = 'cancel-run' | 'launch-recovery'
 type CommandResult = 'succeeded' | 'failed'
 
 export interface UseRecoveryAnalyticsResult<
   RecoveryRouteType,
-  RecoveryRouteStepType
+  RecoveryRouteStepType,
 > {
   /* Report the error which occurs error recovery is currently handling. */
   reportErrorEvent: (
@@ -44,7 +44,7 @@ export interface UseRecoveryAnalyticsResult<
 
 export function useRecoveryAnalytics<
   RecoveryRouteType,
-  RecoveryRouteStepType
+  RecoveryRouteStepType,
 >(): UseRecoveryAnalyticsResult<RecoveryRouteType, RecoveryRouteStepType> {
   const doTrackEvent = useTrackEvent()
 

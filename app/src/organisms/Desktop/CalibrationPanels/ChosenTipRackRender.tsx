@@ -1,15 +1,17 @@
 import { css } from 'styled-components'
+
 import {
   ALIGN_CENTER,
   Box,
   DIRECTION_ROW,
   Flex,
-  SPACING,
   LegacyStyledText,
+  SPACING,
 } from '@opentrons/components'
-import { labwareImages } from '/app/local-resources/labware'
+import { labwareImages } from '@opentrons/shared-data'
 
 import type { SelectOption } from '@opentrons/components'
+
 export interface ChosenTipRackRenderProps {
   selectedValue: SelectOption
 }
@@ -38,11 +40,11 @@ export function ChosenTipRackRender(
           max-width: 7rem;
           max-height: 3.7rem;
         `}
-        src={imageSrc}
+        src={imageSrc[0]}
         alt={`${String(displayName)} image`}
       />
       <Box>
-        <LegacyStyledText as="p" marginLeft={SPACING.spacing16}>
+        <LegacyStyledText forwardedAs="p" marginLeft={SPACING.spacing16}>
           {displayName}
         </LegacyStyledText>
       </Box>

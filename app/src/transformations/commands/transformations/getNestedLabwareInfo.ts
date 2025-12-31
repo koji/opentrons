@@ -1,5 +1,7 @@
+import { locationIsOnDeck, locationIsOnLabware } from '@opentrons/shared-data'
+
 import type {
-  LabwareDefinition2,
+  LabwareDefinition,
   LoadLabwareRunTimeCommand,
   LoadModuleRunTimeCommand,
   RunTimeCommand,
@@ -10,7 +12,7 @@ export interface NestedLabwareInfo {
   nestedLabwareDisplayName: string
   //    shared location between labware and adapter
   sharedSlotId: string
-  nestedLabwareDefinition?: LabwareDefinition2
+  nestedLabwareDefinition?: LabwareDefinition
   nestedLabwareNickName?: string
 }
 export function getNestedLabwareInfo(
@@ -20,14 +22,13 @@ export function getNestedLabwareInfo(
   const nestedLabware = commands.find(
     (command): command is LoadLabwareRunTimeCommand =>
       command.commandType === 'loadLabware' &&
-      command.params.location !== 'offDeck' &&
-      'labwareId' in command.params.location &&
+      locationIsOnLabware(command.params.location) &&
       command.params.location.labwareId === labwareSetupItem.labwareId
   )
   if (nestedLabware == null) return null
 
   let sharedSlotId: string = ''
-  if (labwareSetupItem.initialLocation !== 'offDeck') {
+  if (locationIsOnDeck(labwareSetupItem.initialLocation)) {
     const adapterLocation = labwareSetupItem.initialLocation
     if ('slotName' in adapterLocation) {
       sharedSlotId = adapterLocation.slotName

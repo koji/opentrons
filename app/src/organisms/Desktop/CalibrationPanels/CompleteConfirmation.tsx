@@ -1,5 +1,5 @@
-import type * as React from 'react'
 import { useTranslation } from 'react-i18next'
+
 import {
   ALIGN_CENTER,
   ALIGN_STRETCH,
@@ -9,18 +9,20 @@ import {
   Icon,
   JUSTIFY_CENTER,
   JUSTIFY_FLEX_END,
+  LegacyStyledText,
   PrimaryButton,
   SIZE_3,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
+import type { MouseEventHandler, ReactNode } from 'react'
+
 interface CompleteConfirmationProps {
-  proceed: React.MouseEventHandler
+  proceed: MouseEventHandler
   flowName?: string
   body?: string
-  visualAid?: React.ReactNode
+  visualAid?: ReactNode
 }
 
 export function CompleteConfirmation(
@@ -45,11 +47,11 @@ export function CompleteConfirmation(
         ) : (
           <Icon name="ot-check" size={SIZE_3} color={COLORS.green50} />
         )}
-        <LegacyStyledText as="h1" marginTop={SPACING.spacing24}>
+        <LegacyStyledText forwardedAs="h1" marginTop={SPACING.spacing24}>
           {t('flow_complete', { flowName })}
         </LegacyStyledText>
         {body != null ? (
-          <LegacyStyledText as="p" marginTop={SPACING.spacing8}>
+          <LegacyStyledText forwardedAs="p" marginTop={SPACING.spacing8}>
             {body}
           </LegacyStyledText>
         ) : null}

@@ -1,5 +1,6 @@
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
+
 import {
   ALIGN_CENTER,
   BORDERS,
@@ -8,15 +9,34 @@ import {
   Flex,
   Icon,
   JUSTIFY_CENTER,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
+
 import { getTopPortalEl } from '/app/App/portal'
 import { OddModal } from '/app/molecules/OddModal'
+import { NOT_CONFIGURED } from '/app/organisms/DoorOpenControl/useIsDoorOpen'
 
-export function OpenDoorAlertModal(): JSX.Element {
+export interface OpenDoorModalProps {
+  moduleDoorLocation: string | null
+}
+export function OpenDoorAlertModal(props: OpenDoorModalProps): JSX.Element {
   const { t } = useTranslation('run_details')
+  let doorHeader = t('door_is_open')
+  let doorText = t('close_door_to_resume_run')
+  if (props.moduleDoorLocation === NOT_CONFIGURED) {
+    doorHeader = t('unconfigured_stacker_door_is_open')
+    doorText = t('close_stacker_to_resume_generic')
+  } else if (props.moduleDoorLocation !== null) {
+    doorHeader = t('stacker_door_is_open', {
+      module_door_location: props.moduleDoorLocation,
+    })
+    doorText = t('close_stacker_to_resume_generic', {
+      module_door_location: props.moduleDoorLocation,
+    })
+  }
+
   return createPortal(
     <OddModal>
       <Flex
@@ -36,15 +56,18 @@ export function OpenDoorAlertModal(): JSX.Element {
           alignItems={ALIGN_CENTER}
           width="100%"
         >
-          <LegacyStyledText as="h4" fontWeight={TYPOGRAPHY.fontWeightBold}>
-            {t('door_is_open')}
+          <LegacyStyledText
+            forwardedAs="h4"
+            fontWeight={TYPOGRAPHY.fontWeightBold}
+          >
+            {doorHeader}
           </LegacyStyledText>
           <LegacyStyledText
-            as="p"
+            forwardedAs="p"
             textAlign={TYPOGRAPHY.textAlignCenter}
             color={COLORS.grey60}
           >
-            {t('close_door_to_resume_run')}
+            {doorText}
           </LegacyStyledText>
         </Flex>
       </Flex>

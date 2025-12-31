@@ -4,13 +4,60 @@ import time
 import configparser
 import traceback
 import sys
+from datetime import datetime, timedelta
+from typing import Any
 from hardware_testing.scripts import ABRAsairScript  # type: ignore
+from abr_testing.automation import google_sheets_tool, gopro
 from abr_testing.data_collection import (
     get_run_logs,
     abr_google_drive,
     abr_calibration_logs,
+    abr_hepauv,
 )
 from abr_testing.tools import sync_abr_sheet
+
+
+def clean_sheet(sheet_name: str, credentials: str) -> Any:
+    """Remove data older than 60 days from sheet."""
+    sheet = google_sheets_tool.google_sheet(
+        credentials=credentials, file_name=sheet_name, tab_number=0
+    )
+    date_columns = sheet.get_column(3)
+    curr_date = datetime.now()
+    cutoff_days = 60  # Cutoff period in days
+    cutoff_date = curr_date - timedelta(days=cutoff_days)
+
+    rem_rows = []
+    for row_id, date in enumerate(date_columns):
+        # Convert to datetime if needed
+        formatted_date = None
+        if isinstance(date, str):  # Assuming dates might be strings
+            try:
+                formatted_date = datetime.strptime(date, "%m/%d/%Y")
+            except ValueError:
+                try:
+                    formatted_date = datetime.strptime(date, "%Y-%m-%d")
+                except ValueError:
+                    continue
+
+        # Check if the date is older than the cutoff
+        if formatted_date < cutoff_date:
+            rem_rows.append(row_id)
+        if len(rem_rows) > 1500:
+            break
+    if len(rem_rows) == 0:
+        # No more rows to remove
+        print("Nothing to remove")
+        return
+    print(f"Rows to be removed: {rem_rows}")
+    try:
+        sheet.batch_delete_rows(rem_rows, "0")
+        print("deleted rows")
+    except Exception:
+        print("could not delete rows")
+        return
+
+    clean_sheet(sheet_name, credentials)
 
 
 def run_sync_abr_sheet(
@@ -20,9 +67,22 @@ def run_sync_abr_sheet(
     sync_abr_sheet.run(storage_directory, abr_data_sheet, room_conditions_sheet)
 
 
-def run_temp_sensor(ip_file: str) -> None:
+def run_hepa_uv(
+    turning_hepa_fan: str,
+    google_sheet_name: str,
+    storage_directory: str,
+) -> None:
+    """Record HEPA UVs."""
+    abr_hepauv.run(turning_hepa_fan, google_sheet_name, storage_directory)
+
+
+def run_temp_sensor(
+    ambient_conditions_sheet: str, credentials: str, storage_directory: str
+) -> None:
     """Run temperature sensors on all robots."""
-    processes = ABRAsairScript.run(ip_file)
+    # Remove entries > 60 days
+    clean_sheet(ambient_conditions_sheet, credentials)
+    processes = ABRAsairScript.run(storage_directory)
     for process in processes:
         process.start()
         time.sleep(20)
@@ -64,7 +124,6 @@ def get_calibration_data(
 
 def main(configurations: configparser.ConfigParser) -> None:
     """Main function."""
-    ip_file = None
     storage_directory = None
     email = None
     drive_folder = None
@@ -72,46 +131,44 @@ def main(configurations: configparser.ConfigParser) -> None:
     ambient_conditions_sheet = None
     sheet_url = None
 
-    has_defaults = False
     # If default is not specified get all values
     default = configurations["DEFAULT"]
-    if len(default) > 0:
-        has_defaults = True
-    try:
-        if has_defaults:
-            storage_directory = default["Storage"]
-            email = default["Email"]
-            drive_folder = default["Drive_Folder"]
-            sheet_name = default["Sheet_Name"]
-            sheet_url = default["Sheet_Url"]
-    except KeyError as e:
-        print("Cannot read config file\n" + str(e))
-
+    credentials = ""
+    if default:
+        try:
+            credentials = default["Credentials"]
+        except KeyError as e:
+            print("Cannot read config file\n" + str(e))
+    # Record HEPA/UV Tracking
+    storage_directory = configurations["RUN-LOG"]["Storage"]
+    sheet_name = configurations["RUN-LOG"]["Sheet_Name"]
+    hepa_on = input("Are you turning HEPA Fans on or off? ")
+    run_hepa_uv(hepa_on.lower(), sheet_name, storage_directory)
+    if hepa_on == "off":
+        continue_str = input(
+            "Type 'continue' to continue with the rest of the set up script."
+        )
+        if continue_str == "continue":
+            print("Script will continue.")
+        else:
+            sys.exit()
     # Run Temperature Sensors
-    if not has_defaults:
-        ip_file = configurations["TEMP-SENSOR"]["Robo_List"]
-        ambient_conditions_sheet = configurations["TEMP-SENSOR"]["Sheet_Url"]
-    print("Starting temp sensors...")
-    if ip_file:
-        run_temp_sensor(ip_file)
-        print("Temp Sensors Started")
-    else:
-        print("Missing ip_file location, please fix configs")
-        sys.exit(1)
+    ambient_conditions_sheet = configurations["TEMP-SENSOR"]["Sheet_Url"]
+    ambient_conditions_sheet_name = configurations["TEMP-SENSOR"]["Sheet_Name"]
+    print("Starting 🌡️ temp sensors 🌡️...")
+    run_temp_sensor(ambient_conditions_sheet_name, credentials, storage_directory)
     # Get Run Logs and Record
-    if not has_defaults:
-        storage_directory = configurations["RUN-LOG"]["Storage"]
-        email = configurations["RUN-LOG"]["Email"]
-        drive_folder = configurations["RUN-LOG"]["Drive_Folder"]
-        sheet_name = configurations["RUN-LOG"]["Sheet_Name"]
-        sheet_url = configurations["RUN-LOG"]["Sheet_Url"]
+    email = configurations["RUN-LOG"]["Email"]
+    drive_folder = configurations["RUN-LOG"]["Drive_Folder"]
+    sheet_name = configurations["RUN-LOG"]["Sheet_Name"]
+    sheet_url = configurations["RUN-LOG"]["Sheet_Url"]
     print(sheet_name)
     if storage_directory and drive_folder and sheet_name and email:
-        print("Retrieving robot run logs...")
+        print("🤖 Retrieving robot run logs...")
         get_abr_logs(storage_directory, drive_folder, email)
-        print("Recording robot run logs...")
+        print("📄 Recording robot run logs...")
         record_abr_logs(storage_directory, drive_folder, sheet_name, email)
-        print("Run logs updated")
+        print("✅ Run logs updated")
     else:
         print("Storage, Email, or Drive Folder is missing, please fix configs")
         sys.exit(1)
@@ -119,11 +176,10 @@ def main(configurations: configparser.ConfigParser) -> None:
     if storage_directory and sheet_url and ambient_conditions_sheet:
         run_sync_abr_sheet(storage_directory, sheet_url, ambient_conditions_sheet)
     # Collect calibration data
-    if not has_defaults:
-        storage_directory = configurations["CALIBRATION"]["Storage"]
-        email = configurations["CALIBRATION"]["Email"]
-        drive_folder = configurations["CALIBRATION"]["Drive_Folder"]
-        sheet_name = configurations["CALIBRATION"]["Sheet_Name"]
+    storage_directory = configurations["CALIBRATION"]["Storage"]
+    email = configurations["CALIBRATION"]["Email"]
+    drive_folder = configurations["CALIBRATION"]["Drive_Folder"]
+    sheet_name = configurations["CALIBRATION"]["Sheet_Name"]
     if storage_directory and drive_folder and sheet_name and email:
         print("Retrieving and recording robot calibration data...")
         get_calibration_data(storage_directory, drive_folder, sheet_name, email)
@@ -133,6 +189,9 @@ def main(configurations: configparser.ConfigParser) -> None:
             "Storage, Email, Drive Folder, or Sheet name is missing, please fix configs"
         )
         sys.exit(1)
+    # Set up go pros
+    storage_directory = configurations["RUN-LOG"]["Storage"]
+    gopro.run(storage_directory)
 
 
 if __name__ == "__main__":

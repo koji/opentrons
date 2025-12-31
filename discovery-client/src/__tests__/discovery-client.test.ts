@@ -1,4 +1,7 @@
-import { describe, it, vi, expect, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { createDiscoveryClient } from '..'
+import { HEALTH_STATUS_OK } from '../constants'
 import {
   mockLegacyHealthResponse,
   mockLegacyServerHealthResponse,
@@ -7,20 +10,18 @@ import {
   mockOT3HealthResponse,
   mockOT3ServerHealthResponse,
 } from '../fixtures'
-import { HEALTH_STATUS_OK } from '../constants'
 import * as HealthPollerModule from '../health-poller'
 import * as MdnsBrowserModule from '../mdns-browser'
-import { createDiscoveryClient } from '..'
 
-import type { HealthPollerResult, Logger } from '../types'
 import type { MdnsBrowserService } from '../mdns-browser'
+import type { HealthPollerResult, Logger } from '../types'
 
 vi.mock('../health-poller')
 vi.mock('../mdns-browser')
 
 const createHealthPoller = HealthPollerModule.createHealthPoller
 const createMdnsBrowser = MdnsBrowserModule.createMdnsBrowser
-const logger = ({} as unknown) as Logger
+const logger = {} as unknown as Logger
 
 describe('discovery client', () => {
   const onListChange = vi.fn()
@@ -42,21 +43,22 @@ describe('discovery client', () => {
   }
 
   const emitPollResult = (result: HealthPollerResult): void => {
-    //  @ts-expect-error: mock doesn't exist on type
-    const { onPollResult } = createHealthPoller.mock.calls[
+    const { onPollResult } =
       //  @ts-expect-error: mock doesn't exist on type
-      createHealthPoller.mock.calls.length - 1
-    ][0]
+      createHealthPoller.mock.calls[
+        //  @ts-expect-error: mock doesn't exist on type
+        createHealthPoller.mock.calls.length - 1
+      ][0]
     onPollResult(result)
   }
 
   const emitService = (service: MdnsBrowserService): void => {
-    //  @ts-expect-error: mock doesn't exist on type
-    const { onService } = createMdnsBrowser.mock.calls[
+    const { onService } =
       //  @ts-expect-error: mock doesn't exist on type
-
-      createMdnsBrowser.mock.calls.length - 1
-    ][0]
+      createMdnsBrowser.mock.calls[
+        //  @ts-expect-error: mock doesn't exist on type
+        createMdnsBrowser.mock.calls.length - 1
+      ][0]
     onService(service)
   }
 

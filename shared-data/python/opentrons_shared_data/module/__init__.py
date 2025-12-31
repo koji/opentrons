@@ -1,7 +1,11 @@
-""" opentrons_shared_data.module: functions and types for module defs """
+"""opentrons_shared_data.module: functions and types for module defs"""
+
 import json
+from ast import literal_eval
 from pathlib import Path
 from typing import Union, cast, overload
+from functools import lru_cache
+from itertools import product
 
 from ..load import load_shared_data
 from .types import (
@@ -12,7 +16,9 @@ from .types import (
     ModuleDefinitionV1,
     ModuleDefinitionV3,
     ModuleModel,
+    TOFSensorBaseline,
 )
+
 
 OLD_TC_GEN2_LABWARE_OFFSET = {"x": 0, "y": 68.06, "z": 98.26}
 
@@ -38,15 +44,14 @@ of a thermocycler on a Flex.
 
 
 class ModuleNotFoundError(KeyError):
-    def __init__(self, version: str, model_or_loadname: str):
+    def __init__(self, version: str, model_or_loadname: str) -> None:
         super().__init__(model_or_loadname)
         self.requested_version = version
         self.requested_module = model_or_loadname
 
     def __str__(self) -> str:
         return (
-            f"No such version {self.requested_version} module "
-            f"{self.requested_module}"
+            f"No such version {self.requested_version} module {self.requested_module}"
         )
 
     def __repr__(self) -> str:
@@ -62,16 +67,16 @@ def load_schema(version: SchemaVersions) -> ModuleSchema:
 
 
 @overload
-def load_definition(version: SchemaV1, model_or_loadname: str) -> ModuleDefinitionV1:
-    ...
+def load_definition(
+    version: SchemaV1, model_or_loadname: str
+) -> ModuleDefinitionV1: ...
 
 
 @overload
 def load_definition(
     version: SchemaV3,
     model_or_loadname: Union[str, ModuleModel],
-) -> ModuleDefinitionV3:
-    ...
+) -> ModuleDefinitionV3: ...
 
 
 def load_definition(
@@ -92,3 +97,20 @@ def load_definition(
         except FileNotFoundError:
             raise ModuleNotFoundError(version, model_or_loadname)
         return cast(ModuleDefinitionV3, json.loads(data))
+
+
+@lru_cache
+def load_tof_baseline_data(
+    model_or_loadname: Union[str, ModuleModel],
+) -> TOFSensorBaseline:
+    try:
+        definition = load_definition("3", model_or_loadname)
+        baseline = definition.get("uniqueModuleData", {})["TOFSensorBaseline"]
+        baseline["version"] = baseline.get("version", 1)
+        # The baseline is stored as string, so convert to dict
+        for axis, platform in product(["X", "Z"], ["extend", "retract"]):
+            values = literal_eval(baseline[axis][platform])
+            baseline[axis][platform] = values
+        return cast(TOFSensorBaseline, baseline)
+    except (KeyError, ValueError):
+        raise ModuleNotFoundError("3", model_or_loadname)

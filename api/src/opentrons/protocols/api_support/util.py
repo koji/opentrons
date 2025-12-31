@@ -1,4 +1,5 @@
-""" Utility functions and classes for the protocol api """
+"""Utility functions and classes for the protocol api"""
+
 from __future__ import annotations
 
 from collections import UserDict
@@ -303,7 +304,6 @@ class AxisMaxSpeeds(UserDict[Union[str, Axis], float]):
         return checked_key
 
     def __setitem__(self, key: object, value: object) -> None:
-
         checked_key = AxisMaxSpeeds._verify_key(key)
         if value is None:
             del self[checked_key]
@@ -391,3 +391,13 @@ def requires_version(major: int, minor: int) -> Callable[[FuncT], FuncT]:
         return cast(FuncT, _check_version_wrapper)
 
     return _set_version
+
+
+class ModifiedList(list[str]):
+    def __contains__(self, item: object) -> bool:
+        if not isinstance(item, str):
+            return False
+        for name in self:
+            if name == item.replace("-", "_").lower():
+                return True
+        return False

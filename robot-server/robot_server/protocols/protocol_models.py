@@ -1,22 +1,21 @@
 """Protocol file models."""
 
 from datetime import datetime
-from pydantic import BaseModel, Extra, Field
+from pydantic import ConfigDict, BaseModel, Field
 from typing import Any, List, Optional
-from enum import Enum
 
 from opentrons.protocol_reader import (
     ProtocolType as ProtocolType,
     ProtocolFileRole as ProtocolFileRole,
 )
-
+from opentrons_shared_data.util import StrEnum
 from opentrons_shared_data.robot.types import RobotType
 
 from robot_server.service.json_api import ResourceModel
 from .analysis_models import AnalysisSummary
 
 
-class ProtocolKind(str, Enum):
+class ProtocolKind(StrEnum):
     """Kind of protocol, standard or quick-transfer."""
 
     STANDARD = "standard"
@@ -26,7 +25,6 @@ class ProtocolKind(str, Enum):
 class ProtocolFile(BaseModel):
     """A file in a protocol."""
 
-    # TODO(mc, 2021-11-12): add unique ID to file resource
     name: str = Field(..., description="The file's basename, including extension")
     role: ProtocolFileRole = Field(..., description="The file's role in the protocol.")
 
@@ -49,13 +47,7 @@ class Metadata(BaseModel):
     this should be considered an exception to the rule.
     """
 
-    # todo(mm, 2021-09-17): Revise these docs after specifying
-    # metadata more. github.com/Opentrons/opentrons/issues/8334
-
-    class Config:
-        """Tell Pydantic that metadata objects can have arbitrary fields."""
-
-        extra = Extra.allow
+    model_config = ConfigDict(extra="allow")
 
 
 class Protocol(ResourceModel):

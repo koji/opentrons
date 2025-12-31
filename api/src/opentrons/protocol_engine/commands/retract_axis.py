@@ -1,4 +1,5 @@
 """Retract Axis command payload, result, and implementation models."""
+
 from __future__ import annotations
 from pydantic import BaseModel, Field
 from typing import TYPE_CHECKING, Optional, Type
@@ -61,7 +62,7 @@ class RetractAxis(BaseCommand[RetractAxisParams, RetractAxisResult, ErrorOccurre
 
     commandType: RetractAxisCommandType = "retractAxis"
     params: RetractAxisParams
-    result: Optional[RetractAxisResult]
+    result: Optional[RetractAxisResult] = None
 
     _ImplementationCls: Type[RetractAxisImplementation] = RetractAxisImplementation
 

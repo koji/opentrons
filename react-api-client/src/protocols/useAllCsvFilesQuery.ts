@@ -1,12 +1,11 @@
 import { useQuery } from 'react-query'
+
 import { getCsvFiles } from '@opentrons/api-client'
+
 import { useHost } from '../api'
 
 import type { UseQueryOptions, UseQueryResult } from 'react-query'
-import type {
-  HostConfig,
-  UploadedCsvFilesResponse,
-} from '@opentrons/api-client'
+import type { UploadedCsvFilesResponse } from '@opentrons/api-client'
 
 export function useAllCsvFilesQuery(
   protocolId: string,
@@ -20,10 +19,7 @@ export function useAllCsvFilesQuery(
 
   const query = useQuery<UploadedCsvFilesResponse>(
     [host, `protocols/${protocolId}/dataFiles`],
-    () =>
-      getCsvFiles(host as HostConfig, protocolId as string).then(
-        response => response.data
-      ),
+    () => getCsvFiles(host!, protocolId).then(response => response.data),
     allOptions
   )
   return query

@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+
 import {
-  DIRECTION_COLUMN,
   Banner,
+  DIRECTION_COLUMN,
   Flex,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
@@ -26,14 +27,17 @@ export const UnMatchedModuleWarning = (): JSX.Element | null => {
     >
       <Flex flexDirection={DIRECTION_COLUMN}>
         <LegacyStyledText
-          as="p"
+          forwardedAs="p"
           fontWeight={TYPOGRAPHY.fontWeightSemiBold}
           data-testid="UnMatchedModuleWarning_title"
         >
           {t('extra_module_attached')}
         </LegacyStyledText>
 
-        <LegacyStyledText as="p" data-testid="UnMatchedModuleWarning_body">
+        <LegacyStyledText
+          forwardedAs="p"
+          data-testid="UnMatchedModuleWarning_body"
+        >
           {`${t('module_mismatch_body')}.`}
         </LegacyStyledText>
       </Flex>

@@ -1,17 +1,18 @@
-import * as React from 'react'
-import styled from 'styled-components'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import styled from 'styled-components'
+
 import {
   ALIGN_CENTER,
-  Flex,
-  COLORS,
-  SPACING,
-  TYPOGRAPHY,
-  Icon,
-  DIRECTION_COLUMN,
   ALIGN_FLEX_START,
   BORDERS,
+  COLORS,
+  DIRECTION_COLUMN,
+  Flex,
+  Icon,
   JUSTIFY_FLEX_START,
+  SPACING,
+  TYPOGRAPHY,
 } from '@opentrons/components'
 import {
   NINETY_SIX_CHANNEL,
@@ -23,15 +24,16 @@ import {
   useGripperDisplayName,
   usePipetteNameSpecs,
 } from '/app/local-resources/instruments'
-import { FLOWS } from '/app/organisms/PipetteWizardFlows/constants'
-import { PipetteWizardFlows } from '/app/organisms/PipetteWizardFlows'
 import { GripperWizardFlows } from '/app/organisms/GripperWizardFlows'
+import { PipetteWizardFlows } from '/app/organisms/PipetteWizardFlows'
+import { FLOWS } from '/app/organisms/PipetteWizardFlows/constants'
 
+import type { MouseEventHandler } from 'react'
 import type { InstrumentData } from '@opentrons/api-client'
 import type {
   GripperModel,
-  PipetteName,
   LoadedPipette,
+  PipetteName,
 } from '@opentrons/shared-data'
 import type { Mount } from '/app/redux/pipettes/types'
 
@@ -61,26 +63,25 @@ export function ProtocolInstrumentMountItem(
 ): JSX.Element {
   const { i18n, t } = useTranslation('protocol_setup')
   const { mount, attachedInstrument, speccedName } = props
-  const [
-    showPipetteWizardFlow,
-    setShowPipetteWizardFlow,
-  ] = React.useState<boolean>(false)
-  const [
-    showGripperWizardFlow,
-    setShowGripperWizardFlow,
-  ] = React.useState<boolean>(false)
-  const memoizedAttachedGripper = React.useMemo(
+  const [showPipetteWizardFlow, setShowPipetteWizardFlow] =
+    useState<boolean>(false)
+  const [showGripperWizardFlow, setShowGripperWizardFlow] =
+    useState<boolean>(false)
+  const memoizedAttachedGripper = useMemo(
     () =>
       attachedInstrument?.instrumentType === 'gripper' && attachedInstrument.ok
         ? attachedInstrument
         : null,
     []
   )
-  const [flowType, setFlowType] = React.useState<string>(FLOWS.ATTACH)
-  const selectedPipette =
-    speccedName === 'p1000_96' ? NINETY_SIX_CHANNEL : SINGLE_MOUNT_PIPETTES
+  const [flowType, setFlowType] = useState<string>(FLOWS.ATTACH)
+  const is96ChannelPipette =
+    speccedName === 'p1000_96' || speccedName === 'p200_96'
+  const selectedPipette = is96ChannelPipette
+    ? NINETY_SIX_CHANNEL
+    : SINGLE_MOUNT_PIPETTES
 
-  const handleCalibrate: React.MouseEventHandler = () => {
+  const handleCalibrate: MouseEventHandler = () => {
     setFlowType(FLOWS.CALIBRATE)
     if (mount === 'extension') {
       setShowGripperWizardFlow(true)
@@ -88,7 +89,7 @@ export function ProtocolInstrumentMountItem(
       setShowPipetteWizardFlow(true)
     }
   }
-  const handleAttach: React.MouseEventHandler = () => {
+  const handleAttach: MouseEventHandler = () => {
     setFlowType(FLOWS.ATTACH)
     if (mount === 'extension') {
       setShowGripperWizardFlow(true)
@@ -96,15 +97,16 @@ export function ProtocolInstrumentMountItem(
       setShowPipetteWizardFlow(true)
     }
   }
-  const is96ChannelPipette = speccedName === 'p1000_96'
+
   const isAttachedWithCal =
     attachedInstrument != null &&
     attachedInstrument.ok &&
     attachedInstrument?.data?.calibratedOffset?.last_modified != null
 
   const gripperDisplayName = useGripperDisplayName(speccedName as GripperModel)
-  const pipetteDisplayName = usePipetteNameSpecs(speccedName as PipetteName)
-    ?.displayName
+  const pipetteDisplayName = usePipetteNameSpecs(
+    speccedName as PipetteName
+  )?.displayName
 
   return (
     <>

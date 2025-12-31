@@ -1,4 +1,5 @@
 """Command models to deactivate a Temperature Module."""
+
 from __future__ import annotations
 from typing import Optional, TYPE_CHECKING
 from typing_extensions import Literal, Type
@@ -72,7 +73,7 @@ class DeactivateTemperature(
     commandType: DeactivateTemperatureCommandType = "temperatureModule/deactivate"
 
     params: DeactivateTemperatureParams
-    result: Optional[DeactivateTemperatureResult]
+    result: Optional[DeactivateTemperatureResult] = None
 
     _ImplementationCls: Type[DeactivateTemperatureImpl] = DeactivateTemperatureImpl
 

@@ -1,7 +1,14 @@
-import * as React from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { css } from 'styled-components'
 
+import { MenuItem } from '../../atoms/MenuList/MenuItem'
+import { StyledText } from '../../atoms/StyledText'
+import { LegacyStyledText } from '../../atoms/StyledText/LegacyStyledText'
+import { Tooltip } from '../../atoms/Tooltip'
 import { BORDERS, COLORS } from '../../helix-design-system'
+import { Icon } from '../../icons'
+import { useOnClickOutside } from '../../interaction-enhancers'
+import { Flex } from '../../primitives'
 import {
   ALIGN_CENTER,
   CURSOR_DEFAULT,
@@ -14,33 +21,34 @@ import {
   POSITION_ABSOLUTE,
   POSITION_RELATIVE,
 } from '../../styles'
-import { SPACING, TYPOGRAPHY } from '../../ui-style-constants'
-import { Flex } from '../../primitives'
-import { Icon } from '../../icons'
 import { useHoverTooltip } from '../../tooltips'
-import { useOnClickOutside } from '../../interaction-enhancers'
-import { LegacyStyledText } from '../../atoms/StyledText/LegacyStyledText'
-import { MenuItem } from '../../atoms/MenuList/MenuItem'
-import { Tooltip } from '../../atoms/Tooltip'
-import { StyledText } from '../../atoms/StyledText'
+import { SPACING, TYPOGRAPHY } from '../../ui-style-constants'
 import { LiquidIcon } from '../LiquidIcon'
+import { RobotInfoLabel } from '../RobotInfoLabel'
 
-/** this is the max height to display 10 items */
-const MAX_HEIGHT = 316
-
-/** this is for adjustment variable for the case that the space of the bottom and the space of the top are very close */
-const HEIGHT_ADJUSTMENT = 100
+import type { FlattenSimpleInterpolation } from 'styled-components'
+import type { FocusEventHandler, MouseEvent } from 'react'
 
 export interface DropdownOption {
+  /** dropdown option name */
   name: string
+  /** dropdown option value */
   value: string
   /** optional dropdown option for adding the liquid color icon */
   liquidColor?: string
+  /** optional dropdown option for adding the deck label */
+  deckLabel?: string
+  /** subtext below the name */
+  subtext?: string
+  /** optional disabled */
   disabled?: boolean
-  tooltipText?: string
+  /** optional tooltip text */
+  tooltipText?: string | null
 }
 
 export type DropdownBorder = 'rounded' | 'neutral'
+
+export type MenuPlacement = 'auto' | 'top' | 'bottom'
 
 export interface DropdownMenuProps {
   /** dropdown options */
@@ -64,11 +72,19 @@ export interface DropdownMenuProps {
   /** optional error */
   error?: string | null
   /** focus handler */
-  onFocus?: React.FocusEventHandler<HTMLButtonElement>
+  onFocus?: FocusEventHandler<HTMLElement>
   /** blur handler */
-  onBlur?: React.FocusEventHandler<HTMLButtonElement>
+  onBlur?: FocusEventHandler<HTMLElement>
   /** optional disabled */
   disabled?: boolean
+  /** optional placement of the menu */
+  menuPlacement?: MenuPlacement
+  /** optional enter handler */
+  onEnter?: (id: string) => void
+  /** optional exit handler */
+  onExit?: () => void
+  /** optional test id */
+  testId?: string
 }
 
 // TODO: (smb: 4/15/22) refactor this to use html select for accessibility
@@ -88,65 +104,108 @@ export function DropdownMenu(props: DropdownMenuProps): JSX.Element {
     disabled = false,
     onFocus,
     onBlur,
+    onEnter,
+    onExit,
+    menuPlacement = 'auto',
+    testId,
   } = props
   const [targetProps, tooltipProps] = useHoverTooltip()
-  const [showDropdownMenu, setShowDropdownMenu] = React.useState<boolean>(false)
+  const [showDropdownMenu, setShowDropdownMenu] = useState<boolean>(false)
   const [optionTargetProps, optionTooltipProps] = useHoverTooltip({
     placement: 'top-end',
   })
 
-  const [dropdownPosition, setDropdownPosition] = React.useState<
-    'top' | 'bottom'
-  >('bottom')
+  const [dropdownPosition, setDropdownPosition] =
+    useState<Omit<MenuPlacement, 'auto'>>('bottom')
   const dropDownMenuWrapperRef = useOnClickOutside<HTMLDivElement>({
     onClickOutside: () => {
       setShowDropdownMenu(false)
     },
   })
 
-  React.useEffect(() => {
-    const handlePositionCalculation = (): void => {
-      const dropdownRect = dropDownMenuWrapperRef.current?.getBoundingClientRect()
-      if (dropdownRect != null) {
-        const parentElement = dropDownMenuWrapperRef?.current?.parentElement
-        const grandParentElement = parentElement?.parentElement?.parentElement
-        let availableHeight = window.innerHeight
-        let scrollOffset = 0
+  const menuItemsContainerRef = useRef<HTMLDivElement | null>(null)
 
-        if (grandParentElement != null) {
-          const grandParentRect = grandParentElement.getBoundingClientRect()
-          availableHeight = grandParentRect.bottom - grandParentRect.top
-          scrollOffset = grandParentRect.top
-        } else if (parentElement != null) {
-          const parentRect = parentElement.getBoundingClientRect()
-          availableHeight = parentRect.bottom - parentRect.top
-          scrollOffset = parentRect.top
-        }
+  useEffect(() => {
+    if (
+      !dropDownMenuWrapperRef.current ||
+      !showDropdownMenu ||
+      !menuItemsContainerRef.current ||
+      menuPlacement !== 'auto'
+    ) {
+      return
+    }
 
-        const downSpace =
-          filterOptions.length + 1 > 10
-            ? MAX_HEIGHT
-            : (filterOptions.length + 1) * 34
-        const dropdownBottom = dropdownRect.bottom + downSpace - scrollOffset
+    const dropdownRect = dropDownMenuWrapperRef.current.getBoundingClientRect()
+    let potentialMenuHeight = 0
+    if (menuItemsContainerRef.current) {
+      potentialMenuHeight = menuItemsContainerRef.current.scrollHeight
+    }
 
-        setDropdownPosition(
-          dropdownBottom > availableHeight &&
-            Math.abs(dropdownBottom - availableHeight) > HEIGHT_ADJUSTMENT
-            ? 'top'
-            : 'bottom'
-        )
+    const viewportHeight = window.innerHeight
+    const spaceAbove = dropdownRect.top
+    const spaceBelow = viewportHeight - dropdownRect.bottom
+
+    let newPosition: 'top' | 'bottom' = 'bottom'
+
+    if (menuPlacement === 'auto') {
+      const fitsBelow = spaceBelow >= potentialMenuHeight
+      const fitsAbove = spaceAbove >= potentialMenuHeight
+
+      if (fitsBelow) {
+        newPosition = 'bottom'
+      } else if (fitsAbove) {
+        newPosition = 'top'
+      } else {
+        newPosition = spaceBelow >= spaceAbove ? 'bottom' : 'top'
       }
+    } else {
+      newPosition = menuPlacement
+    }
+    setDropdownPosition(newPosition)
+
+    const handlePositionCalculation = (): void => {
+      if (
+        !dropDownMenuWrapperRef.current ||
+        !showDropdownMenu ||
+        !menuItemsContainerRef.current
+      )
+        return
+      const currentTriggerRect =
+        dropDownMenuWrapperRef.current.getBoundingClientRect()
+      const currentMenuHeight = menuItemsContainerRef.current.scrollHeight
+      const currentViewportHeight = window.innerHeight
+      const currentSpaceAbove = currentTriggerRect.top
+      const currentSpaceBelow =
+        currentViewportHeight - currentTriggerRect.bottom
+      let determinedPosition = 'bottom'
+      if (menuPlacement === 'auto') {
+        const currentFitsBelow = currentSpaceBelow >= currentMenuHeight
+        const currentFitsAbove = currentSpaceAbove >= currentMenuHeight
+        if (currentFitsBelow) determinedPosition = 'bottom'
+        else if (currentFitsAbove) determinedPosition = 'top'
+        else
+          determinedPosition =
+            currentSpaceBelow >= currentSpaceAbove ? 'bottom' : 'top'
+      } else {
+        determinedPosition = menuPlacement
+      }
+      setDropdownPosition(determinedPosition as 'top' | 'bottom')
     }
 
     window.addEventListener('resize', handlePositionCalculation)
-    window.addEventListener('scroll', handlePositionCalculation)
-    handlePositionCalculation()
+    window.addEventListener('scroll', handlePositionCalculation, true)
 
     return () => {
       window.removeEventListener('resize', handlePositionCalculation)
-      window.removeEventListener('scroll', handlePositionCalculation)
+      window.removeEventListener('scroll', handlePositionCalculation, true)
     }
-  }, [filterOptions.length, dropDownMenuWrapperRef])
+  }, [
+    showDropdownMenu,
+    filterOptions.length,
+    menuPlacement,
+    dropDownMenuWrapperRef,
+    menuItemsContainerRef,
+  ])
 
   const toggleSetShowDropdownMenu = (): void => {
     if (!isDisabled) {
@@ -201,12 +260,13 @@ export function DropdownMenu(props: DropdownMenuProps): JSX.Element {
     <Flex
       flexDirection={DIRECTION_COLUMN}
       ref={dropDownMenuWrapperRef}
-      gridGap={SPACING.spacing4}
+      gridGap={SPACING.spacing8}
+      width={width}
     >
-      {title !== null ? (
-        <Flex gridGap={SPACING.spacing8} paddingBottom={SPACING.spacing8}>
+      {title != null ? (
+        <Flex gridGap={SPACING.spacing8} alignItems={ALIGN_CENTER}>
           <StyledText
-            desktopStyle="captionRegular"
+            desktopStyle="bodyDefaultRegular"
             color={disabled ? COLORS.grey35 : COLORS.grey60}
           >
             {title}
@@ -229,61 +289,71 @@ export function DropdownMenu(props: DropdownMenuProps): JSX.Element {
       <Flex flexDirection={DIRECTION_COLUMN} position={POSITION_RELATIVE}>
         <Flex
           onClick={(e: MouseEvent) => {
-            e.preventDefault()
+            e.stopPropagation()
             toggleSetShowDropdownMenu()
           }}
           onFocus={onFocus}
           onBlur={onBlur}
           css={DROPDOWN_STYLE}
+          data-testid={
+            testId != null ? `${testId}_dropdownMenu` : 'dropdownMenu'
+          }
           tabIndex={tabIndex}
         >
           <Flex gridGap={SPACING.spacing8} alignItems={ALIGN_CENTER}>
             {currentOption.liquidColor != null ? (
               <LiquidIcon color={currentOption.liquidColor} />
             ) : null}
+            {currentOption.deckLabel != null ? (
+              <RobotInfoLabel
+                deckLabel={currentOption.deckLabel}
+                svgSize={13}
+              />
+            ) : null}
             <Flex
+              flexDirection={DIRECTION_COLUMN}
               css={css`
                 font-weight: ${dropdownType === 'rounded'
                   ? TYPOGRAPHY.pSemiBold
                   : TYPOGRAPHY.pRegular};
               `}
             >
-              <StyledText desktopStyle="captionRegular" css={MENU_TEXT_STYLE}>
-                {currentOption.name}
-              </StyledText>
+              {currentOption.deckLabel !== currentOption.name ? (
+                <StyledText
+                  desktopStyle="captionRegular"
+                  css={LINE_CLAMP_TEXT_STYLE(1)}
+                >
+                  {currentOption.name}
+                </StyledText>
+              ) : null}
             </Flex>
           </Flex>
-          {showDropdownMenu ? (
-            <Icon size="0.75rem" name="menu-down" transform="rotate(180deg)" />
-          ) : (
-            <Icon size="0.75rem" name="menu-down" />
-          )}
+          <Icon
+            size="0.75rem"
+            name="menu-down"
+            transform={showDropdownMenu ? 'rotate(180deg)' : undefined}
+          />
         </Flex>
         {showDropdownMenu && (
           <Flex
-            zIndex={3}
-            borderRadius={BORDERS.borderRadius8}
-            boxShadow={BORDERS.tinyDropShadow}
-            position={POSITION_ABSOLUTE}
-            backgroundColor={COLORS.white}
-            flexDirection={DIRECTION_COLUMN}
-            width={width}
-            top={dropdownPosition === 'bottom' ? '2.5rem' : undefined}
-            bottom={dropdownPosition === 'top' ? '2.5rem' : undefined}
-            overflowY={OVERFLOW_AUTO}
-            maxHeight="20rem" // Set the maximum display number to 10.
+            ref={menuItemsContainerRef}
+            css={MENU_ITEM_CONTAINER_STYLE(width, dropdownPosition)}
+            role="listbox"
           >
             {filterOptions.map((option, index) => (
-              <React.Fragment key={`${option.name}-${index}`}>
+              <Fragment key={`${option.name}-${index}`}>
                 <MenuItem
-                  disabled={disabled ?? option.disabled}
+                  disabled={option.disabled}
                   zIndex={3}
                   key={`${option.name}-${index}`}
-                  onClick={() => {
+                  onClick={e => {
                     onClick(option.value)
                     setShowDropdownMenu(false)
+                    e.stopPropagation()
                   }}
                   border="none"
+                  onMouseEnter={() => onEnter?.(option.value)}
+                  onMouseLeave={onExit}
                 >
                   <Flex
                     gridGap={SPACING.spacing8}
@@ -293,7 +363,31 @@ export function DropdownMenu(props: DropdownMenuProps): JSX.Element {
                     {option.liquidColor != null ? (
                       <LiquidIcon color={option.liquidColor} />
                     ) : null}
-                    {option.name}
+                    {option.deckLabel != null ? (
+                      <RobotInfoLabel
+                        deckLabel={option.deckLabel}
+                        svgSize={13}
+                      />
+                    ) : null}
+                    <Flex
+                      flexDirection={DIRECTION_COLUMN}
+                      gridGap={option.subtext != null ? SPACING.spacing4 : '0'}
+                    >
+                      {option.deckLabel !== option.name ? (
+                        <StyledText
+                          desktopStyle="captionRegular"
+                          css={LINE_CLAMP_TEXT_STYLE(3, true)}
+                        >
+                          {option.name}
+                        </StyledText>
+                      ) : null}
+                      <StyledText
+                        desktopStyle="captionRegular"
+                        color={COLORS.grey60}
+                      >
+                        {option.subtext}
+                      </StyledText>
+                    </Flex>
                   </Flex>
                 </MenuItem>
                 {option.tooltipText != null ? (
@@ -301,13 +395,13 @@ export function DropdownMenu(props: DropdownMenuProps): JSX.Element {
                     {option.tooltipText}
                   </Tooltip>
                 ) : null}
-              </React.Fragment>
+              </Fragment>
             ))}
           </Flex>
         )}
       </Flex>
       {caption != null ? (
-        <LegacyStyledText as="label" color={COLORS.grey60}>
+        <LegacyStyledText forwardedAs="label" color={COLORS.grey60}>
           {caption}
         </LegacyStyledText>
       ) : null}
@@ -320,11 +414,34 @@ export function DropdownMenu(props: DropdownMenuProps): JSX.Element {
   )
 }
 
-const MENU_TEXT_STYLE = css`
+const MENU_ITEM_CONTAINER_STYLE = (
+  width: string,
+  dropdownPosition: Omit<MenuPlacement, 'auto'>
+): FlattenSimpleInterpolation => css`
+  position: ${POSITION_ABSOLUTE};
+  z-index: 3;
+  width: ${width};
+  flex-direction: ${DIRECTION_COLUMN};
+  border-radius: ${BORDERS.borderRadius8};
+  background-color: ${COLORS.white};
+  box-shadow: ${BORDERS.tinyDropShadow};
+  top: ${dropdownPosition === 'bottom' ? '2.5rem' : undefined};
+  bottom: ${dropdownPosition === 'top' ? '2.5rem' : undefined};
+  overflow-y: ${OVERFLOW_AUTO};
+  max-height: 20rem;
+`
+
+export const LINE_CLAMP_TEXT_STYLE = (
+  lineClamp?: number,
+  wordBreak?: boolean
+): FlattenSimpleInterpolation => css`
   display: -webkit-box;
   -webkit-box-orient: vertical;
   overflow: ${OVERFLOW_HIDDEN};
   text-overflow: ellipsis;
   word-wrap: break-word;
-  -webkit-line-clamp: 1;
+  -webkit-line-clamp: ${lineClamp ?? 1};
+  word-break: ${wordBreak === true
+    ? 'normal'
+    : 'break-all'}; // normal for tile and break-all for a non word case like aaaaaaaa
 `

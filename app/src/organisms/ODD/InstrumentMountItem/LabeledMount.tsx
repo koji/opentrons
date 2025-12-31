@@ -1,6 +1,6 @@
-import type * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import styled from 'styled-components'
+
 import {
   ALIGN_CENTER,
   ALIGN_FLEX_START,
@@ -10,11 +10,13 @@ import {
   Flex,
   Icon,
   JUSTIFY_SPACE_BETWEEN,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TEXT_TRANSFORM_CAPITALIZE,
   TYPOGRAPHY,
 } from '@opentrons/components'
+
+import type { MouseEventHandler } from 'react'
 import type { Mount } from '/app/redux/pipettes/types'
 
 const MountButton = styled.button<{ isAttached: boolean }>`
@@ -34,7 +36,7 @@ const MountButton = styled.button<{ isAttached: boolean }>`
 interface LabeledMountProps {
   mount: Mount | 'extension'
   instrumentName: string | null
-  handleClick: React.MouseEventHandler
+  handleClick: MouseEventHandler
 }
 
 export function LabeledMount(props: LabeledMountProps): JSX.Element {
@@ -55,7 +57,7 @@ export function LabeledMount(props: LabeledMountProps): JSX.Element {
           gridGap={SPACING.spacing24}
         >
           <LegacyStyledText
-            as="h4"
+            forwardedAs="h4"
             fontWeight={TYPOGRAPHY.fontWeightSemiBold}
             textAlign={TYPOGRAPHY.textAlignLeft}
             textTransform={TEXT_TRANSFORM_CAPITALIZE}
@@ -66,7 +68,7 @@ export function LabeledMount(props: LabeledMountProps): JSX.Element {
           </LegacyStyledText>
           <LegacyStyledText
             flex="5"
-            as="h4"
+            forwardedAs="h4"
             color={COLORS.grey60}
             textAlign={TYPOGRAPHY.textAlignLeft}
             fontWeight={TYPOGRAPHY.fontWeightRegular}

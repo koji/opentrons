@@ -1,4 +1,5 @@
 """Command models for Absorbance Reader commands."""
+
 from .close_lid import (
     CloseLidCommandType,
     CloseLidParams,
@@ -33,7 +34,6 @@ from .read import (
 
 
 __all__ = [
-    "MoveLidResult",
     # absorbanace_reader/closeLid
     "CloseLidCommandType",
     "CloseLidParams",

@@ -1,18 +1,20 @@
-import type * as React from 'react'
 import find from 'lodash/find'
-import { Select } from './Select'
+import { css } from 'styled-components'
+
 import {
   COLORS,
   DIRECTION_COLUMN,
   Flex,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
-import { css } from 'styled-components'
 
-import type { SelectProps, SelectOption } from './Select'
+import { Select } from './Select'
+
+import type { ReactNode } from 'react'
 import type { ActionMeta, MultiValue, SingleValue } from 'react-select'
+import type { SelectOption, SelectProps } from './Select'
 
 export interface SelectFieldProps {
   /** optional HTML id for container */
@@ -32,9 +34,9 @@ export interface SelectFieldProps {
   /** render function for the option label passed to react-select */
   formatOptionLabel?: SelectProps['formatOptionLabel']
   /** optional title */
-  title?: React.ReactNode
+  title?: ReactNode
   /** optional caption. hidden when `error` is given */
-  caption?: React.ReactNode
+  caption?: ReactNode
   /** if included, use error style and display error instead of caption */
   error?: string | null
   /** change handler called with (name, value, actionMeta) */
@@ -88,7 +90,7 @@ export function SelectField(props: SelectFieldProps): JSX.Element {
     <Flex flexDirection={DIRECTION_COLUMN}>
       {title != null ? (
         <LegacyStyledText
-          as="label"
+          forwardedAs="label"
           fontWeight={TYPOGRAPHY.fontWeightSemiBold}
           paddingBottom={SPACING.spacing8}
         >

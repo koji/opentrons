@@ -1,13 +1,16 @@
 """Tests for the ProtocolEngine class."""
+
 import inspect
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 from unittest.mock import sentinel
 
 import pytest
 from decoy import Decoy
 
 from opentrons_shared_data.robot.types import RobotType
+from opentrons_shared_data.labware.labware_definition import LabwareDefinition
+from opentrons_shared_data.deck.types import DeckDefinitionV5
 
 from opentrons.protocol_engine.actions.actions import SetErrorRecoveryPolicyAction
 from opentrons.protocol_engine.state.update_types import StateUpdate
@@ -15,9 +18,13 @@ from opentrons.types import DeckSlotName
 from opentrons.hardware_control import HardwareControlAPI, OT2HardwareControlAPI
 from opentrons.hardware_control.modules import MagDeck, TempDeck
 from opentrons.hardware_control.types import PauseType as HardwarePauseType
-from opentrons.protocols.models import LabwareDefinition
 
-from opentrons.protocol_engine import ProtocolEngine, commands, slot_standardization
+from opentrons.protocol_engine import (
+    ProtocolEngine,
+    commands,
+    slot_standardization,
+    labware_offset_standardization,
+)
 from opentrons.protocol_engine.errors.exceptions import (
     CommandNotAllowedError,
 )
@@ -25,14 +32,16 @@ from opentrons.protocol_engine.types import (
     DeckType,
     LabwareOffset,
     LabwareOffsetCreate,
+    LegacyLabwareOffsetCreate,
     LabwareOffsetVector,
-    LabwareOffsetLocation,
+    LegacyLabwareOffsetLocation,
+    OnAddressableAreaOffsetLocationSequenceComponent,
+    LabwareOffsetCreateInternal,
     LabwareUri,
     ModuleDefinition,
     ModuleModel,
     Liquid,
     PostRunHardwareState,
-    AddressableAreaLocation,
 )
 from opentrons.protocol_engine.execution import (
     QueueWorker,
@@ -41,9 +50,11 @@ from opentrons.protocol_engine.execution import (
 )
 from opentrons.protocol_engine.resources import (
     FileProvider,
+    CameraProvider,
     ModelUtils,
     ModuleDataProvider,
 )
+from opentrons.protocol_engine.resources.camera_provider import CameraSettings
 from opentrons.protocol_engine.state.config import Config
 from opentrons.protocol_engine.state.state import StateStore
 from opentrons.protocol_engine.plugins import AbstractPlugin, PluginStarter
@@ -56,6 +67,7 @@ from opentrons.protocol_engine.actions import (
     AddAddressableAreaAction,
     AddLiquidAction,
     AddModuleAction,
+    AddCameraSettingsAction,
     PlayAction,
     PauseAction,
     PauseSource,
@@ -65,7 +77,6 @@ from opentrons.protocol_engine.actions import (
     FinishErrorDetails,
     QueueCommandAction,
     HardwareStoppedAction,
-    ResetTipsAction,
 )
 
 
@@ -129,6 +140,12 @@ def file_provider(decoy: Decoy) -> FileProvider:
     return decoy.mock(cls=FileProvider)
 
 
+@pytest.fixture
+def camera_provider(decoy: Decoy) -> CameraProvider:
+    """Get a mock CameraProvider."""
+    return decoy.mock(cls=CameraProvider)
+
+
 @pytest.fixture(autouse=True)
 def _mock_slot_standardization_module(
     decoy: Decoy, monkeypatch: pytest.MonkeyPatch
@@ -136,6 +153,17 @@ def _mock_slot_standardization_module(
     """Mock out opentrons.protocol_engine.slot_standardization functions."""
     for name, func in inspect.getmembers(slot_standardization, inspect.isfunction):
         monkeypatch.setattr(slot_standardization, name, decoy.mock(func=func))
+
+
+@pytest.fixture(autouse=True)
+def _mock_labware_offset_standardization_module(
+    decoy: Decoy, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Mock out opentrons.labware_offset_standardization functions."""
+    for name, func in inspect.getmembers(
+        labware_offset_standardization, inspect.isfunction
+    ):
+        monkeypatch.setattr(labware_offset_standardization, name, decoy.mock(func=func))
 
 
 @pytest.fixture(autouse=True)
@@ -160,6 +188,7 @@ def subject(
     door_watcher: DoorWatcher,
     module_data_provider: ModuleDataProvider,
     file_provider: FileProvider,
+    camera_provider: CameraProvider,
 ) -> ProtocolEngine:
     """Get a ProtocolEngine test subject with its dependencies stubbed out."""
     return ProtocolEngine(
@@ -173,6 +202,7 @@ def subject(
         door_watcher=door_watcher,
         module_data_provider=module_data_provider,
         file_provider=file_provider,
+        camera_provider=camera_provider,
     )
 
 
@@ -684,7 +714,7 @@ async def test_finish(
     """It should be able to gracefully tell the engine it's done."""
     completed_at = datetime(2021, 1, 1, 0, 0)
 
-    decoy.when(state_store.commands.state.stopped_by_estop).then_return(False)
+    decoy.when(state_store.commands.get_is_stopped_by_async_error()).then_return(False)
     decoy.when(model_utils.get_timestamp()).then_return(completed_at)
 
     await subject.finish(
@@ -719,7 +749,7 @@ async def test_finish_with_defaults(
     state_store: StateStore,
 ) -> None:
     """It should be able to gracefully tell the engine it's done."""
-    decoy.when(state_store.commands.state.stopped_by_estop).then_return(False)
+    decoy.when(state_store.commands.get_is_stopped_by_async_error()).then_return(False)
     await subject.finish()
 
     decoy.verify(
@@ -761,7 +791,7 @@ async def test_finish_with_error(
         error=error,
     )
 
-    decoy.when(state_store.commands.state.stopped_by_estop).then_return(
+    decoy.when(state_store.commands.get_is_stopped_by_async_error()).then_return(
         stopped_by_estop
     )
     decoy.when(model_utils.generate_id()).then_return("error-id")
@@ -804,9 +834,9 @@ async def test_finish_with_estop_error_will_not_drop_tip_and_home(
 ) -> None:
     """It should be able to tell the engine it's finished because of an error and will not drop tip and home."""
     error = ProtocolCommandFailedError(
-        original_error=ErrorOccurrence.construct(  # type: ignore[call-arg]
+        original_error=ErrorOccurrence.model_construct(  # type: ignore[call-arg]
             wrappedErrors=[
-                ErrorOccurrence.construct(errorCode="3008")  # type: ignore[call-arg]
+                ErrorOccurrence.model_construct(errorCode="3008")  # type: ignore[call-arg]
             ]
         )
     )
@@ -861,7 +891,7 @@ async def test_finish_stops_hardware_if_queue_worker_join_fails(
         await queue_worker.join(),
     ).then_raise(exception)
 
-    decoy.when(state_store.commands.state.stopped_by_estop).then_return(False)
+    decoy.when(state_store.commands.get_is_stopped_by_async_error()).then_return(False)
 
     error_id = "error-id"
     completed_at = datetime(2021, 1, 1, 0, 0)
@@ -959,6 +989,96 @@ async def test_stop_for_legacy_core_protocols(
     )
 
 
+async def test_async_module_error_stops_on_match(
+    decoy: Decoy,
+    action_dispatcher: ActionDispatcher,
+    queue_worker: QueueWorker,
+    state_store: StateStore,
+    subject: ProtocolEngine,
+) -> None:
+    """It should be stop the engine if a matching module exists."""
+    module_model = ModuleModel.THERMOCYCLER_MODULE_V1
+    serial = "hello"
+    expected_action = StopAction(from_asynchronous_error=True)
+    validated_action = sentinel.validated_action
+    decoy.when(
+        state_store.commands.validate_action_allowed(expected_action),
+    ).then_return(validated_action)
+    decoy.when(
+        state_store.modules.get_has_module_probably_matching_hardware_details(
+            module_model, serial
+        )
+    ).then_return(True)
+
+    assert await subject.async_module_error(module_model, serial) is True
+
+    decoy.verify(
+        action_dispatcher.dispatch(action=validated_action),
+        queue_worker.cancel(),
+    )
+
+
+async def test_async_module_error_noops_on_no_match(
+    decoy: Decoy,
+    action_dispatcher: ActionDispatcher,
+    queue_worker: QueueWorker,
+    state_store: StateStore,
+    subject: ProtocolEngine,
+) -> None:
+    """It should be stop the engine if a matching module exists."""
+    module_model = ModuleModel.THERMOCYCLER_MODULE_V1
+    serial = "hello"
+    validated_action = sentinel.validated_action
+    decoy.when(
+        state_store.modules.get_has_module_probably_matching_hardware_details(
+            module_model, serial
+        )
+    ).then_return(False)
+
+    assert await subject.async_module_error(module_model, serial) is False
+
+    decoy.verify(
+        action_dispatcher.dispatch(action=validated_action),
+        queue_worker.cancel(),
+        times=0,
+    )
+
+
+async def test_async_module_error_noops_if_invalid(
+    decoy: Decoy,
+    action_dispatcher: ActionDispatcher,
+    queue_worker: QueueWorker,
+    state_store: StateStore,
+    subject: ProtocolEngine,
+) -> None:
+    """It should no-op if a stop is invalid right now.."""
+    module_model = ModuleModel.THERMOCYCLER_MODULE_V1
+    serial = "hello"
+    expected_action = StopAction(from_asynchronous_error=True)
+    decoy.when(
+        state_store.modules.get_has_module_probably_matching_hardware_details(
+            module_model, serial
+        )
+    ).then_return(True)
+    decoy.when(
+        state_store.commands.validate_action_allowed(expected_action),
+    ).then_raise(RuntimeError("unable to stop; this machine craves flesh"))
+
+    assert (
+        await subject.async_module_error(module_model, serial) is True
+    )  # Should not raise, should act as-if it worked
+
+    decoy.verify(
+        action_dispatcher.dispatch(expected_action),
+        times=0,
+    )
+    decoy.verify(
+        queue_worker.cancel(),
+        ignore_extra_args=True,
+        times=0,
+    )
+
+
 async def test_estop(
     decoy: Decoy,
     action_dispatcher: ActionDispatcher,
@@ -967,7 +1087,7 @@ async def test_estop(
     subject: ProtocolEngine,
 ) -> None:
     """It should be able to stop the engine."""
-    expected_action = StopAction(from_estop=True)
+    expected_action = StopAction(from_asynchronous_error=True)
     validated_action = sentinel.validated_action
     decoy.when(
         state_store.commands.validate_action_allowed(expected_action),
@@ -989,7 +1109,7 @@ async def test_estop_noops_if_invalid(
     subject: ProtocolEngine,
 ) -> None:
     """It should no-op if a stop is invalid right now.."""
-    expected_action = StopAction(from_estop=True)
+    expected_action = StopAction(from_asynchronous_error=True)
     decoy.when(
         state_store.commands.validate_action_allowed(expected_action),
     ).then_raise(RuntimeError("unable to stop; this machine craves flesh"))
@@ -997,8 +1117,7 @@ async def test_estop_noops_if_invalid(
     subject.estop()  # Should not raise.
 
     decoy.verify(
-        action_dispatcher.dispatch(),  # type: ignore
-        ignore_extra_args=True,
+        action_dispatcher.dispatch(expected_action),
         times=0,
     )
     decoy.verify(
@@ -1021,6 +1140,81 @@ def test_add_plugin(
     decoy.verify(plugin_starter.start(plugin))
 
 
+def test_add_legacy_labware_offset(
+    decoy: Decoy,
+    action_dispatcher: ActionDispatcher,
+    model_utils: ModelUtils,
+    state_store: StateStore,
+    subject: ProtocolEngine,
+) -> None:
+    """It should have the labware offset request resolved and added to state."""
+    request = LegacyLabwareOffsetCreate(
+        definitionUri="definition-uri",
+        location=LegacyLabwareOffsetLocation(slotName=DeckSlotName.SLOT_1),
+        vector=LabwareOffsetVector(x=1, y=2, z=3),
+    )
+
+    standardized_request = LabwareOffsetCreateInternal(
+        definitionUri="standardized-definition-uri",
+        locationSequence=[
+            OnAddressableAreaOffsetLocationSequenceComponent(addressableAreaName="2")
+        ],
+        legacyLocation=LegacyLabwareOffsetLocation(slotName=DeckSlotName.SLOT_2),
+        vector=LabwareOffsetVector(x=2, y=3, z=4),
+    )
+
+    id = "labware-offset-id"
+
+    created_at = datetime(year=2021, month=11, day=15)
+
+    expected_result = LabwareOffset(
+        id=id,
+        createdAt=created_at,
+        definitionUri=standardized_request.definitionUri,
+        location=standardized_request.legacyLocation,
+        locationSequence=standardized_request.locationSequence,
+        vector=standardized_request.vector,
+    )
+
+    robot_type: RobotType = "OT-3 Standard"
+    decoy.when(state_store.config).then_return(
+        Config(robot_type=robot_type, deck_type=DeckType.OT3_STANDARD)
+    )
+    decoy.when(state_store.addressable_areas.deck_definition).then_return(
+        cast(DeckDefinitionV5, {})
+    )
+    decoy.when(
+        labware_offset_standardization.standardize_labware_offset_create(
+            request, robot_type, cast(DeckDefinitionV5, {})
+        )
+    ).then_return(standardized_request)
+    decoy.when(model_utils.generate_id()).then_return(id)
+    decoy.when(model_utils.get_timestamp()).then_return(created_at)
+    decoy.when(
+        state_store.labware.get_labware_offset(labware_offset_id=id)
+    ).then_return(expected_result)
+
+    result = subject.add_labware_offset(
+        request=LegacyLabwareOffsetCreate(
+            definitionUri="definition-uri",
+            location=LegacyLabwareOffsetLocation(slotName=DeckSlotName.SLOT_1),
+            vector=LabwareOffsetVector(x=1, y=2, z=3),
+        )
+    )
+
+    assert result == expected_result
+
+    decoy.verify(
+        action_dispatcher.dispatch(
+            AddLabwareOffsetAction(
+                labware_offset_id=id,
+                created_at=created_at,
+                request=standardized_request,
+            )
+        )
+    )
+
+
 def test_add_labware_offset(
     decoy: Decoy,
     action_dispatcher: ActionDispatcher,
@@ -1031,23 +1225,31 @@ def test_add_labware_offset(
     """It should have the labware offset request resolved and added to state."""
     request = LabwareOffsetCreate(
         definitionUri="definition-uri",
-        location=LabwareOffsetLocation(slotName=DeckSlotName.SLOT_1),
+        locationSequence=[
+            OnAddressableAreaOffsetLocationSequenceComponent(addressableAreaName="1")
+        ],
         vector=LabwareOffsetVector(x=1, y=2, z=3),
     )
-    standardized_request = LabwareOffsetCreate(
+
+    standardized_request = LabwareOffsetCreateInternal(
         definitionUri="standardized-definition-uri",
-        location=LabwareOffsetLocation(slotName=DeckSlotName.SLOT_2),
-        vector=LabwareOffsetVector(x=2, y=3, z=4),
+        locationSequence=[
+            OnAddressableAreaOffsetLocationSequenceComponent(addressableAreaName="3")
+        ],
+        legacyLocation=LegacyLabwareOffsetLocation(slotName=DeckSlotName.SLOT_3),
+        vector=LabwareOffsetVector(x=2, y=5, z=6),
     )
 
     id = "labware-offset-id"
+
     created_at = datetime(year=2021, month=11, day=15)
 
     expected_result = LabwareOffset(
         id=id,
         createdAt=created_at,
         definitionUri=standardized_request.definitionUri,
-        location=standardized_request.location,
+        location=standardized_request.legacyLocation,
+        locationSequence=standardized_request.locationSequence,
         vector=standardized_request.vector,
     )
 
@@ -1055,8 +1257,13 @@ def test_add_labware_offset(
     decoy.when(state_store.config).then_return(
         Config(robot_type=robot_type, deck_type=DeckType.OT3_STANDARD)
     )
+    decoy.when(state_store.addressable_areas.deck_definition).then_return(
+        cast(DeckDefinitionV5, {})
+    )
     decoy.when(
-        slot_standardization.standardize_labware_offset(request, robot_type)
+        labware_offset_standardization.standardize_labware_offset_create(
+            request, robot_type, cast(DeckDefinitionV5, {})
+        )
     ).then_return(standardized_request)
     decoy.when(model_utils.generate_id()).then_return(id)
     decoy.when(model_utils.get_timestamp()).then_return(created_at)
@@ -1067,7 +1274,11 @@ def test_add_labware_offset(
     result = subject.add_labware_offset(
         request=LabwareOffsetCreate(
             definitionUri="definition-uri",
-            location=LabwareOffsetLocation(slotName=DeckSlotName.SLOT_1),
+            locationSequence=[
+                OnAddressableAreaOffsetLocationSequenceComponent(
+                    addressableAreaName="1"
+                )
+            ],
             vector=LabwareOffsetVector(x=1, y=2, z=3),
         )
     )
@@ -1110,6 +1321,26 @@ def test_add_labware_definition(
     assert result == "some/definition/uri"
 
 
+def test_add_camera_settings(
+    decoy: Decoy,
+    action_dispatcher: ActionDispatcher,
+    subject: ProtocolEngine,
+) -> None:
+    """It should dispatch an AddCameraSettingsAction action."""
+    settings = CameraSettings(
+        cameraEnabled=True, liveStreamEnabled=True, errorRecoveryCameraEnabled=True
+    )
+    decoy.when(subject.state_view.camera.get_enablement_settings()).then_return(
+        settings
+    )
+    subject.add_camera_enablement_settings(settings)
+    decoy.verify(
+        action_dispatcher.dispatch(
+            AddCameraSettingsAction(enablement_settings=settings)
+        )
+    )
+
+
 def test_add_addressable_area(
     decoy: Decoy,
     action_dispatcher: ActionDispatcher,
@@ -1120,11 +1351,7 @@ def test_add_addressable_area(
 
     decoy.verify(
         action_dispatcher.dispatch(
-            AddAddressableAreaAction(
-                addressable_area=AddressableAreaLocation(
-                    addressableAreaName="my_funky_area"
-                )
-            )
+            AddAddressableAreaAction(addressable_area_name="my_funky_area")
         )
     )
 
@@ -1133,21 +1360,18 @@ def test_add_liquid(
     decoy: Decoy,
     action_dispatcher: ActionDispatcher,
     subject: ProtocolEngine,
+    state_store: StateStore,
 ) -> None:
     """It should dispatch an AddLiquidAction action."""
+    liquid_obj = Liquid(id="water-id", displayName="water", description="water desc")
+    decoy.when(
+        state_store.liquid.validate_liquid_allowed(liquid=liquid_obj)
+    ).then_return(liquid_obj)
     subject.add_liquid(
         id="water-id", name="water", description="water desc", color=None
     )
 
-    decoy.verify(
-        action_dispatcher.dispatch(
-            AddLiquidAction(
-                liquid=Liquid(
-                    id="water-id", displayName="water", description="water desc"
-                )
-            )
-        )
-    )
+    decoy.verify(action_dispatcher.dispatch(AddLiquidAction(liquid=liquid_obj)))
 
 
 async def test_use_attached_temp_and_mag_modules(
@@ -1202,18 +1426,6 @@ async def test_use_attached_temp_and_mag_modules(
                 module_live_data={"status": "other-status", "data": {}},
             ),
         ),
-    )
-
-
-def test_reset_tips(
-    decoy: Decoy, action_dispatcher: ActionDispatcher, subject: ProtocolEngine
-) -> None:
-    """It should reset tip state by dispatching an action."""
-    subject.reset_tips(labware_id="cool-labware")
-
-    decoy.verify(
-        action_dispatcher.dispatch(ResetTipsAction(labware_id="cool-labware")),
-        times=1,
     )
 
 

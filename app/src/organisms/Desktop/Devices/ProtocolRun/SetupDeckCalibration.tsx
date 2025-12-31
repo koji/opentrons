@@ -8,12 +8,13 @@ import {
   DIRECTION_ROW,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
 import { TertiaryButton } from '/app/atoms/buttons'
+
 import { useDeckCalibrationData } from '../hooks'
 import { SetupCalibrationItem } from './SetupCalibrationItem'
 
@@ -28,9 +29,8 @@ export function SetupDeckCalibration({
 }: SetupDeckCalibrationProps): JSX.Element | null {
   const { t } = useTranslation('protocol_setup')
 
-  const { deckCalibrationData, isDeckCalibrated } = useDeckCalibrationData(
-    robotName
-  )
+  const { deckCalibrationData, isDeckCalibrated } =
+    useDeckCalibrationData(robotName)
 
   const calibrateNowButton = (
     <Link to={`/devices/${robotName}/robot-settings/calibration/dashboard`}>

@@ -1,14 +1,15 @@
-import type * as React from 'react'
-import { vi, it, describe, expect, beforeEach } from 'vitest'
 import { fireEvent, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useCreateLiveCommandMutation } from '@opentrons/react-api-client'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 import { updateConfigValue } from '/app/redux/config'
+
 import { WelcomeModal } from '../WelcomeModal'
 
+import type { ComponentProps } from 'react'
 import type { SetStatusBarCreateCommand } from '@opentrons/shared-data'
 
 vi.mock('/app/redux/config')
@@ -17,14 +18,14 @@ vi.mock('@opentrons/react-api-client')
 const mockFunc = vi.fn()
 const WELCOME_MODAL_IMAGE_NAME = 'welcome_dashboard_modal.png'
 
-const render = (props: React.ComponentProps<typeof WelcomeModal>) => {
+const render = (props: ComponentProps<typeof WelcomeModal>) => {
   return renderWithProviders(<WelcomeModal {...props} />, {
     i18nInstance: i18n,
   })
 }
 
 describe('WelcomeModal', () => {
-  let props: React.ComponentProps<typeof WelcomeModal>
+  let props: ComponentProps<typeof WelcomeModal>
   let mockCreateLiveCommand = vi.fn()
 
   beforeEach(() => {

@@ -1,6 +1,9 @@
-import { updatePipetteSettings } from '@opentrons/api-client'
 import { useMutation, useQueryClient } from 'react-query'
+
+import { updatePipetteSettings } from '@opentrons/api-client'
+
 import { useHost } from '../api'
+
 import type { AxiosError } from 'axios'
 import type {
   UseMutateAsyncFunction,
@@ -49,7 +52,7 @@ export function useUpdatePipetteSettingsMutation(
   >(
     [host, 'pipettes', 'settings'],
     ({ fields }) =>
-      updatePipetteSettings(host as HostConfig, pipetteId, { fields })
+      updatePipetteSettings(host!, pipetteId, { fields })
         .then(response => {
           queryClient
             .invalidateQueries([host, 'pipettes', 'settings'])

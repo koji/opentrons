@@ -1,16 +1,16 @@
 import type {
-  LoadedPipette,
+  Liquid,
   LoadedLabware,
   LoadedModule,
-  Liquid,
+  LoadedPipette,
   PipetteName,
 } from '../../../js'
-import type { CreateCommand, RunTimeCommand } from './command'
 import type {
   LabwareDefinition2,
   ModuleModel,
   RobotType,
 } from '../../../js/types'
+import type { CreateCommand, RunTimeCommand } from './command'
 
 export * from './command'
 
@@ -76,8 +76,9 @@ export interface ProtocolFile<DesignerApplicationData = {}> {
  * and should not be mixed with our Protocol types
  * @deprecated Use {@link ProtocolFile}
  */
-export interface ProtocolAnalysisFile<DesignerApplicationData = {}>
-  extends Omit<ProtocolFile<DesignerApplicationData>, 'commands'> {
+export interface ProtocolAnalysisFile<
+  DesignerApplicationData = {},
+> extends Omit<ProtocolFile<DesignerApplicationData>, 'commands'> {
   commands: RunTimeCommand[]
 }
 

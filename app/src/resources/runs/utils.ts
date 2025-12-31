@@ -1,17 +1,20 @@
 import { format } from 'date-fns'
 
-import type * as React from 'react'
+import { shouldCommandSucceedGivenRecoveryPolicy } from '/app/local-resources/commands/utils/shouldCommandSucceedGivenRecoveryPolicy'
+
+import type { Dispatch, SetStateAction } from 'react'
 import type { UseMutateAsyncFunction } from 'react-query'
-import type { CommandData } from '@opentrons/api-client'
-import type { CreateCommand } from '@opentrons/shared-data'
+import type { CommandData, ErrorRecoveryPolicy } from '@opentrons/api-client'
 import type { CreateLiveCommandMutateParams } from '@opentrons/react-api-client/src/runs/useCreateLiveCommandMutation'
+import type { CreateCommand } from '@opentrons/shared-data'
 import type { CreateMaintenanceCommand, CreateRunCommand } from './hooks'
 
 export const chainRunCommandsRecursive = (
   commands: CreateCommand[],
   createRunCommand: CreateRunCommand,
   continuePastCommandFailure: boolean = true,
-  setIsLoading: React.Dispatch<React.SetStateAction<boolean>>
+  setIsLoading: Dispatch<SetStateAction<boolean>>,
+  recoveryPolicy?: ErrorRecoveryPolicy
 ): Promise<CommandData[]> => {
   if (commands.length < 1) {
     return Promise.reject(new Error('no commands to execute'))
@@ -23,7 +26,11 @@ export const chainRunCommandsRecursive = (
     waitUntilComplete: true,
   })
     .then(response => {
-      if (!continuePastCommandFailure && response.data.status === 'failed') {
+      if (
+        !continuePastCommandFailure &&
+        response.data.status === 'failed' &&
+        !shouldCommandSucceedGivenRecoveryPolicy(response.data, recoveryPolicy)
+      ) {
         setIsLoading(false)
         return Promise.reject(
           new Error(response.data.error?.detail ?? 'command failed')
@@ -57,7 +64,7 @@ export const chainLiveCommandsRecursive = (
     CreateLiveCommandMutateParams
   >,
   continuePastCommandFailure: boolean = true,
-  setIsLoading: React.Dispatch<React.SetStateAction<boolean>>
+  setIsLoading: Dispatch<SetStateAction<boolean>>
 ): Promise<CommandData[]> => {
   if (commands.length < 1) {
     return Promise.reject(new Error('no commands to execute'))
@@ -100,7 +107,7 @@ export const chainMaintenanceCommandsRecursive = (
   commands: CreateCommand[],
   createMaintenanceCommand: CreateMaintenanceCommand,
   continuePastCommandFailure: boolean = true,
-  setIsLoading: React.Dispatch<React.SetStateAction<boolean>>
+  setIsLoading: Dispatch<SetStateAction<boolean>>
 ): Promise<CommandData[]> => {
   if (commands.length < 1) {
     return Promise.reject(new Error('no commands to execute'))

@@ -1,14 +1,16 @@
-import type * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { InputField } from '@opentrons/components'
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 import { useTrackEventWithRobotSerial } from '/app/redux-resources/analytics'
-import { PipettePath } from '../../QuickTransferAdvancedSettings/PipettePath'
+
 import { useBlowOutLocationOptions } from '../../QuickTransferAdvancedSettings/BlowOut'
+import { PipettePath } from '../../QuickTransferAdvancedSettings/PipettePath'
+
+import type { ComponentProps } from 'react'
 import type { QuickTransferSummaryState } from '../../types'
 
 vi.mock('/app/redux-resources/analytics')
@@ -23,7 +25,7 @@ vi.mock('@opentrons/components', async importOriginal => {
   }
 })
 
-const render = (props: React.ComponentProps<typeof PipettePath>) => {
+const render = (props: ComponentProps<typeof PipettePath>) => {
   return renderWithProviders(<PipettePath {...props} />, {
     i18nInstance: i18n,
   })
@@ -31,7 +33,7 @@ const render = (props: React.ComponentProps<typeof PipettePath>) => {
 let mockTrackEventWithRobotSerial: any
 
 describe('PipettePath', () => {
-  let props: React.ComponentProps<typeof PipettePath>
+  let props: ComponentProps<typeof PipettePath>
 
   beforeEach(() => {
     props = {
@@ -154,8 +156,12 @@ describe('PipettePath', () => {
       state: {
         ...props.state,
         transferType: 'distribute',
-        disposalVolume: 20,
-        blowOut: 'source_well',
+        path: 'multiDispense',
+        disposalVolumeDispenseSettings: {
+          volume: 20,
+          blowOutLocation: 'source_well',
+          flowRate: 10,
+        },
       },
     }
     render(props)
@@ -183,8 +189,11 @@ describe('PipettePath', () => {
         ...props.state,
         transferType: 'distribute',
         path: 'multiDispense',
-        disposalVolume: 20,
-        blowOut: 'source_well',
+        disposalVolumeDispenseSettings: {
+          volume: 20,
+          blowOutLocation: 'source_well',
+          flowRate: 10,
+        },
       },
     }
     render(props)
@@ -195,7 +204,7 @@ describe('PipettePath', () => {
     expect(vi.mocked(InputField)).toHaveBeenCalledWith(
       {
         title: 'Disposal volume (µL)',
-        error: 'Value must be between 1-160',
+        error: 'Value must be between 1 to 160',
         readOnly: true,
         type: 'number',
         value: 201,
@@ -213,8 +222,11 @@ describe('PipettePath', () => {
         ...props.state,
         transferType: 'distribute',
         path: 'multiDispense',
-        disposalVolume: 20,
-        blowOut: 'source_well',
+        disposalVolumeDispenseSettings: {
+          volume: 20,
+          blowOutLocation: 'source_well',
+          flowRate: 10,
+        },
       },
     }
     render(props)
@@ -222,9 +234,5 @@ describe('PipettePath', () => {
     fireEvent.click(continueBtn)
     fireEvent.click(continueBtn)
     screen.getByText('Source well')
-    const saveBtn = screen.getByTestId('ChildNavigation_Primary_Button')
-    fireEvent.click(saveBtn)
-    expect(props.dispatch).toHaveBeenCalled()
-    expect(mockTrackEventWithRobotSerial).toHaveBeenCalled()
   })
 })

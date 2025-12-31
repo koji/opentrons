@@ -1,8 +1,12 @@
 """Shared utilities for ot3 hardware control."""
+
+import copy
 from typing import Dict, Iterable, List, Set, Tuple, TypeVar, cast, Sequence, Optional
 from typing_extensions import Literal
 from logging import getLogger
-from opentrons.config.defaults_ot3 import DEFAULT_CALIBRATION_AXIS_MAX_SPEED
+from opentrons.config.defaults_ot3 import (
+    DEFAULT_EMULSIFYING_PIPETTE_AXIS_MAX_SPEED,
+)
 from opentrons.config.types import OT3MotionSettings, OT3CurrentSettings, GantryLoad
 from opentrons.hardware_control.types import (
     Axis,
@@ -55,6 +59,8 @@ from opentrons_hardware.hardware_control.motion import (
     MoveStopCondition,
     create_gripper_jaw_step,
     create_tip_action_step,
+    SingleMoveStep,
+    MoveGroupSingleAxisStep,
 )
 from opentrons_hardware.hardware_control.constants import interrupts_per_sec
 
@@ -213,7 +219,7 @@ def get_current_settings(
                 hold_current=conf_by_pip["hold_current"][axis_kind],
                 run_current=conf_by_pip["run_current"][axis_kind],
             )
-    if gantry_load == GantryLoad.HIGH_THROUGHPUT:
+    if gantry_load in [GantryLoad.HIGH_THROUGHPUT_1000, GantryLoad.HIGH_THROUGHPUT_200]:
         # In high-throughput configuration, the right mount doesn't do anything: the
         # lead screw nut is disconnected from the carriage, and it just hangs out
         # up at the top of the axis. We should therefore not give it a lot of current.
@@ -240,7 +246,7 @@ def get_system_constraints(
         OT3AxisKind.Z,
         OT3AxisKind.Z_G,
     ]
-    if gantry_load == GantryLoad.HIGH_THROUGHPUT:
+    if gantry_load in [GantryLoad.HIGH_THROUGHPUT_1000, GantryLoad.HIGH_THROUGHPUT_200]:
         axis_kind_list.append(OT3AxisKind.Q)
     for axis_kind in axis_kind_list:
         for axis in Axis.of_kind(axis_kind):
@@ -253,40 +259,27 @@ def get_system_constraints(
     return constraints
 
 
-def get_system_constraints_for_calibration(
-    config: OT3MotionSettings,
-    gantry_load: GantryLoad,
-) -> "SystemConstraints[Axis]":
-    conf_by_pip = config.by_gantry_load(gantry_load)
-    constraints = {}
-    for axis_kind in [
-        OT3AxisKind.P,
-        OT3AxisKind.X,
-        OT3AxisKind.Y,
-        OT3AxisKind.Z,
-        OT3AxisKind.Z_G,
-    ]:
-        for axis in Axis.of_kind(axis_kind):
-            constraints[axis] = AxisConstraints.build(
-                conf_by_pip["acceleration"][axis_kind],
-                conf_by_pip["max_speed_discontinuity"][axis_kind],
-                conf_by_pip["direction_change_speed_discontinuity"][axis_kind],
-                DEFAULT_CALIBRATION_AXIS_MAX_SPEED,
-            )
-    return constraints
-
-
 def get_system_constraints_for_plunger_acceleration(
     config: OT3MotionSettings,
     gantry_load: GantryLoad,
     mount: OT3Mount,
     acceleration: float,
+    high_speed_pipette: bool = False,
 ) -> "SystemConstraints[Axis]":
     old_constraints = config.by_gantry_load(gantry_load)
     new_constraints = {}
     axis_kinds = set([k for _, v in old_constraints.items() for k in v.keys()])
+
+    def _get_axis_max_speed(ax: Axis) -> float:
+        if ax == Axis.of_main_tool_actuator(mount) and high_speed_pipette:
+            _max_speed = float(DEFAULT_EMULSIFYING_PIPETTE_AXIS_MAX_SPEED)
+        else:
+            _max_speed = old_constraints["default_max_speed"][axis_kind]
+        return _max_speed
+
     for axis_kind in axis_kinds:
         for axis in Axis.of_kind(axis_kind):
+            _default_max_speed = _get_axis_max_speed(axis)
             if axis == Axis.of_main_tool_actuator(mount):
                 _accel = acceleration
             else:
@@ -295,7 +288,32 @@ def get_system_constraints_for_plunger_acceleration(
                 _accel,
                 old_constraints["max_speed_discontinuity"][axis_kind],
                 old_constraints["direction_change_speed_discontinuity"][axis_kind],
-                old_constraints["default_max_speed"][axis_kind],
+                _default_max_speed,
+            )
+    return new_constraints
+
+
+def get_system_constraints_for_emulsifying_pipette(
+    config: OT3MotionSettings,
+    gantry_load: GantryLoad,
+    mount: OT3Mount,
+) -> "SystemConstraints[Axis]":
+    old_constraints = config.by_gantry_load(gantry_load)
+    new_constraints = {}
+    axis_kinds = set([k for _, v in old_constraints.items() for k in v.keys()])
+    for axis_kind in axis_kinds:
+        for axis in Axis.of_kind(axis_kind):
+            if axis == Axis.of_main_tool_actuator(mount):
+                _max_speed = float(DEFAULT_EMULSIFYING_PIPETTE_AXIS_MAX_SPEED)
+            else:
+                _max_speed = old_constraints["default_max_speed"][axis_kind]
+            new_constraints[axis] = AxisConstraints.build(
+                max_acceleration=old_constraints["acceleration"][axis_kind],
+                max_speed_discont=old_constraints["max_speed_discontinuity"][axis_kind],
+                max_direction_change_speed_discont=old_constraints[
+                    "direction_change_speed_discontinuity"
+                ][axis_kind],
+                max_speed=_max_speed,
             )
     return new_constraints
 
@@ -362,6 +380,40 @@ def motor_nodes(devices: Set[FirmwareTarget]) -> Set[NodeId]:
     return {NodeId(target) for target in motor_nodes if target in NodeId}
 
 
+def add_delay_to_move_group(
+    group: MoveGroup,
+    present_nodes: Iterable[NodeId],
+    delay: Tuple[List[NodeId], float],
+) -> MoveGroup:
+    delay_nodes, delay_time = delay
+    if delay_time == 0.0:
+        return group
+
+    as_single_moves: Dict[NodeId, List[SingleMoveStep]] = {}
+    for node in present_nodes:
+        as_single_moves[node] = [step[node] for step in group]
+
+    delay_step = MoveGroupSingleAxisStep(
+        distance_mm=np.float64(0),
+        velocity_mm_sec=np.float64(0),
+        duration_sec=np.float64(delay_time),
+    )
+    for node in present_nodes:
+        if node in delay_nodes:
+            # Add the delay at the beginning
+            as_single_moves[node] = [copy.deepcopy(delay_step)] + as_single_moves[node]
+        else:
+            # Add the delay at the end.
+            as_single_moves[node] = as_single_moves[node] + [copy.deepcopy(delay_step)]
+
+    new_move_group: MoveGroup = []
+    for i in range(len(group) + 1):
+        new_move_group.append(
+            {node: as_single_moves[node][i] for node in present_nodes}
+        )
+    return new_move_group
+
+
 def create_move_group(
     origin: Coordinates[Axis, CoordinateValue],
     moves: List[Move[Axis]],
@@ -375,7 +427,7 @@ def create_move_group(
         for block in move.blocks:
             if block.time < (3.0 / interrupts_per_sec):
                 LOG.info(
-                    f"Skipping move block with time {block.time} (<{3.0/interrupts_per_sec})"
+                    f"Skipping move block with time {block.time} (<{3.0 / interrupts_per_sec})"
                 )
                 continue
             distances = unit_vector_multiplication(unit_vector, block.distance)
@@ -498,10 +550,10 @@ def create_gripper_jaw_hold_group(encoder_position_um: int) -> MoveGroup:
     return move_group
 
 
-def moving_pipettes_in_move_group(group: MoveGroup) -> List[NodeId]:
+def moving_pipettes_in_move_group(
+    all_nodes: Set[NodeId], moving_nodes: Set[NodeId]
+) -> List[NodeId]:
     """Utility function to get which pipette nodes are moving either in z or their plunger."""
-    all_nodes = [node for step in group for node, _ in step.items()]
-    moving_nodes = moving_axes_in_move_group(group)
     pipettes_moving: List[NodeId] = [
         k for k in moving_nodes if k in [NodeId.pipette_left, NodeId.pipette_right]
     ]
@@ -510,16 +562,6 @@ def moving_pipettes_in_move_group(group: MoveGroup) -> List[NodeId]:
     if NodeId.head_r in moving_nodes and NodeId.pipette_right in all_nodes:
         pipettes_moving.append(NodeId.pipette_right)
     return pipettes_moving
-
-
-def moving_axes_in_move_group(group: MoveGroup) -> Set[NodeId]:
-    """Utility function to get only the moving nodes in a move group."""
-    ret: Set[NodeId] = set()
-    for step in group:
-        for node, node_step in step.items():
-            if node_step.is_moving_step():
-                ret.add(node)
-    return ret
 
 
 AxisMapPayload = TypeVar("AxisMapPayload")
@@ -652,6 +694,7 @@ _gripper_jaw_state_lookup: Dict[FirmwareGripperjawState, GripperJawState] = {
     FirmwareGripperjawState.force_controlling_home: GripperJawState.HOMED_READY,
     FirmwareGripperjawState.force_controlling: GripperJawState.GRIPPING,
     FirmwareGripperjawState.position_controlling: GripperJawState.HOLDING,
+    FirmwareGripperjawState.stopped: GripperJawState.STOPPED,
 }
 
 

@@ -1,16 +1,17 @@
-import { getLabwareDefIsStandard } from '@opentrons/shared-data'
 import {
-  COMPATIBLE_LABWARE_ALLOWLIST_BY_MODULE_TYPE,
-  COMPATIBLE_LABWARE_ALLOWLIST_FOR_ADAPTER,
-} from '../../utils/labwareModuleCompatibility'
+  getLabwareDefIsStandard,
+  locationIsOffDeck,
+} from '@opentrons/shared-data'
+
+import { getLabwareCompatibleWithModule } from '../../utils/labwareModuleCompatibility'
+
 import type { LabwareLocation } from '@opentrons/shared-data'
 import type {
   InvariantContext,
   LabwareEntity,
 } from '@opentrons/step-generation'
+import type { HydratedFormData } from '../../form-types'
 import type { ProfileFormError } from './profileErrors'
-
-type HydratedFormData = any
 
 const getMoveLabwareError = (
   labware: LabwareEntity,
@@ -21,28 +22,35 @@ const getMoveLabwareError = (
   if (
     labware == null ||
     newLocation == null ||
-    newLocation === 'offDeck' ||
+    locationIsOffDeck(newLocation) ||
     !getLabwareDefIsStandard(labware?.def)
   )
     return null
-  const selectedLabwareDefUri = labware?.labwareDefURI
   if ('moduleId' in newLocation) {
-    const loadName = labware?.def.parameters.loadName
     const moduleType =
       invariantContext.moduleEntities[newLocation.moduleId].type
-    const modAllowList = COMPATIBLE_LABWARE_ALLOWLIST_BY_MODULE_TYPE[moduleType]
-    errorString = !modAllowList.includes(loadName)
-      ? 'labware incompatible with this module'
+    errorString = !getLabwareCompatibleWithModule(labware.def, moduleType)
+      ? 'Labware incompatible with this module'
       : null
   } else if ('labwareId' in newLocation) {
-    const adapterValueDefUri =
+    const adapterLoadName =
       invariantContext.labwareEntities[newLocation.labwareId].def.parameters
         .loadName
-    const adapterAllowList =
-      COMPATIBLE_LABWARE_ALLOWLIST_FOR_ADAPTER[adapterValueDefUri]
-    errorString = !adapterAllowList?.includes(selectedLabwareDefUri)
-      ? 'labware incompatible with this adapter'
-      : null
+
+    if (labware?.def.parameters.loadName === 'opentrons_tough_universal_lid') {
+      errorString = null
+    } else if (
+      labware?.def.compatibleParentLabware?.some(
+        loadName => loadName === adapterLoadName
+      )
+    ) {
+      errorString = null
+    } else {
+      errorString =
+        labware?.def.stackingOffsetWithLabware?.[adapterLoadName] == null
+          ? 'Labware incompatible with this adapter'
+          : null
+    }
   }
   return errorString
 }
@@ -68,7 +76,9 @@ export const getMoveLabwareFormErrors = (
     ? ([
         {
           title: errorString,
-          dependentProfileFields: [],
+          dependentProfileFields: ['newLocation'],
+          location: ['field'],
+          showOnReopen: true,
         },
       ] as ProfileFormError[])
     : []

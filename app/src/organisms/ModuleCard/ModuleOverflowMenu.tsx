@@ -10,17 +10,19 @@ import {
   Tooltip,
   useHoverTooltip,
 } from '@opentrons/components'
-
 import {
   ABSORBANCE_READER_TYPE,
+  FLEX_STACKER_MODULE_TYPE,
   HEATERSHAKER_MODULE_TYPE,
   MODULE_MODELS_OT2_ONLY,
   TEMPERATURE_MODULE_TYPE,
   THERMOCYCLER_MODULE_TYPE,
 } from '@opentrons/shared-data'
-import { useCurrentRunId, useRunStatuses } from '/app/resources/runs'
-import { useIsLegacySessionInProgress } from '/app/resources/legacy_sessions'
+
 import { useIsFlex } from '/app/redux-resources/robots'
+import { useIsLegacySessionInProgress } from '/app/resources/legacy_sessions'
+import { useCurrentRunId, useRunStatuses } from '/app/resources/runs'
+
 import { useModuleOverflowMenu } from './hooks'
 
 import type { AttachedModule } from '/app/redux/modules/types'
@@ -121,6 +123,7 @@ export const ModuleOverflowMenu = (
       <MenuList>
         {isFlex &&
         module.moduleType !== ABSORBANCE_READER_TYPE &&
+        module.moduleType !== FLEX_STACKER_MODULE_TYPE &&
         !MODULE_MODELS_OT2_ONLY.some(
           modModel => modModel === module.moduleModel
         ) ? (
@@ -150,7 +153,7 @@ export const ModuleOverflowMenu = (
               <Fragment key={`${index}_${String(module.moduleType)}`}>
                 <MenuItem
                   onClick={() => item.onClick(item.isSecondary)}
-                  disabled={item.disabledReason || isDisabled}
+                  disabled={item.isSettingDisabled}
                   whiteSpace={NO_WRAP}
                 >
                   {item.setSetting}

@@ -1,12 +1,16 @@
-import type * as React from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, it, vi, beforeEach, expect } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import '@testing-library/jest-dom/vitest'
+
 import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { useTrackEvent, ANALYTICS_JUPYTER_OPEN } from '/app/redux/analytics'
+import { ANALYTICS_JUPYTER_OPEN, useTrackEvent } from '/app/redux/analytics'
+
 import { OpenJupyterControl } from '../OpenJupyterControl'
+
+import type { ComponentProps } from 'react'
 
 vi.mock('/app/redux/analytics')
 
@@ -18,7 +22,7 @@ global.window = Object.create(window)
 Object.defineProperty(window, 'open', { writable: true, configurable: true })
 window.open = vi.fn()
 
-const render = (props: React.ComponentProps<typeof OpenJupyterControl>) => {
+const render = (props: ComponentProps<typeof OpenJupyterControl>) => {
   return renderWithProviders(
     <MemoryRouter>
       <OpenJupyterControl {...props} />
@@ -28,7 +32,7 @@ const render = (props: React.ComponentProps<typeof OpenJupyterControl>) => {
 }
 
 describe('RobotSettings OpenJupyterControl', () => {
-  let props: React.ComponentProps<typeof OpenJupyterControl>
+  let props: ComponentProps<typeof OpenJupyterControl>
   beforeEach(() => {
     props = {
       robotIp: mockIpAddress,

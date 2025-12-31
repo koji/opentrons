@@ -2,11 +2,13 @@
 
 module.exports = {
   appId: 'com.opentrons.odd',
-  electronVersion: '27.0.0',
+  electronVersion: '39.1.2',
   npmRebuild: false,
   files: [
     '**/*',
     '!Makefile',
+    '!**/.venv/**',
+    '!**/shared-data/.venv/**',
     {
       from: '../app/dist',
       to: './ui',

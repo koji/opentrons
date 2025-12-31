@@ -354,7 +354,9 @@ def test_hs_flag_unsafe_move_raises(
     mod._core.geometry.flag_unsafe_move = mock.MagicMock(side_effect=raiser)  # type: ignore[attr-defined]
 
     with pytest.raises(PipetteMovementRestrictedByHeaterShakerError, match="uh oh"):
-        mod._core.flag_unsafe_move(to_loc=labware.wells()[1].top(), is_multichannel=False)  # type: ignore[attr-defined]
+        mod._core.flag_unsafe_move(  # type: ignore[attr-defined]
+            to_loc=labware.wells()[1].top(), is_multichannel=False
+        )
 
 
 def test_hs_flag_unsafe_move_skips_non_labware_locations(
@@ -391,6 +393,9 @@ def test_module_load_labware(ctx_with_tempdeck: papi.ProtocolContext) -> None:
     mod = ctx_with_tempdeck.load_module("Temperature Module", 1)
     assert mod.labware is None
     lw = mod.load_labware(labware_name)
+    assert (
+        labware_def["schemaVersion"] == 2
+    )  # For the presence of ["cornerOffsetFromSlot"].
     lw_offset = Point(
         labware_def["cornerOffsetFromSlot"]["x"],
         labware_def["cornerOffsetFromSlot"]["y"],

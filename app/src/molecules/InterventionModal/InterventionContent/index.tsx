@@ -1,21 +1,23 @@
-import type * as React from 'react'
 import {
-  Flex,
-  StyledText,
   DIRECTION_COLUMN,
-  SPACING,
+  Flex,
+  InlineNotification,
   RESPONSIVENESS,
+  SPACING,
+  StyledText,
 } from '@opentrons/components'
-import { InlineNotification } from '/app/atoms/InlineNotification'
 
 import { InterventionInfo } from './InterventionInfo'
+
+import type { ComponentProps } from 'react'
+
 export type { InterventionInfoProps } from './InterventionInfo'
 export { InterventionInfo }
 
 export interface InterventionContentProps {
   headline: string
-  infoProps: React.ComponentProps<typeof InterventionInfo>
-  notificationProps?: React.ComponentProps<typeof InlineNotification>
+  infoProps: ComponentProps<typeof InterventionInfo>
+  notificationProps?: ComponentProps<typeof InlineNotification>
 }
 
 export function InterventionContent({

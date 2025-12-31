@@ -1,12 +1,16 @@
-import type * as React from 'react'
-import { describe, it, vi, beforeEach } from 'vitest'
-import { renderWithProviders } from '/app/__testing-utils__'
-import { LEFT } from '@opentrons/shared-data'
 import { fireEvent, screen } from '@testing-library/react'
+import { beforeEach, describe, it, vi } from 'vitest'
+
+import { LEFT } from '@opentrons/shared-data'
+
+import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { PipetteWizardFlows } from '/app/organisms/PipetteWizardFlows'
 import { GripperWizardFlows } from '/app/organisms/GripperWizardFlows'
+import { PipetteWizardFlows } from '/app/organisms/PipetteWizardFlows'
+
 import { ProtocolInstrumentMountItem } from '..'
+
+import type { ComponentProps } from 'react'
 
 vi.mock('/app/organisms/PipetteWizardFlows')
 vi.mock('/app/organisms/GripperWizardFlows')
@@ -51,16 +55,14 @@ const mockLeftPipetteData = {
   ok: true,
 }
 
-const render = (
-  props: React.ComponentProps<typeof ProtocolInstrumentMountItem>
-) => {
+const render = (props: ComponentProps<typeof ProtocolInstrumentMountItem>) => {
   return renderWithProviders(<ProtocolInstrumentMountItem {...props} />, {
     i18nInstance: i18n,
   })[0]
 }
 
 describe('ProtocolInstrumentMountItem', () => {
-  let props: React.ComponentProps<typeof ProtocolInstrumentMountItem>
+  let props: ComponentProps<typeof ProtocolInstrumentMountItem>
   beforeEach(() => {
     props = {
       mount: LEFT,
@@ -79,7 +81,7 @@ describe('ProtocolInstrumentMountItem', () => {
     render(props)
     screen.getByText('Left Mount')
     screen.getByText('No data')
-    screen.getByText('Flex 8-Channel 1000 μL')
+    screen.getByText('Flex 8-Channel 1000 µL')
     screen.getByText('Attach')
     fireEvent.click(screen.getByRole('button'))
     screen.getByText('pipette wizard flow')
@@ -92,7 +94,7 @@ describe('ProtocolInstrumentMountItem', () => {
     render(props)
     screen.getByText('Left + Right Mount')
     screen.getByText('No data')
-    screen.getByText('Flex 96-Channel 1000 μL')
+    screen.getByText('Flex 96-Channel 1000 µL')
     screen.getByText('Attach')
   })
   it('renders the correct information when there is a pipette attached with cal data', () => {
@@ -104,7 +106,7 @@ describe('ProtocolInstrumentMountItem', () => {
     render(props)
     screen.getByText('Left Mount')
     screen.getByText('Calibrated')
-    screen.getByText('Flex 8-Channel 1000 μL')
+    screen.getByText('Flex 8-Channel 1000 µL')
   })
   it('renders the pipette with no cal data and the calibration button and clicking on it launches the correct flow', () => {
     props = {
@@ -120,7 +122,7 @@ describe('ProtocolInstrumentMountItem', () => {
     render(props)
     screen.getByText('Left Mount')
     screen.getByText('No data')
-    screen.getByText('Flex 8-Channel 1000 μL')
+    screen.getByText('Flex 8-Channel 1000 µL')
     const button = screen.getByText('Calibrate')
     fireEvent.click(button)
     screen.getByText('pipette wizard flow')
@@ -133,7 +135,7 @@ describe('ProtocolInstrumentMountItem', () => {
     render(props)
     screen.getByText('Left Mount')
     screen.getByText('No data')
-    screen.getByText('Flex 8-Channel 1000 μL')
+    screen.getByText('Flex 8-Channel 1000 µL')
     const button = screen.getByText('Attach')
     fireEvent.click(button)
     screen.getByText('pipette wizard flow')

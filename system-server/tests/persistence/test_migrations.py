@@ -1,10 +1,11 @@
 """Test SQL database migrations."""
+
 from pathlib import Path
 from typing import Generator
 
 import pytest
 import sqlalchemy
-from pytest_lazyfixture import lazy_fixture  # type: ignore[import-untyped]
+from pytest_lazy_fixtures import lf
 
 from system_server.persistence.database import create_sql_engine
 from system_server.persistence import (
@@ -40,7 +41,7 @@ def subject(database_path: Path) -> Generator[sqlalchemy.engine.Engine, None, No
 @pytest.mark.parametrize(
     "database_path",
     [
-        lazy_fixture("database_v0"),
+        lf("database_v0"),
     ],
 )
 def test_migration(subject: sqlalchemy.engine.Engine) -> None:

@@ -1,8 +1,9 @@
-import fetch from 'node-fetch'
 import isError from 'lodash/isError'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import fetch from 'node-fetch'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { HTTP_API_VERSION } from '@opentrons/app/src/redux/robot-api/constants'
+
 import * as Http from '../http'
 
 import type { Request, Response } from 'node-fetch'
@@ -83,11 +84,11 @@ describe('app-shell main http module', () => {
     const { name, method, request, requestOptions, response, expected } = spec
 
     it(`it should handle when ${name}`, () => {
-      vi.mocked(fetch).mockResolvedValueOnce((response as unknown) as Response)
+      vi.mocked(fetch).mockResolvedValueOnce(response as unknown as Response)
 
       // @ts-expect-error(mc, 2021-02-17): reqwrite as integration tests and
       // avoid mocking node-fetch
-      return method((request as unknown) as Request).then((result: string) => {
+      return method(request as unknown as Request).then((result: string) => {
         expect(vi.mocked(fetch)).toHaveBeenCalledWith(request, requestOptions)
         expect(result).toEqual(expected)
       })
@@ -101,12 +102,10 @@ describe('app-shell main http module', () => {
       if (isError(response)) {
         vi.mocked(fetch).mockRejectedValueOnce(response)
       } else {
-        vi.mocked(fetch).mockResolvedValueOnce(
-          (response as unknown) as Response
-        )
+        vi.mocked(fetch).mockResolvedValueOnce(response as unknown as Response)
       }
 
-      return expect(method((request as unknown) as Request)).rejects.toThrow(
+      return expect(method(request as unknown as Request)).rejects.toThrow(
         expected
       )
     })

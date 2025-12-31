@@ -45,6 +45,7 @@ from opentrons.hardware_control.types import (
     EstopPhysicalStatus,
     HardwareEventHandler,
     HardwareEventUnsubscriber,
+    PipetteSensorResponseQueue,
 )
 
 from opentrons_shared_data.pipette.types import PipetteName, PipetteModel
@@ -62,9 +63,10 @@ from opentrons.hardware_control.dev_types import (
 )
 from opentrons.util.async_helpers import ensure_yield
 from .types import HWStopCondition
-from .flex_protocol import FlexBackend
-from opentrons_hardware.firmware_bindings.constants import SensorId
-from opentrons_hardware.sensors.types import SensorDataType
+from .flex_protocol import (
+    FlexBackend,
+)
+
 
 log = logging.getLogger(__name__)
 
@@ -181,7 +183,7 @@ class OT3Simulator(FlexBackend):
             raise KeyError(
                 "If you specify attached_instruments, the model "
                 "should be pipette names or pipette models, but "
-                f'{passed_ai["model"]} is not'
+                f"{passed_ai['model']} is not"
             )
 
         self._attached_instruments = {
@@ -228,14 +230,12 @@ class OT3Simulator(FlexBackend):
     def update_constraints_for_gantry_load(self, gantry_load: GantryLoad) -> None:
         self._sim_gantry_load = gantry_load
 
-    def update_constraints_for_calibration_with_gantry_load(
-        self,
-        gantry_load: GantryLoad,
-    ) -> None:
-        self._sim_gantry_load = gantry_load
-
     def update_constraints_for_plunger_acceleration(
-        self, mount: OT3Mount, acceleration: float, gantry_load: GantryLoad
+        self,
+        mount: OT3Mount,
+        acceleration: float,
+        gantry_load: GantryLoad,
+        high_speed_pipette: bool = False,
     ) -> None:
         self._sim_gantry_load = gantry_load
 
@@ -348,11 +348,10 @@ class OT3Simulator(FlexBackend):
         threshold_pascals: float,
         plunger_impulse_time: float,
         num_baseline_reads: int,
+        z_offset_for_plunger_prep: float,
         probe: InstrumentProbeType = InstrumentProbeType.PRIMARY,
         force_both_sensors: bool = False,
-        response_queue: Optional[
-            asyncio.Queue[Dict[SensorId, List[SensorDataType]]]
-        ] = None,
+        response_queue: Optional[PipetteSensorResponseQueue] = None,
     ) -> float:
         z_axis = Axis.by_mount(mount)
         pos = self._position
@@ -368,6 +367,7 @@ class OT3Simulator(FlexBackend):
         speed: Optional[float] = None,
         stop_condition: HWStopCondition = HWStopCondition.none,
         nodes_in_moves_only: bool = True,
+        delay: Optional[Tuple[List[Axis], float]] = None,
     ) -> None:
         """Move to a position.
 
@@ -439,10 +439,12 @@ class OT3Simulator(FlexBackend):
         return self._sim_jaw_state
 
     async def tip_action(
-        self, origin: Dict[Axis, float], targets: List[Tuple[Dict[Axis, float], float]]
+        self, origin: float, targets: List[Tuple[float, float]]
     ) -> None:
         self._gear_motor_position.update(
-            coalesce_move_segments(origin, [target[0] for target in targets])
+            coalesce_move_segments(
+                {Axis.Q: origin}, [{Axis.Q: target[0]} for target in targets]
+            )
         )
         await asyncio.sleep(0)
 
@@ -505,6 +507,7 @@ class OT3Simulator(FlexBackend):
                         converted_name.pipette_type,
                         converted_name.pipette_channels,
                         converted_name.pipette_version,
+                        converted_name.oem_type,
                     ),
                     "id": None,
                 }
@@ -527,6 +530,7 @@ class OT3Simulator(FlexBackend):
                     converted_name.pipette_type,
                     converted_name.pipette_channels,
                     converted_name.pipette_version,
+                    converted_name.oem_type,
                 ),
                 "id": init_instr["id"],
             }
@@ -538,6 +542,7 @@ class OT3Simulator(FlexBackend):
                     converted_name.pipette_type,
                     converted_name.pipette_channels,
                     converted_name.pipette_version,
+                    converted_name.oem_type,
                 ),
                 "id": None,
             }
@@ -724,7 +729,8 @@ class OT3Simulator(FlexBackend):
     @ensure_yield
     async def clean_up(self) -> None:
         """Clean up."""
-        pass
+        if hasattr(self, "_module_controls") and self._module_controls is not None:
+            await self._module_controls.clean_up()
 
     @staticmethod
     def _get_home_position() -> Dict[Axis, float]:
@@ -777,7 +783,7 @@ class OT3Simulator(FlexBackend):
                 next_fw_version=1,
                 fw_update_needed=False,
                 current_fw_sha="simulated",
-                pcba_revision="A1",
+                pcba_revision="A1.0",
                 update_state=None,
             )
             for axis in self._present_axes
@@ -805,6 +811,9 @@ class OT3Simulator(FlexBackend):
 
     async def set_status_bar_enabled(self, enabled: bool) -> None:
         await asyncio.sleep(0)
+
+    def get_status_bar_enabled(self) -> bool:
+        return True
 
     def get_status_bar_state(self) -> StatusBarState:
         return self._sim_status_bar_state
@@ -841,6 +850,7 @@ class OT3Simulator(FlexBackend):
         max_allowed_grip_error: float,
         hard_limit_lower: float,
         hard_limit_upper: float,
+        disable_geometry_grip_check: bool = False,
     ) -> None:
         # This is a (pretty bad) simulation of the gripper actually gripping something,
         # but it should work.
@@ -862,3 +872,32 @@ class OT3Simulator(FlexBackend):
         """This is something we only use in the simulator.
         It is required so that PE simulations using ot3api don't break."""
         self._sim_tip_state[mount] = status
+
+    async def increase_evo_disp_count(self, mount: OT3Mount) -> None:
+        pass
+
+    async def read_env_temp_sensor(
+        self, mount: OT3Mount, primary: bool
+    ) -> Optional[float]:
+        """Read and return the current sensor information."""
+
+        return 0.0
+
+    async def read_env_hum_sensor(
+        self, mount: OT3Mount, primary: bool
+    ) -> Optional[float]:
+        """Read and return the current sensor information."""
+
+        return 0.0
+
+    async def read_pressure_sensor(
+        self, mount: OT3Mount, primary: bool
+    ) -> Optional[float]:
+        """Read and return the current sensor information."""
+        return 0.0
+
+    async def read_capacitive_sensor(
+        self, mount: OT3Mount, primary: bool
+    ) -> Optional[float]:
+        """Read and return the current sensor information."""
+        return 0.0

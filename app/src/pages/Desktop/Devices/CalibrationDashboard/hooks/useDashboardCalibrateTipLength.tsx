@@ -1,20 +1,21 @@
 import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useSelector, useDispatch } from 'react-redux'
 import { useTranslation } from 'react-i18next'
-import { ModalShell } from '@opentrons/components'
+import { useDispatch, useSelector } from 'react-redux'
+
+import { ModalShell, WizardHeader } from '@opentrons/components'
 
 import { getTopPortalEl } from '/app/App/portal'
-import { WizardHeader } from '/app/molecules/WizardHeader'
 import { CalibrateTipLength } from '/app/organisms/Desktop/CalibrateTipLength'
 import { AskForCalibrationBlockModal } from '/app/organisms/Desktop/CalibrateTipLength/AskForCalibrationBlockModal'
 import { LoadingState } from '/app/organisms/Desktop/CalibrationPanels'
-import * as RobotApi from '/app/redux/robot-api'
-import * as Sessions from '/app/redux/sessions'
 import { tipLengthCalibrationStarted } from '/app/redux/analytics'
 import { getHasCalibrationBlock } from '/app/redux/config'
+import * as RobotApi from '/app/redux/robot-api'
+import * as Sessions from '/app/redux/sessions'
 import { getTipLengthCalibrationSession } from '/app/redux/sessions/tip-length-calibration/selectors'
 
+import type { DashboardCalTipLengthInvoker } from '/app/organisms/Desktop/Devices/hooks/useCalibrationTaskList'
 import type { RequestState } from '/app/redux/robot-api/types'
 import type {
   SessionCommandString,
@@ -22,7 +23,6 @@ import type {
   TipLengthCalibrationSessionParams,
 } from '/app/redux/sessions/types'
 import type { State } from '/app/redux/types'
-import type { DashboardCalTipLengthInvoker } from '/app/organisms/Desktop/Devices/hooks/useCalibrationTaskList'
 
 // tip length calibration commands for which the full page spinner should not appear
 const spinnerCommandBlockList: SessionCommandString[] = [
@@ -54,7 +54,7 @@ export function useDashboardCalibrateTipLength(
       ) {
         createRequestId.current =
           'requestId' in dispatchedAction.meta
-            ? dispatchedAction.meta.requestId ?? null
+            ? (dispatchedAction.meta.requestId ?? null)
             : null
       } else if (
         dispatchedAction.type === Sessions.CREATE_SESSION_COMMAND &&
@@ -63,7 +63,7 @@ export function useDashboardCalibrateTipLength(
       ) {
         jogRequestId.current =
           'requestId' in dispatchedAction.meta
-            ? dispatchedAction.meta.requestId ?? null
+            ? (dispatchedAction.meta.requestId ?? null)
             : null
       } else if (
         dispatchedAction.type !== Sessions.CREATE_SESSION_COMMAND ||
@@ -73,51 +73,54 @@ export function useDashboardCalibrateTipLength(
       ) {
         trackedRequestId.current =
           'meta' in dispatchedAction && 'requestId' in dispatchedAction.meta
-            ? dispatchedAction.meta.requestId ?? null
+            ? (dispatchedAction.meta.requestId ?? null)
             : null
       }
     }
   )
 
-  const tipLengthCalibrationSession: TipLengthCalibrationSession | null = useSelector(
-    (state: State) => {
+  const tipLengthCalibrationSession: TipLengthCalibrationSession | null =
+    useSelector((state: State) => {
       return getTipLengthCalibrationSession(state, robotName)
-    }
-  )
+    })
 
   const configHasCalibrationBlock = useSelector(getHasCalibrationBlock)
   const [showCalBlockModal, setShowCalBlockModal] = useState<boolean | null>(
     null
   )
 
-  const handleStartDashboardTipLengthCalSession: DashboardCalTipLengthInvoker = props => {
-    const { params, hasBlockModalResponse, invalidateHandler } = props
-    invalidateHandlerRef.current = invalidateHandler
-    sessionParams.current = params
-    if (hasBlockModalResponse === null && configHasCalibrationBlock === null) {
-      setShowCalBlockModal(true)
-    } else {
-      setShowCalBlockModal(false)
-      const { mount, tipRackDefinition = null } = sessionParams.current
-      const hasCalibrationBlock = Boolean(
-        configHasCalibrationBlock ?? hasBlockModalResponse
-      )
-      dispatchRequests(
-        Sessions.ensureSession(robotName, sessionType, {
-          mount,
-          tipRackDefinition,
-          hasCalibrationBlock,
-        })
-      )
-      dispatch(
-        tipLengthCalibrationStarted(
-          mount,
-          hasCalibrationBlock,
-          'default Opentrons tip rack for pipette on mount'
+  const handleStartDashboardTipLengthCalSession: DashboardCalTipLengthInvoker =
+    props => {
+      const { params, hasBlockModalResponse, invalidateHandler } = props
+      invalidateHandlerRef.current = invalidateHandler
+      sessionParams.current = params
+      if (
+        hasBlockModalResponse === null &&
+        configHasCalibrationBlock === null
+      ) {
+        setShowCalBlockModal(true)
+      } else {
+        setShowCalBlockModal(false)
+        const { mount, tipRackDefinition = null } = sessionParams.current
+        const hasCalibrationBlock = Boolean(
+          configHasCalibrationBlock ?? hasBlockModalResponse
         )
-      )
+        dispatchRequests(
+          Sessions.ensureSession(robotName, sessionType, {
+            mount,
+            tipRackDefinition,
+            hasCalibrationBlock,
+          })
+        )
+        dispatch(
+          tipLengthCalibrationStarted(
+            mount,
+            hasCalibrationBlock,
+            'default Opentrons tip rack for pipette on mount'
+          )
+        )
+      }
     }
-  }
 
   const startingSession =
     useSelector<State, RequestState | null>(state =>

@@ -1,4 +1,5 @@
 """Command models to close the Heater-Shaker Module's labware latch."""
+
 from __future__ import annotations
 from typing import Optional, TYPE_CHECKING
 from typing_extensions import Literal, Type
@@ -69,7 +70,7 @@ class CloseLabwareLatch(
 
     commandType: CloseLabwareLatchCommandType = "heaterShaker/closeLabwareLatch"
     params: CloseLabwareLatchParams
-    result: Optional[CloseLabwareLatchResult]
+    result: Optional[CloseLabwareLatchResult] = None
 
     _ImplementationCls: Type[CloseLabwareLatchImpl] = CloseLabwareLatchImpl
 

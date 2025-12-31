@@ -8,10 +8,10 @@ PATH := $(shell cd .. && yarn bin):$(PATH)
 
 benchmark_output := $(shell node -e 'console.log(new Date());')
 
-# These variables can be overriden when make is invoked to customize the
+# These variables can be overridden when make is invoked to customize the
 # behavior of jest
 tests ?=
-cov_opts ?= --coverage=true
+cov_opts ?= --coverage --pool=threads
 test_opts ?=
 
 # standard targets
@@ -33,6 +33,7 @@ clean:
 
 .PHONY: build
 build: export NODE_ENV := production
+build: export NODE_OPTIONS := --max-old-space-size=8192
 build:
 	vite build
 	git rev-parse HEAD > dist/.commit
@@ -49,20 +50,15 @@ benchmarks:
 
 .PHONY: dev
 dev: export NODE_ENV := development
+dev: export NODE_OPTIONS := --max-old-space-size=8192
 dev:
 	vite serve
 
 # production assets server
 .PHONY: serve
+serve: export NODE_OPTIONS := --max-old-space-size=8192
 serve: all
-	node ../scripts/serve-static dist
-
-# end to end tests
-.PHONY: test-e2e
-test-e2e:
-	concurrently --no-color --kill-others --success first --names "protocol-designer-server,protocol-designer-tests" \
-	"$(MAKE) dev CYPRESS=1" \
-	"wait-on http://localhost:5178/ && cypress run --browser chrome --headless --record false"
+	vite preview
 
 .PHONY: test
 test:
@@ -71,3 +67,8 @@ test:
 .PHONY: test-cov
 test-cov:
 	make -C .. test-js-protocol-designer tests=$(tests) test_opts="$(test_opts)" cov_opts="$(cov_opts)"
+
+# analyze bundle
+.PHONY: bundle-analyzer
+bundle-analyzer:
+	ANALYZE_DEBUG=true make build

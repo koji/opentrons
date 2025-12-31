@@ -1,56 +1,57 @@
-import type * as React from 'react'
 import {
   ALIGN_CENTER,
   Box,
   COLORS,
   DIRECTION_COLUMN,
   Flex,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
-import OT2_PNG from '/app/assets/images/OT2-R_HERO.png'
-import { MiniCard } from './'
-import { Slideout } from '/app/atoms/Slideout'
 
-import type { Story, Meta } from '@storybook/react'
+import { Slideout } from '../../atoms/Slideout'
+import { MiniCard as MiniCardComponent } from './'
 
-export default {
+import type { Meta, StoryObj } from '@storybook/react'
+
+const ROBOT_IMG = '/images/FLEX.png'
+
+const meta: Meta<typeof MiniCardComponent> = {
   title: 'App/Molecules/MiniCard',
-  component: MiniCard,
-} as Meta
-
-const Template: Story<React.ComponentProps<typeof MiniCard>> = args => {
-  return (
-    <Slideout title="MiniCard" onCloseClick={() => {}} isExpanded={true}>
-      <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing8}>
-        <MiniCard {...args} />
-        <MiniCard {...args} isSelected={false} />
-        <MiniCard {...args} isSelected={false} />
-      </Flex>
-    </Slideout>
-  )
+  component: MiniCardComponent,
+  decorators: [
+    (Story, { args }) => (
+      <Slideout title="MiniCard" onCloseClick={() => {}} isExpanded={true}>
+        <Flex flexDirection={DIRECTION_COLUMN} gridGap={SPACING.spacing8}>
+          <MiniCardComponent {...args} />
+          <MiniCardComponent {...args} isSelected={false} />
+          <MiniCardComponent {...args} isSelected={false} />
+        </Flex>
+      </Slideout>
+    ),
+  ],
 }
 
+export default meta
+
+type Story = StoryObj<typeof MiniCardComponent>
+
 const Children = (
-  <Flex alignItems={ALIGN_CENTER}>
+  <Flex alignItems={ALIGN_CENTER} gap={SPACING.spacing8}>
     <Box backgroundColor={COLORS.white}>
-      <img src={OT2_PNG} style={{ width: '3rem' }} />
+      <img src={ROBOT_IMG} style={{ width: '3rem' }} />
     </Box>
-    <LegacyStyledText
-      as="p"
-      marginLeft={SPACING.spacing8}
-      fontWeight={TYPOGRAPHY.fontWeightSemiBold}
-    >
+    <LegacyStyledText as="p" fontWeight={TYPOGRAPHY.fontWeightSemiBold}>
       MiniCard stories protocol
     </LegacyStyledText>
   </Flex>
 )
 
-export const Primary = Template.bind({})
-Primary.args = {
-  onClick: () => {},
-  isSelected: true,
-  children: Children,
-  isError: false,
+export const MiniCard: Story = {
+  args: {
+    onClick: () => {},
+    isSelected: true,
+    children: Children,
+    isError: false,
+  },
 }

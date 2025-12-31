@@ -1,24 +1,30 @@
-import type * as React from 'react'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { fireEvent, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
 import {
-  useTrackEvent,
   ANALYTICS_ADD_CUSTOM_LABWARE,
+  useTrackEvent,
 } from '/app/redux/analytics'
-import { renderWithProviders } from '/app/__testing-utils__'
+
 import { AddCustomLabwareSlideout } from '..'
+
+import type { ComponentProps } from 'react'
 
 vi.mock('/app/redux/custom-labware')
 vi.mock('/app/local-resources/labware')
 vi.mock('/app/redux/analytics')
+vi.mock('/app/redux/shell/remote', () => ({
+  remote: {
+    getFilePathFrom: vi.fn(),
+  },
+}))
 
 let mockTrackEvent: any
 
-const render = (
-  props: React.ComponentProps<typeof AddCustomLabwareSlideout>
-) => {
+const render = (props: ComponentProps<typeof AddCustomLabwareSlideout>) => {
   return renderWithProviders(
     <MemoryRouter>
       <AddCustomLabwareSlideout {...props} />
@@ -30,7 +36,7 @@ const render = (
 }
 
 describe('AddCustomLabwareSlideout', () => {
-  const props: React.ComponentProps<typeof AddCustomLabwareSlideout> = {
+  const props: ComponentProps<typeof AddCustomLabwareSlideout> = {
     isExpanded: true,
     onCloseClick: vi.fn(() => null),
   }

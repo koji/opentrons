@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -22,8 +22,8 @@ import {
 } from '../shared'
 import { SelectRecoveryOption } from './SelectRecoveryOption'
 
-import type { RecoveryContentProps } from '../types'
 import type { ERUtilsResults } from '../hooks'
+import type { RecoveryContentProps } from '../types'
 
 export function CancelRun(props: RecoveryContentProps): JSX.Element {
   const { recoveryMap } = props
@@ -35,7 +35,9 @@ export function CancelRun(props: RecoveryContentProps): JSX.Element {
       case CANCEL_RUN.STEPS.CONFIRM_CANCEL:
         return <CancelRunConfirmation {...props} />
       default:
-        console.warn(`${step} in ${route} not explicitly handled. Rerouting.`)
+        console.warn(
+          `CancelRun: ${step} in ${route} not explicitly handled. Rerouting.`
+        )
         return <SelectRecoveryOption {...props} />
     }
   }

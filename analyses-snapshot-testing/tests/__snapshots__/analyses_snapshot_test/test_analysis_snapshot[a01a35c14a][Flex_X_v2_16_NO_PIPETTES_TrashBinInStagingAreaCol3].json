@@ -1,4 +1,8 @@
 {
+  "commandAnnotations": [],
+  "commandPreconditions": {
+    "isCameraUsed": false
+  },
   "commands": [
     {
       "commandType": "home",
@@ -100,7 +104,21 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "C4",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutoutC3",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "stagingAreaRightSlot",
+              "stagingAreaSlotWithMagneticBlockV1"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -137,12 +155,7 @@
       ]
     }
   ],
-  "files": [
-    {
-      "name": "Flex_X_v2_16_NO_PIPETTES_TrashBinInStagingAreaCol3.py",
-      "role": "main"
-    }
-  ],
+  "files": [],
   "labware": [
     {
       "definitionUri": "opentrons/nest_1_reservoir_290ml/1",
@@ -153,6 +166,7 @@
       }
     }
   ],
+  "liquidClasses": [],
   "liquids": [],
   "metadata": {
     "author": "Derek Maggio <derek.maggio@opentrons.com>",

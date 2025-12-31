@@ -1,15 +1,16 @@
 import { useReducer } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import {
-  LegacyInputField,
   DeprecatedCheckboxField,
-  INPUT_TYPE_TEXT,
   INPUT_TYPE_PASSWORD,
+  INPUT_TYPE_TEXT,
+  LegacyInputField,
 } from '@opentrons/components'
 
-import { FormRow } from './FormRow'
 import { useConnectFormField } from './form-state'
-import { LABEL_SHOW_PASSWORD } from '../i18n'
+import { FormRow } from './FormRow'
+
 import type {
   ControllerFieldState,
   ControllerRenderProps,
@@ -27,6 +28,7 @@ export interface TextFieldProps {
 }
 
 export const TextField = (props: TextFieldProps): JSX.Element => {
+  const { t } = useTranslation('device_settings')
   const { id, name, label, isPassword, className, field, fieldState } = props
   const { value, error, onChange, onBlur } = useConnectFormField(
     field,
@@ -42,7 +44,7 @@ export const TextField = (props: TextFieldProps): JSX.Element => {
       />
       {isPassword && (
         <DeprecatedCheckboxField
-          label={LABEL_SHOW_PASSWORD}
+          label={t('show_password')}
           value={showPw}
           onChange={toggleShowPw}
         />

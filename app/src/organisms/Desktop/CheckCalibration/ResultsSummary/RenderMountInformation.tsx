@@ -4,8 +4,8 @@ import {
   COLORS,
   DIRECTION_COLUMN,
   Flex,
-  TYPOGRAPHY,
   LegacyStyledText,
+  TYPOGRAPHY,
 } from '@opentrons/components'
 import { getPipetteModelSpecs } from '@opentrons/shared-data'
 
@@ -34,10 +34,10 @@ export const RenderMountInformation = ({
         textTransform={TYPOGRAPHY.textTransformUppercase}
       >{`${mount} MOUNT`}</LegacyStyledText>
       {pipette != null ? (
-        <LegacyStyledText as="p">{displayName}</LegacyStyledText>
+        <LegacyStyledText forwardedAs="p">{displayName}</LegacyStyledText>
       ) : (
         <LegacyStyledText
-          as="p"
+          forwardedAs="p"
           textTransform={TYPOGRAPHY.textTransformCapitalize}
         >
           {t('empty')}

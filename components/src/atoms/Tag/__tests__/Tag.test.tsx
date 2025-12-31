@@ -1,16 +1,18 @@
-import type * as React from 'react'
-import { describe, it, expect } from 'vitest'
 import { screen } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
+
 import { COLORS } from '../../../helix-design-system'
 import { renderWithProviders } from '../../../testing/utils'
 import { Tag } from '../index'
 
-const render = (props: React.ComponentProps<typeof Tag>) => {
+import type { ComponentProps } from 'react'
+
+const render = (props: ComponentProps<typeof Tag>) => {
   return renderWithProviders(<Tag {...props} />)
 }
 
 describe('Tag', () => {
-  let props: React.ComponentProps<typeof Tag>
+  let props: ComponentProps<typeof Tag>
 
   it('should render text, icon with default', () => {
     props = {

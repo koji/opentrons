@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+
 import {
   ALIGN_CENTER,
   COLORS,
@@ -7,31 +8,33 @@ import {
   Flex,
   Icon,
   JUSTIFY_CENTER,
+  LegacyStyledText,
   RobotCoordsForeignObject,
   SPACING,
+  STACKER_HOPPER_LABWARE_X_OFFSET,
   TYPOGRAPHY,
-  LegacyStyledText,
 } from '@opentrons/components'
 import {
+  FLEX_STACKER_MODULE_TYPE,
+  getModuleDef,
   getModuleDisplayName,
-  getModuleDef2,
   MAGNETIC_BLOCK_V1,
 } from '@opentrons/shared-data'
 
 import { useRunHasStarted } from '/app/resources/runs'
+
 import type { ModuleModel } from '@opentrons/shared-data'
-import type { PhysicalPort } from '/app/redux/modules/api-types'
 
 export interface ModuleInfoProps {
   moduleModel: ModuleModel
   isAttached: boolean
-  physicalPort: PhysicalPort | null
+  physicalPort?: string | null
   runId?: string
 }
 
 export const ModuleInfo = (props: ModuleInfoProps): JSX.Element => {
   const { moduleModel, physicalPort, isAttached, runId = null } = props
-  const moduleDef = getModuleDef2(moduleModel)
+  const moduleDef = getModuleDef(moduleModel)
   const {
     xDimension,
     yDimension,
@@ -45,15 +48,17 @@ export const ModuleInfo = (props: ModuleInfoProps): JSX.Element => {
   if (moduleModel === MAGNETIC_BLOCK_V1) {
     connectionStatus = t('no_usb_required')
   }
-  if (physicalPort === null && isAttached) {
-    connectionStatus = t('usb_connected_no_port_info')
-  } else if (physicalPort != null && isAttached) {
-    connectionStatus = t('usb_port_connected', { port: physicalPort.port })
+  if (isAttached) {
+    connectionStatus = physicalPort ?? t('usb_connected_no_port_info')
   }
 
   return (
     <RobotCoordsForeignObject
-      x={0}
+      x={
+        moduleDef.moduleType === FLEX_STACKER_MODULE_TYPE
+          ? STACKER_HOPPER_LABWARE_X_OFFSET
+          : 0
+      }
       y={0}
       height={labwareInterfaceYDimension ?? yDimension}
       width={labwareInterfaceXDimension ?? xDimension}
@@ -70,7 +75,7 @@ export const ModuleInfo = (props: ModuleInfoProps): JSX.Element => {
         {!runHasStarted && moduleModel !== MAGNETIC_BLOCK_V1 ? (
           <Flex flexDirection={DIRECTION_ROW} alignItems={ALIGN_CENTER}>
             <Icon
-              name={isAttached ? 'ot-check' : 'alert-circle'}
+              name={isAttached ? 'ot-check' : 'ot-alert'}
               color={isAttached ? COLORS.green50 : COLORS.yellow50}
               key="icon"
               size="10px"

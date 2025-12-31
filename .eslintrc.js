@@ -16,7 +16,14 @@ module.exports = {
     'plugin:react/jsx-runtime',
   ],
 
-  plugins: ['react', 'react-hooks', 'json', 'testing-library', 'opentrons'],
+  plugins: [
+    'react',
+    'react-hooks',
+    'json',
+    'testing-library',
+    'opentrons',
+    '@eslint-react',
+  ],
 
   rules: {
     camelcase: 'off',
@@ -24,11 +31,18 @@ module.exports = {
     'prefer-const': 'error',
     'react/display-name': 'off',
     'react-hooks/rules-of-hooks': 'error',
-    'react-hooks/exhaustive-deps': 'warn',
+    'react-hooks/exhaustive-deps': [
+      'warn',
+      {
+        additionalHooks: '(useDrag|useDrop)',
+      },
+    ],
     'no-extra-boolean-cast': 'off',
     'import/no-default-export': 'error',
     '@typescript-eslint/promise-function-async': 'off',
     '@typescript-eslint/default-param-last': 'off',
+    '@typescript-eslint/consistent-indexed-object-style': 'off',
+    '@typescript-eslint/no-non-null-assertion': 'warn',
 
     // TODO(mc, 2021-01-29): fix these and remove warning overrides
     'lines-between-class-members': 'warn',
@@ -39,6 +53,8 @@ module.exports = {
     'no-case-declarations': 'warn',
     'prefer-regex-literals': 'warn',
     'react/prop-types': 'warn',
+    'react/jsx-curly-brace-presence': 'warn',
+    '@typescript-eslint/no-non-null-asserted-optional-chain': 'warn',
 
     // Enforce notification hooks
     'no-restricted-imports': [
@@ -54,6 +70,9 @@ module.exports = {
               'useCurrentMaintenanceRun',
               'useDeckConfigurationQuery',
               'useAllCommandsAsPreSerializedList',
+              'useSearchLabwareOffsets',
+              'useImageFileQuery',
+              'useCamera',
             ],
             message:
               'HTTP hook deprecated. Use the equivalent notification wrapper (useNotifyXYZ).',
@@ -102,9 +121,7 @@ module.exports = {
         '@typescript-eslint/no-floating-promises': 'warn',
         '@typescript-eslint/no-unnecessary-type-assertion': 'warn',
         '@typescript-eslint/no-unnecessary-boolean-literal-compare': 'warn',
-        '@typescript-eslint/consistent-indexed-object-style': 'warn',
         '@typescript-eslint/ban-types': 'warn',
-        '@typescript-eslint/non-nullable-type-assertion-style': 'warn',
         '@typescript-eslint/await-thenable': 'warn',
         '@typescript-eslint/ban-ts-comment': 'warn',
         '@typescript-eslint/unbound-method': 'warn',
@@ -118,9 +135,14 @@ module.exports = {
       },
     },
     {
-      files: ['./app/src/**/*.@(ts|tsx)'],
+      files: [
+        './app/src/**/*.@(ts|tsx)',
+        './opentrons-ai-client/src/**/*.@(ts|tsx)',
+        './protocol-designer/src/**/*.@(ts|tsx)',
+      ],
       rules: {
         'import/no-absolute-path': 'off',
+        '@eslint-react/no-nested-component-definitions': 'error',
       },
     },
     {
@@ -179,6 +201,9 @@ module.exports = {
       files: ['./protocol-designer/src/**/*.@(ts|tsx)'],
       rules: {
         'opentrons/no-imports-up-the-tree-of-life': 'warn',
+        'opentrons/no-margins-in-css': 'warn',
+        'opentrons/no-margins-inline': 'warn',
+        '@eslint-react/no-nested-component-definitions': 'error',
       },
     },
     // apply application structure import requirements to app
@@ -186,6 +211,42 @@ module.exports = {
       files: ['./app/src/**/*.@(ts|tsx)'],
       rules: {
         'opentrons/no-imports-across-applications': 'error',
+        'opentrons/no-margins-in-css': 'warn',
+        'opentrons/no-margins-inline': 'warn',
+      },
+    },
+    {
+      files: ['./opentrons-ai-client/src/**/*.@(ts|tsx)'],
+      rules: {
+        'opentrons/no-imports-up-the-tree-of-life': 'warn',
+        'opentrons/no-margins-in-css': 'warn',
+        'opentrons/no-margins-inline': 'warn',
+      },
+    },
+    {
+      files: ['./components/src/**/*.@(ts|tsx)'],
+      rules: {
+        'opentrons/no-margins-in-css': 'warn',
+        'opentrons/no-margins-inline': 'warn',
+      },
+    },
+    {
+      files: ['**/*.tsx'],
+      excludedFiles: ['**/*.stories.tsx'],
+      rules: {
+        // TODO: Switch this rule to 'error' once the CSS modules migration is complete.
+        'react/forbid-dom-props': [
+          'warn',
+          {
+            forbid: [
+              {
+                propName: 'style',
+                message:
+                  'Inline styles are not allowed. Use CSS modules instead.',
+              },
+            ],
+          },
+        ],
       },
     },
   ],

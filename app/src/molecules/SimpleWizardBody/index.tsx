@@ -1,8 +1,9 @@
-import type * as React from 'react'
-
 import { SimpleWizardBodyContainer } from './SimpleWizardBodyContainer'
 import { SimpleWizardBodyContent } from './SimpleWizardBodyContent'
 import { SimpleWizardInProgressBody } from './SimpleWizardInProgressBody'
+
+import type { ComponentProps, ReactNode } from 'react'
+
 export {
   SimpleWizardBodyContainer,
   SimpleWizardBodyContent,
@@ -10,8 +11,13 @@ export {
 }
 
 export function SimpleWizardBody(
-  props: React.ComponentProps<typeof SimpleWizardBodyContent> &
-    React.ComponentProps<typeof SimpleWizardBodyContainer>
+  props: Omit<
+    ComponentProps<typeof SimpleWizardBodyContent> &
+      ComponentProps<typeof SimpleWizardBodyContainer>,
+    'children'
+  > & {
+    children?: ReactNode
+  }
 ): JSX.Element {
   const { children, ...rest } = props
   return (

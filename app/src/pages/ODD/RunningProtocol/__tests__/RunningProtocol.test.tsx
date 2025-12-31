@@ -1,14 +1,14 @@
-import { Route, MemoryRouter, Routes } from 'react-router-dom'
-import { vi, it, describe, expect, beforeEach, afterEach } from 'vitest'
-import { when } from 'vitest-when'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { when } from 'vitest-when'
 
 import {
+  RUN_STATUS_AWAITING_RECOVERY,
+  RUN_STATUS_AWAITING_RECOVERY_BLOCKED_BY_OPEN_DOOR,
   RUN_STATUS_BLOCKED_BY_OPEN_DOOR,
   RUN_STATUS_IDLE,
   RUN_STATUS_STOP_REQUESTED,
-  RUN_STATUS_AWAITING_RECOVERY,
-  RUN_STATUS_AWAITING_RECOVERY_BLOCKED_BY_OPEN_DOOR,
 } from '@opentrons/api-client'
 import {
   useProtocolAnalysesQuery,
@@ -18,34 +18,38 @@ import {
 
 import { renderWithProviders } from '/app/__testing-utils__'
 import { mockRobotSideAnalysis } from '/app/molecules/Command/__fixtures__'
-import {
-  CurrentRunningProtocolCommand,
-  RunningProtocolSkeleton,
-} from '/app/organisms/ODD/RunningProtocol'
 /* eslint-disable-next-line opentrons/no-imports-across-applications */
 import { mockUseAllCommandsResponseNonDeterministic } from '/app/organisms/Desktop/RunProgressMeter/__fixtures__'
-import { getLocalRobot } from '/app/redux/discovery'
-import { CancelingRunModal } from '/app/organisms/ODD/RunningProtocol/CancelingRunModal'
-import { useTrackProtocolRunEvent } from '/app/redux-resources/analytics'
-import { OpenDoorAlertModal } from '/app/organisms/ODD/OpenDoorAlertModal'
-import { RunningProtocol } from '..'
 import {
-  useRunStatus,
-  useRunTimestamps,
-  useNotifyRunQuery,
-  useNotifyAllCommandsQuery,
-  useMostRecentCompletedAnalysis,
-  useLastRunCommand,
-} from '/app/resources/runs'
-import { useFeatureFlag } from '/app/redux/config'
+  NOT_CONFIGURED,
+  useIsDoorOpen,
+} from '/app/organisms/DoorOpenControl/useIsDoorOpen'
 import {
   ErrorRecoveryFlows,
   useErrorRecoveryFlows,
 } from '/app/organisms/ErrorRecoveryFlows'
 import {
-  useInterventionModal,
   InterventionModal,
+  useInterventionModal,
 } from '/app/organisms/InterventionModal'
+import { OpenDoorAlertModal } from '/app/organisms/ODD/OpenDoorAlertModal'
+import {
+  CurrentRunningProtocolCommand,
+  RunningProtocolSkeleton,
+} from '/app/organisms/ODD/RunningProtocol'
+import { CancelingRunModal } from '/app/organisms/ODD/RunningProtocol/CancelingRunModal'
+import { useTrackProtocolRunEvent } from '/app/redux-resources/analytics'
+import { useFeatureFlag } from '/app/redux/config'
+import { getLocalRobot } from '/app/redux/discovery'
+import {
+  useLastRunCommand,
+  useMostRecentCompletedAnalysis,
+  useNotifyAllCommandsQuery,
+  useNotifyRunQuery,
+  useRunTimestamps,
+} from '/app/resources/runs'
+
+import { RunningProtocol } from '..'
 
 import type { UseQueryResult } from 'react-query'
 import type { ProtocolAnalyses, RunCommandSummary } from '@opentrons/api-client'
@@ -56,12 +60,14 @@ vi.mock('/app/redux-resources/robots')
 vi.mock('/app/organisms/RunTimeControl/hooks')
 vi.mock('/app/organisms/ODD/RunningProtocol')
 vi.mock('/app/redux/discovery')
-vi.mock('/app/organisms/ODD/RunningProtocol/CancelingRunModal')
-vi.mock('/app/organisms/ODD/OpenDoorAlertModal')
 vi.mock('/app/resources/runs')
 vi.mock('/app/redux/config')
 vi.mock('/app/organisms/ErrorRecoveryFlows')
 vi.mock('/app/organisms/InterventionModal')
+vi.mock('/app/organisms/DoorOpenControl/useIsDoorOpen')
+vi.mock('/app/local-resources/images/hooks/useToastOnErrorImage')
+vi.mock('/app/organisms/ODD/RunningProtocol/CancelingRunModal')
+vi.mock('/app/organisms/ODD/OpenDoorAlertModal')
 
 const RUN_ID = 'run_id'
 const ROBOT_NAME = 'otie'
@@ -72,6 +78,10 @@ const PROTOCOL_ANALYSIS = {
   status: 'completed',
   labware: [],
 } as any
+const DOOR_RESULT = {
+  isDoorOpen: true,
+  moduleDoorLocation: null,
+}
 const mockPlayRun = vi.fn()
 const mockPauseRun = vi.fn()
 const mockStopRun = vi.fn()
@@ -91,12 +101,16 @@ const render = (path = '/') => {
 describe('RunningProtocol', () => {
   beforeEach(() => {
     when(vi.mocked(useNotifyRunQuery))
-      .calledWith(RUN_ID, { staleTime: Infinity })
+      .calledWith(RUN_ID, {
+        staleTime: Infinity,
+        refetchInterval: 5000,
+      })
       .thenReturn({
         data: {
           data: {
             id: RUN_ID,
             protocolId: PROTOCOL_ID,
+            status: RUN_STATUS_IDLE,
             errors: [],
           },
         },
@@ -107,7 +121,6 @@ describe('RunningProtocol', () => {
       .thenReturn({
         trackProtocolRunEvent: vi.fn(),
       })
-    when(vi.mocked(useRunStatus)).calledWith(RUN_ID).thenReturn(RUN_STATUS_IDLE)
     when(vi.mocked(useProtocolAnalysesQuery))
       .calledWith(PROTOCOL_ID, { staleTime: Infinity }, expect.any(Boolean))
       .thenReturn({
@@ -134,7 +147,8 @@ describe('RunningProtocol', () => {
       pauseRun: mockPauseRun,
       stopRun: mockStopRun,
       resumeRunFromRecovery: mockResumeRunFromRecovery,
-      resumeRunFromRecoveryAssumingFalsePositive: mockResumeRunFromRecoveryAssumingFalsePositive,
+      resumeRunFromRecoveryAssumingFalsePositive:
+        mockResumeRunFromRecoveryAssumingFalsePositive,
       isPlayRunActionLoading: false,
       isPauseRunActionLoading: false,
       isStopRunActionLoading: false,
@@ -146,7 +160,6 @@ describe('RunningProtocol', () => {
       .thenReturn(mockRobotSideAnalysis)
     when(vi.mocked(useNotifyAllCommandsQuery))
       .calledWith(RUN_ID, {
-        cursor: null,
         pageLength: 1,
       })
       .thenReturn(mockUseAllCommandsResponseNonDeterministic)
@@ -162,6 +175,7 @@ describe('RunningProtocol', () => {
     vi.mocked(useErrorRecoveryFlows).mockReturnValue({
       isERActive: false,
       failedCommand: {} as any,
+      runLwDefsByUri: {} as any,
     })
     vi.mocked(useInterventionModal).mockReturnValue({
       showModal: false,
@@ -184,10 +198,26 @@ describe('RunningProtocol', () => {
     expect(vi.mocked(RunningProtocolSkeleton)).toHaveBeenCalled()
   })
   it('should render the canceling run modal when run status is stop requested', () => {
-    when(vi.mocked(useRunStatus))
-      .calledWith(RUN_ID, { refetchInterval: 5000 })
-      .thenReturn(RUN_STATUS_STOP_REQUESTED)
+    when(vi.mocked(useNotifyRunQuery))
+      .calledWith(RUN_ID, {
+        staleTime: Infinity,
+        refetchInterval: 5000,
+      })
+      .thenReturn({
+        key: PROTOCOL_KEY,
+        data: {
+          data: {
+            id: RUN_ID,
+            status: RUN_STATUS_STOP_REQUESTED,
+            protocol_id: PROTOCOL_KEY,
+          },
+        },
+      } as any)
+    vi.mocked(useProtocolQuery).mockReturnValue({
+      data: { data: { metadata: { protocolName: 'mock protocol name' } } },
+    } as any)
     render(`/runs/${RUN_ID}/run`)
+
     expect(vi.mocked(CancelingRunModal)).toHaveBeenCalled()
   })
   it('should render CurrentRunningProtocolCommand when loaded the data', () => {
@@ -195,36 +225,127 @@ describe('RunningProtocol', () => {
     expect(vi.mocked(CurrentRunningProtocolCommand)).toHaveBeenCalled()
   })
 
-  it('should render open door alert modal, when run staus is blocked by open door', () => {
-    when(vi.mocked(useRunStatus))
-      .calledWith(RUN_ID, { refetchInterval: 5000 })
-      .thenReturn(RUN_STATUS_BLOCKED_BY_OPEN_DOOR)
+  it('should render open door alert modal, when run status is blocked by open door', () => {
+    when(vi.mocked(useIsDoorOpen))
+      .calledWith(ROBOT_NAME)
+      .thenReturn(DOOR_RESULT)
+    when(vi.mocked(useNotifyRunQuery))
+      .calledWith(RUN_ID, {
+        staleTime: Infinity,
+        refetchInterval: 5000,
+      })
+      .thenReturn({
+        data: { data: { id: RUN_ID, status: RUN_STATUS_BLOCKED_BY_OPEN_DOOR } },
+      } as any)
+    when(vi.mocked(useIsDoorOpen))
+      .calledWith(ROBOT_NAME)
+      .thenReturn(DOOR_RESULT)
+    vi.mocked(useProtocolQuery).mockReturnValue({
+      data: { data: { metadata: { protocolName: 'mockProtocol' } } },
+    } as any)
     render(`/runs/${RUN_ID}/run`)
-    expect(vi.mocked(OpenDoorAlertModal)).toHaveBeenCalled()
+    expect(vi.mocked(OpenDoorAlertModal)).toHaveBeenCalledWith(
+      { moduleDoorLocation: null },
+      {}
+    )
+  })
+
+  it('should render open stacker door alert modal, when run staus is blocked by open stacker door', () => {
+    when(vi.mocked(useNotifyRunQuery))
+      .calledWith(RUN_ID, {
+        staleTime: Infinity,
+        refetchInterval: 5000,
+      })
+      .thenReturn({
+        data: { data: { id: RUN_ID, status: RUN_STATUS_BLOCKED_BY_OPEN_DOOR } },
+      } as any)
+
+    const mockOpenStacker = {
+      isDoorOpen: true,
+      moduleDoorLocation: 'A4',
+    }
+    when(vi.mocked(useIsDoorOpen))
+      .calledWith(ROBOT_NAME)
+      .thenReturn(mockOpenStacker)
+    vi.mocked(useProtocolQuery).mockReturnValue({
+      data: { data: { metadata: { protocolName: 'mockProtocol' } } },
+    } as any)
+    render(`/runs/${RUN_ID}/run`)
+    expect(vi.mocked(OpenDoorAlertModal)).toHaveBeenCalledWith(
+      { moduleDoorLocation: mockOpenStacker.moduleDoorLocation },
+      {}
+    )
+  })
+
+  it('should render open unconfigured stacker door alert modal, when run staus is blocked by open stacker door not in the deck config', () => {
+    when(vi.mocked(useNotifyRunQuery))
+      .calledWith(RUN_ID, {
+        staleTime: Infinity,
+        refetchInterval: 5000,
+      })
+      .thenReturn({
+        data: { data: { id: RUN_ID, status: RUN_STATUS_BLOCKED_BY_OPEN_DOOR } },
+      } as any)
+
+    const mockUnconfiguredOpenStacker = {
+      isDoorOpen: true,
+      moduleDoorLocation: NOT_CONFIGURED,
+    }
+    when(vi.mocked(useIsDoorOpen))
+      .calledWith(ROBOT_NAME)
+      .thenReturn(mockUnconfiguredOpenStacker)
+    vi.mocked(useProtocolQuery).mockReturnValue({
+      data: { data: { metadata: { protocolName: 'mockProtocol' } } },
+    } as any)
+    render(`/runs/${RUN_ID}/run`)
+    expect(vi.mocked(OpenDoorAlertModal)).toHaveBeenCalledWith(
+      { moduleDoorLocation: NOT_CONFIGURED },
+      {}
+    )
   })
 
   it(`should render not open door alert modal, when run status is ${RUN_STATUS_AWAITING_RECOVERY_BLOCKED_BY_OPEN_DOOR}`, () => {
-    when(vi.mocked(useRunStatus))
-      .calledWith(RUN_ID, { refetchInterval: 5000 })
-      .thenReturn(RUN_STATUS_AWAITING_RECOVERY_BLOCKED_BY_OPEN_DOOR)
+    when(vi.mocked(useNotifyRunQuery))
+      .calledWith(RUN_ID, {
+        staleTime: Infinity,
+        refetchInterval: 5000,
+      })
+      .thenReturn({
+        data: {
+          data: {
+            id: RUN_ID,
+            status: RUN_STATUS_AWAITING_RECOVERY_BLOCKED_BY_OPEN_DOOR,
+          },
+        },
+      } as any)
+    vi.mocked(useProtocolQuery).mockReturnValue({
+      data: { data: { metadata: { protocolName: 'mockProtocol' } } },
+    } as any)
     render(`/runs/${RUN_ID}/run`)
     expect(vi.mocked(OpenDoorAlertModal)).not.toHaveBeenCalled()
   })
 
   it(`should display a Run Paused splash screen if the run status is "${RUN_STATUS_AWAITING_RECOVERY}"`, () => {
-    when(vi.mocked(useRunStatus))
-      .calledWith(RUN_ID, { refetchInterval: 5000 })
-      .thenReturn(RUN_STATUS_AWAITING_RECOVERY)
+    when(vi.mocked(useNotifyRunQuery))
+      .calledWith(RUN_ID, {
+        staleTime: Infinity,
+        refetchInterval: 5000,
+      })
+      .thenReturn({
+        data: { data: { id: RUN_ID, status: RUN_STATUS_AWAITING_RECOVERY } },
+      } as any)
+    vi.mocked(useProtocolQuery).mockReturnValue({
+      data: { data: { metadata: { protocolName: 'mockProtocol' } } },
+    } as any)
     render(`/runs/${RUN_ID}/run`)
   })
 
   it('should render ErrorRecovery appropriately', () => {
-    render(`/runs/${RUN_ID}/run`)
     expect(screen.queryByText('MOCK ERROR RECOVERY')).not.toBeInTheDocument()
-
     vi.mocked(useErrorRecoveryFlows).mockReturnValue({
       isERActive: true,
       failedCommand: {} as any,
+      runLwDefsByUri: {} as any,
     })
     render(`/runs/${RUN_ID}/run`)
     screen.getByText('MOCK ERROR RECOVERY')

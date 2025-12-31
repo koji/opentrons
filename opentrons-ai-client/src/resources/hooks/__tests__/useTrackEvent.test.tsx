@@ -1,13 +1,17 @@
-import { describe, it, vi, expect, afterEach } from 'vitest'
-import { trackEvent } from '../../../analytics/mixpanel'
-import { useTrackEvent } from '../useTrackEvent'
 import { renderHook } from '@testing-library/react'
-import { mixpanelAtom } from '../../atoms'
-import type { AnalyticsEvent } from '../../../analytics/mixpanel'
-import type { Mixpanel } from '../../types'
-import { TestProvider } from '../../../__testing-utils__'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../../../analytics/mixpanel', () => ({
+import { TestProvider } from '/ai-client/__testing-utils__'
+import { trackEvent } from '/ai-client/analytics/mixpanel'
+import { mixpanelAtom } from '/ai-client/resources/atoms'
+
+import { useTrackEvent } from '../useTrackEvent'
+
+import type { ReactNode } from 'react'
+import type { AnalyticsEvent } from '/ai-client/analytics/mixpanel'
+import type { Mixpanel } from '../../types'
+
+vi.mock('/ai-client/analytics/mixpanel', () => ({
   trackEvent: vi.fn(),
 }))
 
@@ -18,7 +22,7 @@ const mockMixpanelAtom: Mixpanel = {
   isInitialized: false,
 }
 
-const wrapper = ({ children }: { children: React.ReactNode }) => {
+const wrapper = ({ children }: { children: ReactNode }) => {
   return (
     <TestProvider initialValues={[[mixpanelAtom, mockMixpanelAtom]]}>
       {children}
@@ -32,7 +36,7 @@ describe('useTrackEvent', () => {
   })
 
   it('should call trackEvent with the correct arguments when hasOptedIn is true', () => {
-    const wrapper = ({ children }: { children: React.ReactNode }) => (
+    const wrapper = ({ children }: { children: ReactNode }) => (
       <TestProvider initialValues={[[mixpanelAtom, mockMixpanelAtom]]}>
         {children}
       </TestProvider>

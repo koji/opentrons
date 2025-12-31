@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { css } from 'styled-components'
+
 import {
   ALIGN_CENTER,
   ALIGN_FLEX_END,
@@ -7,21 +9,23 @@ import {
   COLORS,
   Flex,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   PrimaryButton,
   RESPONSIVENESS,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
-import { css } from 'styled-components'
-import { SimpleWizardBody } from '/app/molecules/SimpleWizardBody'
+
 import { SmallButton } from '/app/atoms/buttons'
+import { SimpleWizardBody } from '/app/molecules/SimpleWizardBody'
 
 interface ProbeNotAttachedProps {
   handleOnClick: () => void
   setShowUnableToDetect: (ableToDetect: boolean) => void
   isOnDevice: boolean
 }
+
+// TODO(jh 01-07-25): This component is utilized by other flows. Let's hoist it out of PipetteWizardFlows.
 
 export const ProbeNotAttached = (
   props: ProbeNotAttachedProps

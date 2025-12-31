@@ -1,12 +1,11 @@
 import { useMutation, useQueryClient } from 'react-query'
+
 import { createCommand } from '@opentrons/api-client'
+
 import { useHost } from '../api'
-import type { UseMutationResult, UseMutateAsyncFunction } from 'react-query'
-import type {
-  CommandData,
-  HostConfig,
-  CreateCommandParams,
-} from '@opentrons/api-client'
+
+import type { UseMutateAsyncFunction, UseMutationResult } from 'react-query'
+import type { CommandData, CreateCommandParams } from '@opentrons/api-client'
 import type { CreateCommand } from '@opentrons/shared-data'
 
 interface CreateCommandMutateParams extends CreateCommandParams {
@@ -36,7 +35,7 @@ export function useCreateCommandMutation(): UseCreateCommandMutationResult {
     params => {
       const { runId, command, ...rest } = params
 
-      return createCommand(host as HostConfig, runId, command, {
+      return createCommand(host!, runId, command, {
         ...rest,
       }).then(response => {
         queryClient.invalidateQueries([host, 'runs']).catch((e: Error) => {

@@ -1,4 +1,8 @@
 {
+  "commandAnnotations": [],
+  "commandPreconditions": {
+    "isCameraUsed": false
+  },
   "commands": [
     {
       "commandType": "home",
@@ -294,6 +298,11 @@
               "x": 0,
               "y": 0,
               "z": 121
+            },
+            "opentrons_flex_tiprack_lid": {
+              "x": 0,
+              "y": 0,
+              "z": 0.25
             }
           },
           "stackingOffsetWithModule": {},
@@ -1165,7 +1174,22 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "C3",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutoutC3",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "flexStackerModuleV1",
+              "singleRightSlot",
+              "stagingAreaRightSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -2351,7 +2375,20 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "C2",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutoutC2",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "singleCenterSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -3518,7 +3555,20 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "C1",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutoutC1",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "singleLeftSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -3537,101 +3587,6 @@
         "model": "thermocyclerModuleV2"
       },
       "result": {
-        "definition": {
-          "calibrationPoint": {
-            "x": 14.4,
-            "y": 64.93,
-            "z": 97.8
-          },
-          "compatibleWith": [],
-          "dimensions": {
-            "bareOverallHeight": 108.96,
-            "lidHeight": 61.7,
-            "overLabwareHeight": 0.0
-          },
-          "displayName": "Thermocycler Module GEN2",
-          "gripperOffsets": {
-            "default": {
-              "dropOffset": {
-                "x": 0.0,
-                "y": 0.0,
-                "z": 5.6
-              },
-              "pickUpOffset": {
-                "x": 0.0,
-                "y": 0.0,
-                "z": 4.6
-              }
-            }
-          },
-          "labwareOffset": {
-            "x": 0.0,
-            "y": 68.8,
-            "z": 108.96
-          },
-          "model": "thermocyclerModuleV2",
-          "moduleType": "thermocyclerModuleType",
-          "otSharedSchema": "module/schemas/2",
-          "quirks": [],
-          "slotTransforms": {
-            "ot3_standard": {
-              "B1": {
-                "cornerOffsetFromSlot": [
-                  [
-                    -98,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    -20.005,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    -0.84,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ]
-                ],
-                "labwareOffset": [
-                  [
-                    -98,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    -20.005,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    -0.84,
-                    0,
-                    0,
-                    1
-                  ],
-                  [
-                    0,
-                    0,
-                    0,
-                    1
-                  ]
-                ]
-              }
-            }
-          }
-        },
         "model": "thermocyclerModuleV2",
         "moduleId": "UUID",
         "serialNumber": "UUID"
@@ -4801,7 +4756,20 @@
             }
           }
         },
-        "labwareId": "UUID"
+        "labwareId": "UUID",
+        "locationSequence": [
+          {
+            "addressableAreaName": "A2",
+            "kind": "onAddressableArea"
+          },
+          {
+            "cutoutId": "cutoutA2",
+            "kind": "onCutoutFixture",
+            "possibleCutoutFixtureIds": [
+              "singleCenterSlot"
+            ]
+          }
+        ]
       },
       "startedAt": "TIMESTAMP",
       "status": "succeeded"
@@ -4957,12 +4925,7 @@
       ]
     }
   ],
-  "files": [
-    {
-      "name": "Flex_X_v2_16_P1000_96_TC_PartialTipPickupThermocyclerLidConflict.py",
-      "role": "main"
-    }
-  ],
+  "files": [],
   "labware": [
     {
       "definitionUri": "opentrons/opentrons_flex_96_tiprack_50ul/1",
@@ -4997,6 +4960,7 @@
       }
     }
   ],
+  "liquidClasses": [],
   "liquids": [],
   "metadata": {},
   "modules": [

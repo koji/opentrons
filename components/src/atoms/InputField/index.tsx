@@ -1,15 +1,30 @@
-import * as React from 'react'
+import { forwardRef } from 'react'
 import styled, { css } from 'styled-components'
 
-import { Flex } from '../../primitives'
-import { ALIGN_CENTER, DIRECTION_COLUMN, TEXT_ALIGN_RIGHT } from '../../styles'
 import { BORDERS, COLORS } from '../../helix-design-system'
 import { Icon } from '../../icons'
-import { RESPONSIVENESS, SPACING, TYPOGRAPHY } from '../../ui-style-constants'
-import { Tooltip } from '../Tooltip'
+import { Flex } from '../../primitives'
+import {
+  ALIGN_CENTER,
+  DIRECTION_COLUMN,
+  DIRECTION_ROW,
+  NO_WRAP,
+  TEXT_ALIGN_RIGHT,
+} from '../../styles'
 import { useHoverTooltip } from '../../tooltips'
+import { RESPONSIVENESS, SPACING, TYPOGRAPHY } from '../../ui-style-constants'
 import { StyledText } from '../StyledText'
+import { Tooltip } from '../Tooltip'
+
+import type {
+  ChangeEventHandler,
+  FocusEvent,
+  MouseEvent,
+  MutableRefObject,
+  ReactNode,
+} from 'react'
 import type { IconName } from '../../icons'
+
 export const INPUT_TYPE_NUMBER = 'number' as const
 export const LEGACY_INPUT_TYPE_TEXT = 'text' as const
 export const LEGACY_INPUT_TYPE_PASSWORD = 'password' as const
@@ -19,7 +34,7 @@ export interface InputFieldProps {
   /** field is disabled if value is true */
   disabled?: boolean
   /** change handler */
-  onChange?: React.ChangeEventHandler<HTMLInputElement>
+  onChange?: ChangeEventHandler<HTMLInputElement>
   /** name of field in form */
   name?: string
   /** optional ID of <input> element */
@@ -27,7 +42,7 @@ export interface InputFieldProps {
   /** placeholder text */
   placeholder?: string
   /** optional suffix component, appears to the right of input text */
-  units?: React.ReactNode
+  units?: ReactNode
   /** current value of text in box, defaults to '' */
   value?: string | number | null
   /** if included, InputField will use error style and display error instead of caption */
@@ -44,11 +59,11 @@ export interface InputFieldProps {
     | typeof LEGACY_INPUT_TYPE_PASSWORD
     | typeof INPUT_TYPE_NUMBER
   /** mouse click handler */
-  onClick?: (event: React.MouseEvent<HTMLInputElement>) => unknown
+  onClick?: (event: MouseEvent<HTMLElement>) => unknown
   /** focus handler */
-  onFocus?: (event: React.FocusEvent<HTMLInputElement>) => unknown
+  onFocus?: (event: FocusEvent<HTMLInputElement>) => unknown
   /** blur handler */
-  onBlur?: (event: React.FocusEvent<HTMLInputElement>) => unknown
+  onBlur?: (event: FocusEvent<HTMLInputElement>) => unknown
   /** makes input field read-only */
   readOnly?: boolean
   /** html tabindex property */
@@ -58,8 +73,8 @@ export interface InputFieldProps {
   /** if true, clear out value and add '-' placeholder */
   isIndeterminate?: boolean
   /** if input type is number, these are the min and max values */
-  max?: number
-  min?: number
+  max?: number | string
+  min?: number | string
   /** horizontal text alignment for title, input, and (sub)captions */
   textAlign?:
     | typeof TYPOGRAPHY.textAlignLeft
@@ -67,14 +82,22 @@ export interface InputFieldProps {
   /** small or medium input field height, relevant only */
   size?: 'medium' | 'small'
   /** react useRef to control input field instead of react event */
-  ref?: React.MutableRefObject<HTMLInputElement | null>
+  ref?: MutableRefObject<HTMLInputElement | null>
+  /** optional IconName to display icon aligned to left of input field */
   leftIcon?: IconName
+  /** if true, show delete icon aligned to right of input field */
   showDeleteIcon?: boolean
+  /** callback passed to optional delete icon onClick */
   onDelete?: () => void
+  /** if true, style the background of input field to error state */
   hasBackgroundError?: boolean
+  /** optional prop to override input field border radius */
+  borderRadius?: string
+  /** optional prop to override input field padding */
+  padding?: string
 }
 
-export const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
+export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
   (props, ref): JSX.Element => {
     const {
       placeholder,
@@ -86,11 +109,17 @@ export const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
       showDeleteIcon = false,
       hasBackgroundError = false,
       onDelete,
+      borderRadius,
+      padding,
+      id,
+      disabled,
+      error,
       ...inputProps
     } = props
     const hasError = props.error != null
-    const value = props.isIndeterminate ?? false ? '' : props.value ?? ''
-    const placeHolder = props.isIndeterminate ?? false ? '-' : props.placeholder
+    const value = (props.isIndeterminate ?? false) ? '' : (props.value ?? '')
+    const placeHolder =
+      (props.isIndeterminate ?? false) ? '-' : props.placeholder
     const [targetProps, tooltipProps] = useHoverTooltip()
 
     const OUTER_CSS = css`
@@ -107,8 +136,10 @@ export const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
     const INPUT_FIELD = css`
       display: flex;
       background-color: ${hasBackgroundError ? COLORS.red30 : COLORS.white};
-      border-radius: ${BORDERS.borderRadius4};
-      padding: ${SPACING.spacing8};
+      border-radius: ${borderRadius != null
+        ? borderRadius
+        : BORDERS.borderRadius4};
+      padding: ${padding ?? SPACING.spacing8};
       border: ${hasBackgroundError
         ? 'none'
         : `1px ${BORDERS.styleSolid}
@@ -206,6 +237,9 @@ export const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
       color: ${COLORS.grey60};
       padding-bottom: ${SPACING.spacing4};
       text-align: ${textAlign};
+      font-size: ${TYPOGRAPHY.fontSizeH3};
+      line-height: ${TYPOGRAPHY.lineHeight20};
+      font-weight: ${TYPOGRAPHY.fontWeightRegular};
       @media ${RESPONSIVENESS.touchscreenMediaQuerySpecs} {
         font-size: ${TYPOGRAPHY.fontSize22};
         font-weight: ${TYPOGRAPHY.fontWeightRegular};
@@ -228,6 +262,7 @@ export const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
       color: ${props.disabled ? COLORS.grey40 : COLORS.grey50};
       font: ${TYPOGRAPHY.bodyTextRegular};
       text-align: ${TYPOGRAPHY.textAlignRight};
+      white-space: ${NO_WRAP};
       @media ${RESPONSIVENESS.touchscreenMediaQuerySpecs} {
         color: ${props.disabled ? COLORS.grey40 : COLORS.grey50};
         font-size: ${TYPOGRAPHY.fontSize22};
@@ -245,18 +280,18 @@ export const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
         fontSize={TYPOGRAPHY.fontSizeP}
         fontWeight={TYPOGRAPHY.fontWeightRegular}
         color={props.error != null ? COLOR_WARNING_DARK : COLORS.black90}
-        opacity={props.disabled ?? false ? 0.5 : ''}
+        opacity={(props.disabled ?? false) ? 0.5 : ''}
       >
         <Flex flexDirection={DIRECTION_COLUMN} width="100%">
           {title != null ? (
-            <Flex gridGap={SPACING.spacing8}>
-              <StyledText
-                desktopStyle="bodyDefaultRegular"
-                htmlFor={props.id}
-                css={TITLE_STYLE}
-              >
+            <Flex
+              flexDirection={DIRECTION_ROW}
+              gridGap={SPACING.spacing8}
+              alignItems={ALIGN_CENTER}
+            >
+              <label htmlFor={id} css={TITLE_STYLE}>
                 {title}
-              </StyledText>
+              </label>
               {tooltipText != null ? (
                 <>
                   <Flex {...targetProps}>
@@ -271,7 +306,12 @@ export const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
               ) : null}
             </Flex>
           ) : null}
-          <Flex width="100%" flexDirection={DIRECTION_COLUMN} css={OUTER_CSS}>
+          <Flex
+            width="100%"
+            flexDirection={DIRECTION_COLUMN}
+            css={OUTER_CSS}
+            onClick={props.disabled === true ? undefined : props.onClick}
+          >
             <Flex
               tabIndex={tabIndex}
               css={INPUT_FIELD}
@@ -300,6 +340,7 @@ export const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
                   event.currentTarget.blur()
                 }} // prevent value change with scrolling
                 type={props.type}
+                disabled={disabled}
                 ref={ref}
               />
               {props.units != null ? (
@@ -320,13 +361,16 @@ export const InputField = React.forwardRef<HTMLInputElement, InputFieldProps>(
             <StyledText
               desktopStyle="bodyDefaultRegular"
               css={FORM_BOTTOM_SPACE_STYLE}
-              color={COLORS.grey60}
+              color={hasError ? COLORS.red50 : COLORS.grey60}
             >
               {props.caption}
             </StyledText>
           ) : null}
           {hasError ? (
-            <StyledText desktopStyle="captionRegular" css={ERROR_TEXT_STYLE}>
+            <StyledText
+              desktopStyle="bodyDefaultRegular"
+              css={ERROR_TEXT_STYLE}
+            >
               {props.error}
             </StyledText>
           ) : null}

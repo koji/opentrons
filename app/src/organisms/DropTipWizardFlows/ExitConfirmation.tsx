@@ -2,16 +2,16 @@ import { Trans, useTranslation } from 'react-i18next'
 import { css } from 'styled-components'
 
 import {
-  COLORS,
-  StyledText,
-  Icon,
-  Flex,
-  RESPONSIVENESS,
-  DISPLAY_FLEX,
-  SPACING,
-  DIRECTION_COLUMN,
   ALIGN_CENTER,
+  COLORS,
+  DIRECTION_COLUMN,
+  DISPLAY_FLEX,
+  Flex,
+  Icon,
   JUSTIFY_CENTER,
+  RESPONSIVENESS,
+  SPACING,
+  StyledText,
   TEXT_ALIGN_CENTER,
 } from '@opentrons/components'
 
@@ -33,7 +33,7 @@ export function ExitConfirmation(
   return (
     <>
       <Flex css={CONTAINER_STYLE}>
-        <Icon name="alert-circle" css={ICON_STYLE} />
+        <Icon name="ot-alert" css={ICON_STYLE} />
         <StyledText oddStyle="level3HeaderBold" desktopStyle="headingSmallBold">
           {t('remove_any_attached_tips')}
         </StyledText>

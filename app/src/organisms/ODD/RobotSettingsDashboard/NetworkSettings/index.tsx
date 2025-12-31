@@ -1,6 +1,5 @@
-import type * as React from 'react'
-import { css } from 'styled-components'
 import { useTranslation } from 'react-i18next'
+import { css } from 'styled-components'
 
 import {
   ALIGN_CENTER,
@@ -12,14 +11,15 @@ import {
   DIRECTION_ROW,
   Flex,
   Icon,
-  SPACING,
   LegacyStyledText,
+  SPACING,
   TYPOGRAPHY,
 } from '@opentrons/components'
 
 import { ChildNavigation } from '/app/organisms/ODD/ChildNavigation'
 
-import type { IconName, ChipType } from '@opentrons/components'
+import type { ComponentProps } from 'react'
+import type { ChipType, IconName } from '@opentrons/components'
 import type { NetworkConnection } from '/app/resources/networking/hooks/useNetworkConnection'
 import type { SetSettingOption } from '../types'
 
@@ -87,7 +87,7 @@ export function NetworkSettings({
   )
 }
 
-interface NetworkSettingButtonProps extends React.ComponentProps<typeof Btn> {
+interface NetworkSettingButtonProps extends ComponentProps<typeof Btn> {
   buttonTitle: string
   iconName: IconName
   chipType: ChipType

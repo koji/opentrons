@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format } from 'date-fns'
 import { css } from 'styled-components'
@@ -18,23 +18,30 @@ import {
   OVERFLOW_WRAP_ANYWHERE,
   SIZE_1,
   SPACING,
-  TOOLTIP_TOP_START,
   Tooltip,
+  TOOLTIP_TOP_START,
   TYPOGRAPHY,
   useHoverTooltip,
 } from '@opentrons/components'
-import { getUniqueWellProperties } from '@opentrons/shared-data'
+import {
+  getLabwareDefIsStandard,
+  getLabwareDisplayName,
+  getUniqueWellProperties,
+} from '@opentrons/shared-data'
+
 import { Slideout } from '/app/atoms/Slideout'
-import { getWellLabel } from './helpers/labels'
-import { WellCount } from './WellCount'
-import { WellProperties } from './WellProperties'
-import { Dimensions } from './Dimensions'
-import { WellDimensions } from './WellDimensions'
-import { WellSpacing } from './WellSpacing'
-import { ManufacturerDetails } from './ManufacturerDetails'
-import { InsertDetails } from './InsertDetails'
-import { Gallery } from './Gallery'
+
 import { CustomLabwareOverflowMenu } from '../LabwareCard/CustomLabwareOverflowMenu'
+import { Dimensions } from './Dimensions'
+import { Gallery } from './Gallery'
+import { getWellLabel } from './helpers/labels'
+import { InsertDetails } from './InsertDetails'
+import { ManufacturerDetails } from './ManufacturerDetails'
+import { WellCount } from './WellCount'
+import { WellDimensions } from './WellDimensions'
+import { WellProperties } from './WellProperties'
+import { WellSpacing } from './WellSpacing'
+
 import type { LabwareDefAndDate } from '/app/local-resources/labware'
 
 const CLOSE_ICON_STYLE = css`
@@ -68,7 +75,8 @@ export function LabwareDetails(props: LabwareDetailsProps): JSX.Element {
   const { t } = useTranslation(['labware_landing', 'branded'])
   const { definition, modified, filename } = props.labware
   const { metadata, parameters, brand, wells, ordering } = definition
-  const apiName = definition.parameters.loadName
+  const displayName = getLabwareDisplayName(definition)
+  const apiName = parameters.loadName
   const { displayVolumeUnits } = metadata
   const wellGroups = getUniqueWellProperties(definition)
   const wellLabel = getWellLabel(definition)
@@ -77,7 +85,7 @@ export function LabwareDetails(props: LabwareDetailsProps): JSX.Element {
   const insertCategory = insert?.metadata.displayCategory
   const irregular = wellGroups.length > 1
   const isMultiRow = ordering.some(row => row.length > 1)
-  const isCustomDefinition = definition.namespace !== 'opentrons'
+  const isCustomDefinition = !getLabwareDefIsStandard(definition)
   const [showToolTip, setShowToolTip] = useState<boolean>(false)
   const [targetProps, tooltipProps] = useHoverTooltip({
     placement: TOOLTIP_TOP_START,
@@ -109,7 +117,7 @@ export function LabwareDetails(props: LabwareDetailsProps): JSX.Element {
         justifyContent={JUSTIFY_SPACE_BETWEEN}
       >
         <LegacyStyledText css={TYPOGRAPHY.h2SemiBold}>
-          {props.labware.definition.metadata.displayName}
+          {displayName}
         </LegacyStyledText>
         <Link
           onClick={props.onClose}
@@ -127,7 +135,7 @@ export function LabwareDetails(props: LabwareDetailsProps): JSX.Element {
         <Flex flexDirection={DIRECTION_ROW} alignItems={ALIGN_CENTER}>
           <Icon color={COLORS.blue50} name="check-decagram" height=".7rem" />{' '}
           <LegacyStyledText
-            as="label"
+            forwardedAs="label"
             id="LabwareDetails_opentronsDef"
             marginLeft={SPACING.spacing4}
           >
@@ -143,7 +151,7 @@ export function LabwareDetails(props: LabwareDetailsProps): JSX.Element {
           alignItems={ALIGN_CENTER}
         >
           <LegacyStyledText
-            as="label"
+            forwardedAs="label"
             color={COLORS.grey50}
             id="LabwareDetails_dateAdded"
           >
@@ -167,7 +175,7 @@ export function LabwareDetails(props: LabwareDetailsProps): JSX.Element {
         marginBottom={SPACING.spacing24}
         borderRadius={BORDERS.borderRadius4}
       >
-        <LegacyStyledText as="h6">{t('api_name')}</LegacyStyledText>
+        <LegacyStyledText forwardedAs="h6">{t('api_name')}</LegacyStyledText>
         <Link
           css={TYPOGRAPHY.pRegular}
           onClick={handleCopy}

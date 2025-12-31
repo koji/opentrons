@@ -80,5 +80,7 @@ def oem_mode_enabled() -> bool:
     return advs.get_setting_with_env_overload("enableOEMMode", RobotTypeEnum.FLEX)
 
 
-def allow_liquid_classes(robot_type: RobotTypeEnum) -> bool:
-    return advs.get_setting_with_env_overload("allowLiquidClasses", robot_type)
+def flex_stacker_tof_sensors_disabled() -> bool:
+    return advs.get_setting_with_env_overload(
+        "disableFlexStackerLabwareDetection", RobotTypeEnum.FLEX
+    )

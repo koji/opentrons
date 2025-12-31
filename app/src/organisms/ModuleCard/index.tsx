@@ -12,70 +12,92 @@ import {
   DIRECTION_ROW,
   Flex,
   Icon,
-  LegacyStyledText,
   ModuleIcon,
   OverflowBtn,
   SPACING,
+  StyledText,
+  SUCCESS_TOAST,
   Tooltip,
   TYPOGRAPHY,
   useHoverTooltip,
-  SUCCESS_TOAST,
   useMenuHandleClickOutside,
   useOnClickOutside,
 } from '@opentrons/components'
 import {
+  useCurrentAllSubsystemUpdatesQuery,
+  useHost,
+} from '@opentrons/react-api-client'
+import {
+  ABSORBANCE_READER_TYPE,
+  FLEX_STACKER_MODULE_TYPE,
   getModuleDisplayName,
   HEATERSHAKER_MODULE_TYPE,
   MAGNETIC_MODULE_TYPE,
+  MODULE_MODELS_OT2_ONLY,
   TEMPERATURE_MODULE_TYPE,
   THERMOCYCLER_MODULE_TYPE,
-  MODULE_MODELS_OT2_ONLY,
-  ABSORBANCE_READER_TYPE,
 } from '@opentrons/shared-data'
-import { RUN_STATUS_FINISHING, RUN_STATUS_RUNNING } from '@opentrons/api-client'
 
+import { useModuleUSBPort } from '/app/local-resources/modules'
+import { UpdateBanner } from '/app/molecules/UpdateBanner'
+import { handleModuleWizardFlows } from '/app/organisms/ModuleWizardFlows'
+import { useToaster } from '/app/organisms/ToasterOven'
+import { useIsFlex } from '/app/redux-resources/robots'
 import {
-  getRequestById,
-  PENDING,
+  dismissRequest,
   FAILURE,
   getErrorResponseMessage,
-  dismissRequest,
+  getRequestById,
+  PENDING,
   SUCCESS,
 } from '/app/redux/robot-api'
-import { UpdateBanner } from '/app/molecules/UpdateBanner'
-import { useChainLiveCommands } from '/app/resources/runs'
-import { useCurrentRunStatus } from '/app/organisms/RunTimeControl'
-import { useIsFlex } from '/app/redux-resources/robots'
+import { useNotifyDeckConfigurationQuery } from '/app/resources/deck_configuration'
+import { useIsEstopNotDisengaged } from '/app/resources/devices'
+import { useRunStatuses } from '/app/resources/runs'
 import { getModuleTooHot } from '/app/transformations/modules'
-import { useToaster } from '/app/organisms/ToasterOven'
-import { MagneticModuleData } from './MagneticModuleData'
-import { TemperatureModuleData } from './TemperatureModuleData'
-import { ThermocyclerModuleData } from './ThermocyclerModuleData'
-import { ModuleOverflowMenu } from './ModuleOverflowMenu'
-import { ThermocyclerModuleSlideout } from './ThermocyclerModuleSlideout'
-import { MagneticModuleSlideout } from './MagneticModuleSlideout'
-import { TemperatureModuleSlideout } from './TemperatureModuleSlideout'
+
 import { AboutModuleSlideout } from './AboutModuleSlideout'
+import { AbsorbanceReaderData } from './AbsorbanceReaderData'
+import {
+  MODULE_INFO_DETAIL_TEXT_STYLE,
+  MODULE_INFO_HEADER_TEXT_STYLE,
+  MODULE_INFO_SUB_CONTAINER_STYLE,
+} from './constants'
+import { ErrorInfo } from './ErrorInfo'
+import { FirmwareUpdateFailedModal } from './FirmwareUpdateFailedModal'
+import { FlexStackerModuleData } from './FlexStackerModuleData'
 import { HeaterShakerModuleData } from './HeaterShakerModuleData'
 import { HeaterShakerSlideout } from './HeaterShakerSlideout'
-import { TestShakeSlideout } from './TestShakeSlideout'
-import { ModuleWizardFlows } from '/app/organisms/ModuleWizardFlows'
-import { getModulePrepCommands } from '/app/local-resources/modules'
-import { getModuleCardImage } from './utils'
-import { FirmwareUpdateFailedModal } from './FirmwareUpdateFailedModal'
-import { ErrorInfo } from './ErrorInfo'
+import { MagneticModuleData } from './MagneticModuleData'
+import { MagneticModuleSlideout } from './MagneticModuleSlideout'
+import { ModuleOverflowMenu } from './ModuleOverflowMenu'
 import { ModuleSetupModal } from './ModuleSetupModal'
-import { useIsEstopNotDisengaged } from '/app/resources/devices'
+import { TemperatureModuleData } from './TemperatureModuleData'
+import { TemperatureModuleSlideout } from './TemperatureModuleSlideout'
+import { TestShakeSlideout } from './TestShakeSlideout'
+import { ThermocyclerModuleData } from './ThermocyclerModuleData'
+import { ThermocyclerModuleSlideout } from './ThermocyclerModuleSlideout'
+import { getModuleCardImage } from './utils'
 
 import type { IconProps } from '@opentrons/components'
+import type { ModuleType } from '@opentrons/shared-data'
 import type {
   AttachedModule,
   HeaterShakerModule,
 } from '/app/redux/modules/types'
-import type { State, Dispatch } from '/app/redux/types'
 import type { RequestState } from '/app/redux/robot-api/types'
-import { AbsorbanceReaderData } from './AbsorbanceReaderData'
-import { AbsorbanceReaderSlideout } from './AbsorbanceReaderSlideout'
+import type { Dispatch, State } from '/app/redux/types'
+
+const HAS_SETUP_INSTRUCTIONS_TYPE: ModuleType[] = [
+  FLEX_STACKER_MODULE_TYPE,
+  HEATERSHAKER_MODULE_TYPE,
+]
+const NO_CALIBRATION_TYPE: ModuleType[] = [
+  ABSORBANCE_READER_TYPE,
+  FLEX_STACKER_MODULE_TYPE,
+]
+
+const POLL_INTERVAL_MS = 5000
 
 interface ModuleCardProps {
   module: AttachedModule
@@ -92,6 +114,8 @@ interface ModuleCardProps {
 
 export const ModuleCard = (props: ModuleCardProps): JSX.Element | null => {
   const { t } = useTranslation('device_details')
+  const host = useHost()!
+
   const {
     module,
     robotName,
@@ -120,19 +144,13 @@ export const ModuleCard = (props: ModuleCardProps): JSX.Element | null => {
   const [hasSecondary, setHasSecondary] = useState(false)
   const [showAboutModule, setShowAboutModule] = useState(false)
   const [showTestShake, setShowTestShake] = useState(false)
-  const [showHSWizard, setShowHSWizard] = useState(false)
+  const [showSetupWizard, setShowSetupWizard] = useState(false)
   const [showFWBanner, setShowFWBanner] = useState(true)
-  const [showCalModal, setShowCalModal] = useState(false)
-
   const [targetProps, tooltipProps] = useHoverTooltip()
 
-  const runStatus = useCurrentRunStatus()
-  const isFlex = useIsFlex(robotName)
-  const requireModuleCalibration =
-    isFlex &&
-    !MODULE_MODELS_OT2_ONLY.some(modModel => modModel === module.moduleModel) &&
-    module.moduleType !== ABSORBANCE_READER_TYPE &&
-    module.moduleOffset?.last_modified == null
+  const { isRunRunning } = useRunStatuses()
+  const { parseModuleUSBPort } = useModuleUSBPort()
+
   const isPipetteReady =
     !Boolean(attachPipetteRequired) &&
     !Boolean(calibratePipetteRequired) &&
@@ -163,11 +181,46 @@ export const ModuleCard = (props: ModuleCardProps): JSX.Element | null => {
     }
   }
 
-  const isPending = latestRequest?.status === PENDING
-  const hotToTouch: IconProps = { name: 'ot-hot-to-touch' }
+  const { data: currentSubsystemsUpdatesData } =
+    useCurrentAllSubsystemUpdatesQuery({
+      refetchInterval: POLL_INTERVAL_MS,
+    })
+  const ongoingSubsystemUpdate = currentSubsystemsUpdatesData?.data.find(
+    update =>
+      update.updateStatus === 'queued' || update.updateStatus === 'updating'
+  )
 
-  const isOverflowBtnDisabled =
-    runStatus === RUN_STATUS_RUNNING || runStatus === RUN_STATUS_FINISHING
+  const isPending = latestRequest?.status === PENDING
+
+  const hideBanners =
+    isPending || isRunRunning || ongoingSubsystemUpdate != null
+  const hotToTouch: IconProps = { name: 'ot-hot-to-touch' }
+  const isFlex = useIsFlex(robotName)
+  const deckConfig = useNotifyDeckConfigurationQuery().data
+
+  const getSetupWizardFlow = (): {
+    requireModuleCalibration: boolean
+    requireModuleSetup: boolean
+  } => {
+    if (!isFlex)
+      return { requireModuleCalibration: false, requireModuleSetup: false }
+    if (NO_CALIBRATION_TYPE.includes(module.moduleType)) {
+      return {
+        requireModuleCalibration: false,
+        requireModuleSetup: !deckConfig?.some(
+          c => c.opentronsModuleSerialNumber === module.serialNumber
+        ),
+      }
+    }
+    return {
+      requireModuleCalibration:
+        !MODULE_MODELS_OT2_ONLY.some(
+          modModel => modModel === module.moduleModel
+        ) && module.moduleOffset?.last_modified == null,
+      requireModuleSetup: false,
+    }
+  }
+  const { requireModuleCalibration, requireModuleSetup } = getSetupWizardFlow()
 
   const isTooHot = getModuleTooHot(module)
 
@@ -214,6 +267,11 @@ export const ModuleCard = (props: ModuleCardProps): JSX.Element | null => {
       moduleData = <AbsorbanceReaderData moduleData={module.data} />
       break
     }
+
+    case FLEX_STACKER_MODULE_TYPE: {
+      moduleData = <FlexStackerModuleData moduleData={module.data} />
+      break
+    }
   }
 
   const handleMenuItemClick = (isSecondary: boolean = false): void => {
@@ -234,23 +292,17 @@ export const ModuleCard = (props: ModuleCardProps): JSX.Element | null => {
   }
 
   const handleInstructionsClick = (): void => {
-    setShowHSWizard(true)
+    setShowSetupWizard(true)
   }
 
-  const { chainLiveCommands, isCommandMutationLoading } = useChainLiveCommands()
-  const [
-    prepCommandErrorMessage,
-    setPrepCommandErrorMessage,
-  ] = useState<string>('')
-  const handleCalibrateClick = (): void => {
-    if (getModulePrepCommands(module).length > 0) {
-      chainLiveCommands(getModulePrepCommands(module), false).catch(
-        (e: Error) => {
-          setPrepCommandErrorMessage(e.message)
-        }
-      )
-    }
-    setShowCalModal(true)
+  const handleSetupClick = (): void => {
+    handleModuleWizardFlows({
+      attachedModule: module,
+      showSetupLauncher: true,
+      isLoadedInRun,
+      robotName,
+      host,
+    })
   }
 
   return (
@@ -260,27 +312,16 @@ export const ModuleCard = (props: ModuleCardProps): JSX.Element | null => {
       width="100%"
       data-testid={`ModuleCard_${module.serialNumber}`}
     >
-      {showCalModal ? (
-        <ModuleWizardFlows
-          attachedModule={module}
-          closeFlow={() => {
-            setShowCalModal(false)
-          }}
-          isLoadedInRun={isLoadedInRun}
-          isPrepCommandLoading={isCommandMutationLoading}
-          prepCommandErrorMessage={
-            prepCommandErrorMessage === '' ? undefined : prepCommandErrorMessage
-          }
-        />
-      ) : null}
-      {showHSWizard && module.moduleType === HEATERSHAKER_MODULE_TYPE && (
-        <ModuleSetupModal
-          close={() => {
-            setShowHSWizard(false)
-          }}
-          moduleDisplayName={getModuleDisplayName(module.moduleModel)}
-        />
-      )}
+      {showSetupWizard &&
+        HAS_SETUP_INSTRUCTIONS_TYPE.includes(module.moduleType) && (
+          <ModuleSetupModal
+            close={() => {
+              setShowSetupWizard(false)
+            }}
+            moduleDisplayName={getModuleDisplayName(module.moduleModel)}
+            moduleModel={module.moduleModel}
+          />
+        )}
       {showSlideout && (
         <ModuleSlideout
           module={module}
@@ -310,8 +351,12 @@ export const ModuleCard = (props: ModuleCardProps): JSX.Element | null => {
           }}
         />
       )}
-      <Box padding={SPACING.spacing16} width="100%">
-        <Flex flexDirection={DIRECTION_ROW} paddingRight={SPACING.spacing8}>
+      <Box
+        paddingY={SPACING.spacing16}
+        paddingLeft={SPACING.spacing16}
+        width="100%"
+      >
+        <Flex flexDirection={DIRECTION_ROW} gridGap={SPACING.spacing8}>
           <Flex alignItems={ALIGN_START} opacity={isPending ? '50%' : '100%'}>
             <img
               width="60px"
@@ -323,7 +368,7 @@ export const ModuleCard = (props: ModuleCardProps): JSX.Element | null => {
           <Flex
             flexDirection={DIRECTION_COLUMN}
             flex="100%"
-            paddingLeft={SPACING.spacing8}
+            gridGap={SPACING.spacing8}
           >
             <ErrorInfo attachedModule={module} />
             {latestRequest != null && latestRequest.status === FAILURE && (
@@ -333,34 +378,27 @@ export const ModuleCard = (props: ModuleCardProps): JSX.Element | null => {
                 errorMessage={getErrorResponseMessage(latestRequest.error)}
               />
             )}
-            {attachPipetteRequired != null &&
-            calibratePipetteRequired != null &&
-            updatePipetteFWRequired != null &&
-            requireModuleCalibration &&
-            !isPending ? (
+            {!hideBanners &&
+            (requireModuleCalibration || requireModuleSetup) ? (
               <UpdateBanner
                 robotName={robotName}
-                updateType="calibration"
+                updateType={requireModuleCalibration ? 'calibration' : 'setup'}
                 serialNumber={module.serialNumber}
-                setShowBanner={() => null}
-                handleUpdateClick={handleCalibrateClick}
+                handleUpdateClick={handleSetupClick}
                 attachPipetteRequired={attachPipetteRequired}
                 calibratePipetteRequired={calibratePipetteRequired}
                 updatePipetteFWRequired={updatePipetteFWRequired}
                 isTooHot={isTooHot}
               />
-            ) : null}
-            {/* Calibration performs firmware updates, so only show calibration if both true. */}
-            {!requireModuleCalibration &&
-            module.hasAvailableUpdate &&
-            showFWBanner &&
-            !isPending ? (
+            ) : !hideBanners && module.hasAvailableUpdate && showFWBanner ? (
               <UpdateBanner
                 robotName={robotName}
                 updateType="firmware"
                 serialNumber={module.serialNumber}
-                setShowBanner={setShowFWBanner}
                 handleUpdateClick={handleFirmwareUpdateClick}
+                handleCloseClick={() => {
+                  setShowFWBanner(false)
+                }}
               />
             ) : null}
             {isTooHot ? (
@@ -377,9 +415,7 @@ export const ModuleCard = (props: ModuleCardProps): JSX.Element | null => {
                     i18nKey="hot_to_the_touch"
                     components={{
                       bold: <strong />,
-                      block: (
-                        <LegacyStyledText fontSize={TYPOGRAPHY.fontSizeP} />
-                      ),
+                      block: <StyledText fontSize={TYPOGRAPHY.fontSizeP} />,
                     }}
                   />
                 </Banner>
@@ -398,46 +434,38 @@ export const ModuleCard = (props: ModuleCardProps): JSX.Element | null => {
                   aria-label="ot-spinner"
                   color={COLORS.grey60}
                 />
-                <LegacyStyledText marginLeft={SPACING.spacing8}>
+                <StyledText marginLeft={SPACING.spacing8}>
                   {t('updating_firmware')}
-                </LegacyStyledText>
+                </StyledText>
               </Flex>
             ) : (
-              <>
-                <LegacyStyledText
+              <Flex css={MODULE_INFO_SUB_CONTAINER_STYLE}>
+                <StyledText
                   textTransform={TYPOGRAPHY.textTransformUppercase}
-                  color={COLORS.grey60}
-                  fontWeight={TYPOGRAPHY.fontWeightSemiBold}
-                  fontSize={TYPOGRAPHY.fontSizeH6}
-                  paddingBottom={SPACING.spacing4}
+                  css={MODULE_INFO_HEADER_TEXT_STYLE}
                   data-testid={`module_card_usb_port_${module.serialNumber}`}
                 >
                   {module.moduleType !== THERMOCYCLER_MODULE_TYPE &&
                   slotName != null
                     ? t('deck_slot', { slot: slotName }) + ' - '
                     : null}
-                  {module?.usbPort !== null
-                    ? t('usb_port', {
-                        port: module?.usbPort?.port,
-                      })
-                    : t('usb_port_not_connected')}
-                </LegacyStyledText>
+                  {parseModuleUSBPort(module)}
+                </StyledText>
                 <Flex
-                  paddingBottom={SPACING.spacing4}
                   data-testid={`ModuleCard_display_name_${module.serialNumber}`}
-                  fontSize={TYPOGRAPHY.fontSizeP}
                 >
                   <ModuleIcon
                     moduleType={module.moduleType}
                     size="1rem"
-                    marginRight={SPACING.spacing2}
+                    marginTop={SPACING.spacing2}
+                    marginRight={SPACING.spacing4}
                     color={COLORS.grey60}
                   />
-                  <LegacyStyledText>
+                  <StyledText css={MODULE_INFO_DETAIL_TEXT_STYLE}>
                     {getModuleDisplayName(module.moduleModel)}
-                  </LegacyStyledText>
+                  </StyledText>
                 </Flex>
-              </>
+              </Flex>
             )}
             <Flex
               opacity={isPending ? '50%' : '100%'}
@@ -457,11 +485,11 @@ export const ModuleCard = (props: ModuleCardProps): JSX.Element | null => {
       >
         <OverflowBtn
           aria-label="overflow"
-          disabled={isOverflowBtnDisabled || isEstopNotDisengaged}
+          disabled={isRunRunning || isEstopNotDisengaged}
           {...targetProps}
           onClick={handleOverflowClick}
         />
-        {isOverflowBtnDisabled && (
+        {isRunRunning && (
           <Tooltip tooltipProps={tooltipProps}>
             {t('module_actions_unavailable')}
           </Tooltip>
@@ -487,7 +515,7 @@ export const ModuleCard = (props: ModuleCardProps): JSX.Element | null => {
               handleSlideoutClick={handleMenuItemClick}
               handleTestShakeClick={handleTestShakeClick}
               handleInstructionsClick={handleInstructionsClick}
-              handleCalibrateClick={handleCalibrateClick}
+              handleCalibrateClick={handleSetupClick}
             />
           </Box>
           {menuOverlay}
@@ -532,15 +560,7 @@ const ModuleSlideout = (props: ModuleSlideoutProps): JSX.Element => {
         isExpanded={showSlideout}
       />
     )
-  } else if (module.moduleType === ABSORBANCE_READER_TYPE) {
-    return (
-      <AbsorbanceReaderSlideout
-        module={module}
-        onCloseClick={onCloseClick}
-        isExpanded={showSlideout}
-      />
-    )
-  } else {
+  } else if (module.moduleType === HEATERSHAKER_MODULE_TYPE) {
     return (
       <HeaterShakerSlideout
         module={module}
@@ -548,5 +568,7 @@ const ModuleSlideout = (props: ModuleSlideoutProps): JSX.Element => {
         isExpanded={showSlideout}
       />
     )
+  } else {
+    return <></>
   }
 }

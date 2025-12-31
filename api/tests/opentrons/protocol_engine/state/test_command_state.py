@@ -30,6 +30,7 @@ from opentrons.protocol_engine.notes.notes import CommandNote
 from opentrons.protocol_engine.state.commands import (
     CommandStore,
     CommandView,
+    CommandErrorSlice,
 )
 from opentrons.protocol_engine.state.config import Config
 from opentrons.protocol_engine.state.update_types import StateUpdate
@@ -193,7 +194,7 @@ def test_command_failure(error_recovery_type: ErrorRecoveryType) -> None:
     )
 
     assert subject_view.get("command-id") == expected_failed_command
-    assert subject.state.failed_command_errors == [expected_error_occurrence]
+    assert subject_view.get_all_errors() == [expected_error_occurrence]
 
 
 def test_command_failure_clears_queues() -> None:
@@ -255,7 +256,7 @@ def test_command_failure_clears_queues() -> None:
     assert subject_view.get_running_command_id() is None
     assert subject_view.get_queue_ids() == OrderedSet()
     assert subject_view.get_next_to_execute() is None
-    assert subject.state.failed_command_errors == [expected_error_occurance]
+    assert subject_view.get_all_errors() == [expected_error_occurance]
 
 
 def test_setup_command_failure_only_clears_setup_command_queue() -> None:
@@ -386,6 +387,184 @@ def test_nonfatal_command_failure() -> None:
         ("command-id-2", commands.CommandStatus.QUEUED),
     ]
     assert subject_view.get_running_command_id() is None
+
+
+def test_nonfatal_command_failure_with_door_open() -> None:
+    """Test the command queue if a command fails recoverably but the door is open.
+
+    Commands that were after the failed command in the queue should be left in
+    the queue.
+
+    The queue status should be "awaiting-recovery-paused."
+    """
+    subject = CommandStore(
+        is_door_open=False,
+        config=Config(
+            block_on_door_open=True,
+            # Choice of robot and deck type are arbitrary.
+            robot_type="OT-3 Standard",
+            deck_type=DeckType.OT3_STANDARD,
+        ),
+        error_recovery_policy=_placeholder_error_recovery_policy,
+    )
+    subject_view = CommandView(subject.state)
+
+    queue_1 = actions.QueueCommandAction(
+        request=commands.WaitForResumeCreate(
+            params=commands.WaitForResumeParams(), key="command-key-1"
+        ),
+        request_hash=None,
+        created_at=datetime(year=2021, month=1, day=1),
+        command_id="command-id-1",
+    )
+    subject.handle_action(queue_1)
+    queue_2 = actions.QueueCommandAction(
+        request=commands.WaitForResumeCreate(
+            params=commands.WaitForResumeParams(), key="command-key-2"
+        ),
+        request_hash=None,
+        created_at=datetime(year=2021, month=1, day=1),
+        command_id="command-id-2",
+    )
+    subject.handle_action(queue_2)
+
+    run_1 = actions.RunCommandAction(
+        command_id="command-id-1",
+        started_at=datetime(year=2022, month=2, day=2),
+    )
+    subject.handle_action(run_1)
+    door_open = actions.DoorChangeAction(
+        door_state=DoorState.OPEN,
+        module_serial=None,
+    )
+    subject.handle_action(door_open)
+    assert subject_view.get_is_door_blocking() is True
+
+    fail_1 = actions.FailCommandAction(
+        command_id="command-id-1",
+        running_command=subject_view.get("command-id-1"),
+        error_id="error-id",
+        failed_at=datetime(year=2023, month=3, day=3),
+        error=errors.ProtocolEngineError(message="oh no"),
+        notes=[],
+        type=ErrorRecoveryType.WAIT_FOR_RECOVERY,
+    )
+    subject.handle_action(fail_1)
+
+    assert (
+        subject_view.get_status() == EngineStatus.AWAITING_RECOVERY_BLOCKED_BY_OPEN_DOOR
+    )
+    assert [(c.id, c.status) for c in subject_view.get_all()] == [
+        ("command-id-1", commands.CommandStatus.FAILED),
+        ("command-id-2", commands.CommandStatus.QUEUED),
+    ]
+    assert subject_view.get_running_command_id() is None
+
+
+def test_fixit_command_failure_handling_by_recovery_type() -> None:
+    """Test that fixit command failures are handled differently based on error recovery type.
+
+    When a fixit command fails with permissible error recovery types, other queued fixit
+    commands should remain in the queue as is.
+
+    When a fixit command fails with other error recovery types, all queued fixit commands
+    should be marked as failed.
+    """
+
+    def test_with_recovery_type(
+        recovery_type: ErrorRecoveryType, should_fail_queued_cmds: bool
+    ) -> None:
+        subject = CommandStore(
+            is_door_open=False,
+            config=_make_config(),
+            error_recovery_policy=_placeholder_error_recovery_policy,
+        )
+        subject_view = CommandView(subject.state)
+
+        protocol_cmd = actions.QueueCommandAction(
+            request=commands.CommentCreate(
+                params=commands.CommentParams(message=""),
+                key="protocol-cmd",
+            ),
+            request_hash=None,
+            created_at=datetime(year=2021, month=1, day=1),
+            command_id="protocol-cmd-id",
+        )
+        subject.handle_action(protocol_cmd)
+        subject.handle_action(
+            actions.RunCommandAction(
+                command_id="protocol-cmd-id",
+                started_at=datetime(year=2021, month=1, day=2),
+            )
+        )
+        subject.handle_action(
+            actions.FailCommandAction(
+                command_id="protocol-cmd-id",
+                running_command=subject_view.get("protocol-cmd-id"),
+                error_id="error-1",
+                failed_at=datetime(year=2021, month=1, day=3),
+                error=errors.ProtocolEngineError(message="recovery needed"),
+                notes=[],
+                type=ErrorRecoveryType.WAIT_FOR_RECOVERY,
+            )
+        )
+
+        for i in range(1, 4):
+            subject.handle_action(
+                actions.QueueCommandAction(
+                    request=commands.CommentCreate(
+                        params=commands.CommentParams(message=f"fixit {i}"),
+                        key=f"fixit-{i}",
+                        intent=commands.CommandIntent.FIXIT,
+                    ),
+                    request_hash=None,
+                    created_at=datetime(year=2021, month=2, day=i),
+                    command_id=f"fixit-id-{i}",
+                )
+            )
+
+        subject.handle_action(
+            actions.RunCommandAction(
+                command_id="fixit-id-1",
+                started_at=datetime(year=2021, month=2, day=10),
+            )
+        )
+        subject.handle_action(
+            actions.FailCommandAction(
+                command_id="fixit-id-1",
+                running_command=subject_view.get("fixit-id-1"),
+                error_id="error-2",
+                failed_at=datetime(year=2021, month=2, day=11),
+                error=errors.ProtocolEngineError(
+                    message=f"fixit failed with {recovery_type}"
+                ),
+                notes=[],
+                type=recovery_type,
+            )
+        )
+
+        if should_fail_queued_cmds:
+            assert all(
+                c.status == commands.CommandStatus.FAILED
+                for c in subject_view.get_all()
+            )
+        else:
+            assert [(c.id, c.status) for c in subject_view.get_all()] == [
+                ("protocol-cmd-id", commands.CommandStatus.FAILED),
+                ("fixit-id-1", commands.CommandStatus.FAILED),
+                ("fixit-id-2", commands.CommandStatus.QUEUED),
+                ("fixit-id-3", commands.CommandStatus.QUEUED),
+            ]
+            assert subject_view.get_next_to_execute() == "fixit-id-2"
+
+    test_with_recovery_type(
+        ErrorRecoveryType.CONTINUE_WITH_ERROR, should_fail_queued_cmds=False
+    )
+    test_with_recovery_type(
+        ErrorRecoveryType.ASSUME_FALSE_POSITIVE_AND_CONTINUE,
+        should_fail_queued_cmds=False,
+    )
+    test_with_recovery_type(ErrorRecoveryType.FAIL_RUN, should_fail_queued_cmds=True)
 
 
 def test_door_during_setup_phase() -> None:
@@ -555,7 +734,7 @@ def test_door_during_error_recovery() -> None:
     subject.handle_action(play)
     assert subject_view.get_status() == EngineStatus.AWAITING_RECOVERY
     assert subject_view.get_next_to_execute() == "command-id-2"
-    assert subject.state.failed_command_errors == [expected_error_occurance]
+    assert subject_view.get_all_errors() == [expected_error_occurance]
 
 
 @pytest.mark.parametrize("close_door_before_queueing", [False, True])
@@ -732,7 +911,7 @@ def test_error_recovery_type_tracking() -> None:
         id="c2-error", createdAt=datetime(year=2023, month=3, day=3), error=exception
     )
 
-    assert subject.state.failed_command_errors == [
+    assert view.get_all_errors() == [
         error_occurrence_1,
         error_occurrence_2,
     ]
@@ -841,8 +1020,8 @@ def test_recovery_target_tracking() -> None:
 @pytest.mark.parametrize(
     "ending_action",
     [
-        actions.StopAction(from_estop=False),
-        actions.StopAction(from_estop=True),
+        actions.StopAction(from_asynchronous_error=False),
+        actions.StopAction(from_asynchronous_error=True),
         actions.FinishAction(set_run_status=False),
         actions.FinishAction(
             set_run_status=True,
@@ -910,7 +1089,7 @@ def test_final_state_after_estop() -> None:
         detail="E-stop activated.",
     )
 
-    subject.handle_action(actions.StopAction(from_estop=True))
+    subject.handle_action(actions.StopAction(from_asynchronous_error=True))
     subject.handle_action(actions.FinishAction(error_details=error_details))
     subject.handle_action(
         actions.HardwareStoppedAction(
@@ -1100,3 +1279,94 @@ def test_get_state_update_for_false_positive() -> None:
     subject.handle_action(resume_from_recovery)
 
     assert subject_view.get_state_update_for_false_positive() == empty_state_update
+
+
+def test_get_errors_slice_empty() -> None:
+    """It should return an empty error list."""
+    subject = CommandStore(
+        config=_make_config(),
+        error_recovery_policy=_placeholder_error_recovery_policy,
+        is_door_open=False,
+    )
+    subject_view = CommandView(subject.state)
+    result = subject_view.get_errors_slice(cursor=0, length=2)
+
+    assert result == CommandErrorSlice(commands_errors=[], cursor=0, total_length=0)
+
+
+def test_get_errors_slice() -> None:
+    """It should return a slice of all command errors."""
+    subject = CommandStore(
+        config=_make_config(),
+        error_recovery_policy=_placeholder_error_recovery_policy,
+        is_door_open=False,
+    )
+
+    subject_view = CommandView(subject.state)
+
+    queue_1 = actions.QueueCommandAction(
+        request=commands.WaitForResumeCreate(
+            params=commands.WaitForResumeParams(), key="command-key-1"
+        ),
+        request_hash=None,
+        created_at=datetime(year=2021, month=1, day=1),
+        command_id="command-id-1",
+    )
+    subject.handle_action(queue_1)
+    queue_2_setup = actions.QueueCommandAction(
+        request=commands.WaitForResumeCreate(
+            params=commands.WaitForResumeParams(),
+            intent=commands.CommandIntent.SETUP,
+            key="command-key-2",
+        ),
+        request_hash=None,
+        created_at=datetime(year=2021, month=1, day=1),
+        command_id="command-id-2",
+    )
+    subject.handle_action(queue_2_setup)
+    queue_3_setup = actions.QueueCommandAction(
+        request=commands.WaitForResumeCreate(
+            params=commands.WaitForResumeParams(),
+            intent=commands.CommandIntent.SETUP,
+            key="command-key-3",
+        ),
+        request_hash=None,
+        created_at=datetime(year=2021, month=1, day=1),
+        command_id="command-id-3",
+    )
+    subject.handle_action(queue_3_setup)
+
+    run_2_setup = actions.RunCommandAction(
+        command_id="command-id-2",
+        started_at=datetime(year=2022, month=2, day=2),
+    )
+    subject.handle_action(run_2_setup)
+    fail_2_setup = actions.FailCommandAction(
+        command_id="command-id-2",
+        running_command=subject_view.get("command-id-2"),
+        error_id="error-id",
+        failed_at=datetime(year=2023, month=3, day=3),
+        error=errors.ProtocolEngineError(message="oh no"),
+        notes=[],
+        type=ErrorRecoveryType.CONTINUE_WITH_ERROR,
+    )
+    subject.handle_action(fail_2_setup)
+
+    result = subject_view.get_errors_slice(cursor=1, length=3)
+
+    assert result == CommandErrorSlice(
+        [
+            ErrorOccurrence(
+                id="error-id",
+                createdAt=datetime(2023, 3, 3, 0, 0),
+                isDefined=False,
+                errorType="ProtocolEngineError",
+                errorCode="4000",
+                detail="oh no",
+                errorInfo={},
+                wrappedErrors=[],
+            )
+        ],
+        cursor=0,
+        total_length=1,
+    )

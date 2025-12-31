@@ -1,9 +1,14 @@
-import { useState, useEffect } from 'react'
-import { useSelector } from 'react-redux'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSelector } from 'react-redux'
+import { useNavigate, useParams } from 'react-router-dom'
 import styled, { css } from 'styled-components'
 
+import {
+  RUN_STATUS_FAILED,
+  RUN_STATUS_STOPPED,
+  RUN_STATUS_SUCCEEDED,
+} from '@opentrons/api-client'
 import {
   ALIGN_CENTER,
   ALIGN_FLEX_START,
@@ -18,6 +23,7 @@ import {
   Icon,
   JUSTIFY_CENTER,
   JUSTIFY_SPACE_BETWEEN,
+  LargeButton,
   OVERFLOW_HIDDEN,
   OVERFLOW_WRAP_ANYWHERE,
   OVERFLOW_WRAP_BREAK_WORD,
@@ -25,55 +31,55 @@ import {
   POSITION_RELATIVE,
   SPACING,
   TYPOGRAPHY,
-  LargeButton,
   WRAP,
 } from '@opentrons/components'
 import {
-  RUN_STATUS_FAILED,
-  RUN_STATUS_STOPPED,
-  RUN_STATUS_SUCCEEDED,
-  RUN_STATUSES_TERMINAL,
-} from '@opentrons/api-client'
-import {
+  useDeleteRunMutation,
+  useErrorRecoverySettings,
   useHost,
   useProtocolQuery,
-  useDeleteRunMutation,
   useRunCommandErrors,
 } from '@opentrons/react-api-client'
-import { useRunControls } from '/app/organisms/RunTimeControl/hooks'
-import { onDeviceDisplayFormatTimestamp } from '/app/transformations/runs'
+
+import { lastRunCommandPromptedErrorRecovery } from '/app/local-resources/commands'
+import { isTerminalRunStatus } from '/app/local-resources/runs/utils'
 import { RunTimer } from '/app/molecules/RunTimer'
+import { handleTipsAttachedModal } from '/app/organisms/DropTipWizardFlows'
+import { RunFailedModal } from '/app/organisms/ODD/RunningProtocol'
+import { useRunControls } from '/app/organisms/RunTimeControl/hooks'
 import {
-  useTrackProtocolRunEvent,
-  useTrackEventWithRobotSerial,
-  useRobotAnalyticsData,
+  SOURCE_RUN_RECORD,
+  useCameraAnalytics,
   useRecoveryAnalytics,
+  useRobotAnalyticsData,
+  useTrackEventWithRobotSerial,
+  useTrackProtocolRunEvent,
 } from '/app/redux-resources/analytics'
+import { useRobotType } from '/app/redux-resources/robots'
 import {
-  useTrackEvent,
-  ANALYTICS_PROTOCOL_RUN_ACTION,
   ANALYTICS_PROTOCOL_PROCEED_TO_RUN,
+  ANALYTICS_PROTOCOL_RUN_ACTION,
   ANALYTICS_QUICK_TRANSFER_RERUN,
+  useTrackEvent,
 } from '/app/redux/analytics'
 import { getLocalRobot } from '/app/redux/discovery'
-import { RunFailedModal } from '/app/organisms/ODD/RunningProtocol'
+import { useRunGeneratedDataFiles } from '/app/resources/dataFiles/useRunGeneratedDataFiles'
+import { useTipAttachmentStatus } from '/app/resources/instruments'
 import {
+  EMPTY_TIMESTAMP,
   formatTimeWithUtcLabel,
+  useCloseCurrentRun,
+  useCurrentRunCommands,
   useIsRunCurrent,
   useNotifyRunQuery,
-  useRunTimestamps,
   useRunCreatedAtTimestamp,
-  useCloseCurrentRun,
-  EMPTY_TIMESTAMP,
+  useRunTimestamps,
 } from '/app/resources/runs'
-import {
-  useTipAttachmentStatus,
-  handleTipsAttachedModal,
-} from '/app/organisms/DropTipWizardFlows'
+import { onDeviceDisplayFormatTimestamp } from '/app/transformations/runs'
 
 import type { IconName } from '@opentrons/components'
 import type { OnDeviceRouteParams } from '/app/App/types'
-import type { PipetteWithTip } from '/app/organisms/DropTipWizardFlows'
+import type { PipetteWithTip } from '/app/resources/instruments'
 
 export function RunSummary(): JSX.Element {
   const { runId } = useParams<
@@ -119,12 +125,7 @@ export function RunSummary(): JSX.Element {
   )
   const localRobot = useSelector(getLocalRobot)
   const robotName = localRobot?.name ?? 'no name'
-
-  const onCloneRunSuccess = (): void => {
-    if (isQuickTransfer) {
-      deleteRun(runId)
-    }
-  }
+  const robotType = useRobotType(robotName)
 
   const { trackProtocolRunEvent } = useTrackProtocolRunEvent(
     runId,
@@ -140,22 +141,22 @@ export function RunSummary(): JSX.Element {
     }
   }, [isRunCurrent, enteredER])
 
-  const { reset, isResetRunLoading } = useRunControls(runId, onCloneRunSuccess)
+  const { reset, isResetRunLoading } = useRunControls(runId)
   const trackEvent = useTrackEvent()
   const { trackEventWithRobotSerial } = useTrackEventWithRobotSerial()
 
   const { closeCurrentRun } = useCloseCurrentRun()
   // Close the current run only if it's active and then execute the onSuccess callback. Prefer this wrapper over
   // closeCurrentRun directly, since the callback is swallowed if currentRun is null.
-  const closeCurrentRunIfValid = (onSuccess?: () => void): void => {
+  const closeCurrentRunIfValid = (onSettled?: () => void): void => {
     if (isRunCurrent) {
       closeCurrentRun({
-        onSuccess: () => {
-          onSuccess?.()
+        onSettled: () => {
+          onSettled?.()
         },
       })
     } else {
-      onSuccess?.()
+      onSettled?.()
     }
   }
   const [showRunFailedModal, setShowRunFailedModal] = useState<boolean>(false)
@@ -171,11 +172,7 @@ export function RunSummary(): JSX.Element {
     runId,
     { cursor: 0, pageLength: 100 },
     {
-      enabled:
-        runStatus != null &&
-        // @ts-expect-error runStatus expected to possibly not be terminal
-        RUN_STATUSES_TERMINAL.includes(runStatus) &&
-        isRunCurrent,
+      enabled: isTerminalRunStatus(runStatus) && isRunCurrent,
     }
   )
   // TODO(jh, 08-14-24): The backend never returns the "user cancelled a run" error and cancelledWithoutRecovery becomes unnecessary.
@@ -227,22 +224,27 @@ export function RunSummary(): JSX.Element {
     ) : null
   }
 
-  const {
-    determineTipStatus,
-    setTipStatusResolved,
-    aPipetteWithTip,
-  } = useTipAttachmentStatus({
-    runId,
-    runRecord: runRecord ?? null,
-    host,
+  const { determineTipStatus, setTipStatusResolved, aPipetteWithTip } =
+    useTipAttachmentStatus({
+      runId,
+      runRecord: runRecord ?? null,
+    })
+  const { data } = useErrorRecoverySettings()
+  const isEREnabled = data?.data.enabled ?? true
+  const runSummaryNoFixit = useCurrentRunCommands({
+    includeFixitCommands: false,
+    pageLength: 1,
   })
 
-  // Determine tip status on initial render only. Error Recovery always handles tip status, so don't show it twice.
   useEffect(() => {
-    if (isRunCurrent && enteredER === false) {
+    // Only run tip checking if it wasn't *just* handled during Error Recovery.
+    if (
+      runSummaryNoFixit != null &&
+      !lastRunCommandPromptedErrorRecovery(runSummaryNoFixit, isEREnabled)
+    ) {
       void determineTipStatus()
     }
-  }, [isRunCurrent, enteredER])
+  }, [isRunCurrent, runSummaryNoFixit, isEREnabled])
 
   const returnToQuickTransfer = (): void => {
     closeCurrentRunIfValid(() => {
@@ -323,11 +325,20 @@ export function RunSummary(): JSX.Element {
   const handleViewErrorDetails = (): void => {
     setShowRunFailedModal(true)
   }
-
+  const { reportImageCaptureUsage } = useCameraAnalytics({
+    source: SOURCE_RUN_RECORD,
+    robotType: robotType,
+  })
+  const outputFileIds = useRunGeneratedDataFiles(runId)
   const handleClickSplash = (): void => {
     trackProtocolRunEvent({
       name: ANALYTICS_PROTOCOL_RUN_ACTION.FINISH,
       properties: robotAnalyticsData ?? undefined,
+    })
+    const numberOfImages = outputFileIds.jpeg.length
+    reportImageCaptureUsage({
+      transactionId: runId,
+      amount: numberOfImages,
     })
     setShowSplash(false)
   }

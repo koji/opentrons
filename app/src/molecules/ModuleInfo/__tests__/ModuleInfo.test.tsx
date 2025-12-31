@@ -1,17 +1,22 @@
-import type * as React from 'react'
 import { screen } from '@testing-library/react'
-import { describe, it, vi, beforeEach, expect } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import '@testing-library/jest-dom/vitest'
-import { renderWithProviders } from '/app/__testing-utils__'
+
 import { when } from 'vitest-when'
+
+import { renderWithProviders } from '/app/__testing-utils__'
 import { i18n } from '/app/i18n'
-import { ModuleInfo } from '../ModuleInfo'
 import { useRunHasStarted } from '/app/resources/runs'
+
+import { ModuleInfo } from '../ModuleInfo'
+
+import type { ComponentProps } from 'react'
 import type { ModuleModel, ModuleType } from '@opentrons/shared-data'
 
 vi.mock('/app/resources/runs')
 
-const render = (props: React.ComponentProps<typeof ModuleInfo>) => {
+const render = (props: ComponentProps<typeof ModuleInfo>) => {
   return renderWithProviders(<ModuleInfo {...props} />, {
     i18nInstance: i18n,
   })[0]
@@ -26,7 +31,7 @@ const mockTCModule = {
 const MOCK_RUN_ID = '1'
 
 describe('ModuleInfo', () => {
-  let props: React.ComponentProps<typeof ModuleInfo>
+  let props: ComponentProps<typeof ModuleInfo>
   beforeEach(() => {
     props = {
       moduleModel: mockTCModule.model,
@@ -51,18 +56,18 @@ describe('ModuleInfo', () => {
   it('should show module connected and USB number', () => {
     props = {
       ...props,
-      physicalPort: { port: 1, hub: false, portGroup: 'unknown', path: '' },
+      physicalPort: 'USB-1',
       isAttached: true,
     }
     render(props)
     screen.getByText('Connected')
-    screen.getByText('USB Port 1')
+    screen.getByText('USB-1')
   })
 
   it('should not show module connected when run has started', () => {
     props = {
       ...props,
-      physicalPort: { port: 1, hub: false, portGroup: 'unknown', path: '' },
+      physicalPort: 'USB-1',
       isAttached: true,
       runId: MOCK_RUN_ID,
     }

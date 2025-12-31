@@ -1,4 +1,5 @@
 """File format validation interface."""
+
 from __future__ import annotations
 
 from typing import Iterable
@@ -6,7 +7,9 @@ from typing import Iterable
 import anyio
 from pydantic import ValidationError as PydanticValidationError
 
-from opentrons_shared_data.labware.labware_definition import LabwareDefinition
+from opentrons_shared_data.labware.labware_definition import (
+    labware_definition_type_adapter,
+)
 from opentrons_shared_data.protocol.models import (
     ProtocolSchemaV6 as JsonProtocolV6,
     ProtocolSchemaV7 as JsonProtocolV7,
@@ -14,7 +17,7 @@ from opentrons_shared_data.protocol.models import (
 )
 from opentrons_shared_data.errors.exceptions import PythonException
 
-from opentrons.protocols.models import JsonProtocol as JsonProtocolUpToV5
+from opentrons.protocols.models.json_protocol import Model as JsonProtocolUpToV5
 
 from .file_identifier import (
     IdentifiedFile,
@@ -60,7 +63,7 @@ class FileFormatValidator:
 async def _validate_labware_definition(info: IdentifiedLabwareDefinition) -> None:
     def validate_sync() -> None:
         try:
-            LabwareDefinition.parse_obj(info.unvalidated_json)
+            labware_definition_type_adapter.validate_python(info.unvalidated_json)
         except PydanticValidationError as e:
             raise FileFormatValidationError(
                 message=f"{info.original_file.name} could not be read as a labware definition.",
@@ -133,17 +136,17 @@ async def _validate_json_protocol(info: IdentifiedJsonMain) -> None:
     def validate_sync() -> None:
         if info.schema_version == 8:
             try:
-                JsonProtocolV8.parse_obj(info.unvalidated_json)
+                JsonProtocolV8.model_validate(info.unvalidated_json)
             except PydanticValidationError as pve:
                 _handle_v8_json_protocol_validation_error(info, pve)
         else:
             try:
                 if info.schema_version == 7:
-                    JsonProtocolV7.parse_obj(info.unvalidated_json)
+                    JsonProtocolV7.model_validate(info.unvalidated_json)
                 elif info.schema_version == 6:
-                    JsonProtocolV6.parse_obj(info.unvalidated_json)
+                    JsonProtocolV6.model_validate(info.unvalidated_json)
                 else:
-                    JsonProtocolUpToV5.parse_obj(info.unvalidated_json)
+                    JsonProtocolUpToV5.model_validate(info.unvalidated_json)
             except PydanticValidationError as e:
                 raise FileFormatValidationError._generic_json_failure(info, e) from e
 

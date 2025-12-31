@@ -1,6 +1,8 @@
-import * as React from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Trans, useTranslation } from 'react-i18next'
+import { useDispatch } from 'react-redux'
+
 import {
   ALIGN_CENTER,
   CheckboxField,
@@ -8,22 +10,23 @@ import {
   Flex,
   JUSTIFY_CENTER,
   JUSTIFY_SPACE_BETWEEN,
+  LegacyStyledText,
   Link,
+  ModalShell,
   PrimaryButton,
   SecondaryButton,
   SPACING,
-  LegacyStyledText,
   TYPOGRAPHY,
-  ModalShell,
+  WizardHeader,
 } from '@opentrons/components'
-import { useDispatch } from 'react-redux'
+import { labwareImages } from '@opentrons/shared-data'
 
-import styles from './styles.module.css'
-import { labwareImages } from '/app/local-resources/labware'
-import { WizardHeader } from '/app/molecules/WizardHeader'
 import { getTopPortalEl } from '/app/App/portal'
 import { setUseTrashSurfaceForTipCal } from '/app/redux/calibration'
 
+import styles from './styles.module.css'
+
+import type { ChangeEvent } from 'react'
 import type { Dispatch } from '/app/redux/types'
 
 const BLOCK_REQUEST_EMAIL_BODY =
@@ -41,9 +44,7 @@ interface Props {
 
 export function AskForCalibrationBlockModal(props: Props): JSX.Element {
   const { t } = useTranslation(['robot_calibration', 'shared', 'branded'])
-  const [rememberPreference, setRememberPreference] = React.useState<boolean>(
-    true
-  )
+  const [rememberPreference, setRememberPreference] = useState<boolean>(true)
   const dispatch = useDispatch<Dispatch>()
 
   const makeSetHasBlock = (hasBlock: boolean) => (): void => {
@@ -71,7 +72,7 @@ export function AskForCalibrationBlockModal(props: Props): JSX.Element {
       >
         <Flex gridGap={SPACING.spacing8}>
           <Flex flex="1" flexDirection={DIRECTION_COLUMN}>
-            <LegacyStyledText as="h1" marginBottom={SPACING.spacing16}>
+            <LegacyStyledText forwardedAs="h1" marginBottom={SPACING.spacing16}>
               {t('do_you_have_a_cal_block')}
             </LegacyStyledText>
 
@@ -80,7 +81,10 @@ export function AskForCalibrationBlockModal(props: Props): JSX.Element {
               i18nKey="branded:calibration_block_description"
               components={{
                 block: (
-                  <LegacyStyledText as="p" marginBottom={SPACING.spacing8} />
+                  <LegacyStyledText
+                    forwardedAs="p"
+                    marginBottom={SPACING.spacing8}
+                  />
                 ),
                 supportLink: (
                   <Link
@@ -94,8 +98,9 @@ export function AskForCalibrationBlockModal(props: Props): JSX.Element {
           </Flex>
           <Flex flex="1" justifyContent={JUSTIFY_CENTER}>
             <img
+              alt="Calibration Block"
               className={styles.block_image}
-              src={labwareImages[CAL_BLOCK_LOAD_NAME]}
+              src={labwareImages[CAL_BLOCK_LOAD_NAME][0]}
             />
           </Flex>
         </Flex>
@@ -108,12 +113,12 @@ export function AskForCalibrationBlockModal(props: Props): JSX.Element {
         >
           <Flex alignItems={ALIGN_CENTER}>
             <CheckboxField
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+              onChange={(e: ChangeEvent<HTMLInputElement>) => {
                 setRememberPreference(e.currentTarget.checked)
               }}
               value={rememberPreference}
             />
-            <LegacyStyledText as="p" marginLeft={SPACING.spacing8}>
+            <LegacyStyledText forwardedAs="p" marginLeft={SPACING.spacing8}>
               {t('shared:remember_my_selection_and_do_not_ask_again')}
             </LegacyStyledText>
           </Flex>
