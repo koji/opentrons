@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDispatch, useSelector } from 'react-redux'
+import { clsx } from 'clsx'
 import get from 'lodash/get'
 
 import {
@@ -29,7 +30,6 @@ import {
   FORM_WARNINGS_EVENT,
 } from '/protocol-designer/analytics/constants'
 import {
-  LINE_CLAMP_TEXT_STYLE,
   LINK_BUTTON_STYLE,
   NAV_BAR_HEIGHT_REM,
 } from '/protocol-designer/components/atoms'
@@ -56,6 +56,7 @@ import {
 import { actions } from '/protocol-designer/steplist'
 import { maskField } from '/protocol-designer/steplist/fieldLevel'
 import { updateFieldsForLiquidClass } from '/protocol-designer/steplist/formLevel/handleFormChange/utils'
+import lineClampStyles from '/protocol-designer/styles/lineclamp.module.css'
 import { getTimelineWarningsForSelectedStep } from '/protocol-designer/top-selectors/timelineWarnings'
 import {
   hoverSelection,
@@ -76,6 +77,7 @@ import {
   PauseTools,
   TemperatureTools,
   ThermocyclerTools,
+  VacuumTools,
 } from './StepTools'
 import {
   capitalizeFirstLetter,
@@ -114,6 +116,7 @@ const STEP_FORM_MAP: StepFormMap = {
   camera: CameraTools,
   absorbanceReader: AbsorbanceReaderTools,
   flexStacker: FlexStackerTools,
+  vacuum: VacuumTools,
 }
 
 // used to inform StepFormToolbox when to prompt user confirmation for overriding advanced settings
@@ -218,11 +221,16 @@ export function StepFormToolbox(props: StepFormToolboxProps): JSX.Element {
   // state used to determine if user has seen advanced settings page (relevant for presaved forms)
   const [hasSeenAdvancedSettings, setHasSeenAdvancedSettings] =
     useState<boolean>(false)
-  useEffect(() => {
-    if (toolboxStep === 2 && !hasSeenAdvancedSettings) {
-      setHasSeenAdvancedSettings(true)
-    }
-  }, [toolboxStep])
+  useEffect(
+    () => {
+      if (toolboxStep === 2 && !hasSeenAdvancedSettings) {
+        setHasSeenAdvancedSettings(true)
+      }
+    },
+    // FIXME(2026-03-03): Supply all missing dependencies, if it's safe. If it's unsafe, explain why.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [toolboxStep]
+  )
   const isConfirmationRequired =
     robotType === FLEX_ROBOT_TYPE &&
     fieldsChangedRequiringConfirmation.length > 0 &&
@@ -271,23 +279,28 @@ export function StepFormToolbox(props: StepFormToolboxProps): JSX.Element {
   )
   const visibleFormErrorsTypes = visibleFormErrors.map(error => error.title)
 
-  useEffect(() => {
-    const dispatchAnalyticsEvent = (
-      eventName: string,
-      eventProperties: FormWarningType[] | string[]
-    ): void => {
-      if (eventProperties.length > 0) {
-        const event: AnalyticsEvent = {
-          name: eventName,
-          properties: { eventProperties },
+  useEffect(
+    () => {
+      const dispatchAnalyticsEvent = (
+        eventName: string,
+        eventProperties: FormWarningType[] | string[]
+      ): void => {
+        if (eventProperties.length > 0) {
+          const event: AnalyticsEvent = {
+            name: eventName,
+            properties: { eventProperties },
+          }
+          dispatch(analyticsEvent(event))
         }
-        dispatch(analyticsEvent(event))
       }
-    }
 
-    dispatchAnalyticsEvent(FORM_WARNINGS_EVENT, visibleFormWarningsTypes)
-    dispatchAnalyticsEvent(FORM_ERRORS_EVENT, visibleFormErrorsTypes)
-  }, [visibleFormWarningsTypes, visibleFormErrorsTypes])
+      dispatchAnalyticsEvent(FORM_WARNINGS_EVENT, visibleFormWarningsTypes)
+      dispatchAnalyticsEvent(FORM_ERRORS_EVENT, visibleFormErrorsTypes)
+    },
+    // FIXME(2026-03-03): Supply all missing dependencies, if it's safe. If it's unsafe, explain why.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [visibleFormWarningsTypes, visibleFormErrorsTypes]
+  )
   const moduleEntities = Object.values(useSelector(getModuleEntities))
   const stackerModules = moduleEntities.filter(moduleEntity => {
     return moduleEntity.type === FLEX_STACKER_MODULE_TYPE
@@ -553,7 +566,11 @@ export function StepFormToolbox(props: StepFormToolboxProps): JSX.Element {
             <Icon size="1rem" name={icon} minWidth="1rem" />
             <StyledText
               desktopStyle="bodyLargeSemiBold"
-              css={LINE_CLAMP_TEXT_STYLE(2, true)}
+              className={clsx(
+                lineClampStyles.line_clamp,
+                lineClampStyles.word_normal
+              )}
+              style={{ WebkitLineClamp: 2 }}
             >
               {/* TODO: use  module object from form.json instead */}
               {formData.stepType === 'flexStacker'

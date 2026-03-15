@@ -4,6 +4,7 @@ import some from 'lodash/some'
 import {
   ABSORBANCE_READER_V1,
   FLEX_ROBOT_TYPE,
+  FLEX_STACKER_V1_FIXTURE,
   FLEX_STAGING_AREA_SLOT_ADDRESSABLE_AREAS,
   getAreSlotsAdjacent,
   getModuleType,
@@ -13,6 +14,7 @@ import {
   TEMPERATURE_MODULE_V2,
   THERMOCYCLER_MODULE_TYPE,
   THERMOCYCLER_MODULE_V2,
+  VACUUM_MODULE_MILLIPORE_V1,
 } from '@opentrons/shared-data'
 import { getSlotInLocationStack } from '@opentrons/step-generation'
 
@@ -98,11 +100,14 @@ export function getModuleModelsBySlot(
           ].filter(model => {
             if (model === THERMOCYCLER_MODULE_V2) {
               return slot === 'B1'
+            } else if (model === VACUUM_MODULE_MILLIPORE_V1) {
+              return slot === 'A3'
             } else if (model === ABSORBANCE_READER_V1) {
               return FLEX_RIGHT_SLOTS.has(slot)
             } else if (
               model === TEMPERATURE_MODULE_V2 ||
-              model === HEATERSHAKER_MODULE_V1
+              model === HEATERSHAKER_MODULE_V1 ||
+              model === FLEX_STACKER_V1_FIXTURE
             ) {
               return !FLEX_MIDDLE_SLOTS.has(slot)
             } else if (

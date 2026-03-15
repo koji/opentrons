@@ -2,12 +2,12 @@ import { memo } from 'react'
 import styled, { css } from 'styled-components'
 
 import { CheckboxField } from '../../atoms/CheckboxField'
-import { InputField } from '../../atoms/InputField'
 import { StyledText } from '../../atoms/StyledText'
 import { BORDERS, COLORS } from '../../helix-design-system'
 import { Flex } from '../../primitives'
 import { CURSOR_POINTER, DIRECTION_COLUMN } from '../../styles'
 import { SPACING } from '../../ui-style-constants'
+import { InputField } from '..//InputField'
 
 import type {
   ChangeEvent,
@@ -101,6 +101,7 @@ export function CustomizeExpandButtonComponent(
               backgroundColor={COLORS.blue10}
               padding={SPACING.spacing16}
               borderRadius={BORDERS.borderRadius4}
+              gridGap={SPACING.spacing8}
             >
               {isLid &&
               !isNestedDefALid &&

@@ -31,11 +31,11 @@ import {
   useFeatureFlag,
 } from '/app/redux/config'
 import { useSearch } from '/app/resources/devices'
+import { useSortedProtocols } from '/app/resources/protocols/hooks'
 
 import { SearchComponent } from '../../Search/SearchComponent'
 import { SendProtocolToFlexSlideout } from '../SendProtocolToFlexSlideout'
 import { EmptyStateLinks } from './EmptyStateLinks'
-import { useSortedProtocols } from './hooks'
 import { ProtocolCard } from './ProtocolCard'
 import { ProtocolUploadInput } from './ProtocolUploadInput'
 

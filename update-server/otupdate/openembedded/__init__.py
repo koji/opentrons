@@ -2,11 +2,16 @@
 
 import asyncio
 import logging
+from typing import Any, Mapping, Optional
 
 from aiohttp import web
-from typing import Optional, Mapping, Any
+
+from server_utils.auth.resource_server.authorization_checker import (
+    AuthorizationChecker,
+)
 
 from otupdate.common import (
+    auth,
     config,
     constants,
     control,
@@ -14,14 +19,13 @@ from otupdate.common import (
     ssh_key_management,
     update,
 )
-
-from otupdate.openembedded.update_actions import (
-    RootFSInterface,
-    PartitionManager,
-    OT3UpdateActions,
-)
 from otupdate.common.file_actions import load_version_file
 from otupdate.common.update_actions import FILE_ACTIONS_VARNAME
+from otupdate.openembedded.update_actions import (
+    OT3UpdateActions,
+    PartitionManager,
+    RootFSInterface,
+)
 
 OE_BUILTIN_VERSION_FILE = "/etc/VERSION.json"
 
@@ -41,6 +45,7 @@ async def log_error_middleware(request, handler):
 
 async def get_app(
     name_synchronizer: name_management.NameSynchronizer,
+    authorization_checker: AuthorizationChecker,
     system_version_file: Optional[str] = None,
     config_file_override: Optional[str] = None,
     name_override: Optional[str] = None,
@@ -66,6 +71,7 @@ async def get_app(
     app[FILE_ACTIONS_VARNAME] = updater
 
     name_management.install_name_synchronizer(name_synchronizer, app)
+    auth.install_authorization_checker(app, authorization_checker)
 
     app.router.add_routes(
         [

@@ -1,11 +1,7 @@
 import { useEffect } from 'react'
 import { useDispatch } from 'react-redux'
 
-import {
-  updateCameraEnablement,
-  updateCameraRecoveryEnablement,
-  updateCameraStreamEnablement,
-} from '/app/redux/protocol-runs'
+import { updateCameraUsageSettings } from '/app/redux/protocol-runs'
 import { useNotifyCamera } from '/app/resources/camera/useNotifyCamera'
 import { useNotifyRunQuery } from '/app/resources/runs'
 
@@ -20,25 +16,36 @@ export function useInitializeCameraState(runId: string): void {
   const cameraSettingsExist = cameraSettings != null
   const runCameraSettingsExist = runCameraSettings != null
 
-  useEffect(() => {
-    if (runCameraSettings != null) {
-      const { cameraEnabled, errorRecoveryCameraEnabled, liveStreamEnabled } =
-        runCameraSettings
+  useEffect(
+    () => {
+      if (runCameraSettings != null) {
+        const { cameraEnabled, errorRecoveryCameraEnabled, liveStreamEnabled } =
+          runCameraSettings
 
-      dispatch(updateCameraEnablement(runId, cameraEnabled))
-      dispatch(updateCameraStreamEnablement(runId, liveStreamEnabled))
-      dispatch(
-        updateCameraRecoveryEnablement(runId, errorRecoveryCameraEnabled)
-      )
-    } else if (cameraSettings != null) {
-      const { cameraEnabled, errorRecoveryCameraEnabled, liveStreamEnabled } =
-        cameraSettings
+        dispatch(
+          updateCameraUsageSettings({
+            runId,
+            cameraEnabled,
+            liveStreamEnabled,
+            recoveryEnabled: errorRecoveryCameraEnabled,
+          })
+        )
+      } else if (cameraSettings != null) {
+        const { cameraEnabled, errorRecoveryCameraEnabled, liveStreamEnabled } =
+          cameraSettings
 
-      dispatch(updateCameraEnablement(runId, cameraEnabled))
-      dispatch(updateCameraStreamEnablement(runId, liveStreamEnabled))
-      dispatch(
-        updateCameraRecoveryEnablement(runId, errorRecoveryCameraEnabled)
-      )
-    }
-  }, [cameraSettingsExist, runCameraSettingsExist])
+        dispatch(
+          updateCameraUsageSettings({
+            runId,
+            cameraEnabled,
+            liveStreamEnabled,
+            recoveryEnabled: errorRecoveryCameraEnabled,
+          })
+        )
+      }
+    },
+    // FIXME(2026-03-03): Supply all missing dependencies, if it's safe. If it's unsafe, explain why.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cameraSettingsExist, runCameraSettingsExist]
+  )
 }

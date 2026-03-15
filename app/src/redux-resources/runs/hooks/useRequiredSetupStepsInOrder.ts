@@ -18,7 +18,6 @@ import type {
 } from '@opentrons/shared-data'
 import type {
   StepKey,
-  StepMap,
   UpdateRunSetupStepsRequiredAction,
 } from '/app/redux/protocol-runs'
 import type { Dispatch, State } from '/app/redux/types'
@@ -105,26 +104,31 @@ export function useRequiredSetupStepsInOrder({
     protocolAnalysis?.labware.length === 0 &&
     protocolAnalysis?.liquids.length === 0
 
-  useEffect(() => {
-    const applicable = keysInOrder(
-      protocolAnalysis,
-      noLwOffsetsInRun,
-      noLabwareOrLiquidsInRun
-    )
-    dispatch(
-      updateRunSetupStepsRequired(runId, {
-        ...ALL_STEPS_IN_ORDER.reduce<
-          UpdateRunSetupStepsRequiredAction['payload']['required']
-        >(
-          (acc, thiskey) => ({
-            ...acc,
-            [thiskey]: applicable.orderedApplicableSteps.includes(thiskey),
-          }),
-          {}
-        ),
-      })
-    )
-  }, [runId, dispatch, keyFor(protocolAnalysis), noLwOffsetsInRun])
+  useEffect(
+    () => {
+      const applicable = keysInOrder(
+        protocolAnalysis,
+        noLwOffsetsInRun,
+        noLabwareOrLiquidsInRun
+      )
+      dispatch(
+        updateRunSetupStepsRequired(runId, {
+          ...ALL_STEPS_IN_ORDER.reduce<
+            UpdateRunSetupStepsRequiredAction['payload']['required']
+          >(
+            (acc, thiskey) => ({
+              ...acc,
+              [thiskey]: applicable.orderedApplicableSteps.includes(thiskey),
+            }),
+            {}
+          ),
+        })
+      )
+    },
+    // FIXME(2026-03-03): Supply all missing dependencies, if it's safe. If it's unsafe, explain why.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [runId, dispatch, keyFor(protocolAnalysis), noLwOffsetsInRun]
+  )
   return protocolAnalysis == null
     ? {
         orderedSteps: NO_ANALYSIS_STEPS_IN_ORDER,
@@ -133,7 +137,12 @@ export function useRequiredSetupStepsInOrder({
     : {
         orderedSteps: ALL_STEPS_IN_ORDER,
         orderedApplicableSteps: ALL_STEPS_IN_ORDER.filter(
-          step => (requiredSteps as Required<StepMap<boolean>> | null)?.[step]
+          step =>
+            (
+              requiredSteps as Required<
+                Partial<Record<StepKey, boolean>>
+              > | null
+            )?.[step]
         ),
       }
 }

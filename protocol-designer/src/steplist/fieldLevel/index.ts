@@ -6,7 +6,9 @@ import {
   defaultTo,
   maskToFloat,
   maskToInteger,
+  maskToSignedDecimal,
   maskToTime,
+  maskToTimeMMSS,
   numberOrNull,
   onlyPositiveNumbers,
   trimDecimals,
@@ -376,14 +378,6 @@ const stepFieldHelperMap = {
   profileVolume: stepFieldHelpers({
     maskValue: composeMaskers(maskToFloat, onlyPositiveNumbers),
   }),
-  blockTargetTempHold: stepFieldHelpers({
-    maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers),
-    castValue: Number,
-  }),
-  lidTargetTempHold: stepFieldHelpers({
-    maskValue: composeMaskers(maskToInteger, onlyPositiveNumbers),
-    castValue: Number,
-  }),
   mix_mmFromBottom: stepFieldHelpers({
     castValue: numberOrNull,
   }),
@@ -449,6 +443,12 @@ const stepFieldHelperMap = {
   conditioning_volume: stepFieldHelpers({
     maskValue: composeMaskers(maskToFloat, onlyPositiveNumbers),
     castValue: numberOrNull,
+  }),
+  pumpDurationTime: stepFieldHelpers({
+    maskValue: composeMaskers(maskToTimeMMSS),
+  }),
+  pressureMbar: stepFieldHelpers({
+    maskValue: composeMaskers(maskToSignedDecimal),
   }),
 }
 

@@ -62,6 +62,10 @@ setup:
 .PHONY: setup-py
 setup-py: setup
 
+.PHONY: lock
+lock:
+	$(UV) lock
+
 .PHONY: clean
 clean:
 	$(clean_all_cmd)
@@ -95,6 +99,7 @@ lint:
 .PHONY: format
 format:
 	$(ruff) format .
+	$(ruff) check --select I --fix .
 
 .PHONY: push
 push: wheel
@@ -102,5 +107,7 @@ push: wheel
 
 .PHONY: push-ot3
 push-ot3: wheel
-	$(call push-python,$(host),$(ssh_key),$(ssh_opts),$(wheel_file),/opt/opentrons-system-server/)
+	$(call push-python,$(host),$(ssh_key),$(ssh_opts),$(wheel_file),/opt/opentrons-auth-server/)
 	$(call push-python,$(host),$(ssh_key),$(ssh_opts),$(wheel_file),/opt/opentrons-robot-server/)
+	$(call push-python,$(host),$(ssh_key),$(ssh_opts),$(wheel_file),/opt/opentrons-system-server/)
+	$(call push-python,$(host),$(ssh_key),$(ssh_opts),$(wheel_file),/opt/opentrons-update-server/)

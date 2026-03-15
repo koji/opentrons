@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
+import { clsx } from 'clsx'
 import { format } from 'date-fns'
 import { css } from 'styled-components'
 
@@ -21,8 +22,9 @@ import {
 import { OT2_ROBOT_TYPE } from '@opentrons/shared-data'
 
 import { PeripheralsInfo } from '/protocol-designer/pages/ProtocolOverview/PeripheralsInfo'
+import lineClampStyles from '/protocol-designer/styles/lineclamp.module.css'
 
-import { COLUMN_STYLE, LINE_CLAMP_TEXT_STYLE } from '../../components/atoms'
+import { COLUMN_STYLE } from '../../components/atoms'
 import { EndUserAgreementFooter } from '../../components/molecules'
 import {
   EditInstrumentsModal,
@@ -94,14 +96,19 @@ export function ProtocolOverview(): JSX.Element {
   const additionalEquipment = useSelector(getAdditionalEquipmentEntities)
   const liquids = useSelector(getLiquidEntities)
 
-  useEffect(() => {
-    if (formValues?.created == null) {
-      console.log(
-        'formValues was possibly refreshed while on the overview page, redirecting to landing page'
-      )
-      navigate('/')
-    }
-  }, [formValues])
+  useEffect(
+    () => {
+      if (formValues?.created == null) {
+        console.log(
+          'formValues was possibly refreshed while on the overview page, redirecting to landing page'
+        )
+        navigate('/')
+      }
+    },
+    // FIXME(2026-03-03): Supply all missing dependencies, if it's safe. If it's unsafe, explain why.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [formValues]
+  )
 
   const {
     modules: modulesOnDeck,
@@ -179,7 +186,11 @@ export function ProtocolOverview(): JSX.Element {
           <Flex flex="1">
             <StyledText
               desktopStyle="displayBold"
-              css={LINE_CLAMP_TEXT_STYLE(3)}
+              className={clsx(
+                lineClampStyles.line_clamp,
+                lineClampStyles.word_break_all
+              )}
+              style={{ WebkitLineClamp: 3 }}
             >
               {protocolName != null && protocolName !== ''
                 ? protocolName

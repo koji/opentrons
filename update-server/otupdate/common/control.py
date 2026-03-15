@@ -9,11 +9,14 @@ import logging
 import subprocess
 from functools import lru_cache
 from pathlib import Path
-from typing import Callable, Coroutine, Mapping, Any
+from typing import Any, Callable, Coroutine, Mapping
 
 from aiohttp import web
 
-from .constants import RESTART_LOCK_NAME, DEVICE_BOOT_ID_NAME
+from server_utils.auth.scopes import Scope
+
+from . import auth
+from .constants import DEVICE_BOOT_ID_NAME, RESTART_LOCK_NAME
 from .name_management import get_name_synchronizer
 
 LOG = logging.getLogger(__name__)
@@ -23,6 +26,7 @@ def _do_restart():
     subprocess.check_call(["reboot"])
 
 
+@auth.require_scopes(Scope.RESTART_WRITE)
 async def restart(request: web.Request) -> web.Response:
     """Restart the robot.
 

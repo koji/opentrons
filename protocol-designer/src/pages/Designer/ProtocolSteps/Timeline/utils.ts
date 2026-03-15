@@ -6,7 +6,12 @@ import { getStepVisibilities } from '/protocol-designer/steplist/utils/getStepVi
 import { convertStepHierarchyToArray } from '/protocol-designer/steplist/utils/stepHierarchy'
 
 import type { MouseEvent } from 'react'
+import type { LabwareTemporalProperties } from '@opentrons/step-generation'
 import type { StepIdType } from '/protocol-designer/form-types'
+import type {
+  ModuleOnDeck,
+  SavedStepFormState,
+} from '/protocol-designer/step-forms'
 import type { StepHierarchy } from '/protocol-designer/steplist/utils/stepHierarchy'
 
 export const capitalizeFirstLetterAfterNumber = (title: string): string =>
@@ -148,3 +153,50 @@ export const getMouseClickKeyInfo = (
 }
 
 export const getUserOS = (): string | undefined => new UAParser().getOS().name
+
+interface FillLabwareToDeleteData {
+  labwareIds: string[]
+  module: ModuleOnDeck
+}
+
+export const getFillLabwareToDeleteData = (
+  stepIds: string[],
+  savedStepForms: SavedStepFormState,
+  deckSetupModules: Record<string, ModuleOnDeck>
+): FillLabwareToDeleteData[] => {
+  return stepIds.reduce<FillLabwareToDeleteData[]>((acc, stepId) => {
+    const formData = savedStepForms[stepId]
+    const module = Object.values(deckSetupModules).find(
+      module => formData.moduleId === module.id
+    )
+    return formData?.stepType === 'flexStacker' &&
+      formData.fillLabwareIds != null &&
+      module != null
+      ? [...acc, { labwareIds: formData.fillLabwareIds as string[], module }]
+      : acc
+  }, [])
+}
+
+export const getConsolidatedStacks = (
+  labwareAtLastState: Record<string, LabwareTemporalProperties>
+): string[][] => {
+  const stacks = Object.values(labwareAtLastState).map(labware => labware.stack)
+  // Only returns stacks that are not subsets of other stacks
+  return stacks.filter(
+    stack =>
+      !stacks.some(
+        previousStack =>
+          // Skip comparing the stack to itself
+          previousStack !== stack &&
+          // Only consider stacks that are longer than the current stack
+          previousStack.length > stack.length &&
+          // Check if the current stack exists at the end of the longer stack
+          // We align the end of both stacks and compare element-by-element
+          stack.every(
+            (labware, index) =>
+              previousStack[index + (previousStack.length - stack.length)] ===
+              labware
+          )
+      )
+  )
+}

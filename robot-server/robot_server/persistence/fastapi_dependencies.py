@@ -4,27 +4,26 @@ import asyncio
 import logging
 from pathlib import Path
 from typing import Annotated, Awaitable, Callable, Iterable, Optional
-from typing_extensions import Literal
 
-from sqlalchemy.engine import Engine as SQLEngine
 from anyio import to_thread
 from fastapi import Depends, status
+from sqlalchemy.engine import Engine as SQLEngine
+from typing_extensions import Literal
 
 from server_utils.fastapi_utils.app_state import (
     AppState,
     AppStateAccessor,
     get_app_state,
 )
-from robot_server.errors.error_responses import ErrorDetails
+from server_utils.persistence.persistence_directory import (
+    PersistenceResetter,
+)
 
 from .database import create_sql_engine
 from .file_and_directory_names import DB_FILE
-from .persistence_directory import (
-    PersistenceResetter,
-    prepare_active_subdirectory,
-    prepare_root,
-)
-from .images_directory import prepare_images_directory, ImagesResetter
+from .images_directory import ImagesResetter, prepare_images_directory
+from .manage_persistence_directory import prepare_active_subdirectory, prepare_root
+from robot_server.errors.error_responses import ErrorDetails
 
 _log = logging.getLogger(__name__)
 

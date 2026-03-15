@@ -18,8 +18,8 @@ export type DevInternalFlag =
   | 'enableSearch'
   | 'reactQueryDevtools'
   | 'reactScan'
-  | 'camera'
   | 'quickTransferProtocolContentsLog'
+  | 'ignoreOT2App'
 
 export type FeatureFlags = Partial<Record<DevInternalFlag, boolean | undefined>>
 

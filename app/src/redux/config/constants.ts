@@ -10,8 +10,8 @@ export const DEV_INTERNAL_FLAGS: DevInternalFlag[] = [
   'enableSearch',
   'reactQueryDevtools',
   'reactScan',
-  'camera',
   'quickTransferProtocolContentsLog',
+  'ignoreOT2App',
 ]
 
 // action type constants

@@ -4,6 +4,7 @@ import type {
   LabwareLocation,
   NozzleConfigurationStyle,
   PositionReference,
+  PrimaryNozzleConfigurationStyle,
   Width,
 } from '@opentrons/shared-data'
 import type {
@@ -118,19 +119,14 @@ export type StepFieldName = string
 
 /* MODULE FIELDS */
 // | 'blockIsActive'
-// | 'blockIsActiveHold'
-// | 'blockTargetTempHold'
 // | 'engageHeight'
 // | 'heaterShakerSetTimer'
 // | 'heaterShakerTimerMinutes'
 // | 'heaterShakerTimerSeconds'
 // | 'latchOpen'
 // | 'lidIsActive'
-// | 'lidIsActiveHold'
 // | 'lidOpen'
-// | 'lidOpenHold'
 // | 'lidTargetTemp'
-// | 'lidTargetTempHold'
 // | 'magnetAction'
 // | 'moduleId'
 // | 'orderedProfileItems'
@@ -178,7 +174,7 @@ export type StepType =
   | 'temperature'
   | 'thermocycler'
   | 'flexStacker'
-
+  | 'vacuum'
 export const stepIconsByType: Record<StepType, IconName> = {
   absorbanceReader: 'ot-absorbance',
   camera: 'camera',
@@ -193,9 +189,24 @@ export const stepIconsByType: Record<StepType, IconName> = {
   pause: 'pause-circle',
   temperature: 'ot-temperature-v2',
   thermocycler: 'ot-thermocycler',
+  vacuum: 'ot-vacuum',
 }
 // ===== Unprocessed form types =====
 export interface AnnotationFields {
+  // todo(mm, 2026-01-06):
+  //
+  // FormData does not extend from this type, but we do have code that tries to access
+  // stepName and stepDetails on FormData. (This has not been an error because FormData
+  // is essentially any-typed).
+  //
+  // Meanwhile, stepNumber seems to be hard-coded to 0 in new protocols, missing in
+  // old migrated protocols, and always overwritten with the actual index in
+  // getArgsAndErrorsByStepId() by the time we pass it to step-generation.
+  //
+  // We probably want to:
+  // - Make FormData extend from this type (to reflect the fact that code expects stepName and stepDetails on it)
+  // - Make stepNumber optional (to reflect the fact that it may or may not be present in imported files)
+  // - Deprecate stepNumber (to reflect the fact that it's overwritten and doesn't matter)
   stepName: string
   stepDetails: string
   stepNumber: number
@@ -296,10 +307,12 @@ export interface HydratedMoveLiquidFormData extends AnnotationFields {
   disposalVolume_checkbox: boolean
   dropTip_location: string
   liquidClassesSupported: boolean
-  nozzles: NozzleConfigurationStyle | null
+  nozzles: NozzleConfigurationStyle
   path: PathOption
   // the existing code claims that pipette and tipRack are not nullable, but they are:
   pipette: PipetteEntity
+  primaryNozzle: PrimaryNozzleConfigurationStyle
+
   tipRack: TipRackWithDef
   volume: number
   pushOut_volume: number | null
@@ -331,6 +344,10 @@ export interface HydratedMoveLiquidFormData extends AnnotationFields {
   aspirate_position_reference: PositionReference
   blowout_flowRate?: number | null
   blowout_location?: string | null
+  blowout_mmFromBottom?: number | null
+  blowout_x_position?: number | null
+  blowout_y_position?: number | null
+  blowout_position_reference?: string | null
   conditioning_checkbox: boolean | null
   conditioning_volume: number | null
   dispense_airGap_volume?: string | null
@@ -406,7 +423,7 @@ export interface HydratedMixFormData extends AnnotationFields {
   mix_touchTip_checkbox: boolean
   mix_wellOrder_first: WellOrderOption
   mix_wellOrder_second: WellOrderOption
-  nozzles: NozzleConfigurationStyle | null
+  nozzles: NozzleConfigurationStyle
   pipette: PipetteEntity // can be null if user deletes pipette
   stepType: 'mix'
   tipRack: TipRackWithDef
@@ -420,6 +437,8 @@ export interface HydratedMixFormData extends AnnotationFields {
   dispense_delay_seconds?: number | null
   dispense_flowRate?: number | null
   dropTip_wellNames?: string[] | null
+  // TODO: mix_mmFromBottom is now the position above the mix_position_reference, not the bottom.
+  // Renaming it will probably require a migration.
   mix_mmFromBottom?: number | null
   mix_touchTip_mmFromTop?: number | null
   mix_x_position?: number | null
@@ -427,6 +446,7 @@ export interface HydratedMixFormData extends AnnotationFields {
   mix_position_reference: PositionReference
   pickUpTip_location?: string | null
   pickUpTip_wellNames?: string[] | null
+  primaryNozzle: PrimaryNozzleConfigurationStyle
   pushOut_volume: number | null
   pushOut_checkbox: boolean
   times?: number | null
@@ -484,18 +504,6 @@ export interface HydratedThermocyclerFormData extends AnnotationFields {
   profileItemsById: Record<string, ProfileItem>
   profileTargetLidTemp: string | null
   profileVolume: string | null
-
-  // https://opentrons.atlassian.net/browse/EXEC-2141
-  /** @deprecated Ignored with enableConcurrentModuleActions. Use a separate Thermocycler step instead. */
-  blockIsActiveHold: boolean
-  /** @deprecated Ignored with enableConcurrentModuleActions. Use a separate Thermocycler step instead. */
-  blockTargetTempHold: string | null
-  /** @deprecated Ignored with enableConcurrentModuleActions. Use a separate Thermocycler step instead. */
-  lidIsActiveHold: boolean
-  /** @deprecated Ignored with enableConcurrentModuleActions. Use a separate Thermocycler step instead. */
-  lidTargetTempHold: string | null
-  /** @deprecated Ignored with enableConcurrentModuleActions. Use a separate Thermocycler step instead. */
-  lidOpenHold: boolean
 }
 
 export type AbsorbanceReaderFormType =
@@ -528,15 +536,22 @@ export interface HydratedFlexStackerFormData extends AnnotationFields {
   stepType: 'flexStacker'
   id: string
   fillLabwareUri: string | null
-  fillQuantity: number | null
+  fillLabwareIds: string[]
   flexStackerFormType: FlexStackerFormType | null
   interventionMessage: string | null
+  moduleId: string
+}
+
+export interface HydratedVacuumFormData extends AnnotationFields {
+  stepType: 'vacuum'
+  id: string
   moduleId: string
 }
 
 // fields used in TipPositionInput
 export type TipZOffsetFields =
   | 'aspirate_mmFromBottom'
+  | 'blowout_mmFromBottom'
   | 'dispense_mmFromBottom'
   | 'mix_mmFromBottom'
   | 'aspirate_touchTip_mmFromTop'
@@ -551,6 +566,7 @@ export type TipZOffsetFields =
 
 export type TipYOffsetFields =
   | 'aspirate_y_position'
+  | 'blowout_y_position'
   | 'dispense_y_position'
   | 'mix_y_position'
   | 'aspirate_retract_y_position'
@@ -560,6 +576,7 @@ export type TipYOffsetFields =
 
 export type TipXOffsetFields =
   | 'aspirate_x_position'
+  | 'blowout_x_position'
   | 'dispense_x_position'
   | 'mix_x_position'
   | 'aspirate_retract_x_position'
@@ -569,6 +586,7 @@ export type TipXOffsetFields =
 
 export type ReferenceFields =
   | 'aspirate_position_reference'
+  | 'blowout_position_reference'
   | 'dispense_position_reference'
   | 'aspirate_submerge_position_reference'
   | 'dispense_submerge_position_reference'
@@ -654,3 +672,4 @@ export type HydratedFormData =
   | HydratedTemperatureFormData
   | HydratedThermocyclerFormData
   | HydratedFlexStackerFormData
+  | HydratedVacuumFormData

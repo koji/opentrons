@@ -1,51 +1,62 @@
+import clsx from 'clsx'
+
+import { COLORS } from '../../helix-design-system'
 import { StyledText } from '../StyledText'
 import styles from './slider.module.css'
 
+import type { CSSProperties } from 'react'
+
 interface SliderProps {
-  /** Title of slider */
-  title: string
-  /** Subtext of slider */
-  subtext: string
-  /** Default value of slider */
+  /** Value of slider as percentage */
   value: number
   /** Function to do something with the value of the slider */
   adjustValue: (value: number) => void
+  /** Optional label for the slider */
+  label?: string
+  /** Optional color for the unfilled (right) track. Defaults to blue-20. */
+  backgroundColor?: string
 }
 
 export function Slider({
   value,
-  title,
-  subtext,
+  label,
   adjustValue,
+  backgroundColor,
 }: SliderProps): JSX.Element {
+  const style: CSSProperties & Record<string, string> = {
+    '--value-percent': `${value}%`,
+    ...(backgroundColor != null && {
+      '--slider-unfilled': backgroundColor,
+    }),
+  }
   return (
-    <div className={styles.slider_setting_container}>
-      <div className={styles.slider_setting_text_container}>
-        <StyledText desktopStyle="bodyDefaultSemiBold">{title}</StyledText>
-        <StyledText desktopStyle="bodyDefaultRegular">{subtext}</StyledText>
-      </div>
-      <div className={styles.slider_value_container}>
-        <input
-          type="range"
-          min="0"
-          max="100"
-          value={value}
-          onChange={e => {
-            adjustValue(Number(e.target.value))
-          }}
-          className={styles.slider_basic}
-          // @ts-expect-error Expected. We want to use style here to avoid more complex
-          //  data-attribute CSS calculations.
-          style={{ '--slider-progress': `${value}%` }}
-          aria-label={title}
-        />
-        <StyledText
-          className={styles.slider_percentage}
-          desktopStyle="bodyDefaultSemiBold"
-        >
-          {`${value}%`}
+    <div className={styles.slider_container}>
+      <div
+        className={clsx(styles.slider_text_container_label, {
+          [styles.slider_text_container_no_label]: label == null,
+        })}
+      >
+        {label != null ? (
+          <StyledText desktopStyle="bodyDefaultRegular" color={COLORS.grey60}>
+            {label}
+          </StyledText>
+        ) : null}
+        <StyledText desktopStyle="bodyDefaultRegular" color={COLORS.grey60}>
+          {value}%
         </StyledText>
       </div>
+      <input
+        type="range"
+        min="1"
+        max="100"
+        value={value}
+        onChange={e => {
+          adjustValue(Number(e.target.value))
+        }}
+        className={styles.slider}
+        style={style}
+        aria-label={label}
+      />
     </div>
   )
 }
