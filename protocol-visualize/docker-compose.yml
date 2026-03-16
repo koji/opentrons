@@ -1,0 +1,50 @@
+services:
+  analyzer:
+    build:
+      context: ./opentrons-robot-analysis
+    container_name: protocol-visualize-analyzer
+    ports:
+      - "7860:7860"
+    healthcheck:
+      test:
+        - CMD
+        - /home/user/app/.venv/bin/python
+        - -c
+        - |
+          import json, sys, urllib.request
+          data = json.load(urllib.request.urlopen("http://127.0.0.1:7860/robot/health"))
+          sys.exit(0 if data.get("ok") else 1)
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 20s
+
+  backend:
+    build:
+      context: ./backend
+    container_name: protocol-visualize-backend
+    depends_on:
+      analyzer:
+        condition: service_healthy
+    environment:
+      ANALYZER_URL: http://analyzer:7860
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend-storage:/app/storage
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import json, sys, urllib.request
+          data = json.load(urllib.request.urlopen("http://127.0.0.1:8000/health"))
+          sys.exit(0 if data.get("ok") else 1)
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  backend-storage:

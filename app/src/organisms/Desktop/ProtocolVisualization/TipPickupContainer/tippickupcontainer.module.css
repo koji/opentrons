@@ -5,6 +5,7 @@
   padding: var(--spacing-12);
   border-radius: var(--border-radius-8);
   background-color: var(--white);
+  color: var(--black);
   container-name: tip-pickup-slot-container;
   container-type: inline-size;
   gap: var(--spacing-8);
@@ -32,6 +33,7 @@
   padding: var(--spacing-12);
   border-radius: var(--border-radius-4);
   background-color: var(--grey-10);
+  color: var(--black);
 }
 
 .footer {

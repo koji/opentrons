@@ -6,6 +6,7 @@
   justify-content: center;
   padding: var(--spacing-16) var(--spacing-20);
   background-color: var(--white);
+  color: var(--black);
 }
 
 .slot_container {
@@ -20,6 +21,7 @@
   height: 100%;
   border-radius: var(--border-radius-8);
   background-color: var(--white);
+  color: var(--black);
   overflow-y: auto;
 }
 

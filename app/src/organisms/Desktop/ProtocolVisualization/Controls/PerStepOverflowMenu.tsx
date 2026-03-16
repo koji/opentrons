@@ -9,7 +9,7 @@ interface PerStepOverflowMenuProps {
   setMilliSecondsPerFrame: (secondsPerFrame: number) => void
 }
 
-const PER_STEP_OPTIONS = [2, 3, 4]
+const PER_STEP_OPTIONS = [2, 1, 0.5]
 
 export function PerStepOverflowMenu(
   props: PerStepOverflowMenuProps

@@ -11,6 +11,7 @@
   padding: var(--spacing-16);
   border-radius: var(--border-radius-8);
   background-color: var(--white);
+  color: var(--black);
   container-name: controls-container;
   container-type: inline-size;
 }
@@ -50,6 +51,10 @@
 
 .max_content_size {
   width: max-content;
+}
+
+.no_wrap_chip {
+  white-space: nowrap;
 }
 
 .buttons_container {

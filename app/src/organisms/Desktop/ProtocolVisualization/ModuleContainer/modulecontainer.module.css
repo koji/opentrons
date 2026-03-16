@@ -4,6 +4,7 @@
   flex-direction: column;
   padding-top: var(--spacing-16);
   background-color: var(--white);
+  color: var(--black);
   gap: var(--spacing-4);
 }
 
@@ -19,6 +20,7 @@
   padding: var(--spacing-16);
   border-radius: var(--border-radius-8);
   background-color: var(--white);
+  color: var(--black);
   gap: var(--spacing-16);
 }
 
