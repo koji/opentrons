@@ -14,16 +14,33 @@ export function HomePage(): JSX.Element {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
+  // useEffect(() => {
+  //   void listProtocols()
+  //     .then(setRecords)
+  //     .catch((e: Error) => {
+  //       setError(e.message)
+  //     })
+  //     .finally(() => {
+  //       setIsLoading(false)
+  //     })
+  // }, [])
+
+    useEffect(() => {
+    console.log('Requesting protocols...'); // ★これを追加
     void listProtocols()
-      .then(setRecords)
+      .then(records => {
+        console.log('Protocols received:', records); // ★これを追加
+        setRecords(records);
+      })
       .catch((e: Error) => {
-        setError(e.message)
+        console.error('Failed to list protocols:', e); // ★これを追加
+        setError(e.message);
       })
       .finally(() => {
-        setIsLoading(false)
-      })
-  }, [])
+        console.log('Request finished.'); // ★これを追加
+        setIsLoading(false);
+      });
+  }, []);
 
   const handleUpload = async (file: File): Promise<void> => {
     setIsUploading(true)

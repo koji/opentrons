@@ -7,7 +7,8 @@ import '@fontsource/public-sans'
 import '@opentrons/components/styles/global'
 import { ApiClientProvider } from '@opentrons/react-api-client'
 
-import { i18n } from '/app/i18n'
+// import { i18n } from './i18n'
+import { i18n } from './i18n'
 
 import { App } from './App'
 import { store } from './store'

@@ -85,8 +85,7 @@ def add_parameters(p: ParameterContext) -> None:
 
 def run(protocol: ProtocolContext) -> None:
     """Main function to run the protocol."""
-    if not protocol.is_simulating():
-        background_helpers.launch_background_tasks()
+    background_helpers.launch_background_tasks()
 
     global open_location
     protocol.capture_image(filename="start_of_run")

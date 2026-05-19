@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { AppHeader } from './components/AppHeader'
 import { HomePage } from './pages/HomePage'
-import { ProtocolPage } from './pages/ProtocolPage'
+import { LoadingView } from './components/LoadingView'
+
+const ProtocolPage = lazy(() =>
+  import('./pages/ProtocolPage').then(m => ({ default: m.ProtocolPage }))
+)
 
 export function App(): JSX.Element {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -24,11 +28,13 @@ export function App(): JSX.Element {
           setTheme(current => (current === 'light' ? 'dark' : 'light'))
         }}
       />
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/protocols/:protocolId" element={<ProtocolPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <Suspense fallback={<LoadingView label="Loading..." />}>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/protocols/:protocolId" element={<ProtocolPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </>
   )
 }
