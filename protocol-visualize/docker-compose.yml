@@ -3,6 +3,8 @@ services:
     build:
       context: ./opentrons-robot-analysis
     container_name: protocol-visualize-analyzer
+    environment:
+      OPENTRONS_PYTHON: python3
     ports:
       - "7860:7860"
     healthcheck:
