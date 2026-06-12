@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   FLEX_ROBOT_TYPE,
@@ -16,7 +16,11 @@ import { StepDetailContainer } from '/app/organisms/Desktop/ProtocolVisualizatio
 import { getProtocolDisplayName } from '/app/transformations/protocols'
 import styles from '/app/organisms/Desktop/ProtocolVisualization/VisualizerContainer/visualizercontainer.module.css'
 
+import { ProtocolCodeView } from './ProtocolCodeView'
+import codeStyles from './ProtocolCodeView.module.css'
+
 import type { MouseEvent } from 'react'
+import type { CommandSourceMap } from '../api/types'
 import type {
   CompletedProtocolAnalysis,
   Liquid,
@@ -52,6 +56,8 @@ interface ProtocolVisualizerProps {
   groupedCommands: GroupedCommands | null
   protocolKey: string
   srcFileNames: string[]
+  protocolSource?: string | null
+  commandSourceMap?: CommandSourceMap | null
   onLaunchSpotlightWindow?: () => void
   onStepDetailClose?: (payload: { protocolKey: string }) => void
   onStepDetailOpen?: (
@@ -74,6 +80,8 @@ export function ProtocolVisualizer({
   groupedCommands,
   protocolKey,
   srcFileNames,
+  protocolSource = null,
+  commandSourceMap = null,
   onLaunchSpotlightWindow,
   onStepDetailClose,
   onStepDetailOpen,
@@ -90,6 +98,9 @@ export function ProtocolVisualizer({
   )
   const [isDragging, setIsDragging] = useState<boolean>(false)
   const [selectedCommandId, setSelectedCommand] = useState<string | null>(null)
+  const [rightPanelTab, setRightPanelTab] = useState<'details' | 'code'>(
+    'details'
+  )
   const [leftWidth, setLeftWidth] = useState<number>(INITIAL_WIDTH_PX)
   const [rightWidth, setRightWidth] = useState<number>(INITIAL_WIDTH_PX)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -107,9 +118,14 @@ export function ProtocolVisualizer({
     rightWidthRef.current = rightWidth
   }, [rightWidth])
 
-  const filteredCommands = commands.filter(
-    command =>
-      !command.commandType.includes('load') && command.commandType !== 'home'
+  const filteredCommands = useMemo(
+    () =>
+      commands.filter(
+        command =>
+          !command.commandType.includes('load') &&
+          command.commandType !== 'home'
+      ),
+    [commands]
   )
 
   const selectedCommandIndex = commands.findIndex(
@@ -133,6 +149,50 @@ export function ProtocolVisualizer({
   const { robotState } = frame
   const selectedRunTimeCommand = commands.find(
     command => command.id === selectedCommandId
+  )
+
+  const selectedSourceLocation =
+    selectedCommandId != null
+      ? commandSourceMap?.[selectedCommandId] ?? null
+      : null
+
+  // Lines shown in the code tab need to know which steps they generated:
+  // badge counts on each statement's first line, and a reverse lookup so
+  // clicking a line selects the first step it produced.
+  const { lineCommandCounts, lineToFirstCommandId } = useMemo(() => {
+    const counts = new Map<number, number>()
+    const firstCommandId = new Map<number, string>()
+    if (commandSourceMap != null) {
+      for (const command of filteredCommands) {
+        const location = commandSourceMap[command.id]
+        if (location == null) continue
+        counts.set(
+          location.startLine,
+          (counts.get(location.startLine) ?? 0) + 1
+        )
+        for (
+          let lineNumber = location.startLine;
+          lineNumber <= location.endLine;
+          lineNumber++
+        ) {
+          if (!firstCommandId.has(lineNumber)) {
+            firstCommandId.set(lineNumber, command.id)
+          }
+        }
+      }
+    }
+    return { lineCommandCounts: counts, lineToFirstCommandId: firstCommandId }
+  }, [commandSourceMap, filteredCommands])
+
+  const handleCodeLineClick = useCallback(
+    (lineNumber: number): void => {
+      const commandId = lineToFirstCommandId.get(lineNumber)
+      if (commandId != null) {
+        setIsPlaying(false)
+        setSelectedCommand(commandId)
+      }
+    },
+    [lineToFirstCommandId]
   )
 
   useEffect(() => {
@@ -387,7 +447,69 @@ export function ProtocolVisualizer({
         }}
       />
       <div className={styles.right_column} style={{ width: `${rightWidth}px` }}>
-        {selectedRunTimeCommand != null ? (
+        {protocolSource != null ? (
+          <div className={codeStyles.code_panel}>
+            <div className={codeStyles.tab_bar} role="tablist">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={rightPanelTab === 'details'}
+                className={`${codeStyles.tab} ${
+                  rightPanelTab === 'details' ? codeStyles.tab_active : ''
+                }`}
+                onClick={() => {
+                  setRightPanelTab('details')
+                }}
+              >
+                Step detail
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={rightPanelTab === 'code'}
+                className={`${codeStyles.tab} ${
+                  rightPanelTab === 'code' ? codeStyles.tab_active : ''
+                }`}
+                onClick={() => {
+                  setRightPanelTab('code')
+                }}
+              >
+                Code
+              </button>
+            </div>
+            {rightPanelTab === 'code' ? (
+              <>
+                {commandSourceMap == null ||
+                Object.keys(commandSourceMap).length === 0 ? (
+                  <div className={codeStyles.code_banner}>
+                    Source mapping isn&apos;t available for this analysis.
+                    Re-upload the protocol to enable step highlighting.
+                  </div>
+                ) : selectedCommandId != null &&
+                  selectedSourceLocation == null ? (
+                  <div className={codeStyles.code_banner}>
+                    The selected step has no matching source line.
+                  </div>
+                ) : null}
+                <ProtocolCodeView
+                  source={protocolSource}
+                  selectedLocation={selectedSourceLocation}
+                  lineCommandCounts={lineCommandCounts}
+                  onLineClick={handleCodeLineClick}
+                />
+              </>
+            ) : selectedRunTimeCommand != null ? (
+              <StepDetailContainer
+                protocolKey={protocolKey}
+                commands={commands}
+                robotState={robotState}
+                invariantContext={invariantContext}
+                currentCommand={selectedRunTimeCommand}
+                liquids={liquids}
+              />
+            ) : null}
+          </div>
+        ) : selectedRunTimeCommand != null ? (
           <StepDetailContainer
             protocolKey={protocolKey}
             commands={commands}

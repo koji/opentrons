@@ -1,0 +1,60 @@
+.code_view {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  background-color: #fff;
+}
+
+.code_panel {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tab_bar {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 8px;
+  background-color: #e0e1e2;
+}
+
+.tab {
+  flex: 1;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #16212d;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.tab_active {
+  background-color: #fff;
+  font-weight: 600;
+}
+
+.error_code_wrapper {
+  display: flex;
+  height: 420px;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+  overflow: hidden;
+  border: 1px solid #e0e1e2;
+  border-radius: 8px;
+}
+
+.code_banner {
+  flex-shrink: 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background-color: #f1f1f1;
+  color: #555;
+  font-size: 11px;
+}

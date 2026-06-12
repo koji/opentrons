@@ -25,6 +25,10 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_PYTHON = str(_REPO_ROOT / "robot-server" / ".venv" / "bin" / "python")
 OPENTRONS_PYTHON = os.environ.get("OPENTRONS_PYTHON", _DEFAULT_PYTHON)
 
+# Wrapper around `opentrons.cli analyze` that also records which protocol
+# source line produced each command (see instrumented_analyze.py).
+_INSTRUMENTED_ANALYZE = Path(__file__).resolve().parent / "instrumented_analyze.py"
+
 
 def _detect_robot_type(protocol_text: str) -> str:
     """Return 'flex' or 'ot2' by parsing the protocol source."""
@@ -73,6 +77,7 @@ async def analyze_protocol(file: UploadFile = File(...)) -> dict[str, Any]:
     with tempfile.TemporaryDirectory() as tmp_dir:
         src_file = Path(tmp_dir) / filename
         out_file = Path(tmp_dir) / "analysis.json"
+        map_file = Path(tmp_dir) / "command_source_map.json"
 
         src_file.write_bytes(content)
 
@@ -80,9 +85,9 @@ async def analyze_protocol(file: UploadFile = File(...)) -> dict[str, Any]:
             proc = subprocess.run(
                 [
                     OPENTRONS_PYTHON,
-                    "-m", "opentrons.cli",
-                    "analyze",
+                    str(_INSTRUMENTED_ANALYZE),
                     "--json-output", str(out_file),
+                    "--map-output", str(map_file),
                     str(src_file),
                 ],
                 capture_output=True,
@@ -127,6 +132,16 @@ async def analyze_protocol(file: UploadFile = File(...)) -> dict[str, Any]:
                 "payload": {"detail": f"Analyzer output was not valid JSON: {exc}"},
             }
 
+        command_source_map: dict[str, Any] = {}
+        if map_file.exists():
+            try:
+                map_payload = json.loads(map_file.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                map_payload = {}
+            commands = map_payload.get("commands")
+            if isinstance(commands, dict):
+                command_source_map = commands
+
     robot_type = _robot_type_from_analysis(analysis)
     ok = analysis.get("result") == "ok"
     return {
@@ -134,6 +149,7 @@ async def analyze_protocol(file: UploadFile = File(...)) -> dict[str, Any]:
         "robot_type": robot_type,
         "status_code": 200,
         "payload": analysis,
+        "command_source_map": command_source_map,
     }
 
 

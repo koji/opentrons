@@ -24,6 +24,14 @@ export function getProtocol(protocolId: string): Promise<ProtocolRecord> {
   return request<ProtocolRecord>(`/protocols/${protocolId}`)
 }
 
+export async function getProtocolSource(protocolId: string): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/protocols/${protocolId}/source`)
+  if (!response.ok) {
+    throw new Error(`Failed to load protocol source (status ${response.status})`)
+  }
+  return await response.text()
+}
+
 export function uploadProtocol(file: File): Promise<ProtocolRecord> {
   const formData = new FormData()
   formData.append('file', file)

@@ -6,6 +6,8 @@ import { ProtocolPage } from './ProtocolPage'
 
 vi.mock('../api/client', () => ({
   getProtocol: vi.fn(),
+  // Reject so views fall back to rendering without the code editor.
+  getProtocolSource: vi.fn(() => Promise.reject(new Error('source unavailable'))),
 }))
 
 vi.mock('../components/VisualizationPanel', () => ({

@@ -1,4 +1,7 @@
+import { useEffect, useState } from 'react'
+
 import { getGroupedCommands } from '/app/redux/protocol-storage/utils'
+import { getProtocolSource } from '../api/client'
 import { ProtocolVisualizer } from './ProtocolVisualizer'
 
 import type { ProtocolAnalysisOutput } from '@opentrons/shared-data'
@@ -9,6 +12,23 @@ export function VisualizationPanel({
 }: {
   record: ProtocolRecord
 }): JSX.Element {
+  const [protocolSource, setProtocolSource] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    getProtocolSource(record.id)
+      .then(source => {
+        if (!cancelled) setProtocolSource(source)
+      })
+      .catch(() => {
+        // The code tab is simply hidden when the source can't be loaded.
+        if (!cancelled) setProtocolSource(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [record.id])
+
   const rawAnalysis = record.analysis as ProtocolAnalysisOutput
   const analysis: ProtocolAnalysisOutput = {
     ...rawAnalysis,
@@ -32,6 +52,8 @@ export function VisualizationPanel({
         groupedCommands={groupedCommands}
         protocolKey={record.id}
         srcFileNames={[record.filename]}
+        protocolSource={protocolSource}
+        commandSourceMap={record.commandSourceMap ?? null}
       />
     </div>
   )

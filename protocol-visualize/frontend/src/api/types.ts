@@ -13,6 +13,17 @@ export interface FailedAnalysisPayload {
   [key: string]: unknown
 }
 
+export interface CommandSourceLocation {
+  /** Line reported by the interpreter when the command was issued. */
+  line: number
+  /** First line of the enclosing statement (multi-line calls span several lines). */
+  startLine: number
+  /** Last line of the enclosing statement. */
+  endLine: number
+}
+
+export type CommandSourceMap = Record<string, CommandSourceLocation>
+
 export interface ProtocolRecord {
   id: string
   filename: string
@@ -24,4 +35,5 @@ export interface ProtocolRecord {
   apiLevel: string | null
   analysis: ProtocolAnalysisOutput | FailedAnalysisPayload
   errorSummary: ErrorSummary | null
+  commandSourceMap?: CommandSourceMap | null
 }

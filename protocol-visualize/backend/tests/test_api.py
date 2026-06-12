@@ -73,6 +73,74 @@ def test_upload_protocol_persists_source_and_analysis(tmp_path: Path) -> None:
     assert [record["id"] for record in list_response.json()] == [protocol_id]
 
 
+def test_upload_protocol_persists_command_source_map(tmp_path: Path) -> None:
+    source_map = {
+        "command-1": {"line": 12, "startLine": 12, "endLine": 14},
+        "command-2": {"line": 20, "startLine": 20, "endLine": 20},
+    }
+    client = make_client(
+        tmp_path,
+        AnalyzerResponse(
+            ok=True,
+            robot_type="flex",
+            status_code=200,
+            payload={
+                "commands": [],
+                "errors": [],
+                "metadata": {},
+                "robotType": "Flex",
+                "createdAt": "2026-03-15T12:00:00Z",
+                "config": {"protocolType": "python", "apiVersion": [2, 20]},
+                "liquids": [],
+                "commandAnnotations": [],
+            },
+            command_source_map=source_map,
+        ),
+    )
+
+    response = client.post(
+        "/protocols",
+        files={"file": ("example.py", b"protocol = 'test protocol'", "text/x-python")},
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["commandSourceMap"] == source_map
+
+    get_response = client.get(f"/protocols/{body['id']}")
+    assert get_response.status_code == 200
+    assert get_response.json()["commandSourceMap"] == source_map
+
+
+def test_protocol_record_without_source_map_defaults_to_none(tmp_path: Path) -> None:
+    client = make_client(
+        tmp_path,
+        AnalyzerResponse(
+            ok=True,
+            robot_type="ot2",
+            status_code=200,
+            payload={
+                "commands": [],
+                "errors": [],
+                "metadata": {},
+                "robotType": "OT-2 Standard",
+                "createdAt": "2026-03-15T12:00:00Z",
+                "config": {"protocolType": "python", "apiVersion": [2, 20]},
+                "liquids": [],
+                "commandAnnotations": [],
+            },
+        ),
+    )
+
+    response = client.post(
+        "/protocols",
+        files={"file": ("example.py", b"protocol = 'test protocol'", "text/x-python")},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["commandSourceMap"] is None
+
+
 def test_upload_protocol_extracts_author_and_api_level_from_source(tmp_path: Path) -> None:
     client = make_client(
         tmp_path,

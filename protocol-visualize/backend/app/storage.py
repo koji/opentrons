@@ -134,6 +134,9 @@ def save_analysis_result(
             status_code=analyzer_response.status_code,
             ok=analyzer_response.ok,
         ),
+        # Kept even for failed analyses: the failed command's source line is
+        # exactly what the error view wants to highlight.
+        commandSourceMap=analyzer_response.command_source_map,
     )
 
     metadata = record.model_dump(mode="json")

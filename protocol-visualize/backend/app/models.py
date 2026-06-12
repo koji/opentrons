@@ -26,6 +26,10 @@ class ProtocolRecord(BaseModel):
     apiLevel: str | None = None
     analysis: dict[str, Any]
     errorSummary: ErrorSummary | None = None
+    # Maps protocol-engine command ids to the protocol source lines that
+    # produced them: {commandId: {line, startLine, endLine}}. None for records
+    # analyzed before this feature existed.
+    commandSourceMap: dict[str, Any] | None = None
 
 
 class AnalyzerResponse(BaseModel):
@@ -33,3 +37,4 @@ class AnalyzerResponse(BaseModel):
     robot_type: RobotType
     status_code: int
     payload: dict[str, Any]
+    command_source_map: dict[str, Any] | None = None
