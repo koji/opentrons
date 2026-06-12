@@ -1,0 +1,140 @@
+{
+  "analysis": {
+    "commandAnnotations": [],
+    "commandPreconditions": {
+      "isCameraUsed": false
+    },
+    "commands": [
+      {
+        "commandType": "home",
+        "completedAt": "2026-06-12T07:05:11.669757Z",
+        "createdAt": "2026-06-12T07:05:11.669757Z",
+        "id": "e56580ab-5edb-4347-aad8-1e4bec1b654f",
+        "key": "50c7ae73a4e3f7129874f39dfb514803",
+        "notes": [],
+        "params": {},
+        "result": {},
+        "startedAt": "2026-06-12T07:05:11.669757Z",
+        "status": "succeeded"
+      }
+    ],
+    "config": {
+      "apiVersion": [
+        2,
+        4
+      ],
+      "protocolType": "python"
+    },
+    "createdAt": "2026-06-12T07:05:11.686504Z",
+    "errors": [
+      {
+        "createdAt": "2026-06-12T07:05:11.685131Z",
+        "detail": "NoSuchModuleError [line 43]: Could not find a module with model \"MAGNETIC_V1\"",
+        "errorCode": "4000",
+        "errorInfo": {},
+        "errorType": "ExceptionInProtocolError",
+        "id": "af0a3007-b75f-4f70-a420-5adb91975223",
+        "isDefined": false,
+        "wrappedErrors": [
+          {
+            "createdAt": "2026-06-12T07:05:11.685131Z",
+            "detail": "opentrons.protocol_api.core.legacy.module_geometry.NoSuchModuleError: Could not find a module with model \"MAGNETIC_V1\"",
+            "errorCode": "4000",
+            "errorInfo": {
+              "args": "('Could not find a module with model \"MAGNETIC_V1\"',)",
+              "class": "NoSuchModuleError",
+              "traceback": "  File \"C:\\Users\\19172\\Desktop\\dev\\opentrons\\protocol-visualize\\opentrons-robot-analysis\\.venv\\lib\\site-packages\\opentrons\\protocols\\execution\\execute_python.py\", line 159, in exec_run\n    exec(\"run(__context)\", new_globs)\n\n  File \"<string>\", line 1, in <module>\n\n  File \"sci-omegabiotek-magbind.py\", line 43, in run\n\n  File \"C:\\Users\\19172\\Desktop\\dev\\opentrons\\protocol-visualize\\opentrons-robot-analysis\\.venv\\lib\\site-packages\\opentrons\\protocols\\api_support\\util.py\", line 390, in _check_version_wrapper\n    return decorated_obj(*args, **kwargs)\n\n  File \"C:\\Users\\19172\\Desktop\\dev\\opentrons\\protocol-visualize\\opentrons-robot-analysis\\.venv\\lib\\site-packages\\opentrons\\protocol_api\\protocol_context.py\", line 1037, in load_module\n    module_core = self._core.load_module(\n\n  File \"C:\\Users\\19172\\Desktop\\dev\\opentrons\\protocol-visualize\\opentrons-robot-analysis\\.venv\\lib\\site-packages\\opentrons\\protocol_api\\core\\legacy\\legacy_protocol_core.py\", line 362, in load_module\n    selected_definition = module_geometry.load_definition(model)\n\n  File \"C:\\Users\\19172\\Desktop\\dev\\opentrons\\protocol-visualize\\opentrons-robot-analysis\\.venv\\lib\\site-packages\\opentrons\\protocol_api\\core\\legacy\\module_geometry.py\", line 537, in load_definition\n    raise NoSuchModuleError(f'Could not find a module with model \"{model}\"')\n"
+            },
+            "errorType": "PythonException",
+            "id": "af0a3007-b75f-4f70-a420-5adb91975223",
+            "isDefined": false,
+            "wrappedErrors": [
+              {
+                "createdAt": "2026-06-12T07:05:11.685131Z",
+                "detail": "opentrons_shared_data.module.ModuleNotFoundError: No such version 3 module MAGNETIC_V1",
+                "errorCode": "4000",
+                "errorInfo": {
+                  "args": "(<MagneticModuleModel.MAGNETIC_V1: 'magneticModuleV1'>,)",
+                  "class": "ModuleNotFoundError",
+                  "requested_module": "MagneticModuleModel.MAGNETIC_V1",
+                  "requested_version": "3",
+                  "traceback": "  File \"C:\\Users\\19172\\Desktop\\dev\\opentrons\\protocol-visualize\\opentrons-robot-analysis\\.venv\\lib\\site-packages\\opentrons\\protocol_api\\core\\legacy\\module_geometry.py\", line 535, in load_definition\n    return module.load_definition(\"3\", model)\n\n  File \"C:\\Users\\19172\\Desktop\\dev\\opentrons\\protocol-visualize\\opentrons-robot-analysis\\.venv\\lib\\site-packages\\opentrons_shared_data\\module\\__init__.py\", line 97, in load_definition\n    raise ModuleNotFoundError(version, model_or_loadname)\n"
+                },
+                "errorType": "PythonException",
+                "id": "af0a3007-b75f-4f70-a420-5adb91975223",
+                "isDefined": false,
+                "wrappedErrors": [
+                  {
+                    "createdAt": "2026-06-12T07:05:11.685131Z",
+                    "detail": "FileNotFoundError: [Errno 2] No such file or directory: 'C:\\\\Users\\\\19172\\\\Desktop\\\\dev\\\\opentrons\\\\protocol-visualize\\\\opentrons-robot-analysis\\\\.venv\\\\lib\\\\site-packages\\\\opentrons_shared_data\\\\data\\\\module\\\\definitions\\\\3\\\\MAGNETIC_V1.json'",
+                    "errorCode": "4000",
+                    "errorInfo": {
+                      "args": "(2, 'No such file or directory')",
+                      "class": "FileNotFoundError",
+                      "errno": "2",
+                      "filename": "C:\\Users\\19172\\Desktop\\dev\\opentrons\\protocol-visualize\\opentrons-robot-analysis\\.venv\\lib\\site-packages\\opentrons_shared_data\\data\\module\\definitions\\3\\MAGNETIC_V1.json",
+                      "filename2": "None",
+                      "strerror": "No such file or directory",
+                      "traceback": "  File \"C:\\Users\\19172\\Desktop\\dev\\opentrons\\protocol-visualize\\opentrons-robot-analysis\\.venv\\lib\\site-packages\\opentrons_shared_data\\module\\__init__.py\", line 95, in load_definition\n    data = load_shared_data(path)\n\n  File \"C:\\Users\\19172\\Desktop\\dev\\opentrons\\protocol-visualize\\opentrons-robot-analysis\\.venv\\lib\\site-packages\\opentrons_shared_data\\load.py\", line 56, in load_shared_data\n    with open(get_shared_data_root() / path, \"rb\") as f:\n",
+                      "winerror": "None"
+                    },
+                    "errorType": "PythonException",
+                    "id": "af0a3007-b75f-4f70-a420-5adb91975223",
+                    "isDefined": false,
+                    "wrappedErrors": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "files": [
+      {
+        "name": "sci-omegabiotek-magbind.py",
+        "role": "main"
+      }
+    ],
+    "labware": [
+      {
+        "definitionUri": "opentrons/opentrons_1_trash_1100ml_fixed/1",
+        "id": "fixedTrash",
+        "loadName": "opentrons_1_trash_1100ml_fixed",
+        "location": {
+          "slotName": "12"
+        }
+      }
+    ],
+    "labwareOffsets": [],
+    "liquidClasses": [],
+    "liquids": [],
+    "metadata": {
+      "apiLevel": "2.4",
+      "author": "Opentrons <protocols@opentrons.com>",
+      "protocolName": "Mag-Bind\u00c2\u00ae Viral DNA/RNA 96 Kit"
+    },
+    "modules": [],
+    "pipettes": [],
+    "result": "not-ok",
+    "robotType": "OT-2 Standard",
+    "runTimeParameters": []
+  },
+  "analysisFile": "1781247911982.json",
+  "analysisStatus": "failed",
+  "apiLevel": "2.4",
+  "author": "Opentrons <protocols@opentrons.com>",
+  "commandSourceMap": {},
+  "errorSummary": {
+    "errors": [
+      "NoSuchModuleError [line 43]: Could not find a module with model \"MAGNETIC_V1\""
+    ],
+    "message": "Protocol analysis failed.",
+    "status_code": 200
+  },
+  "filename": "sci-omegabiotek-magbind.py",
+  "id": "f231c0a2-5dd3-401e-9de0-794463c4ab80",
+  "robotType": "ot2",
+  "updatedAt": "2026-06-12T07:05:11.982013Z",
+  "uploadedAt": "2026-06-12T07:05:06.738070Z"
+}

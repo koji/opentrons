@@ -1,0 +1,15 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "protocol-visualize-frontend",
+      "runtimeExecutable": "C:\\Users\\19172\\scoop\\apps\\mise\\current\\mise\\installs\\node\\22.22.0\\yarn.CMD",
+      "runtimeArgs": ["--cwd", "protocol-visualize/frontend", "dev", "--host", "127.0.0.1", "--port", "5173"],
+      "env": {
+        "VITE_API_BASE_URL": "http://127.0.0.1:8000"
+      },
+      "port": 5173,
+      "autoPort": false
+    }
+  ]
+}

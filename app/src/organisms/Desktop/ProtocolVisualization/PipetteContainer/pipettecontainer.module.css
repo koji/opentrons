@@ -3,6 +3,7 @@
   padding: var(--spacing-12);
   border-radius: var(--border-radius-8);
   background-color: var(--white);
+  color: var(--black);
   container-name: pipette-container;
   container-type: inline-size;
 }

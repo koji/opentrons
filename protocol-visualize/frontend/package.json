@@ -1,0 +1,38 @@
+{
+  "name": "@opentrons/protocol-visualize-frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@codemirror/lang-python": "^6.1.6",
+    "@codemirror/language": "^6.10.2",
+    "@codemirror/state": "^6.4.1",
+    "@codemirror/view": "^6.26.3",
+    "@fontsource/public-sans": "5.0.3",
+    "@opentrons/components": "link:../../components",
+    "@opentrons/labware-library": "link:../../labware-library",
+    "@opentrons/react-api-client": "link:../../react-api-client",
+    "@opentrons/shared-data": "link:../../shared-data",
+    "@opentrons/step-generation": "link:../../step-generation",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-i18next": "14.0.0",
+    "react-router-dom": "6.24.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "6.6.3",
+    "@testing-library/react": "16.3.0",
+    "@types/react": "18.2.51",
+    "@types/react-dom": "18.2.0",
+    "@vitejs/plugin-react": "4.2.0",
+    "jsdom": "26.1.0",
+    "typescript": "5.3.3",
+    "vite": "7.1.11",
+    "vitest": "2.1.9"
+  }
+}

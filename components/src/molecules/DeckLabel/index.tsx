@@ -1,5 +1,3 @@
-import { css } from 'styled-components'
-
 import { getModuleType } from '@opentrons/shared-data'
 
 import { StyledText } from '../../atoms'
@@ -9,7 +7,7 @@ import { Flex } from '../../primitives'
 import { ALIGN_CENTER, FLEX_MAX_CONTENT } from '../../styles'
 import { SPACING } from '../../ui-style-constants'
 
-import type { FlattenSimpleInterpolation } from 'styled-components'
+import type { CSSProperties } from 'react'
 import type { ModuleModel } from '@opentrons/shared-data'
 
 export interface DeckLabelProps {
@@ -38,15 +36,15 @@ export function DeckLabel({
   labelBorderRadius,
   isLast = false,
 }: DeckLabelProps): JSX.Element {
+  const labelStyles = isSelected
+    ? getSelectedDeckLabelStyle(maxWidth, labelBorderRadius)
+    : getUnselectedDeckLabelStyle(maxWidth, labelBorderRadius, isLast)
+
   return (
     <Flex
       fontSize={isZoomed ? '6px' : '18px'}
       data-testid={`DeckLabel_${isSelected ? 'Selected' : 'UnSelected'}`}
-      css={
-        isSelected
-          ? DECK_LABEL_SELECTED_STYLE(maxWidth, labelBorderRadius)
-          : DECK_LABEL_UNSELECTED_STYLE(maxWidth, labelBorderRadius, isLast)
-      }
+      style={labelStyles}
     >
       <Flex gridGap={SPACING.spacing2} alignItems={ALIGN_CENTER}>
         {moduleModel != null && isZoomed ? (
@@ -60,36 +58,36 @@ export function DeckLabel({
   )
 }
 
-const DECK_LABEL_BASE_STYLE = (
+const getBaseDeckLabelStyle = (
   maxWidth: string,
   labelBorderRadius?: string
-): FlattenSimpleInterpolation => css`
-  width: ${FLEX_MAX_CONTENT};
-  max-width: ${maxWidth};
-  padding: ${SPACING.spacing2};
-  border-radius: ${labelBorderRadius ?? '0'};
-`
+): CSSProperties => ({
+  width: FLEX_MAX_CONTENT,
+  maxWidth,
+  padding: SPACING.spacing2,
+  borderRadius: labelBorderRadius ?? '0',
+})
 
-const DECK_LABEL_SELECTED_STYLE = (
+const getSelectedDeckLabelStyle = (
   maxWidth: string,
   labelBorderRadius?: string
-): FlattenSimpleInterpolation => css`
-  ${DECK_LABEL_BASE_STYLE(maxWidth, labelBorderRadius)}
-  color: ${COLORS.white};
-  border: 1.5px solid ${COLORS.blue50};
-  background-color: ${COLORS.blue50};
-`
+): CSSProperties => ({
+  ...getBaseDeckLabelStyle(maxWidth, labelBorderRadius),
+  color: COLORS.white,
+  border: `1.5px solid ${COLORS.blue50}`,
+  backgroundColor: COLORS.blue50,
+})
 
-const DECK_LABEL_UNSELECTED_STYLE = (
+const getUnselectedDeckLabelStyle = (
   maxWidth: string,
   labelBorderRadius?: string,
   isLast?: boolean
-): FlattenSimpleInterpolation => css`
-  ${DECK_LABEL_BASE_STYLE(maxWidth, labelBorderRadius)}
-  color: ${COLORS.blue50};
-  border-right: 1.5px solid ${COLORS.blue50};
-  border-bottom: 1.5px solid ${COLORS.blue50};
-  border-left: 1.5px solid ${COLORS.blue50};
-  background-color: ${COLORS.white};
-  border-radius: ${isLast ? labelBorderRadius : '0'};
-`
+): CSSProperties => ({
+  ...getBaseDeckLabelStyle(maxWidth, labelBorderRadius),
+  color: COLORS.blue50,
+  borderRight: `1.5px solid ${COLORS.blue50}`,
+  borderBottom: `1.5px solid ${COLORS.blue50}`,
+  borderLeft: `1.5px solid ${COLORS.blue50}`,
+  backgroundColor: COLORS.white,
+  borderRadius: isLast ? labelBorderRadius : '0',
+})
